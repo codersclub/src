@@ -1,0 +1,257 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<TABLE align=center border=0 width="100%">
+  <TBODY>
+  <TR>
+    <TD height=71 width="11%">&nbsp;</TD>
+    <TD align=middle height=71 vAlign=bottom width="79%">
+      <B>Visual C++ / FAQ Part 4</B>
+    </TD>
+    <TD height=71 width="10%">&nbsp;</TD>
+  </TR>
+  <TR>
+    <TD height=18 width="11%">&nbsp;</TD>
+    <TD height=18 width="79%">
+      <HR align=center width="100%">
+    </TD>
+    <TD height=18 width="10%">&nbsp;</TD>
+  </TR>
+
+  <TR>
+    <TD height=83 noWrap width="11%">&nbsp;</TD>
+    <TD align=left height=83 vAlign=center width="79%">
+
+      <A name=1></A><IMG height=7 src="active.gif" width=7> 
+      <B>Как убрать кнопку с TaskBar'а?</B>
+      <BR>
+	С помощью Win32 API это можно сделать следующими способами:
+      <BR>
+      <BR>
+	1) Создать окно не имеющее владельца (<U>unowned</U>),
+	указав расширенный стиль WS_EX_TOOLWINDOW.
+	<BR>
+	<B>Недостаток:</B>
+	данный способ изменит вид заголовка окна.
+	<BR><BR>
+
+	2) С помощью интерфейса ITaskbarList.
+<PRE>MSDN: <B>The ITaskbarList interface is used to control the taskbar.
+      It allows you to dynamically add items to the taskbar,
+      remove items from the taskbar, and activate items on the taskbar.</B>
+</PRE>
+	Пример использования:
+<PRE><B>#include &lt;windows.h&gt;
+#include &lt;tchar.h&gt;
+#include &lt;shobjidl.h&gt;
+#include "resource.h"
+
+LRESULT CALLBACK WndProc(HWND,UINT,WPARAM,LPARAM); 
+
+int WINAPI WinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPSTR IpszCmdParam,int nCmdShow)
+{
+    //инициализируем библиотеку COM
+    CoInitialize(0);
+    //регестрируем класс окна
+    WNDCLASS WndClass;
+    WndClass.style = CS_HREDRAW | CS_VREDRAW;
+    WndClass.lpfnWndProc = WndProc;
+    WndClass.cbClsExtra = 0;
+    WndClass.cbWndExtra = 0;
+    WndClass.hInstance = hInstance;
+    WndClass.hIcon = LoadIcon (NULL,IDI_WARNING);
+    WndClass.hCursor = LoadCursor (NULL, IDC_ARROW);
+    WndClass.hbrBackground = (HBRUSH)(COLOR_WINDOW+11);
+    WndClass.lpszMenuName = MAKEINTRESOURCE(IDR_MENU1);
+    WndClass.lpszClassName = _T("ITaskBarList");
+    if(!RegisterClass(&WndClass))
+        return 0;
+    //создаём окно
+    HWND hWnd = CreateWindow(WndClass.lpszClassName, _T("ITaskBarList"), 
+        WS_OVERLAPPEDWINDOW, 
+        CW_USEDEFAULT,CW_USEDEFAULT, 
+        CW_USEDEFAULT, CW_USEDEFAULT,
+        GetDesktopWindow(), NULL, 
+        hInstance, NULL); 
+    ShowWindow(hWnd,nCmdShow); 
+    UpdateWindow(hWnd);
+    MSG Msg;
+    while(GetMessage(&Msg, NULL, 0, 0))
+    {
+        TranslateMessage(&Msg); 
+        DispatchMessage(&Msg); 
+    }
+    ::CoUninitialize();
+    return (int)Msg.wParam; 
+}
+
+LRESULT CALLBACK WndProc(HWND hWnd,UINT uMsg,WPARAM wParam,LPARAM lParam)
+{
+    switch(uMsg)
+    {
+    case WM_COMMAND:
+        //обработчик кнопки delete меню окна 
+        if(LOWORD(wParam)==IDM_DELETETAB)
+        {
+            ITaskbarList* pTaskbarList;
+            //создаём объект
+            HRESULT hRes=::CoCreateInstance(CLSID_TaskbarList,NULL,
+                CLSCTX_INPROC_SERVER,IID_ITaskbarList,(LPVOID*)&pTaskbarList);
+            if(hRes==S_OK)
+                //инициализируем объект
+                if(pTaskbarList->HrInit()==S_OK)
+                    //удаляем кнопку. Здесь идентификатором кнопки является хендл окна-владельца
+                    if(pTaskbarList->DeleteTab(hWnd)!=S_OK)
+                        break;
+            ::MessageBox(hWnd,_T("Ошибка удаления"),0,0);
+        }
+        break;
+    case WM_DESTROY:
+        ::PostQuitMessage(0);
+        break;
+    }
+    return ::DefWindowProc(hWnd,uMsg,wParam,lParam);
+}
+///////////фаил ресурсов//////////////////////////////////////////////////////
+
+#define IDR_MENU1                       101
+#define IDM_DELETETAB                   40001
+
+//
+// Menu
+//
+
+IDR_MENU1 MENU 
+BEGIN
+    POPUP "menu"
+    BEGIN
+        MENUITEM "deletetab",                   40001
+    END
+END</B></PRE>
+
+	<B>Недостаток:</B> при перезапуске эксплорера кнопка вернётся на таскбар.
+<BR><BR>
+
+	3) Пожалуй самый верный способ скрытия кнопки, при котором окно
+	 приложения не изменит вид:
+<PRE>MSDN: <B>As an alternative, you can create a hidden window
+      and make this hidden window the owner of your visible window.</B>
+</PRE>
+	То есть необходимо создать скрытое <I>unowned</I> окно,
+	которое будет владельцем для остальных окон приложения.
+<BR>
+	Это вытекает из того, что кнопка на TaskBar'е соответствует
+	только видимому <I>unowned</I> окну приложения.
+<BR>
+	<B>Недостаток:</B> необходимость дополнительного окна.
+
+      <BR><BR>
+
+      <A name=2></A><IMG height=7 src="active.gif" width=7> 
+      <B>Как определить позицию курсора в консоли Win32?</B> <PRE><TT><B>
+  CONSOLE_SCREEN_BUFFER_INFO bi;
+  GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), bi);
+  // bi.dwCursorPosition - кооpдинаты куpсоpа
+</B></TT></PRE></FONT><A name=3></A><IMG height=7 
+      src="active.gif" width=7> 
+      <B>Как очистить экран в консоли Win32?</B><BR>Можно 
+      использовать функцию ScrollConsoleScreenBuffer или следующий код: <PRE><TT><B>
+  COORD c;
+  c.X = 0;
+  c.Y = 0;
+  CONSOLE_SCREEN_BUFFER_INFO bi;
+  DWORD written;
+  GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), bi);
+  FillConsoleOutputCharacter(GetStdHandle(STD_OUTPUT_HANDLE), ' ',
+bi.dwSize.X*bi.dwSize.Y, c, written);
+  FillConsoleOutputAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_RED |
+FOREGROUND_GREEN | FOREGRUND_BLUE /*цвет*/, bi.dwSize.X*bi.dwSize.Y, c,written);
+</B></TT></PRE></FONT><A name=4></A><IMG height=7 
+      src="active.gif" width=7> 
+      <B>Как узнать количество элементов и размер корзины? Как очистить 
+      корзину?</B><BR><PRE><TT><B>
+//Очищает корзину на указанном диске
+SHSTDAPI SHEmptyRecycleBin(
+    HWND hwnd,
+    LPCTSTR pszRootPath,
+    DWORD dwFlags);
+
+//Получает размер и количество элементов в корзине
+SHSTDAPI SHQueryRecycleBin(
+    LPCTSTR pszRootPath,
+    LPSHQUERYRBINFO pSHQueryRBInfo);
+</B></TT></PRE></FONT><A name=5></A><IMG height=7 
+      src="active.gif" width=7> 
+      <B>Как получить список все запущенных процессов и потоков?</B><BR>Для Windows 9x используйте CreateToolhelp32Snapsot/ 
+      Process32First(Process32Next)/ Thread32First(Thread32Next).<BR>Для WinNT 
+      NTQuerySystemInformation. А можно так: получаете список окон в системе 
+      (каким угодно способом, если нужны только процессы - можно ограничиться 
+      top-level), далее - GetWindowTreadProcessID - получаете ID процесса (и 
+      нити). OpenProcess - дает handle процесса. </FONT><BR><BR><A 
+      name=6></A><IMG height=7 
+      src="active.gif" width=7> 
+      <B>Какие существуют функции для работы с COM-портом напрямую под 
+      Win9x?</B><BR>Посмотрите функции: <PRE><TT><B>
+BuildCommDCB
+BuildCommDCBAndTimeouts
+ClearCommBreak
+ClearCommError
+CommConfigDialog
+EscapeCommFunction
+GetCommConfig
+GetCommMask
+GetCommModemStatus
+GetCommProperties
+GetCommState
+GetCommTimeouts
+GetDefaultCommConfig
+PurgeComm
+SetCommBreak
+SetCommConfig
+SetCommMask
+SetCommState
+SetCommTimeouts
+SetDefaultCommConfig
+SetupComm
+TransmitCommChar
+WaitCommEvent
+</B></TT></PRE></FONT><A name=7></A><IMG height=7 
+      src="active.gif" width=7> 
+      <B>Как завесить Windows?</B><BR>1. Сделать файл 
+      system.ini больше, чем 64К. Вешается при загрузке.<BR>2. Вызвать 
+      код:<BR>cli<BR>jmp $</FONT><BR><BR><A name=8></A><IMG height=7 
+      src="FAQ Part 4-Visual C++ -- ProtoSphere.files/active.gif" width=7> 
+      <B>Как получить hInstance консольного приложения?</B><BR>GetModuleHandle(NULL) ;</FONT> <BR><BR><A name=9></A><IMG 
+      height=7 src="active.gif" 
+      width=7> <B>Чем отличается PID от hInstance?</B><BR>PID - уникальный идентификатор объекта ядра - процесса 
+      <BR>Inst - (упрощенно) указатель на область памяти, куда загружен 
+      экземпляр модуля (экзешника, dll-ки)<BR><BR></FONT><A name=10></A><IMG 
+      height=7 src="active.gif" 
+      width=7> <B>Как установить обои на Рабочий Стол?</B><BR>SystemParametrsInfo(SPI_SETDESKWALLPAPER,0,'обои.bmp',SPIF_UPDATEINIFILE); 
+      </FONT></FONT></TD>
+    <TD height=83 width="10%">&nbsp;</TD></TR>
+  <TR>
+    <TD width="11%">&nbsp;</TD>
+    <TD vAlign=center width="79%">
+      <HR align=center width="100%">
+      <FONT color=#ffffff face="Arial, Helvetica, sans-serif" size=1>
+      <CENTER><A href="mailto:protosphere@tronet.troitsk.ru"></A>
+      <TABLE border=0 width="100%">
+        <TBODY>
+        <TR>
+          <TD height=2 width="25%"><FONT 
+            face="Arial, Helvetica, sans-serif" size=1><A 
+            href="faq3.shtml">Prev. 
+            Part</A></FONT></TD>
+          <TD align=middle height=2 vAlign=center width="50%"><FONT 
+            face="Arial, Helvetica, sans-serif" size=1><A href="cpp_faqindex.shtml"> FAQ 
+            Индекс </A> 
+            </FONT></TD>
+          <TD height=2 width="25%"><FONT color=#ffffff 
+            face="Arial, Helvetica, sans-serif" size=1>
+            <CENTER></CENTER>
+            <DIV align=right><A 
+            href="faq5.shtml">Next 
+            Part</A></DIV></FONT></TD></TR></TBODY></TABLE></CENTER></FONT></TD>
+    <TD width="10%">&nbsp;</TD></TR></TBODY></TABLE>
+<!--#include virtual="/ssi/bottom.html"-->

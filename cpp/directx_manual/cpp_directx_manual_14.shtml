@@ -1,0 +1,1248 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <p><font face="Arial" size="6"><b>Глава 11 Клипы</b></font></p>
+    <hr>
+    <p><font face="Times New Roman" size="2">Кнастоящему моменту мы
+    знаем почти все, что необходимо для создания
+    собственного трехмерного приложения. Остается
+    лишь упомянуть о нескольких малосущественных
+    подробностях, однако в основном мы будем
+    применять уже известные знания для разработки
+    яового приложения.</font> </p>
+    <p><font face="Times New Roman" size="2">В этой главе мы рассмотрим
+    пару способов для создания клипов. Первый
+    заключается в покадровой съемке макета, а второй
+    - в запоминании положения и ориентации
+    движущейся фигуры. У каждого способа есть как
+    свои достоинства, так и недостатки, поэтому я
+    опишу оба, чтобы вы могли выбрать тот, который
+    лучше подходит для ваших целей. Приложение для
+    этой главы находится в каталоге Movie.</font> </p>
+    <p><font face="Arial" size="4"><b>Покадровая съемка</b></font> </p>
+    <p><font face="Times New Roman" size="2">На память мне приходит
+    анекдот времен моего детства, которым я поделюсь
+    с вами, хочется вам того или нет. Известный
+    режиссер снимает в пустыне фильм о ковбоях.
+    Тысячи статистов, томящихся под палящим солнцем,
+    готовы к участию в грандиозной массовой сцене. На
+    вершинах трех холмов стоят камеры, которые
+    должны запечатлеть происходящее в различных
+    ракурсах. Режиссер дает сигнал, статисты
+    бросаются в бой. После завершения сцены режиссер
+    спрашивает операторов, нормально ли прошла
+    съемка. Первый оператор отвечает, что у него в
+    камере заело пленку и он пропустил всю сцену.
+    Второй говорит, что его камеру окутало облако
+    пыли и ему удалось отснять всего несколько
+    секунд. Третий оператор молчит. Режиссер кричит:
+    &lt;Эй, там, третья камера! Как дела?&gt; Оператор
+    отвечает: &lt;Все готово, можно снимать!&gt;</font> </p>
+    <p><font face="Times New Roman" size="2">Концепция покадровой
+    съемки достаточно проста: при каждом перемещении
+    и обсчете макета мы захватываем изображение на
+    экране и сохраняем его в списке. Затем клип
+    воспроизводится путем последовательного
+    копирования на экран изображений из списка. Если
+    результат нас устраивает, список сохраняется в
+    файле в формате, который может быть использован
+    другой программой. Полная последовательность
+    действий такова:</font> </p>
+    <p><font face="Times New Roman" size="2">1. Подготовить пустой
+    список изображений.</font> </p>
+    <p><font face="Times New Roman" size="2">2. Сохранить текущую
+    палитру (для 256-цветной видеосистемы).</font> </p>
+    <p><font face="Times New Roman" size="2">3. Сохранить текущий размер
+    трехмерного окна.</font> </p>
+    <p><font face="Times New Roman" size="2">4. Переместить объекты
+    макета в новое положение.</font> </p>
+    <p><font face="Times New Roman" size="2">5. Воспроизвести макет во
+    вторичном буфере.</font> </p>
+    <p><font face="Times New Roman" size="2">6. Сохранить содержимое
+    вторичного буфера.</font> </p>
+    <p><font face="Times New Roman" size="2">7. Включить полученное
+    изображение в список.</font> </p>
+    <p><font face="Times New Roman" size="2">8. Повторить нужное
+    количество раз, начиная с шага 4.</font> </p>
+    <p><font face="Times New Roman" size="2">Перед тем как приступать к
+    изучению программы, реализующей этот алгоритм, я
+    должен предупредить вас, что он быстро поглощает
+    системную память. Например, давайте представим,
+    что у нас имеется окно размером 320х200 пикселей на
+    256-цветном дисплее. На каждое изображение
+    потребуется 76,800 байт.</font> </p>
+    <p><font face="Arial" size="2">Покадровая съемка '''^Ц'<b> 251</b></font>
+    </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">Если съемка будет
+    производиться с частотой 10 кадров в секунду (fps),
+    то за 10 секунд будет израсходовано 7,680,000 байт
+    памяти (не считая накладных расходов по ведению
+    списка, заголовков изображений и т. д.). При
+    запуске приложения следует приготовиться к тому,
+    что после исчерпания всей свободной памяти ваш
+    диск начнет быстро заполняться. Разумеется,
+    существует несколько способов выйти из
+    положения - например, сжимать графические данные
+    или непосредственно записывать изображения в
+    файл на диске, однако мы рассмотрим их позднее. А
+    пока давайте посмотрим, как же выполняется
+    простейшая покадровая съемка.</font> </p>
+    <p><font face="Arial" size="3"><b>Классы для работы с клипами</b></font>
+    </p>
+    <p><font face="Times New Roman" size="2">Я включил в библиотеку 3dPlus
+    три класса, предназначенных для записи клипов.
+    Объекты CMovieFrame используются для хранения
+    отдельных кадров, объекты класса CMovieTake - для
+    хранения палитры и списка кадров (одного
+    эпизода), а объекты CMovie - для хранения целого
+    клипа (который теоретически может состоять из
+    нескольких эпизодов). Тем не менее, в отличие от
+    режиссера из анекдота, мы снимаем все с первого
+    раза, так что объект CMovie будет содержать только
+    один объект CMovieTake.</font> </p>
+    <p><font face="Times New Roman" size="2">Наиболее интересные
+    фрагменты приложения Movie связаны с сохранением
+    текущей палитры 256-цветного дисплея и записью
+    изображения из вторичного буфера.</font> </p>
+    <p><font face="Arial" size="3"><b>Сохранение палитры</b></font> </p>
+    <p><font face="Times New Roman" size="2">Если на вашем дисплее
+    отводится более 8 бит на пиксель, то никакой
+    палитры у вас нет и вы можете пропустить этот
+    раздел. Тем не менее, поскольку 256-цвет-ные
+    видеосистемы до сих пор остаются самыми
+    распространенными, вполне вероятно, что умение
+    сохранять палитру вам все же пригодится.</font> </p>
+    <p><font face="Times New Roman" size="2">Для ускорения процесса
+    сохранения палитры я буду предполагать, что во
+    время съемки палитра не изменяется. Такое
+    предположение справедливо, если механизм
+    визуализации работает в RGB-режиме, использующем
+    постоянную палитру, но не в монохромном режиме, в
+    котором элементы палитры могут изменяться при
+    необходимости. Однако в простейших случаях
+    объекты эволюционируют незначительно, и палитра
+    остается достаточно стабильной. Следовательно,
+    однократное сохранение палитры выглядит
+    достаточно разумно. Пожалуй, аргумент получился
+    не очень убедительным, но, с другой стороны, для
+    воспроизведения клипа с приемлемым качеством мы
+    просто не можем себе позволить отдельную палитру
+    для каждого кадра. Реализация новой палитры в
+    Microsoft Windows происходит слишком медленно и, кстати
+    говоря, довольно скверно выглядит.</font> </p>
+    <p><font face="Times New Roman" size="2">На проблеме только одной
+    палитры хлопоты не кончаются. Нам понадобится
+    особая разновидность палитры, которая
+    называется идентичной палитрой (identity palette) и
+    точно совпадает с текущей системной палитрой.
+    Идентичная палитра позволяет напрямую
+    копировать растровое изображение в видеопамять,
+    обходясь без преобразования цветов.
+    Преобразование цветового индекса каждого
+    пикселя растра в цветовой индекс физической
+    палитры происходит чрезвычайно медленно. Более
+    подробно этот вопрос рассмотрен в книге<ANIMATION Win32 in Techniques> (Thomson,
+    Microsoft Press, 1995).</font> </p>
+    <p><font face="Times New Roman" size="2">Раз нам приходится
+    работать с одной палитрой, будет вполне логично
+    сохранить ее в начале съемки клипа. Давайте
+    посмотрим, как это делается. Начнем с</font> </p>
+    <p><font face="Arial" size="2"><b>252</b> ИЦГ Глава 11. Клипы</font> </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">delete pip;</font> </p>
+    <p><font face="Times New Roman" size="2">return pPal;</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Times New Roman" size="2">Для получения цветов
+    палитры от интерфейса используется структура
+    LOGPALETTE; они передаются приложению в объекте CPalette.
+    Класс CPalette, входящий в библиотеку MFC, хорошо
+    подходит для хранения набора цветов; мы убедимся
+    в этом, когда будем рассматривать
+    воспроизведение клипа в окне приложения.</font> </p>
+    <p><font face="Times New Roman" size="2">Функция класса CMovie,
+    запрашивающая палитру у объекта DirectDraw в начале
+    съемки, выглядит следующим образом:</font> </p>
+    <p><font face="Times New Roman" size="2">BOOL CMovie::Record() {</font> </p>
+    <p><font face="Times New Roman" size="2">Stop () ;</font> </p>
+    <p><font face="Times New Roman" size="2">// Удалить все, что было
+    записано ранее m Take.DeleteAll();</font> </p>
+    <p><font face="Times New Roman" size="2">m iCurFrame =0;</font> </p>
+    <p><font face="Times New Roman" size="2">// Сохранить текущую
+    палитру ASSERT(m_p3dWnd) ;</font> </p>
+    <p><font face="Times New Roman" size="2">CDirectDraw* pDD = m_p3dWnd-&gt;GetDD () ;</font>
+    </p>
+    <p><font face="Times New Roman" size="2">ASSERT(pDD) ;</font> </p>
+    <p><font face="Times New Roman" size="2">m_Take. SetPalette (pDD-&gt;GrabPalette () ) ;</font>
+    </p>
+    <p><font face="Times New Roman" size="2">// Сохранить размер кадра
+    CRect re;</font> </p>
+    <p><font face="Times New Roman" size="2">m_p3dWnd-&gt;GetClientRect (&amp;rc) ;</font> </p>
+    <p><font face="Times New Roman" size="2">m_Take.SetSize(re.Width(), re.Height()) ;</font> </p>
+    <p><font face="Times New Roman" size="2">// Начать запись m_b!sRecording =
+    TRUE;</font> </p>
+    <p><font face="Times New Roman" size="2">return TRUE;</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Times New Roman" size="2">Как нетрудно убедиться,
+    палитра сохраняется в текущем (и только в
+    текущем!) объекте класса CMovieTakenpH помощи функции
+    CMovieTake::SetPalette. Кроме того, мы сохраняем размер
+    клиентной области текущего окна. Запись кадров
+    происходит во время пассивной работы приложения.</font>
+    </p>
+    <p><font face="Arial" size="4"><b>Запись изображений из буфера</b></font>
+    </p>
+    <p><font face="Times New Roman" size="2">Захват изображения из
+    буфера визуализации - задача достаточно сложная,
+    поскольку при этом необходимо учесть множество
+    разных тонкостей. Ниже приведен фрагмент функции
+    CMovie::Update, вызываемой в цикле пассивной работы
+    приложения для записи кадров по воспроизводимым
+    изображениям.</font> </p>
+    <p><font face="Arial" size="2"><b>254</b> <i>ШУ</i> Глава 11. Клипы</font> </p>
+    <hr>
+    <p align="center"><font face="Courier New" size="2">// Получить указатель
+    на объект DirectDraw в трехмерном</font> </p>
+    <p><font face="Courier New" size="2">окне</font> </p>
+    <p><font face="Courier New" size="2">ASSERT(m_p3dWnd) ;</font> </p>
+    <p><font face="Courier New" size="2">CDirectDraw* pDD = m_p3dWnd-&gt;GetDD () ;</font> </p>
+    <p><font face="Courier New" size="2">ASSERT(pDD) ;</font> </p>
+    <p><font face="Courier New" size="2">// Получить текущее
+    изображение BITMAPINFO* pBMI = NULL;</font> </p>
+    <p><font face="Courier New" size="2">BYTE* pBits = NULL;</font> </p>
+    <p><font face="Courier New" size="2">HBITMAP hBmp = pDD-&gt;GrabImage (&amp;pBMI,
+    (void**)&amp;pBits);</font> </p>
+    <p><font face="Courier New" size="2">ASSERT(hBmp) ;</font> </p>
+    <p><font face="Courier New" size="2">ASSERT(pBMI) ;</font> </p>
+    <p><font face="Courier New" size="2">ASSERT(pBits) ;</font> </p>
+    <p><font face="Courier New" size="2">// Создать кадр клипа</font> </p>
+    <p><font face="Courier New" size="2">CMovieFrame* pFrame = new CMovieFrame(hBmp, pBMI,</font>
+    </p>
+    <p><font face="Courier New" size="2">pBits) ;</font> </p>
+    <p><font face="Courier New" size="2">// Включить кадр в эпизод
+    m_Take.AddTail(pFrame) ;</font> </p>
+    <p><font face="Courier New" size="2">m iCurFrame++;</font> </p>
+    <p><font face="Times New Roman" size="2">По сути дела в данном
+    фрагменте мы запрашиваем изображение у объекта
+    DirectDraw, создаем новый объект CMovieFrame,
+    инкапсулирующий полученное изображение, и
+    добавляем его в конец списка кадров текущего
+    эпизода.</font> </p>
+    <p><font face="Times New Roman" size="2">Каждый кадр представляет
+    собой область памяти, которая называется секцией
+    аппаратно-независимого растра (device-independent bitmap
+    section, или сокращенно DIB-секция). DIB-секцию можно
+    использовать в качестве растра Windows (при помощи
+    связанного с ней логического номера HBITMAP) и
+    напрямую записывать в нее данные через
+    указатель. Вскоре мы увидим, как создается
+    DIB-секция, а пока следует обратить внимание на то,
+    что переменные hBmp, pBMI и pBits, содержащиеся в
+    приведенном выше фрагменте, связаны с той или
+    иной частью полученного изображения. Данное
+    обстоятельство может привести к определенным
+    затруднениям при попытке освободить память,
+    выделенную под DIB-секцию. Для этого необходимо
+    вызвать функцию ::DeleteObject для логического номера
+    HBITMAP (hBmp), не пытаясь удалить данные по указателю
+    pBits. Указатель pBMI ссылается на заголовочный блок,
+    который должен удаляться отдельно от
+    графических данных растра. Кому-то все это
+    покажется неоправданно усложненным, однако к
+    DIB-секции можно обращаться несколькими
+    способами, и все выше указанные переменные
+    необходимы для эффективной работы с ней.</font> </p>
+    <p><font face="Times New Roman" size="2">Функция CDirectDraw::Grablmage
+    выглядит значительно сложнее, поскольку ей
+    приходится поддерживать различные форматы
+    буфера. В общих чертах процесс выглядит примерно
+    так: мы получаем описание типа буфера, создаем
+    структуру типа BITMAPINFO для описания DIB-секции,
+    создаем DIB-секцию, затем задаем маски сдвига и
+    наконец копируем графические данные. При этом
+    возникают определенные сложности, поскольку
+    формат пикселей поверхностей DirectDraw не всегда
+    совпадает с форматом пикселей DIB-секции; а
+    следовательно, нам при-</font> </p>
+    <p><font face="Arial" size="2">Покадровая съемка ''Д1<b> 255</b></font> </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">дется маскировать и
+    сдвигать цветовые компоненты пикселей, чтобы
+    обеспечить их соответствие формату DIB-секции.</font>
+    </p>
+    <p><font face="Times New Roman" size="2">Полагаю, я достаточно
+    подготовил вас. Ниже приведена функция, которая
+    получает изображение из буфера:</font> </p>
+    <p><font face="Times New Roman" size="2">// Получить текущее
+    изображение из буфера.</font> </p>
+    <p><font face="Times New Roman" size="2">// Если функция возвращает
+    информационный заголовок</font> </p>
+    <p><font face="Times New Roman" size="2">// или графические данные,
+    вызывающая функция должна</font> </p>
+    <p><font face="Times New Roman" size="2">// освобождать
+    соответствующую память вызовами delete pBMI</font> </p>
+    <p align="center"><font face="Times New Roman" size="2">// и ::DeleteObject(hBmp). Не
+    пытайтесь применять delete</font> </p>
+    <p><font face="Times New Roman" size="2">// к графическим данным,
+    поскольку они принадлежат</font> </p>
+    <p><font face="Times New Roman" size="2">// объекту-растру.</font> </p>
+    <p><font face="Times New Roman" size="2">HBITMAP CDirectDraw::GrabImage(BITMAPINFO**
+    ppBMI,</font> </p>
+    <p><font face="Times New Roman" size="2">void** ppBits) {</font> </p>
+    <p><font face="Times New Roman" size="2">// Задать исходные
+    значения, возвращаемые функцией</font> </p>
+    <p><font face="Times New Roman" size="2">if (ppBMI) *ppBMI= NULL;</font> </p>
+    <p><font face="Times New Roman" size="2">if (ppBits) *ppBits <i>=</i> NULL;</font> </p>
+    <p><font face="Times New Roman" size="2">if (!m_pBackBuffer) return NULL;</font> </p>
+    <p><font face="Times New Roman" size="2">// Заблокировать вторичный
+    буфер, чтобы получить</font> </p>
+    <p><font face="Times New Roman" size="2">// его описание.</font> </p>
+    <p><font face="Times New Roman" size="2">// ВНИМАНИЕ: вы не сможете
+    осуществить пошаговое</font> </p>
+    <p><font face="Times New Roman" size="2">// выполнение</font> </p>
+    <p><font face="Times New Roman" size="2">// этого фрагмента в
+    отладчике - поверхность GDI</font> </p>
+    <p><font face="Times New Roman" size="2">// блокируется.</font> </p>
+    <p><font face="Times New Roman" size="2">LPDIRECTDRAWSURFACE iS =
+    m_pBackBuffer-&gt;GetInterface () ;</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT;iS) ;</font> </p>
+    <p><font face="Times New Roman" size="2">DDSURFACEDESC ds;</font> </p>
+    <p><font face="Times New Roman" size="2">ds.dwSize = sizeof(ds);</font> </p>
+    <p><font face="Times New Roman" size="2">m_hr = i3-&gt;Lock(NULL,</font> </p>
+    <p><font face="Times New Roman" size="2">&amp;ds,</font> </p>
+    <p><font face="Times New Roman" size="2">DDLOCK_WAIT,</font> </p>
+    <p><font face="Times New Roman" size="2">NULL) ;</font> </p>
+    <p><font face="Times New Roman" size="2">if (m_hr != DD_OK) {</font> </p>
+    <p><font face="Times New Roman" size="2">TRACE(&quot;Failed to lock surface\n&quot;);</font>
+    </p>
+    <p><font face="Times New Roman" size="2">return NULL; // Failed to lock surface }</font> </p>
+    <p><font face="Times New Roman" size="2">// Разблокировать
+    поверхность, чтобы можно было // воспользоваться
+    отладчиком //и при необходимости выйти из
+    приложения m_hr = m_pBackBuffer-&gt;GetInterface()-&gt;Unlock(ds.lpSurface) ;</font>
+    </p>
+    <p><font face="Times New Roman" size="2">// Убедиться, что
+    поверхность относится к одному</font> </p>
+    <p><font face="Times New Roman" size="2">// из типов,</font> </p>
+    <p><font face="Times New Roman" size="2">// с которыми мы можем
+    работать.</font> </p>
+    <p><font face="Times New Roman" size="2">// Примечание: программа
+    обрабатывает только</font> </p>
+    <p><font face="Arial" size="2"><b>256</b> ЯИЦ1 Глава 11. Клипы</font> </p>
+    <hr>
+    <p><font face="Courier New" size="2">// поверхности с 8-,</font> </p>
+    <p><font face="Courier New" size="2">// 16- и 24-битной кодировкой
+    пикселей.</font> </p>
+    <p><font face="Courier New" size="2">if (!(ds.ddpfPixelFormat.dwFlags &amp;
+    DDPF_PALETTEINDEXED8) &amp;&amp; '(ds.ddpfPixelFormat.dwFlags &amp; DDPF_RGB)) { return
+    NULL; // Формат не поддерживается программой</font> </p>
+    <p><font face="Courier New" size="2">} int iBitCount;</font> </p>
+    <p><font face="Courier New" size="2">if (ds.ddpfPixelFormat.dwFiags &amp;
+    DDPF_PALETTEINDEXED8) {</font> </p>
+    <p><font face="Courier New" size="2">iBitCount = 8;</font> </p>
+    <p><font face="Courier New" size="2">} else if (ds.ddpfPixelFormat.dwFlags &amp; DDPF_RGB)
+    {</font> </p>
+    <p><font face="Courier New" size="2">// Проверить поверхность на
+    допустимость типа</font> </p>
+    <p><font face="Courier New" size="2">// цветовой кодировки
+    пикселей</font> </p>
+    <p><font face="Courier New" size="2">iBitCount = ds.ddpfPixel Format.dwRGBBitCount;</font>
+    </p>
+    <p><font face="Courier New" size="2">if ((iBitCount != 16) &amp;&amp; (iBitCount != 24)) (
+    return NULL; // He поддерживается программой</font> </p>
+    <p><font face="Courier New" size="2">}</font> </p>
+    <p><font face="Courier New" size="2">}</font> </p>
+    <p><font face="Courier New" size="2">ASSERT(ds.dwFlags &amp; DDSD_WIDTH);</font> </p>
+    <p><font face="Courier New" size="2">int iWidth <i>=</i> ds.dwWidth;</font> </p>
+    <p><font face="Courier New" size="2">ASSERT(ds.dwFlags &amp; DDSD_HEIGHT) ;</font> </p>
+    <p><font face="Courier New" size="2">int iHeight <i>=</i> ds.dwHeight;</font> </p>
+    <p><font face="Courier New" size="2">// Проверить, нужно ли
+    создавать цветовую таблицу int iCIrTabEntries = 0;</font> </p>
+    <p><font face="Courier New" size="2">if (ds.ddpfPixelFormat.dwFlags &amp;
+    DDPF_PALETTEINDEXED8</font> </p>
+    <p><font face="Courier New" size="2">// Построить цветовую таблицу
+    iCIrTabEntries = 256;</font> </p>
+    <p><font face="Courier New" size="2">iBitCount = 8;</font> </p>
+    <p><font face="Times New Roman" size="2">// Создать структуру BITMAPINFO,
+    описывающую растр int iSize = sizeof(BITMAPINFO) + iCIrTabEntries *
+    sizeof(RGBQUAD) ;</font> </p>
+    <p><font face="Times New Roman" size="2">BITMAPINFO* pBMI = (BITMAPINFO*) new BYTE[iSize];</font>
+    </p>
+    <p><font face="Times New Roman" size="2">memsetfpBMI, 0, iSize);</font> </p>
+    <p><font face="Times New Roman" size="2">pBMI-&gt;bmiHeader.biSize =
+    sizeof(BITMAPINFOHEADER);</font> </p>
+    <p><font face="Times New Roman" size="2">pBMI-&gt;bmiHeader.biWidth = iWidth;</font> </p>
+    <p><font face="Times New Roman" size="2">pBMI-&gt;bmiHeader.biHeight = iHeight;</font> </p>
+    <p><font face="Times New Roman" size="2">pBMI-&gt;bmiHeader. biPlanes = 1;</font> </p>
+    <p><font face="Times New Roman" size="2">pBMI-&gt;bmiHeader.biBitCount = iBitCount;</font>
+    </p>
+    <p><font face="Times New Roman" size="2">pBMI-&gt;bmiHeader.biClrUsed <i>=</i>
+    iCIrTabEntries;</font> </p>
+    <p><font face="Times New Roman" size="2">HOC hdcScreen = ::GetDC(NULL) ;</font> </p>
+    <p><font face="Times New Roman" size="2">// Создать цветовую
+    таблицу, если необходимо if (iCIrTabEntries &gt; 0) (</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT(iClrTabEntries&lt;= 256);</font> </p>
+    <p><font face="Times New Roman" size="2">PALETTEENTRY ре[256];</font> </p>
+    <p><font face="Arial" size="2">Покадровая съемка ''illi'<b> 257</b></font>
+    </p>
+    <hr>
+    <p><font face="Arial" size="2">ASSERT(m_pPalette) ;</font> </p>
+    <p><font face="Arial" size="2">m_pPalette-&gt;GetInterface () -&gt;GetEntries (0, 0,</font>
+    </p>
+    <p><font face="Arial" size="2">iCIrTabEntries, pe) ;</font> </p>
+    <p><font face="Arial" size="2">for (int i = 0; i &lt; iCIrTabEntries; i++) (
+    pBMI-&gt;bmiColors [i] .rgbRed = pe[i].peRed;</font> </p>
+    <p align="center"><font face="Arial" size="2">pBMI-&gt;bmiColors [i] .rgbGreen =
+    pe[i].peGreen;</font> </p>
+    <p align="center"><font face="Arial" size="2">pBMI-&gt;bmiColors [i] .rgbBlue =
+    pe[i].peBlue;</font> </p>
+    <p><font face="Arial" size="2">} &gt;</font> </p>
+    <p><font face="Courier New" size="2">// Создать DIB-секцию, размер
+    которой</font> </p>
+    <p><font face="Courier New" size="2">// совпадает с размером
+    вторичного буфера</font> </p>
+    <p><font face="Courier New" size="2">BYTE* pBits = NULL;</font> </p>
+    <p><font face="Courier New" size="2">HBITMAP hBmp = ::CreateDIBSection(hdcScreen, pBMI,</font>
+    </p>
+    <p><font face="Courier New" size="2">DIB_RGB_COLORS, (VOID**)&amp;pBits, NULL, 0);</font> </p>
+    <p><font face="Courier New" size="2">::ReleaseDC(NULL, hdcScreen);</font> </p>
+    <p><font face="Courier New" size="2">if (!hBmp) { delete pBMI;</font> </p>
+    <p><font face="Courier New" size="2">return NULL;</font> </p>
+    <p><font face="Courier New" size="2">}</font> </p>
+    <p><font face="Courier New" size="2">ASSERT(pBits) ;</font> </p>
+    <p align="center"><font face="Courier New" size="2">// Скопировать
+    графические данные на поверхность DIB</font> </p>
+    <p><font face="Courier New" size="2">int iDIBScan =</font> </p>
+    <p><font face="Courier New" size="2">( ( (pBMI-&gt;bmiHeader.biWidth</font> </p>
+    <p><font face="Courier New" size="2">* pBMI-&gt;bmiHeader.biBitCount) + 31) &amp; -31)
+    &gt;&gt; 3;</font> </p>
+    <p><font face="Courier New" size="2">int iSurfScan = ds.lPitch;</font> </p>
+    <p><font face="Courier New" size="2">BYTE* pDIBLine = pBits + (iHeight - 1) * iDIBScan;</font>
+    </p>
+    <p><font face="Courier New" size="2">BYTE* pSurfLine = (BYTE*)ds.IpSurface;</font> </p>
+    <p><font face="Courier New" size="2">// Сдвигать вниз до тех пор,
+    пока младший байт источника //не совпадет с
+    младшим байтом приемника. // Сдвигать снова, пока
+    не будет достигнута точность // в 5 бит. DWORD dwRShift =
+    O.DWORD dwGShift <i>= 0;</i></font> </p>
+    <p><font face="Courier New" size="2">DWORD dwBShift = O.DWORD dwNotMask;</font> </p>
+    <p><font face="Courier New" size="2">if ((ds.ddpfPixelFormat.dwFlags &amp; DDPF RGB)
+    &amp;&amp;</font> </p>
+    <p><font face="Courier New" size="2">(iBitCount &gt;= 16)) {</font> </p>
+    <p><font face="Courier New" size="2">if (iBitCount == 16) { dwNotMask = OxFFFFFFEO;</font>
+    </p>
+    <p><font face="Arial" size="2"><b>258</b> Глава 11. Клипы</font> </p>
+    <hr>
+    <p><font face="Courier New" size="2">} else {</font> </p>
+    <p><font face="Courier New" size="2">dwNotMask = OxFFFFFFOO;</font> </p>
+    <p><font face="Courier New" size="2">} DWORD dwMask = ds.ddpfPixelFormat.dwRBitMask;</font>
+    </p>
+    <p><font face="Courier New" size="2">ASSERT(dwMask) ;</font> </p>
+    <p><font face="Courier New" size="2">while ((dwMask &amp; 0х01) == 0) {</font> </p>
+    <p><font face="Courier New" size="2">dwRShift++;</font> </p>
+    <p><font face="Courier New" size="2">dwMask = dwMask &gt;&gt; 1;</font> </p>
+    <p><font face="Courier New" size="2">} while ((dwMask &amp; dwNotMask) != 0) {</font> </p>
+    <p><font face="Courier New" size="2">dwRShift++;</font> </p>
+    <p><font face="Courier New" size="2">dwMask = dwMask &gt;&gt; 1;</font> </p>
+    <p><font face="Courier New" size="2">} dwMask = ds.ddpfPixelFormat.dwGBitMask;</font> </p>
+    <p><font face="Courier New" size="2">ASSERT(dwMask) ;</font> </p>
+    <p><font face="Courier New" size="2">while ((dwMask &amp; 0х01) == 0) (</font> </p>
+    <p><font face="Courier New" size="2">dwGShift++;</font> </p>
+    <p><font face="Courier New" size="2">dwMask = dwMask &gt;&gt; 1;</font> </p>
+    <p><font face="Courier New" size="2">) while ((dwMask &amp; dwNotMask) != 0) {</font> </p>
+    <p><font face="Courier New" size="2">dwGShift++;</font> </p>
+    <p><font face="Courier New" size="2">dwMask = dwMask &gt;&gt; 1;</font> </p>
+    <p><font face="Courier New" size="2">}</font> </p>
+    <p><font face="Courier New" size="2">dwMask = ds.ddpfPixelFormat.dwBBitMask;</font> </p>
+    <p><font face="Courier New" size="2">ASSERT(dwMask) ;</font> </p>
+    <p><font face="Courier New" size="2">while ((dwMask &amp; 0х01) == 0) {</font> </p>
+    <p><font face="Courier New" size="2">dwBShift++;</font> </p>
+    <p><font face="Courier New" size="2">dwMask = dwMask &gt;&gt; 1;</font> </p>
+    <p><font face="Courier New" size="2">) while ((dwMask &amp; dwNotMask) != 0) {</font> </p>
+    <p><font face="Courier New" size="2">dwBShift++;</font> </p>
+    <p><font face="Courier New" size="2">dwMask <i>=</i> dwMask &gt;&gt; 1;</font> </p>
+    <p><font face="Courier New" size="2">} i</font> </p>
+    <p><font face="Times New Roman" size="2">// Снова заблокировать
+    поверхность // для получения графических данных
+    m_hr = iS-&gt;Lock(NULL,</font> </p>
+    <p><font face="Times New Roman" size="2">Sds,</font> </p>
+    <p><font face="Times New Roman" size="2">DDLOCK_SURFACEMEMORYPTR I DDLOCK_WAIT,</font> </p>
+    <p><font face="Times New Roman" size="2">NULL) ;</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT(m_hr == DD_OK) ;</font> </p>
+    <p><font face="Times New Roman" size="2">for (int у = 0; у &lt; iHeight; y++) { switch
+    (iBitCount) { case 8: {</font> </p>
+    <p><font face="Times New Roman" size="2">BYTE* pDIBPix = pDIBLine;</font> </p>
+    <p><font face="Times New Roman" size="2">BYTE* pSurfPix = pSurfLine;</font> </p>
+    <p><font face="Times New Roman" size="2">for (int x = 0; x &lt; iWidth; x++) {*pDIBPix++ =</font>
+    </p>
+    <p><font face="Arial" size="2">Покадровая съемка 'Ч^Щ<b> 259</b></font> </p>
+    <hr>
+    <p><font face="Courier New" size="2">// *pSurfPix++;</font> </p>
+    <p><font face="Courier New" size="2">} } break;</font> </p>
+    <p><font face="Courier New" size="2">case 16: (</font> </p>
+    <p><font face="Courier New" size="2">WORD* pDIBPix = (WORD*)pDIBLine;</font> </p>
+    <p><font face="Courier New" size="2">WORD* pSurfPix = (WORD*)pSurfLine;</font> </p>
+    <p><font face="Courier New" size="2">WORD r, g, b;</font> </p>
+    <p><font face="Courier New" size="2">// (int x = 0; x &lt; iWidth; x++) ( r = (*pSurfPix
+    &amp; (WORD)</font> </p>
+    <p><font face="Courier New" size="2">ds.ddpfPixel Format.dwRBitMask) &gt;&gt; dwRShift;</font>
+    </p>
+    <p><font face="Courier New" size="2">g = (*pSurfPix &amp; (WORD)</font> </p>
+    <p><font face="Courier New" size="2">ds.ddpfPixelFormat.dwGBitMask) &gt;&gt; dwGShift;</font>
+    </p>
+    <p><font face="Courier New" size="2">b = (*pSurfPix &amp; (WORD)</font> </p>
+    <p><font face="Courier New" size="2">ds.ddpfPixeiFormat.dwBBitMask) &gt;&gt; dwBShift;</font>
+    </p>
+    <p><font face="Courier New" size="2">*pDIBPix++ = ((r &amp; OxIF) &lt;&lt; 10) Ѓ ( (g
+    &amp; OxIF) &lt;&lt; 5) I (b S OxIF) ;</font> </p>
+    <p><font face="Courier New" size="2">p3urfPix++;</font> </p>
+    <p><font face="Courier New" size="2">} } break;</font> </p>
+    <p><font face="Courier New" size="2">case 24: {</font> </p>
+    <p><font face="Courier New" size="2">BYTE* pDIBPix = pDIBLine;</font> </p>
+    <p><font face="Courier New" size="2">BYTE* pSurfPix = pSurfLine;</font> </p>
+    <p><font face="Courier New" size="2">for (int x = 0; x &lt; iWidth; x++) (</font> </p>
+    <p><font face="Courier New" size="2">// ВНИМАНИЕ: Предполагается,
+    что RGB-маски // поверхности и DIB-секции совпадают,
+    что // на самом деле не всегда справедливо. // Нам
+    следовало бы рассматривать маску //
+    ds.ddpfPixelFormat.dwRGBBitMask.</font> </p>
+    <p><font face="Courier New" size="2">*pDIBPix++ = *pSurfPix++;</font> </p>
+    <p><font face="Courier New" size="2">*pDIBPix++ = *pSurfPix++;</font> </p>
+    <p><font face="Courier New" size="2">*pDIBPix++ = *pSurfPix++;</font> </p>
+    <p><font face="Courier New" size="2">} } break;</font> </p>
+    <p><font face="Courier New" size="2">default:</font> </p>
+    <p><font face="Courier New" size="2">// Мы не должны сюда попасть</font>
+    </p>
+    <p><font face="Courier New" size="2">break;</font> </p>
+    <p><font face="Courier New" size="2">} pDIBLine -= iDIBScan;</font> </p>
+    <p><font face="Courier New" size="2">pSurfLine += iSurfScan;</font> </p>
+    <p><font face="Courier New" size="2">}</font> </p>
+    <p><font face="Times New Roman" size="2">// Разблокировать буфер</font>
+    </p>
+    <p><font face="Times New Roman" size="2">m hr = m pBackBuffer-&gt;Get!nterface()</font> </p>
+    <p><font face="Times New Roman" size="2">&gt;Unlock(ds.lpSurface) ;</font> </p>
+    <p><font face="Arial" size="2"><b>260</b> ill5' Глава 11. Клипы</font> </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">// Проверить, возвращен ли
+    информационный // заголовок растра if (ppBMI) {</font> </p>
+    <p><font face="Times New Roman" size="2">*ppBMI = pBMI;</font> </p>
+    <p><font face="Arial" size="2">} else {</font> </p>
+    <p><font face="Times New Roman" size="2">delete pBMI;</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Times New Roman" size="2">// Проверить, возвращен ли
+    указатель //на графические данные растра if (ppBits)
+    *ppBit3- = pBits;</font> </p>
+    <p><font face="Times New Roman" size="2">// Вернуть логический номер
+    растра return hBmp;</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Times New Roman" size="2">Если объем кода начисто
+    отбил у вас охоту снимать клипы, вспомните о том,
+    что функция уже написана! Вам остается только
+    вызвать ее. Подробное описание ее работы выходит
+    за рамки главы и даже всей книги в целом. Я
+    написал эту функцию, руководствуясь
+    документацией по непосредственному режиму Direct3D
+    и некоторыми примерами, входящими в комплект DirectX
+    2 SDK. 0 непосредственном режиме подробнее
+    рассказывается в главе 13.</font> </p>
+    <p><font face="Times New Roman" size="2">Допустим, нам удалось
+    сохранить текущий вид макета. Что происходит
+    дальше? Мы создаем объект CMovieFrame для хранения
+    этого изображения и включаем кадр в список
+    кадров объекта CMovieTake.</font> </p>
+    <p><font face="Arial" size="3"><b>Просмотр клипа</b></font> </p>
+    <p><font face="Times New Roman" size="2">Просмотреть записанную
+    последовательность кадров относительно просто.
+    Если вы знакомились с исходным текстом функции
+    Grablmage, то эта задача может показаться вам
+    тривиальной. Тем не менее существуют детали,
+    которые заметно влияют на скорость работы. Перед
+    тем как воспроизводить набор кадров, мы вызываем
+    функцию CMovie::Stop, чтобы остановить процесс записи.
+    Возможно, это покажется вам несущественным,
+    однако в данной функции имеется одна
+    исключительно важная строка (удастся ли вам
+    найти ее?):</font> </p>
+    <p><font face="Arial" size="2">void CMovie::Stop()</font> </p>
+    <p><font face="Arial" size="2">(</font> </p>
+    <p><font face="Times New Roman" size="2">if (m Displaying) {</font> </p>
+    <p><font face="Times New Roman" size="2">m bIsPlaying = FALSE;</font> </p>
+    <p><font face="Times New Roman" size="2">// Заново отобразить цвета
+    палитры</font> </p>
+    <p><font face="Times New Roman" size="2">m_Take.Optimize() ;</font> </p>
+    <p><font face="Times New Roman" size="2">} if (m_b!sRecording) (</font> </p>
+    <p><font face="Times New Roman" size="2">m_bIsRecording = FALSE;</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Arial" size="2">Покадровая съемка &lt;:^^;<b> 261</b></font>
+    </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">Что же делает функция Optimize?
+    Она создает идентичную палитру на основе
+    сохраненной и отображает в ней цвета,
+    используемые в наших кадрах. По крайней мере, так
+    должно быть. На практике выяснилось, что мы можем
+    немного смошенничать и заметно ускорить дело,
+    пропустив этап отображения цветов. Другими
+    словами, мы оптимизируем процесс
+    воспроизведения, создавая новую (идентичную)
+    палитру, но не отображая цвета изображения в
+    созданной палитре. Но как же можно добиться
+    правильного вывода цветов на экран, если палитра,
+    в которой воспроизводятся изображения,
+    отличается от той, в которой они были созданы?</font>
+    </p>
+    <p><font face="Times New Roman" size="2">Дело в том, что идентичная
+    палитра очень цохожа на исходную, а в некоторых
+    случаях они будут совпадать. Единственные цвета
+    палитры, которые могут измениться, - 20
+    зарезервированных системных цветов (10 в начале и
+    10 в конце палитры). Эти цвета не используются
+    механизмом визуализации, а их изменение не
+    влияет на вид изображения. В любом случае, мелкие
+    детали вряд ли заметно отразятся на качестве
+    изображения. Возможно, мое объяснение вас не
+    убеждает;</font> </p>
+    <p><font face="Times New Roman" size="2">меня это вовсе не удивляет.
+    Более подробные разъяснения затронутой
+    деликатной темы можно найти в книге<ANIMATION Win32 in Techniques> . Я предлагаю
+    вам самостоятельно просмотреть код функции Optimize
+    на досуге.</font> </p>
+    <p><font face="Times New Roman" size="2">Итак, все готово к показу
+    клипа. Поскольку мы не сможем одновременно
+    воспроизводить очередной макет и смотреть
+    записанный клип в одном и том же окне, во время
+    просмотра необходимо отключить функцию
+    пассивного цикла, которая обычно обновляет и
+    воспроизводит макет. При условии, что работа
+    механизма визуализации временно приостановлена,
+    приведенная ниже функция вызывается в CMovie::Update в
+    режиме просмотра для вывода в окно следующего
+    записанного кадра:</font> </p>
+    <p><font face="Times New Roman" size="2">BOOL CMovie::Update() {</font> </p>
+    <p><font face="Times New Roman" size="2">if (m_bIsPlaying) {</font> </p>
+    <p><font face="Times New Roman" size="2">// Вывести следующий кадр if
+    (m_Take.IsEmptyO) {</font> </p>
+    <p><font face="Times New Roman" size="2">m_bIsPlaying = FALSE;</font> </p>
+    <p><font face="Times New Roman" size="2">return FALSE;</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Times New Roman" size="2">// Найти текущий кадр POSITION
+    pos = m_Take.FindIndex(m_iCurFrame);</font> </p>
+    <p><font face="Times New Roman" size="2">if (!pos) {</font> </p>
+    <p><font face="Times New Roman" size="2">m_bIsPlaying = FALSE;</font> </p>
+    <p><font face="Times New Roman" size="2">return FALSE;</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Times New Roman" size="2">CMovieFrame* pFrame = m_Take.GetAt(pos);</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT(pFrame) ;</font> </p>
+    <p><font face="Times New Roman" size="2">// Получить текущий
+    контекст устройства (DC) ASSERT(m_p3dWnd) ;</font> </p>
+    <p><font face="Times New Roman" size="2">CDC* pdc = m_p3dWnd-&gt;GetDC() ;</font> </p>
+    <p><font face="Arial" size="2">// Задать палитру <b>262</b> ЩЦ1 Глава
+    11. Клипы</font> </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">CPalette* pOldPal њ NULL;</font> </p>
+    <p><font face="Times New Roman" size="2">CPalette* pPal = m_Take.GetPalette();</font> </p>
+    <p><font face="Times New Roman" size="2">if (pPal) {</font> </p>
+    <p><font face="Times New Roman" size="2">pOldPal = pdc-&gt;SelectPalette(pPal, FALSE);</font>
+    </p>
+    <p><font face="Times New Roman" size="2">pdc-&gt;RealizePalette () ;</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Times New Roman" size="2">// Создать совместимый DC
+    для растра CDC dcMem;</font> </p>
+    <p><font face="Times New Roman" size="2">dcMem.CreateCompatibleDC(pdc);</font> </p>
+    <p><font face="Times New Roman" size="2">// Выбрать палитру в
+    совместимом DC CPalette* pOldMemPal = NULL;</font> </p>
+    <p><font face="Times New Roman" size="2">if (pPal) {</font> </p>
+    <p><font face="Times New Roman" size="2">pOldMemPal = dcMem.SelectPalette(pPal, FALSE);</font>
+    </p>
+    <p><font face="Times New Roman" size="2">dcMem.RealizePalette() ;</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Times New Roman" size="2">// Выбрать растр в
+    совместимом DC</font> </p>
+    <p><font face="Times New Roman" size="2">HBITMAP hOldBmp = (HBITMAP) ::SelectObject(dcMem,
+    pFrame-&gt;m hBmp) ;</font> </p>
+    <p><font face="Times New Roman" size="2">// Скопировать растр в окно
+    pdc-&gt;BitBlt (0, О,</font> </p>
+    <p><font face="Times New Roman" size="2">m_Take.GetWidth(), m_Take.GetHeight(),</font> </p>
+    <p><font face="Times New Roman" size="2">SidcMem,</font> </p>
+    <p><font face="Arial" size="2">0, 0,</font> </p>
+    <p><font face="Times New Roman" size="2">SRCCOPY) ;</font> </p>
+    <p><font face="Times New Roman" size="2">// Восстановить прежнее
+    состояние DC if (pOldMemPal) {</font> </p>
+    <p><font face="Times New Roman" size="2">dcMem.SelectPalette(pOldMemPal, FALSE) ;</font> </p>
+    <p><font face="Times New Roman" size="2">} ::SelectObject(dcMem, hOldBmp);</font> </p>
+    <p><font face="Times New Roman" size="2">if (pOldPal) (</font> </p>
+    <p><font face="Times New Roman" size="2">pdc-&gt;SelectPalette (pOldPal, FALSE) ;</font> </p>
+    <p><font face="Times New Roman" size="2">} m_p3dWnd-&gt;ReleaseDC(pdc) ;</font> </p>
+    <p><font face="Times New Roman" size="2">m_iCurFrame++;</font> </p>
+    <p><font face="Times New Roman" size="2">return TRUE; // Остальные кадры</font>
+    </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Arial" size="2">Покадровая съемка ''''Щ<b> 263</b></font> </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">Последовательность
+    действий в приведенном выше фрагменте такова:</font>
+    </p>
+    <p><font face="Times New Roman" size="2">1. Найти следующий
+    выводимый кадр.</font> </p>
+    <p><font face="Times New Roman" size="2">2. Получить контекст
+    устройства (DC) для окна.</font> </p>
+    <p><font face="Times New Roman" size="2">3. Выбрать палитру в DC окна.</font>
+    </p>
+    <p><font face="Times New Roman" size="2">4. Создать в памяти
+    совместимый DC.</font> </p>
+    <p><font face="Times New Roman" size="2">5. Выбрать палитру в
+    совместимом DC.</font> </p>
+    <p><font face="Times New Roman" size="2">6. Выбрать логический номер
+    растра в объекте CMovieFrame и поместить его в
+    совместимый DC.</font> </p>
+    <p><font face="Times New Roman" size="2">7. Вызвать функцию BitBIt для
+    копирования изображения из совместимого в
+    оконный DC.</font> </p>
+    <p><font face="Times New Roman" size="2">8. Восстановить состояние DC
+    и освободить их.</font> </p>
+    <p><font face="Times New Roman" size="2">Ветераны программирования
+    для Windows немедленно узнают в этом чудовищном
+    списке необходимую последовательность действий
+    для вывода растра в окне.</font> </p>
+    <p><font face="Times New Roman" size="2">На первый взгляд может
+    показаться, что многократный выбор и реализация
+    палитры должны быть чрезвычайно медленными.
+    Однако Windows знает, что при выполнении этих
+    действий с одной и той же палитрой делать ничего
+    не нужно, поэтому все издержки связаны только с
+    вызовом BitBIt.</font> </p>
+    <p><font face="Times New Roman" size="2">Наблюдательный читатель
+    может спросить, почему мы пользуемся BitBIt - ведь в
+    нашем распоряжении имеются функции DirectDraw, и
+    вообще мы работаем с поверхностью DirectDraw.
+    Разумеется, мы можем повернуть вспять процесс
+    сохранения кадра и снова отправить изображение
+    на поверхность DirectDraw с тем же результатом.
+    Подобные вещи обычно называются &lt;упражнениями
+    для самостоятельной работы&gt;. Почему? Взгляните
+    на огромный объем кода для сохранения кадра на
+    стр. 256 и представьте себе, что вам нужно сделать
+    то же самое в противоположном направлении.
+    Теперь вы понимаете, почему этим придется
+    заниматься вам, а не мне?! На самом деле
+    конкретный способ выполнения данной задачи не
+    имеет особого значения, и я выбрал то, что кажется
+    мне привычным. Разумеется, вы можете попробовать
+    сделать это по-другому.</font> </p>
+    <p><font face="Arial" size="4"><b>Стоит ли игра свеч?</b></font> </p>
+    <p><font face="Times New Roman" size="2">Подведем итог всему, что мы
+    узнали к настоящему моменту: программа
+    получилась довольно большой, и к тому же она
+    использует много памяти. Это - нехороший признак.
+    Если учесть, что свободной памяти обычно не
+    хватает для хранения всего клипа (без выгрузки в
+    файл), в большинстве случаев просмотр будет
+    замедляться из-за работы с диском. Таким образом,
+    методика покадровой съемки вовсе не идеальна.
+    Однако мы можем сделать на этом пути еще один шаг,
+    который стоит рассмотреть подробнее.</font> </p>
+    <p><font face="Arial" size="4"><b>Создание AVI-файла</b></font> </p>
+    <p><font face="Times New Roman" size="2">Мы можем взять список
+    кадров и создать по нему AVI-файл, который может
+    быть воспроизведен компонентами Microsoft Video for Windows
+    практически на любой Windows-машине, независимо от
+    того, установлен ли на ней DirectSD или нет. Если на
+    вашем компьютере имеется устройство для
+    сжатия/восстановления видеоинформации (CODEC),
+    данные можно сжать (коэффициент сжатия зависит
+    от CODEC). Клип, сжатый по стандарту MPEG (Motion Picture Expert
+    Group),</font> </p>
+    <p><font face="Arial" size="2"><b>264</b> ДИГ Глава 11. Клипы</font> </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">как правило, получается
+    довольно маленьким. Функция, которую я собираюсь
+    вам представить, не пользуется никакой методикой
+    сжатия, а просто записывает последовательность
+    кадров в AVI-файл. Для сжатия создаваемого ей файла
+    придется написать дополнительный код или
+    воспользоваться готовыми утилитами.</font> </p>
+    <p><font face="Times New Roman" size="2">И снова я не стану подробно
+    рассматривать представленный фрагмент,
+    поскольку на это уйдет слишком много времени.
+    Лучшая документация по Video for Windows содержится в
+    Microsoft Development Library. Функция CMovie::Save, создающая
+    AVI-файл по списку кадров, выглядит следующим
+    образом:</font> </p>
+    <p><font face="Times New Roman" size="2">BOOL CMovie::Save()</font> </p>
+    <p><font face="Arial" size="2">{</font> </p>
+    <p><font face="Times New Roman" size="2">if (GetNumFrames() &lt;= 0) return FALSE;</font> </p>
+    <p><font face="Times New Roman" size="2">// Получить имя файла
+    ASSERT(m_p3dWnd) ;</font> </p>
+    <p><font face="Times New Roman" size="2">CFileDialog dig(FALSE,</font> </p>
+    <p><font face="Arial" size="2">&quot;avi&quot;,</font> </p>
+    <p><font face="Times New Roman" size="2">NULL,</font> </p>
+    <p><font face="Times New Roman" size="2">OFN_OVERWRITEPROMPT,</font> </p>
+    <p><font face="Arial" size="2">&quot;AVI Files (*.avi)Ѓ*.aviЃЃ&quot;,</font> </p>
+    <p><font face="Times New Roman" size="2">m_p3dWnd) ;</font> </p>
+    <p><font face="Times New Roman" size="2">if (dIg.DoModal() != IDOK) return FALSE;</font> </p>
+    <p><font face="Times New Roman" size="2">// Открыть AVI-файл HRESULT hr;</font>
+    </p>
+    <p><font face="Times New Roman" size="2">PAVIFILE pfile = NULL;</font> </p>
+    <p><font face="Times New Roman" size="2">hr = ::AVIFileOpen(Spfile,</font> </p>
+    <p><font face="Times New Roman" size="2">dig.GetFileName(), OF_CREATE Ѓ OF_WRITE, NULL) ;</font>
+    </p>
+    <p><font face="Times New Roman" size="2">if (FAILED(hr)) return FALSE;</font> </p>
+    <p><font face="Times New Roman" size="2">// Создать видеопоток в
+    файле PAVISTREAM pstream = NULL;</font> </p>
+    <p><font face="Times New Roman" size="2">AVISTREAMINFO si;</font> </p>
+    <p><font face="Times New Roman" size="2">memset(&amp;si, 0, sizeof(si));</font> </p>
+    <p><font face="Times New Roman" size="2">si.fccType = streamtypeVIDEO;</font> </p>
+    <p><font face="Times New Roman" size="2">si.fccHandler = mmioFOURCC('M','S','V,'C');</font>
+    </p>
+    <p><font face="Times New Roman" size="2">si.dwRate = 100; // Fps si.dwScale = 1;</font> </p>
+    <p><font face="Times New Roman" size="2">si.dwLength = 0;</font> </p>
+    <p><font face="Times New Roman" size="2">si.dwQuality = (DWORD) -1;</font> </p>
+    <p><font face="Times New Roman" size="2">si.rcFrame.top = 0;</font> </p>
+    <p><font face="Times New Roman" size="2">si.rcFrame.left = 0;</font> </p>
+    <p><font face="Times New Roman" size="2">si.rcFrame.bottom = m Take.GetHeight() ;</font> </p>
+    <p><font face="Times New Roman" size="2">si.rcFrame.right = m_Take.GetWidth() ;</font> </p>
+    <p><font face="Times New Roman" size="2">strcpy(si.szName, &quot;3dPlus Movie&quot;);</font>
+    </p>
+    <p><font face="Times New Roman" size="2">hr = ::AVIFileCreateStream(pfile, Spstream,
+    &amp;si);</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT(SUCCEEDED(hr));</font> </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">// Задать формат CMovieFrame* pFrame
+    = m_Take.GetHead();</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT(pFrame) ;</font> </p>
+    <p><font face="Times New Roman" size="2">int iSize &gt; sizeof(BITMAPINFOHEADER)</font> </p>
+    <p><font face="Arial" size="2">+</font> </p>
+    <p><font face="Times New Roman" size="2">DIBColorEntries((BITMAPINFOHEADER*)(pFraine-</font>
+    </p>
+    <p><font face="Times New Roman" size="2">&gt;m_pBMI))</font> </p>
+    <p align="center"><font face="Times New Roman" size="2">* sizeof(RGBQUAD) ;</font> </p>
+    <p><font face="Times New Roman" size="2">hr === : :AVIStreamSetFormat(pstream,</font> </p>
+    <p><font face="Arial" size="2">0,</font> </p>
+    <p><font face="Times New Roman" size="2">pFrame-&gt;m_pBMI,</font> </p>
+    <p><font face="Arial" size="2">iSize) ;</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT(SUCCEEDED(hr));</font> </p>
+    <p><font face="Times New Roman" size="2">// Записать кадры POSITION pos =
+    m_Take.GetHeadPosition();</font> </p>
+    <p><font face="Arial" size="2">int iSample = 0;</font> </p>
+    <p><font face="Arial" size="2">while (pos) (</font> </p>
+    <p><font face="Times New Roman" size="2">CMovieFrame* pFrame = m_Take.GetNext(pos);</font>
+    </p>
+    <p><font face="Times New Roman" size="2">BITMAPINFOHEADER* pBIH = (BITMAPINFOHEADER*)</font>
+    </p>
+    <p><font face="Times New Roman" size="2">&amp; (pFrame-&gt;m_pBMI-&gt;bmiHeader) ;</font> </p>
+    <p><font face="Times New Roman" size="2">int iBits = DIBStorageWidth(pBIH) *
+    pBIH-&gt;biHeight;</font> </p>
+    <p><font face="Times New Roman" size="2">hr = ::AVIStreamWrite(pstream,</font> </p>
+    <p><font face="Times New Roman" size="2">iSample, // Текущий кадр</font> </p>
+    <p><font face="Times New Roman" size="2">1, // Всего один</font> </p>
+    <p><font face="Times New Roman" size="2">pFrame-&gt;m_pBits, // Графические
+    данные</font> </p>
+    <p><font face="Times New Roman" size="2">iBits, // Размер буфера</font> </p>
+    <p><font face="Arial" size="2">О,</font> </p>
+    <p><font face="Arial" size="2">NULL,</font> </p>
+    <p><font face="Arial" size="2">NULL) ;</font> </p>
+    <p><font face="Arial" size="2">ASSERT(SUCCEEDED(hr)) ;</font> </p>
+    <p><font face="Arial" size="2">iSample++;</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Times New Roman" size="2">// Освободить поток
+    ::AVIStreamRelease(pstream);</font> </p>
+    <p><font face="Arial" size="2">// Освободить файл AVI : .-AVIFileRelease
+    (pfile) ;</font> </p>
+    <p><font face="Times New Roman" size="2">return TRUE;</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Times New Roman" size="2">В двух словах происходит
+    следующее: мы создаем новый AVI-фаил и видеопоток в
+    этом файле. Затем тип видеопогока задается с
+    помощью структуры BITMAPINFOHEADER и кадры записываются
+    в поток, после чего поток и файл закрываются. Файл
+    можно просмотреть программой Windows 95 Media Viewer или ее
+    аналогом.</font> </p>
+    <p><font face="Arial" size="1"><b>9АА <i>S^S^f</i> Гпапа <i>ЛЛ</i> l^nurll.1</b></font>
+    </p>
+    <hr>
+    <p><font face="Arial" size="4"><b>Запись отдельного кадра</b></font> </p>
+    <p><font face="Times New Roman" size="2">Иногда требуется записать
+    лишь один кадр. Зачем? Например, вы провели много
+    времени за созданием великолепного трехмерного
+    макета и хотите сохранить его внешний вид.
+    Приложение Save на прилагаемом диске CD-ROM
+    использует функцию сохранения изображения,
+    приведенную на стр. 252, для записи отдельного
+    кадра в формате DIB для Windows. Предлагаю
+    самостоятельно рассмотреть код приложения Save,
+    если оно вас интересует.</font> </p>
+    <p><font face="Arial" size="4"><b>Запись данных объекта</b></font> </p>
+    <p><font face="Times New Roman" size="2">Итак, покадровая запись
+    клипа связана как с большим объемом кода, так и с
+    расходом памяти, а скорость просмотра
+    ограничивается параметрами обмена данными с
+    жестким диском (сетью, дисководом CD-ROM и т. д.).
+    Кроме того, записанные клипы неинтерактивны, что
+    ограничивает их применение во многих
+    приложениях. Если нам захочется исследовать
+    трехмерные объекты в окне, стоит поискать другую
+    методику.</font> </p>
+    <p><font face="Times New Roman" size="2">В главе 6 мы уже создавали
+    подвижные объекты, но их перемещение было
+    ограничено круговой траекторией. Тогда я
+    упомянул, что траектория вовсе не обязана быть
+    круговой и что ей можно придать любую желаемую
+    форму. Сейчас мы рассмотрим другой способ
+    задания траектории, при котором запоминаются
+    положение и ориентация объекта в нескольких
+    точках траектории. Затем перемещение
+    воспроизводится интерполяцией по записанным
+    точкам, позволяющей построить гладкую
+    траекторию. Чтобы выдержать единую терминологию
+    с документацией по DirecQD, я буду называть такую
+    методику созданием анимации. Попробовав ее на
+    практике, вы убедитесь, что благодаря высокой
+    производительности механизма визуализации она
+    практически полностью вытесняет покадровую
+    съемку.</font> </p>
+    <p><font face="Arial" size="4"><b>Кватернионы</b></font> </p>
+    <p><font face="Times New Roman" size="2">Для задания поворотов в
+    анимационных последовательностях механизм
+    визуализации Direct3D использует кватернионы. Хочу
+    немедленно оправдаться перед читателями и
+    заявить, что перед созданием приложения Movie для
+    этой главы я понятия не имел о том, что же такое
+    кватернион. После знакомства с многочисленными
+    справочниками могу сказать, что кватернион -
+    хитроумная математическая конструкция, которая
+    проделывает всякие интересные штуки по очень
+    малым исходным данным. Объяснить ее работу
+    простым английским языком совершенно
+    невозможно, хотя это не совсем справедливо,
+    поскольку изобретатель кватернионов, В. Р.
+    Гамильтон (W. R. Hamilton), довольно много написал о них
+    в 1843 году для Ирландской Королевской Академии.
+    Однако специально для читателя я все же приведу
+    более строгое определение. Кватернионом
+    называется математический инструмент для
+    описания поворотов объекта в пространстве с
+    использованием минимального количества
+    переменных. В нашем трехмерном мире кватернион
+    определяется всего четырьмя переменными.
+    Итоговый поворот объекта может быть описан с
+    помощью кватерниона, являющегося произведением
+    всех кватернионов, описывающих отдельные
+    повороты объекта. Короче говоря, кватернионы
+    позволяют с высокой эффективностью описывать
+    повороты.</font> </p>
+    <p><font face="Times New Roman" size="2">Я довольно долго пытался
+    добиться от класса C3dQuaternion нужного поведения. Тем
+    не менее мне так и не удалось привести его в
+    рабочее состояние, а сроки</font> </p>
+    <p><font face="Arial" size="2">Запись ляиных г&gt;(тьйитя ''^Ш<b>
+    2&amp;7</b></font> </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">поджимали, поэтому мне
+    пришлось расстаться с кватернионами и
+    встроенной в Direct3D поддержкой анимационных
+    последовательностей в пользу своей собственной
+    программы и нескольких объектов CVector. Если вам
+    все же удастся реализовать кватернионы, можете
+    выкинуть мою программу и пользоваться своей.
+    Разумеется, мне бы очень хотелось взглянуть на
+    работающий класс.</font> </p>
+    <p><font face="Times New Roman" size="2">Существует еще одна
+    причина, по которой я отказался от использования
+    кватернионов. Она не имеет никакого отношения к
+    сложностям конструирования: на практике
+    случается, что применение кватернионов для
+    управления перемещениями объектов приводит к
+    нежелательным побочным эффектам. Кватернион
+    описывает общий результат поворота, но не то, как
+    именно вы пришли к этому результату.
+    Следовательно, если вы станете определять
+    промежуточные положения объекта, производя
+    интерполяцию по кватернионам, ваш объект может
+    &lt;неестественно&gt; вести себя при перемещении из
+    одного положения в другое. Проблема решается
+    добавлением новых контрольных точек, однако их
+    появление сводит на нет все преимущества
+    компактности кватернионов.</font> </p>
+    <p><font face="Arial" size="4"><b>Запись траектории объекта</b></font>
+    </p>
+    <p><font face="Times New Roman" size="2">Я решил, что при отсутствии
+    кватернионов для записи состояния объекта CSdShape в
+    макете необходимо сохранить его положение,
+    направление и верхний вектор (для задания
+    вектора направления и верхнего вектора
+    необходимо шесть переменных вместо четырех для
+    кватернионов, так что здесь имеется некоторая
+    избыточность). Для хранения данных объекта я
+    создал класс C3dAnimKey:</font> </p>
+    <p><font face="Times New Roman" size="2">class C3dAnimKey : public C3d0bject</font> </p>
+    <p><font face="Arial" size="2">(</font> </p>
+    <p><font face="Times New Roman" size="2">public:</font> </p>
+    <p><font face="Times New Roman" size="2">C3dAnimKey(double time,</font> </p>
+    <p align="center"><font face="Times New Roman" size="2">const D3DVECTOR&amp; pos, const
+    D3DVECTOR&amp; dir, const D3DVECTOR&amp; up) : m_vPos(pos), m_vDir(dir), m vUp(up),
+    m_dTime(time)</font> </p>
+    <p><font face="Arial" size="2">t</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Times New Roman" size="2">public:</font> </p>
+    <p><font face="Times New Roman" size="2">C3dVector m vPos;</font> </p>
+    <p><font face="Times New Roman" size="2">C3dVector m vDir;</font> </p>
+    <p><font face="Times New Roman" size="2">C3dVector m_vUp;</font> </p>
+    <p><font face="Times New Roman" size="2">double m_dTime;</font> </p>
+    <p><font face="Arial" size="2">};</font> </p>
+    <p><font face="Times New Roman" size="2">Из листинга видно, что
+    объект класса C3dAnimKey представляет собой
+    структуру, которая инициализируется в несложном
+    конструкторе. Анимация строится на основе класса
+    MFC CObjectList и состоит из списка объектов C3dAnimKey,
+    указателя на фрейм перемещаемой фигуры и
+    переменной, содержащей текущее время
+    перемещения по траектории. Единицы времени
+    выбираются произвольно. Мы запоминаем состояние
+    объекта в отдельных точках в заданный момент
+    времени. Точки заносятся в список в
+    хронологическом порядке, а воспроизводящая</font> </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">функция осуществляет по
+    ним линейную интерполяцию, тем самым позволяя
+    определить состояние объекта в любой точке
+    траектории.</font> </p>
+    <p><font face="Times New Roman" size="2">ПРИМЕЧАНИЕ</font> </p>
+    <p><font face="Arial" size="2">На момент написания книги в
+    анимациях DirectSD поддерживалась только линейная
+    интерполяция. К тому времени, когда книга
+    окажется у читателя, в Direct3D появится сплайновая
+    интерполяция, благодаря которой кватернионы
+    станут приносить больше пользы (разумеется, вы
+    можете'написать свой собственный код для работы
+    со сплайнами).</font> </p>
+    <p><font face="Times New Roman" size="2">Запись происходит
+    следующим образом: мы очищаем список, размещаем
+    объект в макете и добавляем ключевую точку для
+    каждого состояния объекта, включаемого в
+    анимацию. Во время воспроизведения объект
+    перемещается вдоль своей траектории с
+    приращением в 0,1 единицы времени. Для простоты
+    запись состояния объекта осуществляется с
+    временными интервалами в 1,0 единицы, так что в
+    процессе записи нельзя с полной уверенностью
+    предсказать поведение объекта при
+    воспроизведении. В приложении Movie имеется
+    команда Edit ] Demonstration, которая записывает движение
+    объекта и затем воспроизводит его в
+    неограниченном цикле.</font> </p>
+    <p><font face="Times New Roman" size="2">Чтобы упростить код
+    приложения, я включил в него глобальный объект
+    C3dAnimation, который позволяет записывать состояние
+    только одного объекта.</font> </p>
+    <p><font face="Times New Roman" size="2">Программная реализация
+    настолько проста, что ее даже не стоит приводить
+    здесь, однако для полноты картины мы все же
+    кратко рассмотрим ключевые функции класса
+    C3dAnimation. Давайте для начала посмотрим, как новая
+    ключевая точка заносится в список.
+    Предполагается, что фигура для анимации была
+    выбрана ранее, при вызове функции C3dAnimation::Attach:</font>
+    </p>
+    <p><font face="Times New Roman" size="2">BOOL C3dAnimation::AddKey(double time) {</font> </p>
+    <p><font face="Times New Roman" size="2">if (!m_pFrame) return FALSE;</font> </p>
+    <p><font face="Times New Roman" size="2">// Определить положение и
+    ориентацию фрейма C3dVector p, d, u;</font> </p>
+    <p><font face="Times New Roman" size="2">m pFrame-&gt;GetPosition (p) ;</font> </p>
+    <p><font face="Times New Roman" size="2">m_pFrame-&gt;GetDirection (d, u) ;</font> </p>
+    <p><font face="Times New Roman" size="2">// Создать новый ключ C3dAnimKey*
+    pKey = new C3dAnimKey(time, p, d, u);</font> </p>
+    <p><font face="Times New Roman" size="2">// Внести ключ в список return
+    AddKey(pKey);</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Times New Roman" size="2">Функция определяет
+    текущее положение и ориентацию фрейма и создает
+    по ним новый объект C3dAnimKey. Затем ключ вносится в
+    список:</font> </p>
+    <p><font face="Times New Roman" size="2">BOOL C3dAnimation::AddKey(C3dAnimKey* pNewKey) {</font>
+    </p>
+    <p><font face="Times New Roman" size="2">if (!pNewKey) return FALSE;</font> </p>
+    <p><font face="Arial" size="1"><b>.'^япиг^ nauu^iy itfvi-ei/Ta ^IRK: ^AO</b></font> </p>
+    <hr>
+    <p><font face="Courier New" size="2">// Обновить текущее время m
+    dCurTime = pNewKey-&gt;m_dTime;</font> </p>
+    <p><font face="Courier New" size="2">// Внести ключ в список if
+    (IsEmptyO) {</font> </p>
+    <p><font face="Courier New" size="2">AddTail(pNewKey) ;</font> </p>
+    <p><font face="Courier New" size="2">return TRUE;</font> </p>
+    <p><font face="Courier New" size="2">}</font> </p>
+    <p><font face="Times New Roman" size="2">// Перебрать элементы
+    списка в обратном направлении</font> </p>
+    <p><font face="Times New Roman" size="2">POSITION роз = GetTailPositionO ;</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT(pos) ;</font> </p>
+    <p><font face="Times New Roman" size="2">do {</font> </p>
+    <p><font face="Times New Roman" size="2">POSITION thispos = pos;</font> </p>
+    <p align="center"><font face="Times New Roman" size="2">C3dAnimKey* pKey = (C3dAnimKey*)
+    GetPrev(pos);</font> </p>
+    <p><font face="Times New Roman" size="2">if (pKey-&gt;m dTime &lt;= pNewKey-&gt;m_dTime) {
+    // Вставить новый ключ после текущего InsertAfter(thispos,
+    pNewKey);</font> </p>
+    <p><font face="Times New Roman" size="2">return TRUE;</font> </p>
+    <p><font face="Times New Roman" size="2">) } while (pos);</font> </p>
+    <p><font face="Times New Roman" size="2">// Внести новый ключ в
+    начало списка AddHead(pNewKey) ;</font> </p>
+    <p><font face="Times New Roman" size="2">return TRUE;</font> </p>
+    <p><font face="Arial" size="2"><b>}</b></font> </p>
+    <p><font face="Times New Roman" size="2"><b>ПРИМЕЧАНИЕ</b></font> </p>
+    <p><font face="Arial" size="2"><b>Если вы никогда не
+    пользовались классом MFC СОЫ-ist, то можете
+    растеряться при виде функций GetNext (см. выше) и GetPrev
+    (см. ниже). Эти функции извлекают данные по ключу,
+    после чего увеличивают или уменьшают значение
+    ключевой переменной. Я ненавижу их, поскольку их
+    использование противоречит здравому смыслу,
+    однако в целом класс СОЫ-ist достаточно удобен - во
+    всяком случае, до тех пор, пока я не разберусь с
+    шаблонами и стандартными библиотеками C++ и не
+    разработаю более удачное решение.</b></font> </p>
+    <p><font face="Times New Roman" size="2"><b>При добавлении новых
+    ключей список просматривается с конца, поскольку
+    обычно это ускоряет поиск нужной позиции.</b></font> </p>
+    <p><font face="Times New Roman" size="2"><b>После того как список
+    построен, остается воспроизвести его. Для этого
+    мы в цикле устанавливаем время анимации, что
+    приводит к перемещению объекта в соответствии с
+    текущим временем в анимационной
+    последовательности. Ниже приведен фрагмент
+    цикла пассивной работы приложения:</b></font> </p>
+    <p><font face="Arial" size="2"><b>270</b> Глава 11. Клипы</font> </p>
+    <hr>
+    <p><font face="Courier New" size="2">BOOL CMainFrame::Update() {</font> </p>
+    <p><font face="Courier New" size="2">if (m bPlayAnimation) {</font> </p>
+    <p><font face="Courier New" size="2">double 1 = m_Anim.GetLength();</font> </p>
+    <p><font face="Courier New" size="2">double t = in_Anim.GetCurTime() ;</font> </p>
+    <p><font face="Courier New" size="2">t += 0.1;</font> </p>
+    <p><font face="Courier New" size="2">if (t &gt; 1) (</font> </p>
+    <p><font face="Courier New" size="2">if (m_bLoopAnim) {</font> </p>
+    <p><font face="Courier New" size="2">m_Anim.SetTime(0.0) ;</font> </p>
+    <p><font face="Courier New" size="2"><i>}</i> else {</font> </p>
+    <p align="center"><font face="Courier New" size="2">m_bPlayAnimation = FALSE;</font> </p>
+    <p><font face="Courier New" size="2">Status(&quot;End of animation&quot;);</font> </p>
+    <p align="center"><font face="Courier New" size="2">} } else (</font> </p>
+    <p><font face="Courier New" size="2">m Anim.SetTime (t);</font> </p>
+    <p><font face="Courier New" size="2">}</font> </p>
+    <p><font face="Courier New" size="2">i</font> </p>
+    <p><font face="Times New Roman" size="2">Счетчик времени
+    увеличивается с интервалом в 0,1 единицы. В конце
+    анимация останавливается или запускается снова,
+    в зависимости от состояния флага m_bLoopAnim. Ниже
+    приведена функция C3dAnimationTime::SetTime, задающая
+    состояние объекта для нужного момента времени:</font>
+    </p>
+    <p><font face="Times New Roman" size="2">BOOL C3dAnimation::SetTime(double time) (</font> </p>
+    <p><font face="Times New Roman" size="2">m_dCurTime <i>=</i> time;</font> </p>
+    <p><font face="Times New Roman" size="2">if (!m_pFrame) return FALSE;</font> </p>
+    <p><font face="Times New Roman" size="2">if (IsEmptyO) return FALSE;</font> </p>
+    <p><font face="Times New Roman" size="2">// Перебрать элементы
+    списка в поисках пары ключей, // между которыми
+    лежит заданная величина // (или точного
+    совпадения) POSITION pos = GetHeadPositionO;</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT(pos) ;</font> </p>
+    <p><font face="Times New Roman" size="2">C3dAnimKey* pBefore = (C3dAnimKey*) GetNext(pos)
+    ;</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT(pBefore) ;</font> </p>
+    <p><font face="Times New Roman" size="2">if (pBefore-&gt;m_dTime &gt; time) return FALSE;</font>
+    </p>
+    <p><font face="Times New Roman" size="2">// Слишком рано, // ключ
+    отсутствует</font> </p>
+    <p><font face="Times New Roman" size="2">C3dAnimKey* pAfter = NULL;</font> </p>
+    <p><font face="Arial" size="2">while (pos) {</font> </p>
+    <p><font face="Times New Roman" size="2">pAfter = (C3dAnimKey*) GetNext(pos) ;</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT(pAfter) ;</font> </p>
+    <hr>
+    <p><font face="Courier New" size="2">if ( (pBefore-&gt;m_dTime &lt;= time) &amp;&amp;
+    (pAfter-&gt;m_dTime <i>&gt;=</i> time) ) break;</font> </p>
+    <p><font face="Courier New" size="2">pBefore = pAfter;</font> </p>
+    <p><font face="Times New Roman" size="2">// Вычислить
+    интерполированные значения C3dVector p, d, u;</font> </p>
+    <p><font face="Times New Roman" size="2">double dt;</font> </p>
+    <p><font face="Times New Roman" size="2">if (pAfter != NULL) {</font> </p>
+    <p><font face="Times New Roman" size="2">dt = pAfter-&gt;m dTime - pBefore-&gt;m_dTime;</font>
+    </p>
+    <p><font face="Arial" size="2">} else {</font> </p>
+    <p><font face="Times New Roman" size="2">dt = pBefore-&gt;m_dTime;</font> </p>
+    <p><font face="Times New Roman" size="2">} if ((pAfter == NULL) ЃЃ (dt ==0)) {</font> </p>
+    <p><font face="Times New Roman" size="2">p = pBefore-&gt;m_vPos;</font> </p>
+    <p><font face="Times New Roman" size="2">d = pBefore-&gt;m_vDir;</font> </p>
+    <p><font face="Times New Roman" size="2">u = pBefore-&gt;m_vUp;</font> </p>
+    <p><font face="Arial" size="2">} else <i>{</i></font> </p>
+    <p><font face="Times New Roman" size="2">double r = (time - pBefore-&gt;m_dTime) / dt;</font>
+    </p>
+    <p><font face="Times New Roman" size="2">p = pBefore-&gt;m_vPos + (pAfter-&gt;m_vPos -
+    pBefore-</font> </p>
+    <p><font face="Times New Roman" size="2">&gt;m_vPos) * r;</font> </p>
+    <p><font face="Times New Roman" size="2">d =s pBefore-&gt;m_vDir + (pAfter-&gt;m_vDir -
+    pBefore-</font> </p>
+    <p><font face="Arial" size="2">&gt;m vDir) * r;</font> </p>
+    <p><font face="Times New Roman" size="2">u = pBefore-&gt;m_vUp + (pAfter-&gt;m_vUp -
+    pBefore-</font> </p>
+    <p><font face="Times New Roman" size="2">&gt;iri_vUp) *<b> r;</b></font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Courier New" size="2">// Задать новое положение и
+    направление m pFrame-&gt;SetPosition (p) ;</font> </p>
+    <p><font face="Courier New" size="2">m_pFrame-&gt;SetDirection (d, u) ;</font> </p>
+    <p><font face="Courier New" size="2">return TRUE;</font> </p>
+    <p><font face="Courier New" size="2">}</font> </p>
+    <p><font face="Times New Roman" size="2">Мы ищем в списке две точки,
+    в интервале между которыми лежит нужный момент
+    времени, и методом линейной интерполяции
+    определяем по ним положение, направление и
+    верхний вектор объекта. Данный фрагмент наглядно
+    показывает, как благодаря классу C3dVector можно
+    получить легко читаемый код. Только представьте
+    себе, что нам пришлось бы производить вычисления
+    для каждого компонента вектора!</font> </p>
+    <p><font face="Times New Roman" size="2">Имена функций AddKey и SetTime
+    были выбраны так, чтобы они напоминали имена
+    функций из анимационного интерфейса Direct3D. Если
+    вам вдруг захочется поэкспериментировать с
+    кватернионами, то в код приложения даже не
+    придется вносить многочисленных изменений.</font> </p>
+    <p><font face="Arial" size="4"><b>Упражнения для вас</b></font> </p>
+    <p><font face="Times New Roman" size="2">Погодите, не торопитесь
+    переходить к следующей главе! Я подготовил
+    несколько задач для самостоятельной работы.
+    Однако перед тем, как приступать к ним, я</font> </p>
+    <p><font face="Arial" size="1"><b><i>ЧТ&gt; ИИЮ'</i> Гг.-.ОЗ 1-1 1/П..П,-,</b></font>
+    </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">хочу напомнить, что эта
+    глава не имеет никакого отношения к трехмерной
+    графике. Все, что в ней рассматривалось, в равной
+    степени относится и к двумерной, спрайтовой
+    графике. Наше изучение трехмерных технологий
+    закончено; далее речь пойдет о том, как их
+    применить на практике. Так что на самом деле курс
+    обучения позади; считайте эти задачи чем-то вроде
+    выпускного экзамена.</font> </p>
+    <p><font face="Times New Roman" size="2">1. Разработайте для
+    анимаций класс на базе списка и создайте макет с
+    несколькими объектами, движущимися
+    одновременно. Например, постройте модель
+    солнечной системы.</font> </p>
+    <p><font face="Times New Roman" size="2">2. Попробуйте закрепить
+    анимационную последовательность
+    непосредственно за объектом класса,
+    производного от CSdShape, чтобы каждый объект
+    содержал свою собственную траекторию. Снова
+    создайте макет для задачи 1. Будет ли такой способ
+    лучше, чем решение задачи I?</font> </p>
+    <p><font face="Times New Roman" size="2">3. Модифицируйте функцию
+    C3dAnimation::SetTime так, чтобы вместо линейной
+    интерполяции в ней использовались сплайны.</font> </p>
+    <p><font face="Times New Roman" size="2">4. Сравните методики
+    покадровой съемки и точечной анимации.
+    Существуют ли приложения, в которых одна из них
+    обладает несомненными преимуществами?</font></p>
+    <p align="center"><a href="cpp_directx_manual_15.shtml"><font size="3">Далее...</font></a></td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

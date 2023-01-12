@@ -1,0 +1,1535 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <p><font face="Arial" size="6"><b>Глава 3 Интерфейсы и классы</b></font>
+    </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">В этой главе мы кратко
+    рассмотрим интерфейсы механизма визуализации
+    Direct3D, а также классы C++ из библиотеки 3dPlus, которые
+    пользуются этими интерфейсами. Не ждите
+    подробного обсуждения всех интерфейсов и
+    классов, скорее это лишь краткое введение в них.
+    Каждый из упомянутых здесь интерфейсов и классов
+    будет подробно рассмотрен в последующих главах.
+    К концу этой главы вы будете иметь достаточно
+    четкое представление о том, для чего нужен тот
+    или иной интерфейс механизма визуализации и как
+    к нему обращаться. Кроме того, мы познакомимся с
+    иерархией классов библиотеки 3dPlus. Если вам не
+    хочется плотно заниматься классами и
+    интерфейсами, пропустите эту главу и вернитесь к
+    ней, когда возникнет необходимость.</font> </p>
+    <p><font face="Arial" size="4"><b>Работа с интерфейсами
+    СОМ-объектов</b></font> </p>
+    <p><font face="Times New Roman" size="2">Давайте в общих чертах
+    познакомимся с составной объектной моделью (СОМ -
+    Component Object Model) и работой СОМ-интерфейсов.</font> </p>
+    <p><font face="Times New Roman" size="2">Интерфейс представляет
+    собой набор функций, объединенных общим
+    назначением. Интерфейсные функции напоминают
+    функции классов C++, за тем исключением, что
+    функции интерфейса только определяются, но не
+    реализуются. Можно считать их чем-то вроде плана
+    для класса C++, который вы только собираетесь
+    написать.</font> </p>
+    <p><font face="Times New Roman" size="2">СОМ-объектом называют
+    фрагмент кода, реализующий один или несколько
+    интерфейсов. СОМ-объекты могут быть чрезвычайно
+    простыми (например, объекты классов C++ со
+    статической компоновкой) или чрезвычайно
+    сложными (программа, работающая на сервере на
+    другом краю Земли). Если вы представляете себе
+    работу библиотек динамической компоновки (DLL), то
+    по словам моего коллеги Дейла Роджерсона
+    &lt;СОМ-объекты при программировании на C++ играют
+    ту же роль, что и DLL при программировании на С&gt;.</font>
+    </p>
+    <p><font face="Times New Roman" size="2">Любой СОМ-объект в
+    обязательном порядке должен поддерживать
+    интерфейс с именем lUnknown, обеспечивающий два
+    базовых свойства СОМ-объектов: подсчет обращений
+    и способность запрашивать другие интерфейсы. При
+    помощи интерфейса lUnknown можно определить, какие
+    еще интересующие вас интерфейсы поддерживаются
+    объектом. Поясню сказанное на примере.
+    Предположим, мы только что создали трехмерный
+    объект средствами механизма визуализации и
+    теперь хотим изменить его положение в макете.
+    Поскольку нужная функция для изменения
+    положения присутствует в интерфейсе IDirect3DRMFrame,
+    желательно выяснить, поддерживается ли этот
+    интерфейс созданным объектом, и, если результат
+    проверки окажется положительным, - вызвать
+    соответствующую функцию IDirect3DRMFrame для изменения
+    положения объекта. Для определения того,
+    поддерживается ли тот или иной интерфейс данным
+    объектом, следует вызвать функцию IUnknown::Querylnterface:</font>
+    </p>
+    <p><font face="Times New Roman" size="2">HRESULT hr;</font> </p>
+    <p><font face="Times New Roman" size="2">IDirect3DRMFrame* pIFrame = NULL;</font> </p>
+    <p><font face="Times New Roman" size="2">hr = pI[Jnknown-&gt;QueryInterface (IID
+    IDirect3DRMFrame, (void**)&amp;plFrame) ;</font> </p>
+    <p><font face="Times New Roman" size="2">Если вызов функции был
+    успешным, следовательно, объект поддерживает
+    интерфейс IDirect3DRMFrame и вы можете им пользоваться:</font>
+    </p>
+    <p><font face="Times New Roman" size="2">pIFrame-&gt;SetPosition(2, 4, 5);</font> </p>
+    <p><font face="Times New Roman" size="2">Когда функция Querylnterface
+    возвращает указатель на IDirect3DRMFrame, она также
+    увеличивает на единицу счетчик обращений
+    объекта. Следовательно, при завершении работы с
+    указателем необходимо снова уменьшить значение
+    счетчика обращении:</font> </p>
+    <p><font face="Times New Roman" size="2">pIFrame-&gt;Release () ;</font> </p>
+    <p><font face="Times New Roman" size="2">pi Frame = NULL;</font> </p>
+    <p><font face="Times New Roman" size="2">Присваивать указателю NULL
+    необязательно. Я делаю это лишь для того, чтобы
+    отладчик смог перехватить любую попытку
+    повторного использования указателя после
+    освобождения интерфейса, на который он ссылался.
+    Если вы любите макросы (лично я их не люблю), то
+    всегда можете написать макрос для
+    одновременного освобождения интерфейса и
+    присвоения указателю NULL:</font> </p>
+    <p><font face="Times New Roman" size="2">#define RELEASE (p) ( (р)-&gt;Release () ; (р)
+    = NULL;)</font> </p>
+    <p><font face="Times New Roman" size="2">ПРИМЕЧАНИЕ</font> </p>
+    <p><font face="Arial" size="2">Я не люблю пользоваться
+    макросами, потому что они скрывают конкретную
+    программную реализацию. Мне кажется, что
+    удобства от использования макросов за долгие
+    годы отладки так и не оправдали тех хлопот,
+    которые я имел с ними.</font> </p>
+    <p><font face="Times New Roman" size="2">Интерфейс lUnknown является
+    базовым для всех остальных СОМ-интерфейсов, так
+    что при наличии указателя на <i>любой</i> интерфейс
+    можно вызвать Querylnterface для любого интерфейса,
+    которым вы хотите пользоваться. Например, если у
+    нас уже имеется указатель на интерфейс IDirect3DRMFrame
+    (pIFrame) и необходимо выяснить, поддерживается ли
+    интерфейс IDirect3DRMMesh объектом, на который
+    ссылается указатель, проверка может выглядеть
+    следующим образом:</font> </p>
+    <p><font face="Times New Roman" size="2">HRESULT hr;</font> </p>
+    <p><font face="Times New Roman" size="2">IDirect3DRMMesh* pIMesh = NULL;</font> </p>
+    <p><font face="Times New Roman" size="2">hr =
+    pIFrame-&gt;Query!nterface(IID_IDirect3DRMMesh, (void**)SpIMesh) ;</font> </p>
+    <p><font face="Times New Roman" size="2">if (SUCCEEDED(hr)) {</font> </p>
+    <p><font face="Times New Roman" size="2">// Использовать интерфейс
+    для работы с сетками</font> </p>
+    <p><font face="Times New Roman" size="2">int i = pIMesh-&gt;GetGroupCount;</font> </p>
+    <p><font face="Times New Roman" size="2">pIMesh-&gt;Release;</font> </p>
+    <p><font face="Times New Roman" size="2">pIMesh = NULL;</font> </p>
+    <p><font face="Arial" size="2">&gt;</font> </p>
+    <p><font face="Times New Roman" size="2">Это исключительно мощное
+    средство, поскольку при наличии <i>любого</i>
+    интерфейсного указателя на любой СОМ-объект
+    можно определить, поддерживает ли данный объект
+    тот интерфейс, которым вы хотите пользоваться.
+    Единственное, чего нельзя сделать - получить
+    список всех интерфейсов, поддерживаемых
+    объектом.</font> </p>
+    <p><font face="Arial" size="2">Все имена СОМ-интерфейсов
+    начинаются с префикса I, по которому их можно
+    отличить от классов C++ или других объектов. Я не
+    стал пояснять этот факт в тексте, поскольку счел
+    его достаточно очевидным, но потом решил, что,
+    возможно, кто-то из читателей недоумевает по
+    этому поводу. Префикс 1 также напомнит о том, что
+    после завершения работы с интерфейсом
+    необходимо вызвать Release.</font> </p>
+    <p><font face="Times New Roman" size="2">Кроме того, любой
+    интерфейс или СОМ-объект может наследовать
+    функции и свойства от другого интерфейса или
+    целой группы интерфейсов. Однако выяснить это
+    программными средствами невозможно; приходится
+    смотреть на определение интерфейса. Например,
+    если заглянуть в заголовочный файл d3drmobj.h в DirectX 2
+    SDK, вы увидите, что интерфейс IDirect3DRMFrame является
+    производным от IDirect3DRMVisual. Следовательно,
+    IDirect3DRMFrame заведомо поддерживает все функции
+    интерфейса IDirect3DRMVisual. IDirect3DRMVisual является
+    производным от IDirect3DRMObject, который в свою очередь
+    порожден от IDnknown. Следовательно, интерфейс
+    IDirect3DRMFrame поддерживает все функции IDirect3DRMFrame, а
+    также все функции интерфейсов IDirect3DRMVisual,
+    IDirect3DRMObject и lUnknown.</font> </p>
+    <p><font face="Times New Roman" size="2">ПРИМЕЧАНИЕ</font> </p>
+    <p><font face="Arial" size="2">Все интерфейсы механизма
+    визуализации имеют префикс IDirect3D. Интерфейсы с
+    префиксом IDirect3DRM относятся к более высокому
+    уровню и предназначаются для работы с фреймами,
+    фигурами, источниками света и т. д. Буквы RM
+    являются сокращением от Retained Mode (то есть
+    &lt;абстрактный режим&gt;, в отличие от
+    расположенного на более низком уровне
+    непосредственного режима, Immediate Mode).</font> </p>
+    <p><font face="Times New Roman" size="2">На самом деле иерархия
+    интерфейсов не так уж важна, потому что
+    поддерживаемые объектом интерфейсы всегда можно
+    определить функцией Querylnterface. Но если вы
+    добиваетесь от приложения максимальной
+    производительности, знание иерархии поможет
+    обойтись без лишних вызовов функций.</font> </p>
+    <p><font face="Times New Roman" size="2">Позвольте мне завершить
+    этот краткий обзор СОМ-объектов на обсуждении
+    того, как функции AddRef и Release интерфейса lUnknown
+    применяются для совместного использования
+    объектов. Предположим, мы хотим создать макет с
+    несколькими деревьями. Описание дерева состоит
+    из набора описаний вершин и граней, объединенных
+    в сетку. Сетка является визуальным объектом,
+    который можно присоединить к фрейму для того,
+    чтобы задать его положение в макете. На самом
+    деле одна и та же сетка может присоединяться к
+    нескольким фреймам. Для создания нашего
+    маленького леса понадобится одна сетка,
+    определяющая форму дерева, и несколько фреймов
+    для указания положений отдельных деревьев. Затем
+    сетка присоединяется к каждому фрейму в качестве
+    визуального элемента, для этого используется
+    следующий вызов:</font> </p>
+    <p><font face="Times New Roman" size="2">pIFrame-&gt;AddVisual (pIMesh) ;</font> </p>
+    <p><font face="Times New Roman" size="2">Если взглянуть на код
+    функции AddVisual в IDirect3DRMFrame, вы увидите что-нибудь в
+    таком роде:</font> </p>
+    <p><font face="Times New Roman" size="2">HRESULT
+    IDirect3DRMFrame::AddVisual(IDirect3DRMVisual * pIVisual)</font> </p>
+    <p><font face="Arial" size="2">f</font> </p>
+    <p><font face="Arial" size="2">pIVisual-&gt;AddRef () ;</font> </p>
+    <p><font face="Arial" size="2">AddVisualToList(pIVisual) ;</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Times New Roman" size="2">Функция AddRef, входящая в
+    интерфейс Визуального элемента (визуальный
+    интерфейс), увеличивает счетчик обращений к
+    объекту-сетке. Зачем? Затем, что во время
+    существования объекта-фрейма нельзя допустить
+    уничтожения объекта, предоставляющего ему
+    визуальный интерфейс. После уничтожения фрейма
+    или удаления из него конкретного визуального
+    интерфейса код фрейма освобождает объект-сетку:</font>
+    </p>
+    <p><font face="Arial" size="2">pIVisual-&gt;Release () ;</font> </p>
+    <p><font face="Times New Roman" size="2">Следовательно, после
+    освобождения объекта-сетки последним фреймом
+    счетчик обращений объекта упадет до нуля, и он
+    самоуничтожится.</font> </p>
+    <p><font face="Times New Roman" size="2">Какой же вывод следует
+    сделать из всего этого? Если вы правильно
+    обращаетесь с интерфейсами СОМ-объектов с
+    помощью функций AddRef и Release, вам никогда не
+    придется следить за тем, какие объекты
+    присутствуют в памяти и когда их можно удалять,
+    поскольку внутренний счетчик обращений
+    самостоятельно справится с этой работой.</font> </p>
+    <p><font face="Times New Roman" size="2">Позвольте дать пару
+    последних рекомендаций по работе с
+    СОМ-объектами. Любая функция, которая возвращает
+    указатель на интерфейс, перед тем как вернуть
+    управление, вызывает AddRef для увеличения счетчика
+    обращений; после завершения работы с указателем
+    необходимо вызвать Release, чтобы избежать
+    ненужного хранения объектов в памяти. Если вы
+    копируете указатель на интерфейс, вызовите AddRef
+    для копии и освободите оба указателя функцией
+    Release, когда надобность в них отпадет. Помните о
+    том, что возврат указателя на интерфейс одной из
+    ваших функций фактически равносилен его
+    копированию. Перед тем, как возвращать указатель,
+    не забудьте вызвать для него AddRef.</font> </p>
+    <p><font face="Times New Roman" size="2">А теперь я собираюсь
+    нарушить только что установленное правило. Если
+    вы стопроцентно уверены в том, что делаете, то при
+    копировании указателя можно обойтись и без
+    вызова AddRef, однако при этом следует неуклонно
+    следить за тем, чтобы функция Release была вызвана
+    нужное количество раз. Лишние вызовы Release
+    приведут к уничтожению используемого объекта, их
+    нехватка - к непроизводительным расходам памяти.
+    Просмотрев исходные тексты библиотеки 3dPlus, вы
+    убедитесь, что во многих объектах C++ присутствует
+    функция Getlnterface. Она возвращает указатель на тот
+    интерфейс, для которого данный класс C++ выступает
+    в роли оболочки. Я сделал это из соображений
+    удобства и производительности. Функция Getlnterface не
+    увеличивает счетчик обращений, так что при
+    вызове какой-либо из функций Getlnterface не следует
+    вызывать Release для возвращаемого указателя.</font> </p>
+    <p><font face="Arial" size="2">Книги, указанные в разделе
+    &lt;Библиография&gt;, содержат более подробную
+    информацию о СОМ-объектах.</font> </p>
+    <p><font face="Arial" size="4"><b>Интерфейсы трехмерной графики</b></font>
+    </p>
+    <p><font face="Times New Roman" size="2">Речь пойдет лишь о самых
+    распространенных интерфейсах, включенных мной в
+    библиотеку SdPlus. Все интерфейсы механизма
+    визуализации документированы в справочных
+    файлах, входящих в комплект DirectX 2 SDK, так что я не
+    собираюсь подробно рассматривать работу всех
+    функций каждого интерфейса. На рис. 3-1 изображена
+    иерархия интерфейсов, входящих в библиотеку 3dPlus.
+    Диаграмма была создана на основании определений
+    интерфейсов из файла d3drmobj.h, входящего в DirectX 2 SDK.</font>
+    </p>
+    <p><a href="http://usinsk.parma.ru/directx/62.jpg"><img alt="62.jpg" border="0" hspace="3"
+    src="62_small.jpg" vspace="3" width="300" height="569"></a> <br clear="all">
+    </p>
+    <p><font face="Arial" size="2"><b>Рис. 3-1.</b> Иерархия интерфейсов
+    в механизме визуализации</font> </p>
+    <p><font face="Times New Roman" size="2">Как видите, в иерархии
+    существуют две основные группы: интерфейсы,
+    производные от IDirect3DRMObject, и интерфейсы,
+    производные от IDirect3DRMVisual. Интерфейс IDirect3DRMObject
+    является общим предком для всех интерфейсов
+    библиотеки и включает функцию SetAppData, которая
+    позволяет включить в любой интерфейс закрытую
+    32-разрядную переменную. Например, такая
+    возможность оказывается очень полезной при
+    инкапсуляции интерфейса в классе C++. Закрытая
+    переменная будет содержать указатель на объект
+    класса C++, и при наличии указателя на интерфейс
+    можно быстро добраться до объекта-оболочки C++.</font>
+    </p>
+    <p><font face="Times New Roman" size="2">Важно учесть, что
+    интерфейсы, производные от IDirect3DRMVisual, могут
+    использоваться в качестве аргумента любой
+    функции, для которой требуется указатель на
+    интерфейс IDirect3DRMVisual (см. пример IDirect3DRMFrame::AddVisual на
+    следующей странице). Что касается аргументов
+    функций, следует упомянуть о том, что в реальных
+    прототипах функций, определенных в DirectX 2 SDK, типы
+    интерфейсов не указываются прямо. Например,
+    функция, аргументом которой является указатель
+    на интерфейс IDirect3DRMVisual, может быть определена
+    следующим образом:</font> </p>
+    <p><font face="Times New Roman" size="2">HRESULT
+    IDirect3DRMFrame::AddVisual(LPDIRECT3DRMVISUAL pVisual) ;</font> </p>
+    <p><font face="Times New Roman" size="2">Как видите, указатель на
+    интерфейс IDirect3DRMVisual имеет тип LPDIRECT3DRMVISUAL.</font> </p>
+    <p><font face="Times New Roman" size="2">ПРИМЕЧАНИЕ</font> </p>
+    <p><font face="Arial" size="2">Использование специальных
+    типов данных в качестве указателей общепринято в
+    Microsoft Windows. Мне кажется, что в новом 32-разрядном
+    мире эта практика устарела, поскольку нам уже не
+    нужно различать near и far-указатели. Как можно
+    видеть в приведенном выше примере, использование
+    специальных типов данных также затрудняет ответ
+    на вопрос, что же собой представляет аргумент
+    функции на самом деле. Имена типов, состоящие из
+    прописных букв, также являются общепринятыми -
+    регистр помогает отличить тип указателя от типа
+    объекта, на который ссылается данный указатель.
+    Как бы то ни было, я все равно не считаю такую
+    практику полезной. И все же определения в SDK
+    записаны именно так, к тому же они соответствуют
+    стандартам Windows, поэтому мы должны учесть это
+    обстоятельство и следовать ему в своих
+    программах.</font> </p>
+    <p><font face="Times New Roman" size="2">В библиотеке SdPlus я
+    определил тип указателя так, как показано ниже,
+    для тех немногочисленных случаев, когда функция
+    получает в качестве аргумента указатель на
+    интерфейс:</font> </p>
+    <p><font face="Arial" size="2">void AttachVisual(IDirect3DRMVisual* pIVisual);</font> </p>
+    <p><font face="Times New Roman" size="2">Почти все интерфейсные
+    функции возвращают значение типа HRESULT, которое
+    проверяется в моих программах следующим образом:</font>
+    </p>
+    <p><font face="Times New Roman" size="2">ASSERT;SUCCEEDED(m_hr)) ;</font> </p>
+    <p><font face="Times New Roman" size="2">А иногда проверка выглядит
+    так:</font> </p>
+    <p><font face="Times New Roman" size="2">return SUCCEEDED(m_hr);</font> </p>
+    <p><font face="Times New Roman" size="2">Обратите внимание -
+    СОМ-интерфейсы могут возвращать значение S_FALSE,
+    которое свидетельствует об ошибке, но успешно
+    проходит проверку макроса SUCCEEDED. Ни один из
+    интерфейсов Direct3D не возвращает S_FALSE, поэтому
+    использование макросов SUCCEEDED и FAILED всегда будет
+    давать правильный результат.</font> </p>
+    <p><font face="Times New Roman" size="2">Давайте пройдемся по
+    интерфейсам, производным от IDirect3DRMObject и
+    изображенным на рис. 3-1, и кратко рассмотрим
+    назначение каждого из них.</font> </p>
+    <p><font face="Arial" size="3"><b>IDirect3DRMDevice</b></font> </p>
+    <p><font face="Times New Roman" size="2">Интерфейс содержит
+    управляющие функции, которые влияют на
+    отображение макета в вашем окне. Функции
+    работают со вспомогательным слоем Direct3D, и, в
+    сущности, со многими аспектами физического
+    устройства вывода. Вероятнее всего, вы будете
+    пользоваться этим интерфейсом для изменения
+    качества визуализации с помощью функции SetQuality.
+    Кроме того, функция SetShades интерфейса IDirect3DRMDevice
+    служит для ограничения количества цветовых
+    оттенков при работе с палитрами. В качестве
+    примера давайте посмотрим, как устанавливается
+    качество визуализации. Ниже приведена
+    реализация функции SetQuality в классе C3dDevice (он
+    находится в файле 3dStage.cpp):</font> </p>
+    <p><font face="Times New Roman" size="2">void C3dDevice::SetQuality(D3DRMRENDERQUALITY
+    quality), {</font> </p>
+    <p><font face="Times New Roman" size="2">if (!m_pIDevice) return;</font> </p>
+    <p><font face="Arial" size="2">m hr = m pIDevice-&gt;SetQuality (quality) ;</font> </p>
+    <p><font face="Arial" size="2">AiSERT(SUCCEEDED(m_hr)) ;</font> </p>
+    <p><font face="Arial" size="2">)</font> </p>
+    <p><font face="Times New Roman" size="2">А вот как функция C3dDevice:
+    :SetQuality используется при первом создании объекта
+    C3dStage и инициализации переменной m_Quality значением
+    D3DRMRENDERJ30URARD:</font> </p>
+    <p><font face="Times New Roman" size="2">BOOL C3dStage::Create(CDirect3D* pD3D) (</font> </p>
+    <p><font face="Times New Roman" size="2">// Установить текущее
+    качество визуализации m_Device.SetQuality(m_Quality);</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Times New Roman" size="2">Качество визуализации
+    может соответствовать нескольким уровням - от
+    простейшего &lt;проволочного каркаса&gt; до
+    закраски методом Гуро, как показано в табл. 3-1. Я
+    выбрал в качестве стандартной закраску Гуро
+    (одна из технологий для получения плавной
+    закраски), поскольку, на мой взгляд, она дает
+    самый реалистичный результат.</font> </p>
+    <p><font face="Arial" size="2"><b>Таблица 3-1. Возможные значения
+    параметров функции SetQuality</b></font> </p>
+    <table align="left" border="0">
+<TBODY>
+      <tr>
+        <td><font face="Times New Roman" size="2">Качество визуализации</font>
+        </td>
+        <td colSpan="3"><font face="Times New Roman" size="2">Закраска Освещение
+        Заполнение</font> </td>
+      </tr>
+      <tr>
+        <td><font face="Times New Roman" size="2">D3DRMRENDER WIREFRAME</font> </td>
+        <td><font face="Times New Roman" size="2">Однородная</font> </td>
+        <td><font face="Times New Roman" size="2">Нет</font> </td>
+        <td><font face="Times New Roman" size="2">Нет</font> </td>
+      </tr>
+      <tr>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td><font face="Times New Roman" size="2">(&lt;проволочный</font> </td>
+      </tr>
+      <tr>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td><font face="Times New Roman" size="2">каркас&gt;)</font> </td>
+      </tr>
+      <tr>
+        <td><font face="Times New Roman" size="2">D3DRMRENDER UNLITFLAT</font> </td>
+        <td><font face="Times New Roman" size="2">Однородная</font> </td>
+        <td><font face="Times New Roman" size="2">Нет</font> </td>
+        <td><font face="Times New Roman" size="2">Сплошное</font> </td>
+      </tr>
+      <tr>
+        <td><font face="Times New Roman" size="2">D3DRMRENDER FLAT</font> </td>
+        <td><font face="Times New Roman" size="2">Однородная</font> </td>
+        <td><font face="Times New Roman" size="2">Да</font> </td>
+        <td><font face="Times New Roman" size="2">Сплошное</font> </td>
+      </tr>
+      <tr>
+        <td><font face="Times New Roman" size="2">D3DRMRENDER GOURARD</font> </td>
+        <td><font face="Times New Roman" size="2">Метод Гуро</font> </td>
+        <td><font face="Times New Roman" size="2">Да</font> </td>
+        <td><font face="Times New Roman" size="2">Сплошное</font> </td>
+      </tr>
+      <tr>
+        <td><font face="Times New Roman" size="2">D3DRMRENDERPHONG</font> </td>
+        <td><font face="Times New Roman" size="2">Метод Фонга</font> </td>
+        <td><font face="Times New Roman" size="2">Да</font> </td>
+        <td><font face="Times New Roman" size="2">Сплошное&quot;</font> </td>
+      </tr>
+      <tr>
+        <td><font face="Times New Roman" size="2">* He поддерживается и Direct3D
+        версии</font> </td>
+        <td><font face="Times New Roman" size="2">2 (DircctX 2).</font> </td>
+        <td></td>
+        <td></td>
+      </tr>
+</TBODY>
+    </table>
+    <p><br clear="all">
+    </p>
+    <p><font face="Times New Roman" size="2">ПРИМЕЧАНИЕ</font> </p>
+    <p><font face="Arial" size="2">Многие функции библиотеки 3dPlus
+    возвращают значение типа BOOL, которое показывает,
+    успешно ли завершилась функция. Тем не менее я
+    решил, что некоторые функции могут закончиться
+    неудачей лишь при полной катастрофе, и такие
+    функции не возвращают никакого значения. Вместо
+    этого в функцию включается директива ASSERT,
+    которая отлавливает любые возможные проблемы.</font>
+    </p>
+    <p><font face="Arial" size="4"><b>IDirect3DRMViewport</b></font> </p>
+    <p><font face="Times New Roman" size="2">Интерфейс IDirect3DRMViewport
+    управляет работой проекционной системы,
+    изображенной на рис. 3-2 и преобразующей
+    пространственные координаты в двумерные
+    координаты на экране вашего компьютера. Функция
+    SetBack используется для задания положения задней
+    отсекающей плоскости на оси z. Функция SetField
+    изменяет фокальное расстояние камеры,
+    воспроизводящей макет.</font> </p>
+    <p><a href="http://usinsk.parma.ru/directx/63.jpg"><img alt="63.jpg" border="0" hspace="3"
+    src="63_small.jpg" vspace="3" width="300" height="162"></a> <br clear="all">
+    </p>
+    <p><font face="Arial" size="2">Положение Угол обзора камеры
+    камеры</font> </p>
+    <p><font face="Arial" size="2">Задняя отсекающая <u>'&quot; </u>плоскость</font>
+    </p>
+    <p><font face="Arial" size="2"><b>Рис. 3-2.</b> Проекционная система</font>
+    </p>
+    <p><font face="Times New Roman" size="2">Функция SetProjection
+    определяет, следует ли применять к изображению
+    корректировку перспективы, или же объекты должны
+    воспроизводиться в простой ортогональной
+    проекции. В большинстве случаев следует
+    пользоваться перспективной проекцией для
+    повышения реализма. Коррекция перспективы
+    рассматривается в главе 8, где мы будем изучать
+    наложение текстур.</font> </p>
+    <p><font face="Times New Roman" size="2">Помимо определения
+    исходных условий, основное назначение этого
+    интерфейса связано с выбором объектов в макете.
+    Функция Pick определяет, какой объект (если он
+    имеется) лежит под заданной точкой экрана. Мы
+    подробнее рассмотрим эту функцию в главе 7.</font> </p>
+    <p><font face="Arial" size="3"><b>IDirect3DRMFace</b></font> </p>
+    <p><font face="Times New Roman" size="2">Интерфейс IDirect3DRMFace
+    позволяет определить или задать атрибуты одной
+    грани трехмерного объекта. Например, вы можете
+    задать цвет грани функцией SetColor, или же получить
+    вектор, направленный по нормали к ней, функцией
+    GetNormal. Для получения указателя на интерфейс
+    IDirect3DRMFace обычно следует запросить у интерфейса
+    IDirectSDRMMeshBuiIder список граней, после чего выбрать из
+    возвращаемого массива одну конкретную грань.
+    Присвоение цвета грани в функции C3dShape::SetFaceColor
+    происходит следующим образом:</font> </p>
+    <p align="center"><font face="Times New Roman" size="2">BOOL C3dShape::SetFaceColor(int
+    nFace, double r, double g,</font> </p>
+    <p><font face="Times New Roman" size="2">double b) {</font> </p>
+    <p><font face="Times New Roman" size="2">if (nFace &gt;= GetFaceCount()) return FALSE;</font>
+    </p>
+    <p><font face="Times New Roman" size="2">// Получить список граней
+    IDirect3DRMFaceArray* pIFaces = NULL;</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT&lt;m_pIMeshBld) ;</font> </p>
+    <p><font face="Times New Roman" size="2">m_hr = m_pIMeshBld-&gt;GetFaces (&amp;pl Faces);</font>
+    </p>
+    <p><font face="Times New Roman" size="2">ASSERT(SUCCEEDED(m_hr)) ;</font> </p>
+    <p><font face="Times New Roman" size="2">// Выбрать из списка нужную
+    грань IDirect3DRMFace* pIFace = NULL;</font> </p>
+    <p><font face="Times New Roman" size="2">m_hr = pIFaces-&gt;GetElement (nFace, SpIFace);</font>
+    </p>
+    <p><font face="Times New Roman" size="2">ASSERT(SUCCEEDED(m_hr)) ;</font> </p>
+    <p><font face="Times New Roman" size="2">// Задать цвет грани m_hr =
+    pIFace-&gt;SetColorRGB(r, g, b) ;</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT(SUCCEEDED(m_hr)) ;</font> </p>
+    <p><font face="Times New Roman" size="2">// Освободить интерфейсы
+    грани и списка граней pIFace-&gt;Release () ;</font> </p>
+    <p><font face="Times New Roman" size="2">pIFaces-&gt;Release () ;</font> </p>
+    <p><font face="Times New Roman" size="2">return TRUE;</font> </p>
+    <p><font face="Arial" size="2">Интерфейсы трехмерной графики <i>^fit</i>
+    69</font> </p>
+    <hr>
+    <p><font face="Arial" size="3"><b>IDirect3DRMLight</b></font> </p>
+    <p><font face="Times New Roman" size="2">Интерфейс IDirect3DRMLight
+    предназначен для управления различными
+    источниками света, поддерживаемыми механизмом
+    визуализации (источники света более подробно
+    рассматриваются в главе 10). Источник света может
+    обладать различными характеристиками, от цвета
+    до закона изменения интенсивности с расстоянием.
+    Приведу простой пример установки цвета
+    источника в функции C3dLight::SetColor:</font> </p>
+    <p><font face="Arial" size="2">BOOL C3dLight::SetColor(double r, double g, double b) {</font>
+    </p>
+    <p><font face="Arial" size="2">ASSERT(m_pILight) ;</font> </p>
+    <p><font face="Arial" size="2">m_hr = m_pILight-&gt;SetColorRGB(D3DVAL(r) , <b>D3DVAL(g),
+    D3DVAL(b));</b></font> </p>
+    <p><font face="Arial" size="2">return SUCCEEDED(m hr) ;</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Times New Roman" size="2">Макрос D3DVAL преобразует
+    величины к формату с плавающей точкой, который
+    используется в механизме визуализации.</font> </p>
+    <p><font face="Arial" size="3"><b>IDirect3DRMWrap</b></font> </p>
+    <p><font face="Times New Roman" size="2"><i>Покрытие</i> (wrap)
+    определяет способ наложения текстуры на объект.
+    Покрытия могут быть плоскими, цилиндрическими,
+    сферическими и хромовыми. Для наложения покрытий
+    (за исключением хромовых) на сетку используется
+    функция Apply. Хромовое покрытие, предназначенное
+    для имитации отражающих поверхностей,
+    накладывается функцией ApplyRelative; при этом
+    текстура ориентируется по отношению к фрейму, а
+    не к объекту, благодаря чему достигается
+    правильное поведение &lt;отражений&gt; даже при
+    вращении объекта.</font> </p>
+    <p><font face="Times New Roman" size="2">Покрытие также можно
+    наложить на одну грань объекта. Ниже приводится
+    функция (из файла 3dlmage.cpp), которая накладывает
+    объект-покрытие C3dWrap на заданную грань объекта
+    C3dShape:</font> </p>
+    <p><font face="Times New Roman" size="2">BOOL C3dWrap::Apply(C3dShape* pShape, int nFace)
+    {</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT(pShape) ;</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT(m_pIWrap) ;</font> </p>
+    <p><font face="Times New Roman" size="2">if (nFace &gt;= pShape-&gt;GetFaceCount () )
+    return FALSE;</font> </p>
+    <p><font face="Times New Roman" size="2">// Получить список граней
+    IDirect3DRMMeshBuiider* pIBId = pShape-&gt;GetMeshBuilder () ;</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT(pIBId) ;</font> </p>
+    <p><font face="Times New Roman" size="2">IDirect3DRMFaceArray* pIFaces = NULL;</font> </p>
+    <p><font face="Times New Roman" size="2">m_hr = pIBld-&gt;GetFaces (&amp;pIFaces) ;</font>
+    </p>
+    <p><font face="Times New Roman" size="2">ASSERT;SUCCEEDED(m_hr)) ;</font> </p>
+    <p><font face="Times New Roman" size="2">// Выбрать из списка нужную
+    грань <b>70</b> <i>ЩЩУ</i> Глава 3. Интерфейсы и классы</font>
+    </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">IDirect3DRMFace* pIFace = NULL;</font> </p>
+    <p><font face="Times New Roman" size="2">m_hr <i>=</i> pIFaces-&gt;GetElement (nFace,
+    SpIFace) ;</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT(SUCCEEDED(m_hr)) ;</font> </p>
+    <p><font face="Times New Roman" size="2">// Наложить покрытие на
+    грань m_hr = m_pIWrap-&gt;Apply(pIFace);</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT(SUCCEEDED(m_hr)) ;</font> </p>
+    <p><font face="Times New Roman" size="2">// Освободить интерфейсы
+    pIFace-&gt;Release () ;</font> </p>
+    <p><font face="Times New Roman" size="2">pIFaces-&gt;Release () ;</font> </p>
+    <p><font face="Times New Roman" size="2">return SUCCEEDED(m_hr) ;</font> </p>
+    <p><font face="Arial" size="2"><i>\</i></font> </p>
+    <p><font face="Arial" size="4"><b>IDirect3DRMMaterial</b></font> </p>
+    <p><font face="Times New Roman" size="2"><i>Материал</i> определяет
+    отражающие свойства поверхности. Используя их,
+    вы можете регулировать блеск поверхности и
+    придавать ей вид, характерный для металла или
+    пластика.</font> </p>
+    <p><font face="Times New Roman" size="2">В общем случае материал
+    имеет два цвета: нормальный и цвет, присущий ему
+    при сильном освещении. Посмотрите на зеленое
+    яблоко при ярко-белом свете. Поверхность яблока
+    выглядит зеленой за исключением тех мест, где на
+    нее падает прямой свет - в этих участках она
+    белая. Цвета, которые вы видите, обусловлены
+    диффузными и зеркальными отражающими свойствами
+    объекта, они имитируются с помощью материала. В
+    главе 8 материалы рассматриваются более
+    подробно.</font> </p>
+    <p><font face="Arial" size="3"><b>IDirect3DRMVisual</b></font> </p>
+    <p><font face="Times New Roman" size="2">Интерфейс IDirect3DRMVisual не
+    содержит собственных функций. Он лишь является
+    базой, от которой порождаются все интерфейсы,
+    которые могут использоваться в качестве
+    визуальных элементов. Хотя в документации по SDK
+    интерфейс IDirect3DRMVisual упоминается довольно часто,
+    обычно он используется лишь как тип аргументов
+    различных функций, как показано в объявлении
+    AddVisual на стр. 64.</font> </p>
+    <p><font face="Arial" size="4"><b>IDirect3DRMFrame</b></font> </p>
+    <p><font face="Times New Roman" size="2">IDirect3DRMFrame используется
+    чаще других интерфейсов и служит для изменения
+    свойств фрейма. Например, можно задать положение
+    фрейма функцией SetPosition или определить его
+    ориентацию функцией SetOrientation. Приведу другой
+    пример - функция SetTexture закрепляет за фреймом
+    текстуру, которая используется сетками,
+    прикрепленными к фрейму в качестве визуальных
+    элементов. Таким образом, одна сетка,
+    определяющая форму объекта, может
+    использоваться с различными текстурами. Ниже
+    приводится функция C3dFraiDe::SetPosition, которая
+    пользуется интерфейсом для установки положения
+    фрейма (при наличии объявления IDirect3DRMFrame* m_plFrame):</font>
+    </p>
+    <p><font face="Arial" size="2">Интерфейсы трехмерной графики
+    '^^i<b> 71</b></font> </p>
+    <hr>
+    <p align="center"><font face="Times New Roman" size="2">void C3dFrame::SetPosition(double
+    x, double y, double z, C3dFrame* pRef)</font> </p>
+    <p><font face="Arial" size="2">[</font> </p>
+    <p><font face="Arial" size="2">ASSERT(m_pIFrame) ;</font> </p>
+    <p><font face="Arial" size="2">m_hr <i>=</i> m_pIFrame-&gt;SetPosition(_GetRef (pRef) ,
+    D3DVAL(x), D3DVAL(y) , D3DVAL(z)) ;</font> </p>
+    <p><font face="Arial" size="2">ASSERT (SUCCEEDED (m_,hr) ) ;</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Times New Roman" size="2">Функция SetRotation задает
+    вращение фрейма вокруг заданного вектора, а
+    функция SetVeiocity - скорость вращения. Такая
+    возможность оказывается полезной, если в вашем
+    макете происходит непрерывное движение и вы не
+    хотите постоянно пересчитывать положение
+    объектов.</font> </p>
+    <p><font face="Times New Roman" size="2">Если фрейм является
+    корневым (то есть не имеет родительского фрейма),
+    можно задать для него фоновое изображение
+    функцией SceneSetBackground или просто выбрать цвет фона
+    функцией SceneSetBackGroundRGB.</font> </p>
+    <p><font face="Arial" size="4"><b>IDirect3DRMMesh</b></font> </p>
+    <p><font face="Times New Roman" size="2">Интерфейс сеток IDirect3DRMMesh в
+    основном используется для задания атрибутов
+    групп внутри сетки. <i>Группой</i> называется набор
+    вершин с общими атрибутами (например, цветом).
+    Группировка сходных элементов повышает
+    производительность визуализации и часто
+    используется абстрактным режимом DirectSD.</font> </p>
+    <p><font face="Times New Roman" size="2">Интерес представляют еще
+    две функции этого интерфейса - функция Save,
+    сохраняющая сетку в файле на диске, и функция
+    Translate, прибавляющая заданное смещение к каждой
+    вершине сетки. Последняя функция особенно
+    полезна для присоединения нескольких сеток к
+    общему фрейму при построении сложной фигуры.</font> </p>
+    <p><font face="Arial" size="3"><b>IDirect3DRMShadow</b></font> </p>
+    <p><font face="Times New Roman" size="2">Интерфейс IDirect3DRMShadow не
+    содержит собственных функций и служит в качестве
+    типа данных для объектов-теней, которые являются
+    разновидностью визуальных элементов. Работа с
+    тенями рассмотрена в главе 10.</font> </p>
+    <p><font face="Arial" size="4"><b>IDirect3DRMMeshBuilder</b></font> </p>
+    <p><font face="Times New Roman" size="2">Комплексный интерфейс,
+    используемый для создания трехмерных объектов.
+    Большая часть функций класса C3dShape реализована
+    именно с помощью интерфейса IDirect3DRMMeshBuilder.
+    Интерфейс содержит много функций, от очень
+    простых (например, Load, загружающей сетку из файла
+    на диске) до более сложных, типа функции AddFaces,
+    которая по списку вершин, нормалей (векторов,
+    обозначающих направление) и описаниям граней
+    создает новый набор граней сетки. О применении
+    сеток для создания трехмерных объектов
+    рассказано в главе 4.</font> </p>
+    <p><font face="Times New Roman" size="2">Ниже приводится функция
+    C3dShape::Create, которая использует интерфейс
+    построения сеток для создания нового объекта по
+    описаниям вершин и граней (при условии, что
+    переменная m_plMeshBld объявлена как указатель на
+    IDirect3DRMMeshBuilder):</font> </p>
+    <p><font face="Arial" size="2"><b>72</b> <i>аЦ^'</i> Глава 3. Интерфейсы
+    и классы</font> </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">BOOL CSdShape::Create(D3DVECTOR* pVectors, int
+    iVectors, D3DVECTOR* pNormals, int iNormals, int* pFaceData, BOOL bAutoGen)</font> </p>
+    <p><font face="Arial" size="2">(</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT(m_pIMeshBld) ;</font> </p>
+    <p><font face="Times New Roman" size="2">// Построить сетку по
+    списку векторов</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT(sizeof(ULONG) == sizeof(int));</font> </p>
+    <p><font face="Times New Roman" size="2">m_hr = m_pIMeshBld-&gt;AddFaces (iVe'ctors,
+    pVectors, iNormals, pNormals, (ULONG*)pFaceData, NULL);</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT(SUCCEEDED(m_hr)) ;</font> </p>
+    <p><font face="Times New Roman" size="2">if ((iNormals == 0) &amp;&amp; bAutoGen) (</font>
+    </p>
+    <p><font face="Times New Roman" size="2">m pIMeshBld-&gt;GenerateNormals () ;</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Times New Roman" size="2">AttachVisual(m_pIMeshBld) ;</font> </p>
+    <p><font face="Times New Roman" size="2">// Разрешить коррекцию
+    перспективы m_pIMeshBld-&gt;SetPerspective (TRUE) ;</font> </p>
+    <p><font face="Times New Roman" size="2">return TRUE;</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Times New Roman" size="2">Интерфейс построения
+    сеток также содержит много справочных функции,
+    предназначенных для получения информации о
+    сетке. Например, можно узнать, сколько граней
+    входит в сетку:</font> </p>
+    <p><font face="Times New Roman" size="2">int C3dShape::GetFaceCount() (</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT(m_pIMeshBld) ;</font> </p>
+    <p><font face="Times New Roman" size="2">int i = (int) m_pIMeshBld-&gt;GetFaceCount () ;</font>
+    </p>
+    <p><font face="Times New Roman" size="2">return i;</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Arial" size="3"><b>IDirect3DRMTexture</b></font> </p>
+    <p><font face="Times New Roman" size="2"><i>Текстурой</i> (texture)
+    называется изображение, которое накладывается
+    на фигуры или на их отдельные грани для придания
+    им большего реализма. Функции интерфейса
+    IDirect3DRMTexture чаще всего используются для
+    управления процессом визуализации текстур.
+    Например, если вы желаете ограничить количество
+    цветов при воспроизведении текстуры, следует
+    вызвать функцию SetShades. В противном случае одна
+    насыщенная цветами текстура может заполнить всю
+    палитру и не оставить в ней места для других
+    фигур и текстур.</font> </p>
+    <p><font face="Times New Roman" size="2">Функция SetDecalTransparencyColor
+    задает прозрачные области текстуры. <i>Де-калом</i>
+    (decal) называется текстура, которая
+    воспроизводится непосредственно как визуальный
+    элемент и обычно представляет собой что-то вроде
+    плоского спрайта, всегда обращенного лицевой
+    стороной к камере. Тем не менее прозрач-</font> </p>
+    <p><font face="Arial" size="2">Интерфейсы трехмерной графики
+    '^Ѓр1 73</font> </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">ные текстуры вовсе не
+    обязаны использоваться в качестве декалов.
+    Текстуры подробнее рассмотрены в главе 8, а
+    спрайты - в главе 9.</font> </p>
+    <p><font face="Arial" size="4"><b>Библиотека классов 3dPlus</b></font> </p>
+    <p><font face="Times New Roman" size="2">В предыдущих главах уже
+    говорилось, что библиотека классов 3dPlus не
+    претендует на роль ведущего средства для работы
+    с функциями Direct3D. Я спроектировал ее лишь для
+    того, чтобы исследовать концепции трехмерной
+    графики более удобным и привычным способом, чем с
+    использованием СОМ-интерфейсов. Для разработки
+    трехмерных приложений эта библиотека не нужна,
+    однако ее использование в качестве учебного
+    средства или основы для настоящей библиотеки
+    может ускорить вашу работу.</font> </p>
+    <p><font face="Times New Roman" size="2">Для проверки указателей и
+    различных условий в библиотеке применяются
+    директивы ASSERT. Во многих случаях ошибки в ваших
+    программах приведут к тому, что отладчик Visual C++
+    остановится на директиве ASSERT вместо того, чтобы
+    заглохнуть где-нибудь в ядре библиотеки
+    трехмерной графики.</font> </p>
+    <p><font face="Times New Roman" size="2">Многие классы 3dPlus
+    представляют собой простейшие оболочки для
+    интерфейсов Direct3D. Отдельные классы
+    предоставляют более высокий уровень
+    функциональности, чем интерфейс. В любом случае я
+    старался сделать так, чтобы вы могли максимально
+    просто обойти класс и напрямую обратиться к
+    базовому интерфейсу. Для этого в большинстве
+    классов библиотеки присутствует функция Getlnterface,
+    которая возвращает указатель на базовый
+    интерфейс. Обратите внимание на то, что перед
+    возвращением указателя она <i>не</i> вызывает
+    функцию AddRef, так что в этом случае вам <i>не</i>
+    следует вызывать функцию Release для указателя -
+    относитесь к нему, как к обычному указателю на
+    объект класса C++.</font> </p>
+    <p><font face="Times New Roman" size="2">На рис. 3-3 изображена
+    иерархия классов библиотеки 3dPlus. Я не стал
+    включать в нее классы, относящиеся
+    непосредственно к программному слою DirectDraw. Все
+    классы на рис. 3-3 относятся к абстрактному режиму
+    Direct3D.</font> </p>
+    <p><font face="Times New Roman" size="2">Классы библиотеки делятся
+    на три группы: производные непосредственно от
+    C3d0bject, производные от C3dVisual и производные от CSdFrame.
+    Если вы посмотрите на иерархию Direct3D,
+    изображенную на рис. 3-1 на стр. 65, то увидите, что
+    эти две иерархии во многом схожи. Основное
+    отличие между ними заключается в том, что я
+    сделал некоторые классы производными от C3dFi-ame,
+    чтобы объекты этих классов могли иметь
+    собственное положение и направление и при этом
+    выступать в роли визуальных элементов.
+    Следовательно, по отношению к интерфейсам это
+    означает, что классы, производные от CSdFrame,
+    используют оба интерфейса - IDirect3DRMFrame и IDirecGDRMVisual.
+    Давайте кратко познакомимся с классами 3dPlus,
+    узнаем их назначение и в отдельных случаях
+    посмотрим, как ими пользоваться.</font> </p>
+    <p><font face="Arial" size="4"><b>C3dEngine</b></font> </p>
+    <p><font face="Times New Roman" size="2">Класс C3dEngine объединяет
+    несколько глобальных функций механизма
+    визуализации. Библиотека классов 3dPlus содержит
+    всего один глобальный объект этого класса с
+    именем the3dEngine. Функции данного класса чаще всего
+    используются для создания других объектов,
+    относящихся к механизму визуализации, и
+    возвращают указатель на интерфейс. Обычно вам не
+    придется непосредственно пользоваться этим
+    классом в своих приложениях, однако при создании
+    объектов других классов нередко применяется код
+    C3dEngine. В приведенном ниже примере показано, как
+    работают с объектом the3dEngine:</font> </p>
+    <p><font face="Arial" size="2"><b>74</b> ЃЃу Глава 3. Интерфейсы и
+    классы</font> </p>
+    <hr>
+    <p><a href="http://usinsk.parma.ru/directx/64.jpg"><img alt="64.jpg" border="0" hspace="3"
+    src="64_small.jpg" vspace="3" width="300" height="474"></a> <br clear="all">
+    </p>
+    <p><font face="Arial" size="2"><b>Рис. 3-3.</b> Иерархия классов
+    библиотеки 3dPlus</font> </p>
+    <p><font face="Arial" size="2">Библиотека классов 3dPlus</font> </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">BOOL C3dFrame::Create(C3dFrame* pParent)</font> </p>
+    <p><font face="Arial" size="2">{</font> </p>
+    <p><font face="Times New Roman" size="2">if (m_plFrame) {</font> </p>
+    <p><font face="Times New Roman" size="2">m pIFrame-&gt;Release () ;</font> </p>
+    <p><font face="Times New Roman" size="2">m_plFrame = NULL;</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Times New Roman" size="2">if (!the3dEngine.CreateFrame(_GetRef(pParent),
+    &amp;m_plFrame)) (</font> </p>
+    <p><font face="Times New Roman" size="2">TRACE (&quot;Frame create failedW);</font> </p>
+    <p><font face="Times New Roman" size="2">m_plFrame = NULL;</font> </p>
+    <p><font face="Times New Roman" size="2">return FALSE;</font> </p>
+    <p><font face="Times New Roman" size="2">} ASSERT(m_plFrame) ;</font> </p>
+    <p><font face="Times New Roman" size="2">m_pIFrame-&gt;SetAppData ( (ULONG) this) ;</font>
+    </p>
+    <p><font face="Times New Roman" size="2">return TRUE;</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Times New Roman" size="2">Именно функция CreateFrame
+    объекта the3dEngine фактически создает интерфейс
+    фрейма и присваивает указатель на него
+    переменной фрейма m_plFrame.</font> </p>
+    <p><font face="Arial" size="3"><b>C3dMatrix</b></font> </p>
+    <p><font face="Times New Roman" size="2">В механизме визуализации
+    предусмотрена собственная матрица 4х4 для
+    преобразований координат, однако я предпочитаю
+    пользоваться классами C++, поскольку они
+    сокращают объем программного кода. Например,
+    найдите в описании класса C3dFrame на стр. 81 функцию
+    C3dPosCtrl::OnUpdate, и вы увидите, как матрица
+    используется для вращения двух векторов.
+    Программа выглядит до смешного простой, невзирая
+    на сложный математический базис вычислений.
+    Классы C++ позволяют чрезвычайно гибко работать с
+    матрицами, не загромождая программу.</font> </p>
+    <p><font face="Times New Roman" size="2">Разумеется, вы не обязаны
+    пользоваться классами C3dMatrix и C3d Vector. Однако при
+    работе с другими классами библиотеки SdPlus вы
+    увидите, что наличие классов для матриц и
+    векторов упрощает вашу работу. Матрицы подробнее
+    рассмотрены в главе 5.</font> </p>
+    <p><font face="Arial" size="4"><b>C3dDevice</b></font> </p>
+    <p><font face="Times New Roman" size="2">Класс C3dDevice представляет
+    собой простую оболочку для интерфейса IDirect3DRMDevice.
+    Класс C3dStage пользуется C3dDevice для создания
+    окружения, в котором отображаются трехмерные
+    объекты. Вероятно, вам не придется обращаться к
+    объектам этого класса, если только вы не
+    надумаете полностью пересмотреть концепцию
+    сцены. Тем не менее вам может пригодиться функция
+    SetQuality, устанавливающая качество визуализации в
+    вашем приложении. Работу с классом устройства
+    рассмотрим на примере функции для создания
+    сцены:</font> </p>
+    <p><font face="Times New Roman" size="2">BOOL C3dStage::Create(CDirect3D* pD3D) {</font> </p>
+    <p align="center"><font face="Courier New" size="2">// Создать новое
+    устройство по поверхностям Direct3D</font> </p>
+    <p><font face="Arial" size="2"><b>76</b> <i>ШУ</i> Глава 3. Интерфейсы и
+    классы</font> </p>
+    <hr>
+    <p><font face="Courier New" size="2">if (!m_Device.Create(pD3D)) return FALSE;</font> </p>
+    <p><font face="Courier New" size="2">// Установить текущее
+    качество визуализации m_Device.SetQuality(m_Quality) ;</font> </p>
+    <p><font face="Courier New" size="2">}</font> </p>
+    <p><font face="Arial" size="3"><b>C3dViewport</b></font> </p>
+    <p><font face="Times New Roman" size="2">Класс C3dViewport представляет
+    собой простую оболочку для интерфейса
+    IDirectSDRMViewport. Маловероятно, что вам придется
+    непосредственно работать с этим классом,
+    поскольку объект C3dStage берет управление ракурсом
+    на себя. Ниже приводится функция класса сцены,
+    которая воспроизводит на экране текущее
+    состояние макета:</font> </p>
+    <p><font face="Times New Roman" size="2">void C3dStage::Render()</font> </p>
+    <p><font face="Arial" size="2">{</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT(m_plFrame) ;</font> </p>
+    <p><font face="Times New Roman" size="2">// Очистить ракурс m_Viewport.Clear
+    ();</font> </p>
+    <p><font face="Times New Roman" size="2">if (m_pScene) {</font> </p>
+    <p><font face="Times New Roman" size="2">// Воспроизвести макет
+    m_Viewport.Render(m_pScene) ;</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Times New Roman" size="2">// Обновить изображение m
+    Device.Update() ;</font> </p>
+    <p><font face="Arial" size="2">)</font> </p>
+    <p><font face="Times New Roman" size="2">Как видите, пользоваться
+    классами-оболочками очень просто. Различные
+    функции класса скрывают функции базового
+    СОМ-интерфеиса и упрощают программу.</font> </p>
+    <p><font face="Arial" size="3"><b>CSdWrap</b></font> </p>
+    <p><font face="Times New Roman" size="2">Класс C3dWrap (определяемый в
+    Sdlmage.cpp) также в основном используется как
+    оболочка интерфейса IDirectSDRMWrap, однако он обладает
+    и самостоятельной ценностью. Функция Apply
+    реализована в двух версиях. Ниже приведен первый,
+    более простой вариант, при котором покрытие
+    накладывается на весь объект:</font> </p>
+    <p><font face="Times New Roman" size="2">BOOL C3dWrap::Apply(CSdShape* pShape) (</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT(pShape) ;</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT(m_pIWrap) ;</font> </p>
+    <p><font face="Times New Roman" size="2">HRESULT hr;</font> </p>
+    <p><font face="Arial" size="2">Библиотека классов 3dPlus ^Ш<b> 77</b></font>
+    </p>
+    <hr>
+    <p><font face="Courier New" size="2">hr = m_pIWrap-&gt;Apply(pShape-&gt;GetVisual () ) ;</font>
+    </p>
+    <p><font face="Courier New" size="2">return SUCCEEDED(hr) ;</font> </p>
+    <p><font face="Courier New" size="2"><i>)</i></font> </p>
+    <p><font face="Times New Roman" size="2">Второй вариант,
+    приведенный на стр. 70, накладывает покрытие лишь
+    на одну грань.</font> </p>
+    <p><font face="Times New Roman" size="2">Наличие двух разных
+    вариантов функции Apply упрощает код и
+    одновременно сохраняет гибкость в реализации.
+    Покрытия, в том числе и хромовые, подробно
+    рассмотрены в главе 8, посвященной текстурам.</font> </p>
+    <p><font face="Arial" size="4"><b>C3dVisual</b></font> </p>
+    <p><font face="Times New Roman" size="2">Базовый класс для всех
+    классов, объекты которых используются в качестве
+    визуальных элементов макета. C3dVisual содержит
+    переменную, в которой хранится имя объекта. Для
+    задания и получения этого имени служат функции
+    SetName и GetName. Имена помогают при выделении объектов
+    с помощью мыши - отображение имени объекта
+    позволяет проверить выбор.</font> </p>
+    <p><font face="Arial" size="4"><b>C3dlmage</b></font> </p>
+    <p><font face="Times New Roman" size="2">Единственный класс,
+    который не пользуется никакими интерфейсами,
+    входящими в механизм визуализации. Он
+    предназначен для загрузки изображений из файлов
+    на диске или ресурсов приложения и их
+    последующего использования в качестве текстур
+    или декалов. Механизм визуализации определяет
+    для таких изображений специальную структуру с
+    именем D3DRMIMAGE. Класс C3dlmage пользуется ей для
+    хранения данных загруженного изображения. В
+    приведенном ниже примере класс C3dlmage применяется
+    для загрузки из файла на диске изображения,
+    которое будет использовано в качестве фонового
+    изображения макета:</font> </p>
+    <p><font face="Times New Roman" size="2">C3dlmage* pimg = new C3dlmage;</font> </p>
+    <p><font face="Times New Roman" size="2">if ( !pImg-&gt;Load() ) {</font> </p>
+    <p><font face="Times New Roman" size="2">delete pimg;</font> </p>
+    <p><font face="Times New Roman" size="2">return;</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT(m_pScene) ;</font> </p>
+    <p><font face="Times New Roman" size="2">m pScene-&gt;m_ImgList .Append (pimg) ;</font> </p>
+    <p><font face="Times New Roman" size="2">m_pScene~&gt;SetBackground (pimg) ;</font> </p>
+    <p><font face="Times New Roman" size="2">Функция C3dlmage::Load вызвана
+    без аргументов, поэтому на экране появляется
+    окно диалога. Здесь пользователь может выбрать
+    растровый (bitmap) файл Windows, который будет служить
+    фоновым изображением. Кроме того, загружаемый
+    растр можно выбрать и другим способом - передавая
+    функции Load имя файла или идентификатор
+    растрового ресурса. В приведенном ниже примере
+    мы загружаем растровый ресурс и затем используем
+    его для создания текстуры:</font> </p>
+    <p><font face="Times New Roman" size="2">// Загрузить изображение
+    земного шара C3dlmage* pimgl = new C3dlmage;</font> </p>
+    <p><font face="Times New Roman" size="2">if ( !pImgl-&gt;Load(IDB_WORLD) ) {</font> </p>
+    <p><font face="Arial" size="2"><b>78</b> <i>Щу</i> Глава 3. Интерфейсы и
+    классы</font> </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">AfxMessageBox(&quot;Failed to load
+    worldl.bmp&quot;);</font> </p>
+    <p><font face="Times New Roman" size="2">delete pimgl;</font> </p>
+    <p><font face="Times New Roman" size="2">return;</font> </p>
+    <p><font face="Times New Roman" size="2">} m_pScene-&gt;m_ImgList. Append (pimgl) ;</font>
+    </p>
+    <p><font face="Times New Roman" size="2">// Создать текстуру по
+    изображению C3dTexture texl;</font> </p>
+    <p><font face="Arial" size="2">texl.Create(pimgl);</font> </p>
+    <p><font face="Arial" size="4"><b>C3dTexture</b></font> </p>
+    <p><font face="Times New Roman" size="2">Класс C3dTexture (определяемый
+    в 3dlmage.cpp) является оболочкой интерфейса
+    IDirect3DRMTexture. Как видно из приведенного выше
+    примера, текстуры создаются на основе
+    графических изображений. Размеры сторон у таких
+    изображений должны быть равны степеням двойки.
+    Так, параметры 32х64, 128х128 и 4х8 подходят для
+    создания текстур; а величины 32х45 и 11х16 являются
+    недопустимыми. Если изображение имеет
+    неправильный размер, функция C3dTexture::Create
+    завершится неудачей:</font> </p>
+    <p><font face="Arial" size="2">BOOL C3dTexture::Create() {</font> </p>
+    <p><font face="Arial" size="2">if (m_pITexture) (</font> </p>
+    <p><font face="Arial" size="2">m_pITexture-&gt;Release () ;</font> </p>
+    <p><font face="Arial" size="2">m_pITexture <i>=</i> NULL;</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Times New Roman" size="2">// Убедиться, что размеры
+    изображения равны степеням 2 for (int i <i>= 0;</i> (1 &lt;&lt; i)
+    &lt; GetWidth(); i++);</font> </p>
+    <p><font face="Arial" size="2">for (int j <i>= 0;</i> (1 &lt;&lt; j) &lt; GetHeight();
+    j++);</font> </p>
+    <p><font face="Arial" size="2">if (GetWidthf) != (1 &lt;&lt; i) ЃЃ GetHeightO
+    !=&quot;(1&quot; &lt;&lt; j)) ( TRACE(&quot;This image can't be used as a texture.&quot;\
+    &quot; Its sides are not exact powers of 2\n&quot;);</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Times New Roman" size="2">if (!the3dEngine.CreateTexture(GetObject(),
+    &amp;m_pITexture)) {</font> </p>
+    <p><font face="Times New Roman" size="2">TRACE(&quot;Texture create failed\n&quot;);</font>
+    </p>
+    <p><font face="Times New Roman" size="2">m pITexture = NULL;</font> </p>
+    <p><font face="Times New Roman" size="2">return FALSE;</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Courier New" size="2">ASSERT(m_pITexture) ;</font> </p>
+    <p><font face="Courier New" size="2">return TRUE;</font> </p>
+    <p><font face="Courier New" size="2">}</font> </p>
+    <p><font face="Times New Roman" size="2">Текстуры воспроизводятся
+    на экране с учетом покрытий. Покрытие определяет
+    алгоритм, в соответствии с которым текстура
+    накладывается на объект.</font> </p>
+    <p><font face="Arial" size="2">^^teb Библиотека классов SdPlus ж! 79</font>
+    </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">Приведенный ниже фрагмент
+    создает текстуру по готовому изображению и затем
+    накладывает ее на фигуру с использованием
+    цилиндрического покрытия:</font> </p>
+    <p><font face="Times New Roman" size="2">C3dlmage* pimgl = new C3dlmage;</font> </p>
+    <p><font face="Times New Roman" size="2">pImgl-&gt;Load(IDB_LEAVES) ;</font> </p>
+    <p><font face="Times New Roman" size="2">C3dTexture texl;</font> </p>
+    <p><font face="Times New Roman" size="2">texl.Create(pimgl) ;</font> </p>
+    <p><font face="Courier New" size="2">C3dWrap wrap;</font> </p>
+    <p><font face="Courier New" size="2">wrap.Create(D3DRMWRAP_CYLINDER, NULL,</font> </p>
+    <p><font face="Courier New" size="2">0, 0, 0, // Начало координат</font> </p>
+    <p><font face="Courier New" size="2">О, 0, 1, // Направление</font> </p>
+    <p><font face="Courier New" size="2">О, 1, 0 // Вверх</font> </p>
+    <p><font face="Courier New" size="2">О, 0, // Начало текстуры</font> </p>
+    <p><font face="Courier New" size="2">1, 1); // Масштаб текстуры</font> </p>
+    <p><font face="Courier New" size="2">pTree-&gt;SetTexture (Stexl) ;</font> </p>
+    <p><font face="Courier New" size="2">wrap.Apply(pTree);</font> </p>
+    <p><font face="Arial" size="4"><b>C3dFrame</b></font> </p>
+    <p><font face="Times New Roman" size="2">Класс C3dFrame является
+    оболочкой интерфейса IDirect3DRMFrame и включает
+    несколько дополнительных функций, облегчающих
+    работу с ним. Фреймы содержат ряд атрибутов, в
+    число которых входит положение фрейма и его
+    ориентация в трехмерном пространстве. Положение
+    фрейма устанавливается функцией SetPosition, а
+    ориентация (то есть направление, в котором <i>обращен</i>
+    фрейм) - функцией SetDirection. Для точного определения
+    ориентации необходимо указать два вектора.
+    Первый вектор описывает <i>переднее</i>
+    направление, а второй - <i>верхнее.</i> Рассмотрим
+    ситуацию на примере летящего самолета. Передний
+    вектор (или вектор направления) - это курс, по
+    которому летит самолет, то есть направление, в
+    котором ориентирован его нос. Верхний вектор
+    показывает, куда обращено хвостовое перо
+    самолета - вверх, вниз, влево и т. д. Для некоторых
+    объектов верхний вектор оказывается
+    несущественным. Например, в вашем макете может
+    присутствовать конус, указывающий на некоторый
+    объект. Ориентация конуса совпадает с
+    направлением, куда смотрит его вершина. Верхний
+    вектор не имеет никакого значения, поскольку при
+    вращении конуса вокруг продольной оси его
+    внешний вид не меняется. Чтобы упростить вашу
+    работу, функция SetDirection позволяет задать только
+    передний вектор и определяет верхний вектор за
+    вас. Вот как это делается:</font> </p>
+    <p align="center"><font face="Times New Roman" size="2">void C3dFrame::SetDirection(double
+    dx, double dy, double dz,</font> </p>
+    <p><font face="Times New Roman" size="2">C3dFrame* pRef) f</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT(m_pIFrame) ;</font> </p>
+    <p><font face="Times New Roman" size="2">// Создать передний вектор
+    C3dVector d(dx, dy, dz);</font> </p>
+    <p><font face="Arial" size="2"><b>80</b></font> </p>
+    <p><font face="Arial" size="2">Глава З. Интерфейсы и классы</font> </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">// Сгенерировать верхний
+    вектор C3dVector u = d.GenerateUpO;</font> </p>
+    <p><font face="Times New Roman" size="2">SetDirection(d.x, d.y, d.z, u.x, u.y, u.z, pRef);</font>
+    </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Times New Roman" size="2">Класс C3dVector содержит ряд
+    функции для генерации верхних векторов,
+    благодаря которым работа с классом упрощается до
+    предела. Мне это нравится.</font> </p>
+    <p><font face="Times New Roman" size="2">Во всех функциях для
+    определения положения и ориентации присутствует
+    обязательный аргумент - эталонный фрейм (pRef в
+    приведенном выше примере). Он чрезвычайно важен,
+    поскольку ваш фрейм может находиться в
+    произвольном месте иерархии фреймов, а его
+    положение определяется его собственным
+    преобразованием вместе с преобразованиями всех
+    родительских фреймов. Это напоминает бег по
+    кухне; если перенести ваш дом из Вашингтона в
+    Колорадо, вы все равно сможете бегать по кухне, но
+    ваше положение на планете при этом изменится.
+    Другими словами, любые перемещения происходят по
+    отношению к некоторому эталонному фрейму. Для
+    удобства можно передать вместо эталонного
+    фрейма NULL, и тогда за эталон будет принят
+    фрейм-родитель. Примером использования
+    эталонного фрейма служит функция из файла
+    SdlnCtlr.cpp, которая позиционирует объекты в макете
+    по мере того, как пользователь перемещает их с
+    помощью клавиатуры, мыши или джойстика:</font> </p>
+    <p><font face="Times New Roman" size="2">void C3dPosCtlr::OnUpdate(_3DINPUTSTATE&amp;<b>
+    st,</b></font> </p>
+    <p><font face="Times New Roman" size="2">C3dFrame* pFrame) {</font> </p>
+    <p><font face="Times New Roman" size="2">// Получить указатель на
+    сцену, которая будет</font> </p>
+    <p><font face="Times New Roman" size="2">// использоваться</font> </p>
+    <p><font face="Times New Roman" size="2">// в качестве эталона при
+    определении положений</font> </p>
+    <p><font face="Times New Roman" size="2">// фреймов и т. д.</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT(m_pWnd) ;</font> </p>
+    <p><font face="Times New Roman" size="2">C3dStage* pStage = m_pWnd-&gt;GetStage () ;</font>
+    </p>
+    <p><font face="Times New Roman" size="2">ASSERT(pStage) ;</font> </p>
+    <p><font face="Times New Roman" size="2">double x, y, z;</font> </p>
+    <p><font face="Times New Roman" size="2">pFrame-&gt;GetPosition (x, y, z, pStage);</font> </p>
+    <p><font face="Times New Roman" size="2">x += st.dX * 0.1;</font> </p>
+    <p><font face="Times New Roman" size="2">y += st.dY * 0.1;</font> </p>
+    <p><font face="Times New Roman" size="2">z += st.dZ * 0.1;</font> </p>
+    <p><font face="Times New Roman" size="2">pFrame-&gt;SetPosition (x, y, z, pStage);</font> </p>
+    <p><font face="Arial" size="2">C3dVector d, u;</font> </p>
+    <p><font face="Arial" size="2">pFrame-&gt;GetDirection (d, u, pStage);</font> </p>
+    <p><font face="Arial" size="2">// Повернуть вектор направления
+    и верхний вектор double a = 3.0;</font> </p>
+    <p><font face="Arial" size="2">C3dMatrix<b> r;</b></font> </p>
+    <p><font face="Arial" size="2">r.Rotatef-st.dR * a, -st.dU * a, -st.dV * a) ;</font> </p>
+    <p><font face="Arial" size="2">d = r * d;</font> </p>
+    <p><font face="Arial" size="2">u = r * u;</font> </p>
+    <p><font face="Arial" size="2">pFrame-&gt;SetDirection (d, u, pStage);</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Arial" size="2">Библиотека классов SdPlus <i>'^Ш</i><b>
+    81</b></font> </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">Нетрудно убедиться, что
+    все положения объектов задаются относительно
+    сцены; именно на такое поведение рассчитывает
+    пользователь, когда он перемещает объекты по
+    сцене.</font> </p>
+    <p><font face="Arial" size="4"><b>C3dScene</b></font> </p>
+    <p><font face="Times New Roman" size="2">Класс C3dScene содержит всю
+    информацию, необходимую для описания макета:</font> </p>
+    <p><font face="Times New Roman" size="2">источники света, список
+    фигур, текущее фоновое изображение и настройку
+    камеры. В любой момент времени к сцене может быть
+    присоединен только один объект-макет C3dScene. Макет
+    содержит встроенный источник рассеянного света,
+    параметры которого задаются функцией SetAmbientLight.
+    Вы можете включить в макет и другие источники
+    света, вызывая функцию AddLight. Макет возглавляет
+    всю иерархию фреймов, поэтому трехмерные фигуры
+    (которые также являются фреймами) присоединяются
+    к ней функцией AddChild. Вы можете задать цвет фона
+    макета функцией SetBackgroiind(r, g, Ь) или же вместо этого
+    указать фоновое изображение, для чего
+    используется функция SetBackground(plmage). Функция Move
+    обновляет положение всех движущихся объектов
+    макета и воспроизводит текущий макет в окне
+    приложения. Вызов функции Move приводит к каким-то
+    результатам лишь в том случае, если макет
+    присоединен к сцене. В объекте C3dScene также
+    хранятся векторы, определяющие положение и
+    направление камеры. Значения этих векторов
+    задаются функциями SetCameraPosition и SetCameraDirection.
+    Приведенный ниже фрагмент программы создает
+    новый макет и задает исходные параметры
+    источников света:</font> </p>
+    <p><font face="Times New Roman" size="2">// Создать исходный макет
+    m_pScene = new C3dScene;</font> </p>
+    <p><font face="Times New Roman" size="2">if ( !m_pScene-&gt;Create () ) return FALSE;</font>
+    </p>
+    <p><font face="Times New Roman" size="2">// Установить источники
+    света C3dDirLight dl;</font> </p>
+    <p><font face="Times New Roman" size="2">dl.Create(0.8, 0.8, 0.8);</font> </p>
+    <p><font face="Times New Roman" size="2">m_pScene-&gt;AddChild(&amp;dl) ;</font> </p>
+    <p><font face="Times New Roman" size="2">dl.SetPosition(-2, 2, -5);</font> </p>
+    <p><font face="Times New Roman" size="2">dl.SetDirection(1, -1, 1);</font> </p>
+    <p><font face="Times New Roman" size="2">m_pScene-&gt;SetAmbientLight (0 . 4, 0.4, 0.4);</font>
+    </p>
+    <p><font face="Times New Roman" size="2">В данном случае уровень
+    рассеянного освещения установлен довольно
+    низким, а для освещения фигур, которые будут
+    включены в макет, добавлен направленный источник
+    света, который светит вниз из левого верхнего
+    угла.</font> </p>
+    <p><font face="Times New Roman" size="2">Объект C3dScene содержит два
+    объекта-списка, которые облегчают работу с
+    макетами. Список m_ShapeList помогает определить
+    перечень объектов C3dShape, а список mJmageUst - объектов
+    C3dlmage, удаляемых при уничтожении макета. Новью
+    объекты заносятся в эти списки только при вызове
+    функции Append объекта-списка. Вы не можете свободно
+    манипулировать содержимым этих списков.</font> </p>
+    <p><font face="Arial" size="3"><b>C3dSprite</b></font> </p>
+    <p><font face="Times New Roman" size="2">Класс C3dSprite поддерживает
+    работу с плоскими объектами в объемном мире. В
+    документации по DirectX 2 SDK такие спрайты именуются <i>декадами.</i>
+    В главе 9</font> </p>
+    <p><font face="Arial" size="2"><b>82</b> <i>ЩЦ^</i> Глава 3. Интерфейсы
+    и классы</font> </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">показано, как можно
+    пользоваться спрайтами в играх, где
+    производительность важнее подлинной объемности
+    изображения. Класс CSdSprite является производным от
+    CSdFrame, поэтому спрайты обладают теми же
+    возможностями позиционирования, что и
+    трехмерные объекты.</font> </p>
+    <p><font face="Arial" size="4"><b>CSdCamera</b></font> </p>
+    <p><font face="Times New Roman" size="2">Класс СЗсЮатега не
+    содержит собственных функций и в сущности вообще
+    ничего не делает. Он является производным от C3dFrame
+    и позволяет установить положение и ориентацию
+    камеры - все, что нужно, чтобы камера пронеслась
+    над макетом или просто была обращена в одном
+    направлении.</font> </p>
+    <p><font face="Arial" size="4"><b>C3dShape</b></font> </p>
+    <p><font face="Times New Roman" size="2">Класс C3dShape сочетает
+    функциональность интерфейсов фрейма и
+    визуального элемента, что позволяет создавать
+    трехмерные фигуры, для которых можно задать
+    непосредственное расположение в макете. Одна
+    фигура легко присоединяется к другой в качестве
+    потомка, так что вы можете строить сложные
+    фигуры. В класс входит несколько функций,
+    предназначенных для создания простых
+    геометрических фигур (сфер, цилиндров и конусов),
+    а также функция Load, которая позволяет создать
+    объект по данным из файла .х. Вы можете задать
+    цвет и текстуру всей фигуры или ее отдельных
+    граней. При наложении текстур на отдельные грани
+    имеются ограничения, о которых рассказано в
+    главе 8. В приведенном ниже примере мы создаем
+    простую геометрическую фигуру и присоединяем ее
+    к текущему макету:</font> </p>
+    <p><font face="Times New Roman" size="2">C3dShape shi;</font> </p>
+    <p><font face="Times New Roman" size="2">shi.CreateCube(2) ;</font> </p>
+    <p><font face="Times New Roman" size="2">m_pScene-&gt;AddChild(&amp;shl) ;</font> </p>
+    <p><font face="Times New Roman" size="2">Обратите внимание на то,
+    что объект C3dShape всего лишь является контейнером
+    для интерфейсов фрейма и визуального элемента.
+    После того как фигура будет присоединена к
+    макету или другому фрейму, объект-контейнер
+    оказывается ненужным, потому что для включения
+    фигуры в макет использовались интерфейсы, а не
+    объект C++. Если визуальный элемент,
+    соответствующий одному объекту, будет
+    использован во втором объекте, то второй объект
+    вызывает AddRefдля интерфейсного указателя
+    визуального элемента. Таким образом, даже после
+    уничтожения исходного контейнера и освобождения
+    указателя на интерфейс визуальный элемент все
+    равно продолжит свое существование.</font> </p>
+    <p><font face="Times New Roman" size="2">Хотя я и сказал, что
+    контейнер не обязательно сохранять после
+    завершения его работы, он все же может принести
+    определенную пользу. Дело в том, что пользователь
+    может выбрать объект, с которым желает
+    произвести какие-то манипуляции в макете.
+    Хотелось бы управлять им посредством
+    объекта-контейнера C++. Непонятно? Мы рассмотрим
+    эту тему в главе 6, когда будем изучать
+    манипуляции с объектами, входящими в макет.</font> </p>
+    <p><font face="Arial" size="4"><b>C3dStage</b></font> </p>
+    <p><font face="Times New Roman" size="2">Класс C3dStage используется
+    классом C3dWnd и обеспечивает устройство и ракурс,
+    необходимые для отображения трехмерного макета
+    в окне. Данный класс</font> </p>
+    <p><font face="Arial" size="2">Библиотека классов 3dPlus <i>^iS.</i><b>
+    83</b></font> </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">содержит функции для
+    определения параметров камеры, установки
+    качества визуализации и задания фона для
+    текущего макета. Вряд ли на первых порах вам
+    придется пользоваться всеми функциями этого
+    класса. Вам скорее всего понадобятся функции для
+    определения камеры. Макет можно прикрепить к
+    сцене и в классе C3dWnd, содержащем функцию SetScene,
+    которая передает запрос в класс сцены:</font> </p>
+    <p><font face="Times New Roman" size="2">BOOL C3dWnd::SetScene(C3dScene* pScene)</font> </p>
+    <p><font face="Arial" size="2">{</font> </p>
+    <p><font face="Times New Roman" size="2">if (!m_pStage) return FALSE;</font> </p>
+    <p><font face="Times New Roman" size="2">m_pScene = pScene;</font> </p>
+    <p><font face="Times New Roman" size="2">m_pStage-&gt;SetScene (m_p3cene) ;</font> </p>
+    <p><font face="Times New Roman" size="2">if (m_pScene) (</font> </p>
+    <p><font face="Times New Roman" size="2">// Разрешить
+    воспроизведение</font> </p>
+    <p><font face="Times New Roman" size="2">// во время пассивной
+    работы приложения m_bEnableUpdates = TRUE;</font> </p>
+    <p><font face="Arial" size="2">( else (</font> </p>
+    <p><font face="Times New Roman" size="2">m_bEnableUpdates = FALSE;</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Times New Roman" size="2">return TRUE;</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Arial" size="4"><b>C3dLighf</b></font> </p>
+    <p><font face="Times New Roman" size="2">Базовый класс для
+    производных классов, объекты которых
+    представляют источники света. Его функция Create
+    вызывается производными классами для
+    конструирования соответствующего интерфейса:</font>
+    </p>
+    <p><font face="Times New Roman" size="2">BOOL C3dLight::Create(D3DRMLIGHTTYPE type,</font>
+    </p>
+    <p><font face="Times New Roman" size="2">double r, double g, double b)</font> </p>
+    <p><font face="Arial" size="2">{</font> </p>
+    <p><font face="Times New Roman" size="2">// Создать фрейм для
+    источника света if (!C3dFrame::Create(NULL)) return FALSE;</font> </p>
+    <p><font face="Times New Roman" size="2">// Создать объект-источник
+    света ASSERT(m_pILight == NULL);</font> </p>
+    <p><font face="Times New Roman" size="2">if (!the3dEngine.CreateLight(type, r, g, b,
+    &amp;m_pILight)) ( return FALSE;</font> </p>
+    <p><font face="Times New Roman" size="2">} ASSERT(m_pILight) ;</font> </p>
+    <p><font face="Times New Roman" size="2">// Присоединить источник
+    света к его фрейму ASSERT(m_plFrame) ;</font> </p>
+    <p><font face="Times New Roman" size="2">m_hr = m_pIFrame-&gt;AddLight (m pILight);</font>
+    </p>
+    <p><font face="Times New Roman" size="2">if (FAILED(m_hr)) return FALSE;</font> </p>
+    <p><font face="Times New Roman" size="2">return TRUE;</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Arial" size="2"><b>84</b> liy Глава 3. Интерфейсы и
+    классы</font> </p>
+    <hr>
+    <p><font face="Arial" size="3"><b>CSdAmbLight</b></font> </p>
+    <p><font face="Times New Roman" size="2">Класс C3dAmbLight реализует
+    рассеянный источник света, встроенный в объект
+    C3dScene. Вместо того чтобы вызывать функции этого
+    класса, можно работать с источником рассеянного
+    света в макете посредством C3dScene::SetAmbientLight.</font> </p>
+    <p><font face="Arial" size="3"><b>C3dDirLight</b></font> </p>
+    <p><font face="Times New Roman" size="2">Класс реализует
+    направленный источник света,'который может
+    размещаться в произвольной точке макета для
+    получения бликов на его объектах. Ниже
+    приводится пример размещения направленного
+    источника света в левом верхнем углу макета:</font> </p>
+    <p><font face="Arial" size="2">C3dDirLight dl;</font> </p>
+    <p><font face="Arial" size="2">dl.Create(0.8, 0.8, 0.8);</font> </p>
+    <p><font face="Arial" size="2">m_pScene-&gt;AddChild(&amp;dl) ;</font> </p>
+    <p><font face="Arial" size="2">dl.SetPosition(-2, 2, -5);</font> </p>
+    <p><font face="Arial" size="2">dl.SetDirection(l, -1, 1);</font> </p>
+    <p><font face="Times New Roman" size="2">Обратите внимание на то,
+    что направление, в котором падает свет источника,
+    задается только передним вектором. Верхний
+    вектор генерируется автоматически, что
+    избавляет вас от необходимости высчитывать его.</font>
+    </p>
+    <p><font face="Times New Roman" size="2">Класс C3dLight имеет еще
+    несколько производных классов. Все различные
+    типы источников света рассмотрены в главе 10.</font> </p>
+    <p><font face="Arial" size="3"><b>C3dShapeList, C3dlmageList, C3dFrameList</b></font> </p>
+    <p><font face="Times New Roman" size="2">Эти классы предназначены
+    для хранения списка объектов C3dShape (C3dShapeList), C3dlmage
+    (C3dlmageList), C3dFrame (C3dFrameList). Каждый из этих классов
+    является производным от CObList, входящего в
+    библиотеку MFC. Подробное описание работы CObList
+    можно найти в документации по MFC. Все эти списки
+    содержатся в объекте C3dScene и помогают найти
+    фигуры, изображения и фреймы, которые необходимо
+    удалить при уничтожении макета.</font> </p>
+    <p><font face="Arial" size="3"><b>C3dWnd</b></font> </p>
+    <p><font face="Times New Roman" size="2">Класс C3dWnd содержит все
+    необходимое для создания всплывающего или
+    дочернего окна, содержащего трехмерный макет. В
+    частности, в этот класс включается объект-сцена.
+    Класс поддерживает работу с манипуляторами,
+    которые используются для перемещения объектов
+    (клавиатура, мышь и джойстик), а также выбор
+    объектов мышью. Он позволяет чрезвычайно легко
+    создавать дочерние трехмерные окна, как
+    показывает приведенный ниже фрагмент программы:</font>
+    </p>
+    <p><font face="Times New Roman" size="2">// Создать трехмерное окно
+    if (!m_wnd3d.Create(this, IDC_3DWND)) { return -1;</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Arial" size="2">Библиотека классов SdPlus ^Щ<b> 85</b></font>
+    </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">Трехмерное окно создается
+    как дочернее, с заданным родительским окном и
+    идентификатором дочернего окна. После
+    построения окна вам остается лишь создать макет
+    и присоединить его к сцене трехмерного окна,
+    чтобы он появился на экране:</font> </p>
+    <p><font face="Times New Roman" size="2">m_pScene = new C3dScene;</font> </p>
+    <p><font face="Times New Roman" size="2">if ( !m_pScene-&gt;Create () ) return FALSE;</font>
+    </p>
+    <p><font face="Times New Roman" size="2">// Установить источники
+    света C3dDirLight dl;</font> </p>
+    <p><font face="Times New Roman" size="2">dl.Create(0.8, 0.8, 0.8);</font> </p>
+    <p><font face="Times New Roman" size="2">m_pScene-&gt;AddChild(&amp;dl) ;</font> </p>
+    <p><font face="Times New Roman" size="2">dl.SetPosition(-2, 2, -5);</font> </p>
+    <p><font face="Times New Roman" size="2">dl.SetDirection(1, -1, 1);</font> </p>
+    <p><font face="Times New Roman" size="2">m_pScene-&gt;SetAmbientLight (0.4, 0.4, 0.4);</font>
+    </p>
+    <p><font face="Times New Roman" size="2">m wnd3d.SetScene(m pScene);</font> </p>
+    <p><font face="Arial" size="4"><b>C3dVector</b></font> </p>
+    <p><font face="Times New Roman" size="2">В механизме визуализации
+    определен трехмерный вектор D3DVECTOR, который
+    представляет собой обычную структуру, однако я
+    предпочитаю работать с векторными объектами C++.
+    При таком подходе я могу иметь несколько
+    конструкторов, упрощающих создание вектора, и,
+    конечно же, реализовать операторы (например,
+    сложения и умножения) для упрощения кода. Класс
+    C3dVector является производным от структуры D3DVECTOR,
+    так что во всех случаях, где допускается
+    присутствие структуры D3DVECTOR, вы можете
+    пользоваться объектом C3dVector. В качестве примера
+    использования класса C3dVector приведу фрагмент
+    программы, который обновляет положение
+    трехмерного объекта, перемещаемого
+    пользователем по экрану:</font> </p>
+    <p><font face="Times New Roman" size="2">C3dVector d, u;</font> </p>
+    <p><font face="Times New Roman" size="2">pFrame-&gt;GetDirection (d, и, pStage);</font> </p>
+    <p><font face="Times New Roman" size="2">// Повернуть вектор
+    направления и верхний вектор double a = 3.0;</font> </p>
+    <p><font face="Times New Roman" size="2">C3dMatrix<b> r;</b></font> </p>
+    <p><font face="Times New Roman" size="2">r.Rotate(-st.dR * a, -st.dU * a, -st.dv * a) ;</font>
+    </p>
+    <p><font face="Times New Roman" size="2">d = r * d;</font> </p>
+    <p><font face="Times New Roman" size="2">u = r * u;</font> </p>
+    <p><font face="Times New Roman" size="2">pFrame-&gt;SetDirection (d, u, pStage);</font> </p>
+    <p><font face="Times New Roman" size="2">Использование классов для
+    работы с векторами (и матрицами) заметно упрощает
+    программу. Учтите, что понимание всех тонкостей
+    их работы потребует некоторых усилий. Мы
+    вернемся к этой теме в главе 6, где научимся
+    перемещать объекты по желанию пользователя.</font> </p>
+    <p><font face="Arial" size="2"><b>86</b> вЃ?' Глава 3. Интерфейсы и
+    классы</font> </p>
+    <hr>
+    <p><font face="Arial" size="4"><b>Классы DirectDraw в библиотеке 3d Plus</b></font>
+    </p>
+    <p><font face="Times New Roman" size="2">В библиотеку 3dPlus входит
+    несколько классов для поддержки интерфейсов
+    DirectDraw. Эти классы изображены на рис. 3-4.</font> </p>
+    <p><img alt="65.jpg" border="0" hspace="3" src="65.jpg" vspace="3" width="287"
+    height="309"> <br clear="all">
+    </p>
+    <p><font face="Arial" size="2"><b>Рис. 3-4.</b> Вспомогательные
+    классы DirectDraw из библиотеки 3dPlus</font> </p>
+    <p><font face="Times New Roman" size="2">Такие классы представляют
+    собой простейшие оболочки над базовыми
+    интерфейсами DirectDraw (более подробное описание
+    интерфейсов DirectDraw можно найти в главе 12). Код,
+    реализующий эти классы, находится в файле 3dDirDraw.cpp
+    в каталоге с исходными текстами библиотеки 3dPlus.
+    При его написании я взял за основу код приложения
+    VIEWER, входящего в комплект DirectX 2 SDK. Я реализовал
+    лишь минимальный набор функций, обеспечивающий
+    работу моего класса CSdDevice. Разумеется, вы
+    обладаете полным правом просмотреть исходный
+    текст и сделать с ним все, что сочтете нужным.</font> </p>
+    <p><font face="Times New Roman" size="2">В главе 13 подробно
+    рассмотрены интерфейсы DirectDraw, для которых в
+    библиотеке 3dPlus вообще нет классов-оболочек.
+    Однако в коде для главы 13 все же есть достаточно
+    &lt;тонкие&gt; классы-оболочки для этих интерфейсов.</font>
+    </p>
+    <p><font face="Arial" size="4"><b>Спасибо за внимание</b></font> </p>
+    <p><font face="Times New Roman" size="2">Мы очень кратко
+    рассмотрели все интерфейсы и классы C++, которыми
+    будем пользоваться в оставшейся части книги для
+    создания приложений-примеров. Несомненно,
+    изложенный материал вызвал у вас множество
+    вопросов; все, что упоминалось в этой главе, более
+    подробно рассматривается в последующих главах.
+    Если вы не можете отличить функции библиотеки
+    3dPlus от функций интерфейсов Direct3D, помните: все
+    интерфейсные указатели имеют префикс pi, a
+    указатели на объекты библиотеки 3dPlus - префикс р.
+    Кроме того, не забывайте, что классы C++ нередко
+    являются лишь удобными оболочками для
+    интерфейсов Direct3D. Только немногочисленные
+    классы (например, C3dShape) реально обладают
+    собственным содержанием. В последующих главах мы
+    изучим их более подробно.</font></p>
+    <p align="center"><font size="3"><a href="cpp_directx_manual_7.shtml">Далее..</a></font></td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

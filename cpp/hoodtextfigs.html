@@ -1,0 +1,683 @@
+<html><head><title>Under the Hood text figures</title><META name="robots" content="noindex">
+
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso8859-1">
+</head>
+
+
+
+
+<BODY link="000080" vlink=800000>
+
+<!--TOOLBAR_START-->
+
+<!--TOOLBAR_EXEMPT-->
+
+<!--TOOLBAR_END-->
+
+<b>
+<FONT SIZE=4 COLOR=#800000 FACE="verdana, arial, helv"><a name="fig1">Figure 1</a></FONT>
+<FONT SIZE=4 COLOR=#FFFFFF FACE="verdana, arial, helv">&nbsp;</FONT>
+<FONT SIZE=4 COLOR=#000080 FACE="verdana, arial, helv">WININETSPY.CPP</FONT></b>
+<P><pre><font size=1>
+//==========================================
+// Matt Pietrek
+// Microsoft Systems Journal, September 1997
+// FILE: WININETSPY.CPP
+//==========================================
+#include &lt;windows.h&gt;
+#include &lt;stdio.h&gt;
+
+#pragma warning( disable:4005 )         // Ignore macro redefinition
+
+#define SPYMACRO( x ) FARPROC g_pfn##x;
+#include &quot;wininet_functions.inc&quot;
+
+HANDLE g_hOutputFile = INVALID_HANDLE_VALUE;
+
+#define SPYCALL( pfn, cArgs )           \
+    __asm lea   edi, [esp - cArgs*4]    \
+    __asm lea   esi, [ebp+8]            \
+    __asm mov   ecx, cArgs              \
+    __asm rep   movsd                   \
+    __asm sub   esp, cArgs * 4          \
+    __asm call  dword ptr [pfn]         \
+    __asm mov   [retValue], EAX 
+
+//=============================================================================
+// Start of custom code
+//=============================================================================
+BOOL WINAPI DllMain(
+    HINSTANCE hinstDLL,    // handle to DLL module 
+    DWORD fdwReason,       // reason for calling function 
+    LPVOID lpvReserved)    // reserved 
+{
+    if ( fdwReason == DLL_PROCESS_ATTACH )  // When initializing....
+    {
+        // We don't need thread notifications for what we're doing.  Thus, get
+        // rid of them, thereby eliminating some of the overhead of this DLL,
+        // which will end up in nearly every GUI process anyhow.
+        DisableThreadLibraryCalls( hinstDLL );
+
+        char szRealWININET[ MAX_PATH ];
+        
+        GetSystemDirectory( szRealWININET, sizeof(szRealWININET) );
+        strcat( szRealWININET, &quot;\\WININET.DLL&quot; );
+        
+        HMODULE hModWininet = LoadLibrary( szRealWININET );
+        if ( 0 == hModWininet )
+        {
+            MessageBox( 0, &quot;Unable to load real WININET.DLL&quot;, 0, MB_OK );
+            return FALSE;
+        }
+
+        //
+        // Call GetProcAddress for each WININET function, and store the return
+        // value into the appropriately named g_pfnXXX pointer
+        //      
+        #define SPYMACRO( x )  \
+            g_pfn##x = GetProcAddress( hModWininet, #x );
+        #include &quot;wininet_functions.inc&quot;
+
+        // Open the output file.  Lines with &quot;//&quot; comments include replacement
+        // parameters that can be used if you want to write output to a file,
+        // rather than to a mailslot.
+        g_hOutputFile = CreateFile(
+                &quot;\\\\.\\mailslot\\wininetspymon_mailslot&quot;, // &quot;WININETSPY.TXT&quot;, 
+                GENERIC_WRITE,
+                FILE_SHARE_READ, // 0,
+                0, 
+                OPEN_EXISTING,  // CREATE_ALWAYS,
+                FILE_ATTRIBUTE_NORMAL,
+                0 );
+
+        if ( INVALID_HANDLE_VALUE == g_hOutputFile )
+        {
+            MessageBox( 0, &quot;Unable to open logging output file&quot;, 0, MB_OK );
+            return FALSE;
+        }
+    }
+    else if ( fdwReason == DLL_PROCESS_DETACH ) // When shutting down...
+    {
+        if ( INVALID_HANDLE_VALUE != g_hOutputFile )
+            CloseHandle( g_hOutputFile );
+    }   
+    return TRUE;
+}
+
+//
+// Our own, custom printf that writes to the file handle opened in DllMain
+//
+int __cdecl printf(const char * format, ...)
+{
+    char szBuff[1024];
+    int retValue;
+    DWORD cbWritten;
+    va_list argptr;
+          
+    if ( INVALID_HANDLE_VALUE == g_hOutputFile )
+        return 0;
+                
+    va_start( argptr, format );
+    retValue = wvsprintf( szBuff, format, argptr );
+    va_end( argptr );
+
+    WriteFile(  g_hOutputFile, szBuff, retValue, &amp;cbWritten, 0 );
+
+    return retValue;
+}
+
+//=============================================================================
+// Start of WININET API stubs
+//=============================================================================
+
+#define _WINX32_        // Fake the compiler into thinking it's compiling the
+                        // real WININET.DLL
+#include &lt;wininet.h&gt;    // Include this to get all the definitions
+
+#define SAFESTR( x ) ( x ? x : &quot;&quot; ) // Macro that converts null pointers to &quot;&quot;
+
+extern &quot;C&quot;              // begin - extern &quot;C&quot;
+{
+
+INTERNETAPI BOOL WINAPI InternetCanonicalizeUrlA(
+    IN LPCSTR lpszUrl,
+    OUT LPSTR lpszBuffer,
+    IN OUT LPDWORD lpdwBufferLength,
+    IN DWORD dwFlags )
+{
+    BOOL retValue;
+    
+    SPYCALL( g_pfnInternetCanonicalizeUrlA, 4 )
+
+    printf( &quot;InternetCanonicalizeUrlA( In:\&quot;%s\&quot;  Out:\&quot;%s\&quot; )&quot;,
+            lpszUrl, lpszBuffer );
+        
+    return retValue;
+}
+    
+INTERNETAPI BOOL WINAPI InternetCombineUrlA(
+    IN LPCSTR lpszBaseUrl,
+    IN LPCSTR lpszRelativeUrl,
+    OUT LPSTR lpszBuffer,
+    IN OUT LPDWORD lpdwBufferLength,
+    IN DWORD dwFlags )
+{
+    BOOL retValue;
+
+    SPYCALL( g_pfnInternetCombineUrlA, 5 )
+
+    printf( &quot;InternetCombineUrlA( Base:\&quot;%s\&quot;  Relative:\&quot;%s\&quot;  Out:\&quot;%s\&quot;&quot;,
+            SAFESTR(lpszBaseUrl), SAFESTR(lpszRelativeUrl),
+            SAFESTR(lpszBuffer) );
+        
+    return retValue;
+}
+    
+INTERNETAPI BOOL WINAPI InternetCrackUrlA(
+    IN LPCSTR lpszUrl,
+    IN DWORD dwUrlLength,
+    IN DWORD dwFlags,
+    IN OUT LPURL_COMPONENTSA lpUrlComponents )
+{
+    BOOL retValue;
+
+    SPYCALL( g_pfnInternetCrackUrlA, 4 )
+
+    printf( &quot;InternetCrackUrlA( Url:\&quot;%s\&quot; )&quot;, SAFESTR(lpszUrl) );
+        
+    return retValue;
+}
+    
+INTERNETAPI BOOL WINAPI InternetTimeFromSystemTime(
+    IN  CONST SYSTEMTIME *pst,  // input GMT time
+    IN  DWORD dwRFC,            // RFC format
+    OUT LPSTR lpszTime,         // output string buffer
+    IN  DWORD cbTime )          // output buffer size 
+{
+    BOOL retValue;
+
+    SPYCALL( g_pfnInternetTimeFromSystemTime, 4 )
+
+    printf( &quot;InternetTimeFromSystemTime&quot; );
+        
+    return retValue;
+}
+    
+INTERNETAPI HINTERNET WINAPI InternetOpenUrlA(
+    IN HINTERNET hInternet,
+    IN LPCSTR lpszUrl,
+    IN LPCSTR lpszHeaders OPTIONAL,
+    IN DWORD dwHeadersLength,
+    IN DWORD dwFlags,
+    IN DWORD dwContext )
+{
+    HINTERNET retValue;
+
+    SPYCALL( g_pfnInternetOpenUrlA, 6 )
+
+    printf( &quot;InternetOpenUrlA( Url:\&quot;%s\&quot; Headers:\&quot;%s\&quot;)&quot;,
+            SAFESTR(lpszUrl), SAFESTR(lpszHeaders) );
+        
+    return retValue;
+}
+    
+INTERNETAPI BOOL WINAPI HttpSendRequestA(
+    IN HINTERNET hRequest,
+    IN LPCSTR lpszHeaders OPTIONAL,
+    IN DWORD dwHeadersLength,
+    IN LPVOID lpOptional OPTIONAL,
+    IN DWORD dwOptionalLength )
+{
+    BOOL retValue;
+
+    SPYCALL( g_pfnHttpSendRequestA,  5)
+
+    printf( &quot;HttpSendRequestA( header:\&quot;%s\&quot; )&quot;, SAFESTR(lpszHeaders) );
+        
+    return retValue;
+}
+    
+INTERNETAPI HINTERNET WINAPI HttpOpenRequestA(
+    IN HINTERNET hConnect,
+    IN LPCSTR lpszVerb,
+    IN LPCSTR lpszObjectName,
+    IN LPCSTR lpszVersion,
+    IN LPCSTR lpszReferrer OPTIONAL,
+    IN LPCSTR FAR * lplpszAcceptTypes OPTIONAL,
+    IN DWORD dwFlags,
+    IN DWORD dwContext )
+{
+    HINTERNET retValue;
+
+    SPYCALL( g_pfnHttpOpenRequestA, 8 )
+
+    printf( &quot;HttpOpenRequestA( verb:\&quot;%s\&quot;  object:\&quot;%s\&quot;  version:\&quot;%s\&quot;&quot;
+            &quot;  referrer:\&quot;%s\&quot;  flags:%X )&quot;,
+            SAFESTR(lpszVerb), SAFESTR(lpszObjectName), SAFESTR( lpszVersion),
+            SAFESTR(lpszReferrer), dwFlags  );
+
+    if ( lplpszAcceptTypes )
+    {
+        while ( *lplpszAcceptTypes )
+        {
+            printf( &quot;  AcceptType: %s&quot;, SAFESTR(*lplpszAcceptTypes) );
+            lplpszAcceptTypes++;
+        }
+    }
+    
+    return retValue;
+}
+    
+INTERNETAPI BOOL WINAPI HttpQueryInfoA(
+    IN HINTERNET hRequest,
+    IN DWORD dwInfoLevel,
+    IN OUT LPVOID lpBuffer OPTIONAL,
+    IN OUT LPDWORD lpdwBufferLength,
+    IN OUT LPDWORD lpdwIndex OPTIONAL )
+{
+    BOOL retValue;
+
+    SPYCALL( g_pfnHttpQueryInfoA,  5)
+
+    printf( &quot;HttpQueryInfoA&quot; );
+        
+    return retValue;
+}
+    
+URLCACHEAPI BOOL WINAPI UnlockUrlCacheEntryFile(
+    IN LPCSTR lpszUrlName,
+    IN DWORD dwReserved )
+{
+    BOOL retValue;
+
+    SPYCALL( g_pfnUnlockUrlCacheEntryFile, 2 )
+
+    printf( &quot;UnlockUrlCacheEntryFile&quot; );
+        
+    return retValue;
+}
+
+URLCACHEAPI BOOL WINAPI CreateUrlCacheEntryA(
+    IN LPCSTR lpszUrlName,
+    IN DWORD dwExpectedFileSize,
+    IN LPCSTR lpszFileExtension,
+    OUT LPSTR lpszFileName,
+    IN DWORD dwReserved )
+{
+    BOOL retValue;
+
+    SPYCALL( g_pfnCreateUrlCacheEntryA, 5 )
+
+    printf( &quot;CreateUrlCacheEntryA( Url:\&quot;%s\&quot;  Filename:\&quot;%s\&quot;)&quot;,
+            SAFESTR(lpszUrlName), SAFESTR(lpszFileName) );
+            
+    return retValue;
+}
+
+INTERNETAPI BOOL WINAPI InternetUnlockRequestFile(
+    IN HINTERNET hFile )
+{
+    BOOL retValue;
+
+    SPYCALL( g_pfnInternetUnlockRequestFile, 1 )
+
+    printf( &quot;InternetUnlockRequestFile&quot; );
+        
+    return retValue;
+}
+
+URLCACHEAPI BOOL WINAPI RetrieveUrlCacheEntryFileA(
+    IN LPCSTR  lpszUrlName,
+    OUT LPINTERNET_CACHE_ENTRY_INFOA lpCacheEntryInfo,
+    IN OUT LPDWORD lpdwCacheEntryInfoBufferSize,
+    IN DWORD dwReserved )
+{
+    BOOL retValue;
+
+    SPYCALL( g_pfnRetrieveUrlCacheEntryFileA, 4 )
+
+    printf( &quot;RetrieveUrlCacheEntryFileA( Url:\&quot;%s\&quot; )&quot;, SAFESTR(lpszUrlName) );
+        
+    return retValue;
+}
+
+INTERNETAPI BOOL WINAPI InternetLockRequestFile(
+    IN HINTERNET hFile,
+    IN DWORD unknown )
+{
+    BOOL retValue;
+
+    SPYCALL( g_pfnInternetLockRequestFile, 2 )
+
+    printf( &quot;InternetLockRequestFile&quot; );
+        
+    return retValue;
+}
+
+
+URLCACHEAPI BOOL WINAPI GetUrlCacheEntryInfoA(
+    IN LPCSTR lpszUrlName,
+    OUT LPINTERNET_CACHE_ENTRY_INFOA lpCacheEntryInfo,
+    IN OUT LPDWORD lpdwCacheEntryInfoBufferSize )
+{
+    BOOL retValue;
+
+    SPYCALL( g_pfnGetUrlCacheEntryInfoA,  3)
+
+    printf( &quot;GetUrlCacheEntryInfoA( Url:\&quot;%s\&quot; ) &quot;, SAFESTR(lpszUrlName) );
+        
+    return retValue;
+}
+    
+INTERNETAPI DWORD WINAPI InternetErrorDlg(
+     IN HWND hWnd,
+     IN OUT HINTERNET hRequest,
+     IN DWORD dwError,
+     IN DWORD dwFlags,
+     IN OUT LPVOID * lppvData )
+{
+    DWORD retValue;
+
+    SPYCALL( g_pfnInternetErrorDlg, 5 )
+
+    printf( &quot;InternetErrorDlg&quot; );
+        
+    return retValue;
+}
+     
+INTERNETAPI BOOL WINAPI InternetQueryDataAvailable(
+    IN HINTERNET hFile,
+    OUT LPDWORD lpdwNumberOfBytesAvailable,
+    IN DWORD dwFlags,
+    IN DWORD dwContext )
+{
+    BOOL retValue;
+
+    SPYCALL( g_pfnInternetQueryDataAvailable, 4 )
+
+    printf( &quot;InternetQueryDataAvailable&quot; );
+        
+    return retValue;
+}
+    
+INTERNETAPI BOOL WINAPI InternetCloseHandle(
+    IN HINTERNET hInternet )
+{
+    BOOL retValue;
+
+    SPYCALL( g_pfnInternetCloseHandle, 1 )
+
+    printf( &quot;InternetCloseHandle&quot; );
+        
+    return retValue;
+}
+    
+INTERNETAPI HINTERNET WINAPI InternetConnectA(
+    IN HINTERNET hInternet,
+    IN LPCSTR lpszServerName,
+    IN INTERNET_PORT nServerPort,
+    IN LPCSTR lpszUserName OPTIONAL,
+    IN LPCSTR lpszPassword OPTIONAL,
+    IN DWORD dwService,
+    IN DWORD dwFlags,
+    IN DWORD dwContext )
+{
+    HINTERNET retValue;
+
+    SPYCALL( g_pfnInternetConnectA, 8 )
+
+    printf( &quot;InternetConnectA( Server:\&quot;%s\&quot;  Username:\&quot;%s\&quot;  Password:\&quot;%s\&quot;&quot;
+            &quot;nServerPort:%X  Service:%X  Flags:%X )&quot;,
+            SAFESTR( lpszServerName ),
+            SAFESTR( lpszUserName ),
+            SAFESTR( lpszPassword),
+            nServerPort,
+            dwService,
+            dwFlags );
+        
+    return retValue;
+}
+    
+INTERNETAPI HINTERNET WINAPI InternetOpenA(
+    IN LPCSTR lpszAgent,
+    IN DWORD  dwAccessType,
+    IN LPCSTR lpszProxy OPTIONAL,
+    IN LPCSTR lpszProxyBypass OPTIONAL,
+    IN DWORD dwFlags )
+{
+    HINTERNET retValue;
+
+    SPYCALL( g_pfnInternetOpenA, 5 )
+
+    printf( &quot;InternetOpenA( Agent:\&quot;%s\&quot;  AccessType:%X  Proxy:\&quot;%s\&quot;&quot;
+            &quot;  Bypass:\&quot;%s\&quot;  Flags:%X)&quot;,
+            SAFESTR(lpszAgent),
+            dwAccessType,
+            SAFESTR(lpszProxy),
+            SAFESTR(lpszProxyBypass),
+            dwFlags );
+        
+    return retValue;
+}
+    
+INTERNETAPI INTERNET_STATUS_CALLBACK WINAPI InternetSetStatusCallback(
+    IN HINTERNET hInternet,
+    IN INTERNET_STATUS_CALLBACK lpfnInternetCallback )
+{
+    INTERNET_STATUS_CALLBACK retValue;
+
+    SPYCALL( g_pfnInternetSetStatusCallback, 2 )
+
+    printf( &quot;InternetSetStatusCallback&quot; );
+        
+    return retValue;
+}
+    
+INTERNETAPI BOOL WINAPI InternetSetOptionA(
+    IN HINTERNET hInternet OPTIONAL,
+    IN DWORD dwOption,
+    IN LPVOID lpBuffer,
+    IN DWORD dwBufferLength )
+{
+    BOOL retValue;
+
+    SPYCALL( g_pfnInternetSetOptionA, 4 )
+
+    printf( &quot;InternetSetOptionA&quot; );
+        
+    return retValue;
+}
+    
+INTERNETAPI BOOL WINAPI InternetQueryOptionA(
+    IN HINTERNET hInternet OPTIONAL,
+    IN DWORD dwOption,
+    OUT LPVOID lpBuffer OPTIONAL,
+    IN OUT LPDWORD lpdwBufferLength )
+{
+    BOOL retValue;
+
+    SPYCALL( g_pfnInternetQueryOptionA, 4 )
+
+    printf( &quot;InternetQueryOptionA&quot; );
+        
+    return retValue;
+}
+    
+INTERNETAPI BOOL WINAPI InternetReadFile(
+    IN HINTERNET hFile,
+    IN LPVOID lpBuffer,
+    IN DWORD dwNumberOfBytesToRead,
+    OUT LPDWORD lpdwNumberOfBytesRead )
+{
+    BOOL retValue;
+
+    SPYCALL( g_pfnInternetReadFile, 4 )
+
+    printf( &quot;InternetReadFile( hFile:%X  dwNumberToRead:%u )&quot;,
+            hFile, dwNumberOfBytesToRead );
+        
+    return retValue;
+}
+    
+INTERNETAPI BOOL WINAPI HttpAddRequestHeadersA(
+    IN HINTERNET hRequest,
+    IN LPCSTR lpszHeaders,
+    IN DWORD dwHeadersLength,
+    IN DWORD dwModifiers )
+{
+    BOOL retValue;
+
+    SPYCALL( g_pfnHttpAddRequestHeadersA, 4 )
+
+    printf( &quot;HttpAddRequestHeadersA( Headers:\&quot;%s\&quot; )&quot;, SAFESTR(lpszHeaders) );
+        
+    return retValue;
+}
+
+INTERNETAPI DWORD WINAPI InternetConfirmZoneCrossing(
+     IN HWND hWnd,
+     IN LPSTR szUrlPrev,
+     IN LPSTR szUrlNew,
+     IN BOOL bPost )
+{
+    DWORD retValue;
+
+    SPYCALL( g_pfnInternetConfirmZoneCrossing, 4 )
+
+    printf( &quot;InternetConfirmZoneCrossing( Prev:\&quot;%s\&quot;  New:\&quot;%s\&quot;) &quot;,
+            SAFESTR(szUrlPrev), SAFESTR(szUrlNew) );
+    
+    return retValue;
+}
+
+URLCACHEAPI BOOL WINAPI SetUrlCacheEntryInfoA(
+    IN LPCSTR lpszUrlName,
+    IN LPINTERNET_CACHE_ENTRY_INFOA lpCacheEntryInfo,
+    IN DWORD dwFieldControl )
+{
+    BOOL retValue;
+    
+    SPYCALL( g_pfnSetUrlCacheEntryInfoA, 3 );
+
+    printf( &quot;SetUrlCacheEntryInfoA&quot; );
+        
+    return retValue;
+}
+
+
+INTERNETAPI BOOL WINAPI InternetGetCookieA(
+    IN LPCSTR lpszUrl,
+    IN LPCSTR lpszCookieName,
+    OUT LPSTR lpCookieData,
+    IN OUT LPDWORD lpdwSize )
+{
+    BOOL retValue;
+
+    SPYCALL( g_pfnInternetGetCookieA, 4 )
+
+    printf( &quot;InternetGetCookieA( Url:\&quot;%s\&quot;  Cookie:\&quot;%s\&quot; )&quot;,
+            SAFESTR(lpszUrl), SAFESTR(lpszCookieName) );
+    
+    return retValue;
+}
+
+INTERNETAPI BOOL WINAPI InternetSetCookieA(
+    IN LPCSTR lpszUrl,
+    IN LPCSTR lpszCookieName,
+    IN LPCSTR lpszCookieData )
+{
+    BOOL retValue;
+
+    SPYCALL( g_pfnInternetSetCookieA, 3 )
+
+    printf( &quot;InternetSetCookieA( Url:\&quot;%s\&quot;  Cookie:\&quot;%s\&quot; )&quot;,
+            SAFESTR(lpszUrl), SAFESTR(lpszCookieName) );
+    
+    return retValue;
+}
+
+
+INTERNETAPI BOOL WINAPI InternetTimeToSystemTime(
+    IN  LPCSTR lpszTime,         // NULL terminated string
+    OUT SYSTEMTIME *pst,         // output in GMT time
+    IN  DWORD dwReserved )
+{
+    BOOL retValue;
+
+    SPYCALL( g_pfnInternetTimeToSystemTime, 3 )
+
+    printf( &quot;InternetTimeToSystemTime( Time:\&quot;%s\&quot; )&quot;, SAFESTR(lpszTime) );
+    
+    return retValue;
+}
+
+URLCACHEAPI BOOL WINAPI CommitUrlCacheEntryA(
+    IN LPCSTR lpszUrlName,
+    IN LPCSTR lpszLocalFileName,
+    IN FILETIME ExpireTime,
+    IN FILETIME LastModifiedTime,
+    IN DWORD CacheEntryType,
+    IN LPBYTE lpHeaderInfo,
+    IN DWORD dwHeaderSize,
+    IN LPCSTR lpszFileExtension,
+    IN DWORD dwReserved )
+{
+    BOOL retValue;
+
+    // 11 = 7 DWORDS + 2 (8 byte) FILETIMES 
+    SPYCALL( g_pfnCommitUrlCacheEntryA, 11 )
+
+    printf( &quot;CommitUrlCacheEntryA( Url:\&quot;%s\&quot; )&quot;, SAFESTR(lpszUrlName) );
+    
+    return retValue;
+}
+
+INTERNETAPI BOOL WINAPI InternetCreateUrlA(
+    IN LPURL_COMPONENTSA lpUrlComponents,
+    IN DWORD dwFlags,
+    OUT LPSTR lpszUrl,
+    IN OUT LPDWORD lpdwUrlLength )
+{
+    BOOL retValue;
+
+    SPYCALL( g_pfnInternetCreateUrlA, 4 )
+
+    printf( &quot;InternetCreateUrlA( Url:\&quot;%s\&quot; )&quot;, SAFESTR(lpszUrl) );
+    
+    return retValue;
+}
+
+INTERNETAPI BOOL WINAPI GetUrlCacheConfigInfoA(
+    IN DWORD unknown1,
+    IN DWORD unknown2,
+    IN DWORD unknown3 )
+{
+    BOOL retValue;
+
+    SPYCALL( g_pfnGetUrlCacheConfigInfoA    , 3 )
+
+    printf( &quot;GetUrlCacheConfigInfoA &quot; );
+    
+    return retValue;
+}
+    
+INTERNETAPI BOOL WINAPI InternetGetCertByURL(
+    IN DWORD unknown1,
+    IN DWORD unknown2,
+    IN DWORD unknown3 )
+{
+    BOOL retValue;
+
+    SPYCALL( g_pfnInternetGetCertByURL , 3 )
+
+    printf( &quot;InternetGetCertByURL&quot; );
+    return retValue;
+}
+
+}   // end - extern &quot;C&quot; 
+</font></pre>
+        
+
+<hr color=000080 align=left width=200>
+
+</body></html>

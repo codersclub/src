@@ -1,0 +1,155 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3 align="center"><font color="#a0a099">Как программно определить
+    букву CD-ROM</font></h3>
+    <hr>
+    <p>Сперва необходимо запомнить, что на компьютере
+    может быть установлено несколько устройств CD-ROM!
+    Очень часто на машине присутствует один обычный
+    CD-ROM, плюс перезаписываемый и, возможно, DVD. Однако,
+    вне зависимости от количества различных дисковых
+    устройств, давайте разберёмся как их определить.</p>
+    <p>Для нахождения дисковых устройств
+    используются функции GetLogicalDrives, GetLogicalDriveStrings, и
+    GetDriveType. Первые две из них возвращают логические
+    диски. Кроме того GetLogicalDriveStrings возвращает строку
+    с именами типа:<br>
+    </p>
+    <pre class="clsCode">&quot;A:\&lt;null&gt;C:\&lt;null&gt;F:\&lt;null&gt;&lt;null&gt;&quot;
+</pre>
+    <p>и т.д. Каждое имя корневого пути отделено от
+    следующего символом null (ноль), с двумя null в конце—это
+    стандартный способ в C окончания строк.</p>
+    <p>Функция GetLogicalDrives возвращает логические диски в
+    виде битовой маски. Это значение DWORD, в котором
+    нулевой бит указывает на наличие дисковода A,
+    первый за наличие B, и т.д. То есть каждый бит
+    отвечает за присутствие определённого
+    логического диска. Либо, если бит не установлен,
+    то это указывает на отсутствие логического диска.
+    DWORD имеет размер 32 бита, этого вполне достаточно,
+    чтобы уместить весь английский алфавит, который
+    содержит 26 букв.</p>
+    <p>GetDriveType используется для определения типа
+    логического диска. Достаточно в качестве
+    параметра передать в эту функцию путь C:\ и она
+    вернёт код типа DRIVE_FIXED, DRIVE_REMOVABLE, или DRIVE_UNKNOWN.</p>
+    <p>Ниже представлен список возможных значений,
+    возвращаемых функцией <span class="clsCap">GetDriveType</span>:</p>
+    <pre>////////////////
+// (Из winbase.h)
+//
+
+#define DRIVE_UNKNOWN     0   // Неправильное имя
+#define DRIVE_NO_ROOT_DIR 1   // Неправильное имя: отсутствует диск
+#define DRIVE_REMOVABLE   2   // Съёмное устройство (магнито-оптика, zip)
+#define DRIVE_FIXED       3   // жёсткий диск (обычный винчестер)
+#define DRIVE_REMOTE      4   // сетевой диск
+#define DRIVE_CDROM       5   // CD-ROM
+#define DRIVE_RAMDISK     6   // RAM диск
+</pre>
+    <p>Для удобства была написана небольшая программа
+    ListDrives, которая показывает список логических
+    дисков на компьютере. Ниже представлен код этой
+    программы ( <span class="clsCap">ListDrives.cpp</span> ):</p>
+    <p>&nbsp;</p>
+    <pre>////////////////////////////////////////////////////////////////
+// MSDN Magazine — Апрель 2002
+// Если этот код работает, то он был написан Paul DiLascia.
+// Если нет, то автор этого кода неизвестен.
+// Компилировалось при помощи Visual C++ 6.0. Установите в редакторе
+// tabsize = 3. Работает в Windows XP и возможно в Windows 2000 тоже.
+//
+#include &quot;stdafx.h&quot;
+#include &quot;resource.h&quot;
+
+#ifdef _DEBUG
+#define new DEBUG_NEW
+#undef THIS_FILE
+static char THIS_FILE[] = __FILE__;
+#endif
+
+using namespace std; // для класса строки
+
+//////////////////
+// Простая таблица соответствия кодов из GetDriveType и читабельным
+// названиям типов дисков
+//
+struct {
+   UINT type;        // возвращаемый код из GetDriveType
+   LPCSTR name;      // ascii имя
+} DriveTypeFlags [] = {
+   { DRIVE_UNKNOWN,     &quot;Unknown&quot; },
+   { DRIVE_NO_ROOT_DIR, &quot;Invalid path&quot; },
+   { DRIVE_REMOVABLE,   &quot;Removable&quot; },
+   { DRIVE_FIXED,       &quot;Fixed&quot; },
+   { DRIVE_REMOTE,      &quot;Network drive&quot; },
+   { DRIVE_CDROM,       &quot;CD-ROM&quot; },
+   { DRIVE_RAMDISK,     &quot;RAM disk&quot; },
+   { 0, NULL},
+};
+
+//////////////////
+// Стандартная функция tmain
+//
+int _tmain(int argc, TCHAR* argv[], TCHAR* envp[])
+{
+   if (!AfxWinInit(::GetModuleHandle(NULL), NULL, ::GetCommandLine(), 0)) {
+      cerr &lt;&lt; _T(&quot;Fatal Error: MFC initialization failed&quot;) &lt;&lt; endl;
+      return -1;
+   }
+
+   // Получаем строки логических дисков— a:\b:\c:\... и т.д.
+   //
+   TCHAR buf[100];
+   DWORD len = GetLogicalDriveStrings(sizeof(buf)/sizeof(TCHAR),buf);
+
+   // Показываем информацию о каждом диске.
+   //
+   string msg = &quot;Logical Drives:\n&quot;;  // строка STL
+   for (TCHAR* s=buf; *s; s+=_tcslen(s)+1) {
+      LPCTSTR sDrivePath = s;
+      msg += sDrivePath;
+      msg += &quot; &quot;;
+
+      // GetDriveType получает одно из перечисленных значений
+      // DRIVE_UNKNOWN, и т.д.
+      //
+      UINT uDriveType = GetDriveType(sDrivePath);
+
+      // Находим тип диска в таблице.
+      //
+      for (int i=0; DriveTypeFlags[i].name; i++) {
+         if (uDriveType == DriveTypeFlags[i].type) {
+            msg += DriveTypeFlags[i].name;
+            break;
+         }
+      }
+      msg += '\n';
+   }
+   cout &lt;&lt; msg.c_str();
+
+   return 0;
+}
+</pre>
+    <p>На рисунке видно, что у меня три устройства CD-ROM.
+    Код довольно прост. Функция GetLogicalDriveStrings
+    используется для получения корневого пути для
+    всех логических дисков, а затем вызывается
+    GetDriveType для каждого логического диска. Если Вы
+    ищете устройства CD-ROM, то необходимо проверять
+    uDriveType = DRIVE_CDROM.<br>
+    <br>
+    <img src="cd_letter.gif" width="200" height="235"><br>
+    <span class="clsCap">Список дисков</span><br>
+    </p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

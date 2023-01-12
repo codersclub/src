@@ -1,0 +1,309 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<TABLE align=center border=0 width="100%">
+  <TBODY>
+  <TR>
+    <TD height=71 width="11%">&nbsp;</TD>
+    <TD align=middle height=71 vAlign=bottom width="79%"><B><FONT face="Arial, Helvetica, sans-serif">Visual C++ / 
+      FAQ Part 6</FONT></B></FONT></TD>
+    <TD height=71 width="10%">&nbsp;</TD></TR>
+  <TR>
+    <TD height=18 width="11%">&nbsp;</TD>
+    <TD height=18 width="79%">
+      <HR align=center width="100%">
+    </TD>
+    <TD height=18 width="10%">&nbsp;</TD></TR>
+  <TR>
+    <TD height=83 noWrap width="11%">&nbsp;</TD>
+    <TD align=left height=83 vAlign=center width="79%"><FONT 
+      face="Arial, Helvetica, sans-serif"><IMG height=7 
+      src="active.gif" width=7> 
+      <B>Как узнать частоту обновления экрана перед началом переключения, чтобы 
+      потом ее восстановить? </B><BR>Смотрите функцию 
+      GetDeviceCaps, с паpаметpом VREFRESH </FONT><BR><BR><IMG height=7 
+      src="active.gif" width=7> 
+      <B>Как узнать тип диска?</B><BR>Для NT все пpосто - 
+      там надо вызвать QueryDosDevice, а остальное настолько очевидно, что 
+      описывать дольше чем самому посмотpеть ;-))<BR>Для Win95 несколько 
+      сложнее. Я не буду выкусывать соответствующий кусок из функции опpеделения 
+      типа диска. Без контекста там не совсем понятно что к чему. Hадо только 
+      учесть, что эта функция 16-ти битная и ее надо вызывать чеpез Thunk-и. 
+      Конечно, часть того, что она делает можно сделать и в 32-х битном коде, но 
+      не все. <PRE><TT><B>
+/************************************************************************\
+* Module   : DrvType.cpp                                                *
+*-----------------------------------------------------------------------*
+*          :               : Original by Micro$oft corp. from MSDN      *
+\************************************************************************/
+/*
+How to Determine Drive Types in Windows
+
+Article ID: Q105922
+
+*/
+
+#include  &lt;windows.h&gt;
+#include  &lt;string.h&gt;
+#include    "..\SRC\IO_Const.h"
+
+#pragma warning(disable:4704)
+
+extern void FAR PASCAL DOS3Call(void);
+
+
+   // See the "MS-DOS Programmer's Reference" for further information
+   // about this structure.
+typedef struct tagDEVICEPARAMS {
+   BYTE  bSpecFunc;        // Special functions
+   BYTE  bDevType;         // Device type
+   WORD  wDevAttr;         // Device attributes
+   WORD  wCylinders;       // Number of cylinders
+   BYTE  bMediaType;       // Media type
+                        // Beginning of BIOS parameter block (BPB)
+   WORD  wBytesPerSec;     // Bytes per sector
+   BYTE  bSecPerClust;     // Sectors per cluster
+   WORD  wResSectors;      // Number of reserved sectors
+   BYTE  bFATs;            // Number of FATs
+   WORD  wRootDirEnts;     // Number of root-directory entries
+   WORD  wSectors;         // Total number of sectors
+   BYTE  bMedia;           // Media descriptor
+   WORD  wFATsecs;         // Number of sectors per FAT
+   WORD  wSecPerTrack;     // Number of sectors per track
+   WORD  wHeads;           // Number of heads
+   DWORD dwHiddenSecs;     // Number of hidden sectors
+   DWORD dwHugeSectors;    // Number of sectors if wSectors == 0
+   char  Dummy[71];        // Fuck Microsoft and Microsoft's sample code!!!
+   // ----------------------  // End of BIOS parameter block (BPB)
+} DEVICEPARAMS, FAR * LPDEVICEPARAMS;
+
+// Function prototypes
+static BOOL GetDeviceParameters (int nDrive,LPDEVICEPARAMS dp) ;
+static BOOL IsCDRomDrive (int nDrive) ;
+
+//-----------------------------------------------------------------
+// GetDeviceParameters()
+//
+// Fills a DEVICEPARAMS struct with info about the given drive.
+// Calls DOS IOCTL Get Device Parameters (440Dh, 60h) function.
+//
+// Parameters
+//   nDrive   Drive number  0 = A, 1 = B, 2 = C, and so on.
+//   dp       Pointer to a structure that will contain the drive's
+//            parameters.
+//
+// Returns TRUE if it succeeded, FALSE if it failed.
+//-----------------------------------------------------------------
+static BOOL GetDeviceParameters (int nDrive, LPDEVICEPARAMS dp)
+{
+    BOOL bResult = TRUE;      // Assume success
+    __asm {
+         push ds
+         mov  bx, nDrive
+         inc  bx           // Convert 0-based #'s to 1-based #s
+         mov  ch, 08h      // Device category--must be 08h
+         mov  cl, 60h      // MS-DOS IOCTL Get Device Parameters
+         lds  dx, dp
+         mov  ax, 440Dh
+         int  21h
+         jnc  gdp_done     // CF SET if error
+         mov  bResult, FALSE
+      gdp_done:
+         pop  ds
+    }
+    return (bResult);
+}
+//-----------------------------------------------------------------
+// IsCDRomDrive()
+//
+// Determines if a drive is a CD-ROM. Calls MSCDEX and checks
+// that MSCDEX is loaded, and that MSCDEX reports the drive is a
+// CD-ROM.
+//
+// Parameters
+//    nDrive    Drive number  0 = A, 1 = B, 2 = C, and so forth.
+//
+// Returns TRUE if nDrive is a CD-ROM drive, FALSE if it isn't.
+//-----------------------------------------------------------------
+static BOOL IsCDRomDrive (int nDrive)
+{
+    BOOL bResult = FALSE;      // Assume not a CD-ROM drive
+    __asm {
+         mov  ax, 150Bh       // MSCDEX CD-ROM Drive Check
+         xor  bx, bx
+         mov  cx, nDrive
+         int  2Fh
+         cmp  bx, 0ADADh      // Check MSCDEX signature
+         jne  not_cd_drive
+         or   ax, ax          // Check the drive type
+         jz   not_cd_drive    // 0 (zero) means not CD-ROM
+         mov  bResult, TRUE
+      not_cd_drive:
+    }
+    return (bResult);
+}
+
+//-----------------------------------------------------------------
+UINT GetDriveTypeEx (int nDrive)
+{
+    DEVICEPARAMS dp;
+    UINT uType;
+    UINT Drv4409Flag ;
+    UINT fAddFlags = 0 ;
+
+    _fmemset (&amp;dp, 0, sizeof(dp));    // Init device params struct
+    uType = GetDriveType (nDrive);
+
+    switch (uType) {
+      case DRIVE_REMOTE:
+            // GetDriveType() reports CD-ROMs as Remote drives. Need
+-7395------------------------------------------------------------------------
+            // to see if the drive is a CD-ROM or a network drive.
+        if (IsCDRomDrive (nDrive)) {
+            return (EX_DRIVE_CDROM | EX_DRIVE_NOACCESS);
+        } else {
+            return (EX_DRIVE_REMOTE | EX_DRIVE_NOACCESS);
+        }
+        break;
+
+      case DRIVE_REMOVABLE:
+            // Check for a floppy disk drive. If it isn't, then we
+            // don't know what kind of removable media it is.
+            // For example, could be a Bernoulli box or something new...
+        if (GetDeviceParameters (nDrive, &amp;dp))
+            switch (dp.bDevType) {
+               // Floppy disk drive types
+               case 0x0: case 0x1:              // 5.25" floppy
+               case 0x3: case 0x4:              // 8" floppy
+                  return (EX_DRIVE_FLOPPY5);
+               case 0x2: case 0x7: case 0x8:    // 3.5" floppy
+                  return (EX_DRIVE_FLOPPY3);
+            }
+        return (EX_DRIVE_REMOVABLE);  // Unknown removable media type
+        break;
+
+      case DRIVE_FIXED:
+        __asm {
+            xor  dx,dx
+            mov  bx,nDrive
+            inc  bl                    // 1-'A', 2-'B',...
+            mov  ax,0x4409
+            call far ptr DOS3Call
+            mov  Drv4409Flag,dx
+        }
+        if (Drv4409Flag &amp; 0x0100) fAddFlags |= EX_DRIVE_NOACCESS ;
+            // GetDeviceParameters returns a device type of 0x05 for
+            // hard disks. Because hard disks and RAM disks are the two
+            // types of fixed-media drives, we assume that any fixed-
+            // media drive that isn't a hard disk is a RAM disk.
+        if (GetDeviceParameters (nDrive, &amp;dp) &amp;&amp; dp.bDevType == 0x05) {
+            if (Drv4409Flag &amp; 0x8000)
+                return (EX_DRIVE_SUBSTED | fAddFlags);
+            else
+                return (EX_DRIVE_FIXED | fAddFlags);
+        } else {
+            return (EX_DRIVE_RAMDISK | fAddFlags);
+        }
+        break;
+    }
+    return (EX_DRIVE_INVALID);   // Drive is invalid if we get here.
+}
+</B></TT></PRE></FONT><IMG height=7 
+      src="active.gif" width=7> 
+      <B>Как удалить .exe-файл из самого себя? </B><BR><PRE><TT><B>
+#include &lt;windows.h&gt;
+#include &lt;stdio.h&gt;
+
+void DelSelf(void)
+{
+ char modulename[MAX_PATH];
+ char batfile[MAX_PATH];
+ char batlines[MAX_PATH*4];
+ LPSTR tempdir;
+ char Buf[MAX_PATH];
+
+ GetModuleFileName(NULL,modulename,MAX_PATH);
+
+ tempdir = ((GetEnvironmentVariable(TEXT("TEMP"),
+ Buf, MAX_PATH) &gt; 0) ? Buf : NULL);
+
+ strcpy(batfile,tempdir);
+ strcat(batfile,"\\");
+ strcat(batfile,"delself.bat");
+ strcpy(batlines,"@echo off\n:try\ndel ");
+ strcat(batlines,modulename);
+ strcat(batlines,"\nif exist ");
+ strcat(batlines,modulename);
+ strcat(batlines," goto try\n");
+ strcat(batlines,"del ");
+ strcat(batlines,batfile);
+
+ DWORD NOfBytes;
+ HANDLE hbf= CreateFile(batfile, GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ
+| FILE_SHARE_WRITE, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+ WriteFile(hbf,batlines,strlen(batlines),&amp;NOfBytes, NULL);
+ CloseHandle(hbf);
+
+ STARTUPINFO         si;
+ PROCESS_INFORMATION pi;
+ ZeroMemory( &amp;si, sizeof(si) );
+ si.cb = sizeof(si);
+ si.wShowWindow = SW_HIDE;
+ si.dwFlags = STARTF_USESHOWWINDOW;
+
+ CreateProcess(
+     NULL,
+     batfile,
+     NULL,
+     NULL,
+     FALSE,
+     IDLE_PRIORITY_CLASS|DETACHED_PROCESS,
+     NULL,
+     NULL,
+     &amp;si,
+     &amp;pi);
+
+}
+void main()
+{
+ DelSelf();
+} 
+</B></TT></PRE></FONT><IMG height=7 
+      src="active.gif" width=7> 
+      <B>Как изменить разрешение экрана? </B><BR><PRE><TT><B>
+DEVMODE dm;
+
+ZeroMemory(&amp;dm,sizeof(DEVMODE));
+dm.dmSize=sizeof(DEVMODE);
+dm.dmBitsPerPel=16;
+dm.dmPelsWidth=800;
+dm.dmPelsHeight=600;
+dm.dmDisplayFrequency=60;
+dm.dmFields=DM_BITSPERPEL|DM_PELSWIDTH|DM_PELSHEIGHT|DM_DISPLAYFREQUENCY;
+
+ChangeDisplaySettings(&amp;dm,CDS_UPDATEREGISTRY);
+</B></TT></PRE></FONT><BR></FONT></TD>
+    <TD height=83 width="10%">&nbsp;</TD></TR>
+  <TR>
+    <TD width="11%">&nbsp;</TD>
+    <TD vAlign=center width="79%">
+      <HR align=center width="100%">
+      <FONT color=#ffffff face="Arial, Helvetica, sans-serif" size=1>
+      <CENTER><A href="mailto:protosphere@tronet.troitsk.ru"></A>
+      <TABLE border=0 width="100%">
+        <TBODY>
+        <TR>
+          <TD height=2 width="25%"><FONT 
+            face="Arial, Helvetica, sans-serif" size=1><A 
+            href="faq5.shtml">Prev. 
+            Part</A></FONT></TD>
+          <TD align=middle height=2 vAlign=center width="50%"><FONT 
+            face="Arial, Helvetica, sans-serif" size=1><A href="cpp_faqindex.shtml"> FAQ 
+            Индекс </A></FONT></TD>
+          <TD height=2 width="25%"><FONT color=#ffffff 
+            face="Arial, Helvetica, sans-serif" size=1>
+            <CENTER></CENTER>
+            <DIV align=right>Next 
+      Part</DIV></FONT></TD></TR></TBODY></TABLE></CENTER></FONT></TD>
+    <TD width="10%">&nbsp;</TD></TR></TBODY></TABLE>
+<!--#include virtual="/ssi/bottom.html"-->

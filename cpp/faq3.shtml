@@ -1,0 +1,255 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table align="center" border="0" width="100%">
+<TBODY>
+  <tr>
+    <td height="71" width="11%"></td>
+    <td align="middle" height="71" vAlign="bottom" width="79%"><b><font
+    face="Arial, Helvetica, sans-serif">Visual C++ / FAQ Part 3</font></b></td>
+    <td height="71" width="10%"></td>
+  </tr>
+  <tr>
+    <td height="18" width="11%"></td>
+    <td height="18" width="79%"><hr align="center" width="100%">
+    </td>
+    <td height="18" width="10%"></td>
+  </tr>
+  <tr>
+    <td height="83" noWrap width="11%"></td>
+    <td align="left" height="83" vAlign="center" width="79%"><font
+    face="Arial, Helvetica, sans-serif"><a name="1"></a><img height="7" src="active.gif"
+    width="7"> <b>Как определить, что запущен Screen Saver?</b><br>
+    Если верить справочнику по Win32 API: <pre><tt><b>
+bool bIsSaverActive;
+
+SystemParametersInfo(SPI_GETSCREENSAVEACTIVE, 0, &amp;bIsSaverActive, 0);
+if (bIsSaverActive) {  ...  }
+</b></tt></pre>
+    <p>или </p>
+    <pre><tt><b>
+BOOL IsSaverRunning()
+{ BOOL isNT;
+  OSVERSIONINFO ovi; ovi.dwOSVersionInfoSize=sizeof(ovi);
+  GetVersionEx(&amp;ovi); isNT=(ovi.dwPlatformId==VER_PLATFORM_WIN32_NT);
+  if (!isNT)
+  { UINT dummy, srunning=0;
+    BOOL res=SystemParametersInfo(SPI_SCREENSAVERRUNNING,0,&amp;srunning,0);
+    SystemParametersInfo(SPI_SCREENSAVERRUNNING,srunning,&amp;dummy,0);
+    if (srunning==0) return FALSE; else return TRUE;
+  }
+  // это прекрасно рабоатет под '95. Но НТ могут быть проблемы
+  HWND hfw=GetForegroundWindow();
+  if (hfw==NULL) return TRUE;
+  LONG wl=GetWindowLong(hfw,GWL_STYLE);
+  if ((wl&amp;0xF0000000)!=WS_POPUP|WS_VISIBLE) return FALSE;
+  RECT rc; GetWindowRect(hfw,&amp;rc);
+  if (rc.right-rc.left!=GetSystemMetrics(SM_CXSCREEN) ||
+      rc.bottom-rc.top!=GetSystemMetrics(SM_CYSCREEN)) return FALSE;
+  return TRUE;
+}
+</b></tt></font><a
+name="2"></a><img height="7"
+src="FAQ%20Part%203-Visual%20C++%20--%20ProtoSphere.files/active.gif" width="7"> <b>С        помощью каких функций можно написать программу, которая использует        соединения, имеющиеся в удаленном доступе?</b>
+Смотрите Win32 API-фукнции, начинающиеся с RAS.        
+
+<a
+name="3"></a><img height="7" src="active.gif" width="7">        <b>Как программно сжать/растянуть картинку? </b>
+Смотрите Win32 API-фукнции: StretchBlt, StretchDIBits и        SetStretchBltMode. 
+
+<a
+name="4"></a><img height="7" src="active.gif" width="7">        <b>Как принудительно завершить MS-DOS задачу, не дожидаясь ее нормального        выхода?</b>
+</pre>
+    <pre><tt><b>
+DWORD ProcessID; //Здесь будет ProcessId, котоpый получили после CreateProcess
+HANDLE hProcess;
+
+  hProcess=OpenProcess(PROCESS_TERMINATE,0,ProcessID);
+  if(hProcess!=NULL)
+    {
+      TerminateProcess(hProcess,0);
+      CloseHandle(hProcess);
+    }
+</b></tt></pre>
+    <p><a name="5"></a><img height="7" src="active.gif" width="7"> <b>Как
+    нарисовать рванное окно?</b><br>
+    </p>
+    <pre><tt><b>
+...
+   WNDCLASS WndClass;
+
+   WndClass.lpszClassName =(LPSTR)&quot;BalonHelp&quot;;
+   WndClass.hInstance     =hInstance;
+   WndClass.lpfnWndProc   =BalonWndProc;
+   WndClass.style         =CS_SAVEBITS; // восстановление возлагаем на Win
+&gt;  WndClass.hbrBackground =GetStockBrush(NULL_BRUSH);
+   WndClass.hCursor       =LoadCursor(NULL,IDC_ARROW);
+   WndClass.hIcon         =NULL;
+   WndClass.lpszMenuName  =NULL;
+   WndClass.cbClsExtra    =0;
+   WndClass.cbWndExtra    =0;
+
+   RegisterClass(&amp;WndClass);
+...
+LRESULT CALLBACK BalonWndProc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam)
+{
+  switch(msg)
+  {
+    case WM_PAINT:
+&gt;    // отpисовка всего окна ложится на твои плечи :-)
+     ...
+    case ...
+  }
+  return DefWindowProc(hWnd,msg,wParam,lParam);
+}
+</b></tt><a
+name="6"></a><img height="7" src="active.gif" width="7">        <b>Как полностью перекрыть доступ к файлу во время работы с        ним?</b>
+После создания с помощью следующего кода        файл даже не читается: </pre>
+    <pre><tt><b>
+CreateFile(f,GENERIC_WRITE,0,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL);
+</b></tt><a
+name="7"></a><img height="7" src="active.gif" width="7">        <b>Как сделать так, чтобы во время выполнения длинного метода приложение        реагировало на сообщения? </b>
+</pre>
+    <pre><tt><b>
+BOOL ProcessMessages()
+{
+  MSG msgCur;
+  if (!::GetMessage(&amp;msgCur, NULL, NULL, NULL))
+  {
+   return FALSE;
+  }
+
+
+  // обрабатываем это сообщение
+
+  ::TranslateMessage(&amp;m_msgCur);
+  ::DispatchMessage(&amp;m_msgCur);
+  return TRUE;
+}
+</b></tt><a
+name="8"></a><img height="7" src="active.gif" width="7">        <b>Как сделать цикличным проигрывание MIDI-файла? </b>
+</pre>
+    <pre><tt><b>
+LRESULT CMainFrame::WindowProc(UINT message, WPARAM wParam, LPARAM lParam)
+{
+  if(message==MM_MCINOTIFY)
+   if(wParam!=MCI_NOTIFY_ABORTED)
+   {
+      if(m_bIsPlaing)
+      {
+          if(SetMidi())
+           PlayMidi();
+      }
+   }
+
+  return CFrameWnd::WindowProc(message, wParam, lParam);
+}
+
+BOOL CMainFrame::SetMidi()
+{
+  StopMidi();
+  MCI_OPEN_PARMS OpenParm;
+  OpenParm.dwCallback = (DWORD)GetSafeHwnd();
+  OpenParm.lpstrDeviceType = NULL;
+  OpenParm.lpstrElementName = filename;
+  DWORD flags=MCI_OPEN_ELEMENT;
+  MCIERROR err;
+  err=mciSendCommand(0, MCI_OPEN, flags,(DWORD)&amp;OpenParm);
+  if(!err){
+   m_nMidideviceID=OpenParm.wDeviceID;
+   return TRUE;
+  }
+  else
+  return FALSE;
+}
+
+BOOL CMainFrame::PlayMidi(void)
+{
+  MCI_PLAY_PARMS PlayParm;
+  PlayParm.dwCallback =(DWORD)GetSafeHwnd();
+  PlayParm.dwFrom=0;
+  MCIERROR err;
+
+err=mciSendCommand(m_nMidideviceID,MCI_PLAY,MCI_FROM|MCI_NOTIFY,(DWORD)&amp;PlayParm);
+  if(!err)
+  {
+   m_bIsPlaing=TRUE;
+   return TRUE;
+  }
+  m_bIsPlaing=FALSE;
+  return FALSE;
+}
+
+BOOL CMainFrame::StopMidi(void)
+{
+  m_bIsPlaing=FALSE;
+  MCI_GENERIC_PARMS generic_params;
+  generic_params.dwCallback=(DWORD)GetSafeHwnd();
+  mciSendCommand(m_nMidideviceID,MCI_CLOSE,MCI_WAIT,(DWORD)&amp;generic_params);
+  return TRUE;
+}
+</b></tt><a
+name="9"></a><img height="7" src="active.gif" width="7">        <b>Как перехватывать ВСЕ исключения в процессе?</b>
+</pre>
+    <pre><tt><b>
+    main()
+    {
+      try {
+        ...
+      }
+      catch(...) {
+               ^^^именно так и напиши!
+        ...
+      }
+    }
+</b></tt></pre>
+    <p>Так как функция main() совсем не типична для Win32,
+    предлагаю уделить внимание SetUnhandledExceptionFilter(). <br>
+    <br>
+    <a name="10"></a><img height="7" src="active.gif" width="7"> <b>Как узнать,
+    кто в данный момент присоединен через Сеть к
+    машине?</b><br>
+    Это можно узнать по сессиям: </p>
+    <pre><tt><b>
+   SESSION_INFO_2 *psi2;
+  NET_API_STATUS Result;
+  wchar_t wcServerName[MAX_COMPUTERNAME_LENGTH + 1];
+  DWORD prefmaxlen = MAX_PREFERRED_LENGTH;
+  DWORD entriesread;
+  DWORD totalentries;
+
+  StringToWideChar( name, wcServerName, MAX_COMPUTERNAME_LENGTH );
+
+  Result = NetSessionEnum( (LPTSTR) wcServerName, NULL, NULL, 2,
+    (unsigned char**) &amp;psi2, prefmaxlen, &amp;entriesread,  &amp;totalentries, NULL );
+  if( Result != NERR_Success )
+    throw Exception(&quot;Информация о сессиях не получена!&quot;);
+</b></tt></pre>
+    </td>
+    <td height="83" width="10%"></td>
+  </tr>
+  <tr>
+    <td width="11%"></td>
+    <td vAlign="center" width="79%"><hr align="center" width="100%">
+    <p align="center"><font color="#ffffff" face="Arial, Helvetica, sans-serif" size="1"><a
+    href="mailto:protosphere@tronet.troitsk.ru"></a> </p>
+    <div align="center"><center><table border="0" width="100%">
+<TBODY>
+      <tr>
+        <td height="2" width="25%"><font color="#ffffff" face="Arial, Helvetica, sans-serif"
+        size="1"><a href="faq2.shtml"><p align="left">Prev. Part</a></font></td>
+        <td align="middle" height="2" vAlign="center" width="50%"><font
+        face="Arial, Helvetica, sans-serif" size="1"><a href="cpp_faqindex.shtml">FAQ Индекс</a>
+        | </font></td>
+        <td height="2" width="25%"><font face="Arial, Helvetica, sans-serif" size="1"><a
+        href="faq4.shtml"><p align="right">Next Part</a></font></td>
+      </tr>
+</TBODY>
+    </table>
+    </center></div></font></td>
+    <td width="10%"></td>
+  </tr>
+</TBODY>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

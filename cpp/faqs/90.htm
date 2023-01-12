@@ -1,0 +1,188 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Final//RU">
+<html>
+<head>
+ <meta http-equiv=Content-Type content="text/html; charset=windows-1251">
+ <meta name="keywords" content="C, C++, Visual C++, FAQ, ЧаВО, Часто задаваемые вопросы, Метод класса в новом потоке">
+ <title>Метод класса в новом потоке</title>
+ <style>
+  a:link { color: #005177; text-decoration: underline; }
+  a:visited { color: #665066; text-decoration: underline; }
+  a:hover { color: #cc3333; text-decoration: underline; }
+  body { text-align: justify; LINE-HEIGHT: 150%; }
+
+  .question { font-family: Verdana, Arial, Helvetica, sans-serif; font-size: 11pt; color:#ffffff; text-decoration: none; font-weight: bold; text-align: center; padding-bottom: 0pt; padding-top: 0pt}
+  .answer { font-family: Verdana, Arial, Helvetica, sans-serif; font-size: 10pt; text-align: justify; padding: 10pt 10pt 10pt 10pt;}
+  .code { font-family: Courier; font-style:normal; font-weight:normal; font-size:10pt; color:#900090; background-color:#f8f8f8; padding: 10pt 10pt 10pt 10pt; border:1pt solid silver; text-align:left; LINE-HEIGHT: 150%; }
+  .head { font-family: Verdana, Arial, Helvetica, sans-serif; font-size: 9pt; color: #000000; text-decoration: none; text-align: center; LINE-HEIGHT: 120%; padding-bottom: 6pt; }
+  .foot { font-family: Verdana; font-size: 7.5pt; color: #000000; text-decoration: none; text-align: center; LINE-HEIGHT: 130%; }
+  .author { font-family: Verdana, Arial, Helvetica, sans-serif; font-size: 10pt; color: #000000; font-weight: bold; text-decoration: none; text-align: left; LINE-HEIGHT: 150%; padding-left: 20pt; }
+  .leftmenu { font-family: Verdana, Arial, Helvetica, sans-serif; font-size: 10pt; text-decoration: none; LINE-HEIGHT: 150%; }
+  .menuhead { color: #ffffff; text-align: center; font-size:10pt; font-weight: bold }
+  .menucont { color: #000000; text-align: left; background-color: #ffffff; LINE-HEIGHT: 180%; }
+  SELECT { BACKGROUND-COLOR: #accaf4; COLOR: #000000; FONT-FAMILY: Verdana, Helvetica, Arial; FONT-SIZE: 7pt}
+  .underfoot { font-family: Tahoma; font-size: 8pt; color: #000000; text-decoration: none; LINE-HEIGHT: 150%; }
+  .tabletop { background-color: #6e94b7 }
+
+ </style>
+</head>
+
+<body bgcolor=#ffffff onload="window.focus();" leftmargin=10 rightmargin=10 topmargin=10 bottommargin=10>
+<div class="head">Часто задаваемые вопросы и ответы по C/C++/Visual C++<br>
+Последнее обновление: 27.08.2003</div>
+<table width=100% class="answer" style="line-height:100%;"><tr><td><img src="folder.gif"> <a href="index.htm">FAQ по C/C++/Visual C++</a>
+<br>
+<!--<img src="line.gif"><img src="folder.gif"><font face="Verdana" color="#000000" size="2"><b> Метод класса в новом потоке</b>--><img src="line2.gif"><img src="folder.gif"><a href="0.htm"> Работа с сетью</a><br><img src="line.gif"><img src="line2.gif"><img src="folder.gif"> Метод класса в новом потоке</font></td>
+<td align=right valign=top class="underfoot">
+Составители: <a href="mailto:SUnteXx@sources.ru">SUnteXx</a>, <a href="mailto:Leprecon@sources.ru">Leprecon</a>
+</tr></table>
+
+<table cellspacing=1 cellpadding=5 class="tabletop" width=100%>
+<tr><td class="question">Метод класса в новом потоке</td></tr>
+<tr><td bgcolor=#ffffff class="answer" style="LINE-HEIGHT: 150%;">
+
+<div class="author">A: (<a href="mailto:leprecon@pisem.net">Leprecon</a>)<br>
+ Оригинальная ссылка: <a >нету</a><br><br></div>
+Иногда функциональности глобальной функции или статического метода класса не хватает при запуске нового потока. С методом класса новый поток не создашь. Компилятор выдаст вот такую ошибку: <div class="quote">error C2664: 'CreateThread' : cannot convert parameter 3 from 'unsigned long (__thiscall CMyClass::*)(void *)' to 'unsigned long (__stdcall *)(void *)'</div> Функцию <font color="#0000ff">__thiscall</font> просто так к <font color="#0000ff">__stdcall</font> не приведешь, ведь для метода передается еще указатель на класс. Но если немного схитрить, то это можно обойти. Вместо метода мы создадим поток со статической функцией. А в качестве данных, передадим указатель на структуру, в которую положим:<br>
+1. Указатель на экземпляр класса.<br>
+2. Указатель на метод класса.<br>
+3. Указатель на дествительные данные для метода.<br>
+Когда новый поток запустится, то статическая функция, зная указатель на класс и нужный метод, запустит этот метод в новом потоке. <pre class="code"><font color="#000080">class </font>CMyClass<font color="#0000ff">;
+</font><font color="#000080">typedef </font>DWORD <font color="#0000ff">(</font>CMyClass<font color="#0000ff">::*</font>LPTHREAD_METHOD<font color="#0000ff">)(</font>LPVOID pParam<font color="#0000ff">);
+
+</font><font color="#008000">// Структура параметров для статической функции.
+</font><font color="#000080">typedef struct </font>STARTUP_PARAM
+<font color="#0000ff">{
+&nbsp;&nbsp;&nbsp;&nbsp;</font>CMyClass<font color="#0000ff">*&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>pClass<font color="#0000ff">;
+&nbsp;&nbsp;&nbsp;&nbsp;</font>LPTHREAD_METHOD&nbsp;&nbsp;&nbsp;&nbsp;pMethod<font color="#0000ff">;
+&nbsp;&nbsp;&nbsp;&nbsp;</font>LPVOID&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pParam<font color="#0000ff">;
+} *</font>LPSTARTUP_PARAM<font color="#0000ff">;
+
+</font><font color="#008000">// Объявление класса.
+</font><font color="#000080">class </font>CMyClass
+<font color="#0000ff">{
+</font><font color="#000080">public</font><font color="#0000ff">:
+&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#008000">// Метод, который мы хотели бы запустить в новом потоке.
+&nbsp;&nbsp;&nbsp;&nbsp;</font>DWORD&nbsp;&nbsp;&nbsp;&nbsp;Process&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000ff">(</font>LPVOID pParam<font color="#0000ff">);
+
+&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#008000">// Функция, которая создает новый поток.
+&nbsp;&nbsp;&nbsp;&nbsp;</font>HANDLE&nbsp;&nbsp;&nbsp;&nbsp;StartThread&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000ff">(</font>LPTHREAD_METHOD pMethod<font color="#0000ff">, </font>LPVOID pParam<font color="#0000ff">, 
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </font>LPDWORD pdwThreadID <font color="#0000ff">= </font>NULL<font color="#0000ff">, 
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </font>LPSECURITY_ATTRIBUTES pSecurity <font color="#0000ff">= </font>NULL <font color="#0000ff">, 
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </font>DWORD dwStackSize <font color="#0000ff">= 0 , 
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </font>DWORD dwFlags <font color="#0000ff">= 0);
+</font><font color="#000080">protected</font><font color="#0000ff">:
+&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#008000">// Статическая функция, которая запустит метод.
+&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">static &nbsp;</font>DWORD StartFunc&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000ff">(</font>LPSTARTUP_PARAM pStartup<font color="#0000ff">);
+};
+
+</font><font color="#008000">// В этом методе можно реализовать вычисления, которые вам нужны.
+</font>DWORD CMyClass<font color="#0000ff">::</font>Process<font color="#0000ff">(</font>LPVOID pParam<font color="#0000ff">)
+{
+&nbsp;&nbsp;&nbsp;&nbsp;</font>Sleep<font color="#0000ff">(1000);
+&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">return </font><font color="#0000ff">0;
+}
+
+</font>HANDLE CMyClass<font color="#0000ff">::</font>StartThread<font color="#0000ff">(</font>LPTHREAD_METHOD pMethod<font color="#0000ff">, </font>LPVOID pParam<font color="#0000ff">, 
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </font>LPDWORD pdwThreadID <font color="#008000">/* = NULL */</font><font color="#0000ff">, 
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </font>LPSECURITY_ATTRIBUTES pSecurity <font color="#008000">/* = NULL */</font><font color="#0000ff">, 
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </font>DWORD dwStackSize <font color="#008000">/* = 0 */</font><font color="#0000ff">, 
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </font>DWORD dwFlags <font color="#008000">/* = 0 */</font><font color="#0000ff">)
+{
+&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#008000">// Создаем структуру и упаковываем данные для статической функции.
+&nbsp;&nbsp;&nbsp;&nbsp;</font>LPSTARTUP_PARAM pStartup <font color="#0000ff">= </font><font color="#000080">new </font>STARTUP_PARAM<font color="#0000ff">;
+&nbsp;&nbsp;&nbsp;&nbsp;</font>pStartup<font color="#0000ff">-&gt;</font>pClass&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000ff">= </font><font color="#000080">this</font><font color="#0000ff">;
+&nbsp;&nbsp;&nbsp;&nbsp;</font>pStartup<font color="#0000ff">-&gt;</font>pMethod&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000ff">= </font>pMethod<font color="#0000ff">;
+&nbsp;&nbsp;&nbsp;&nbsp;</font>pStartup<font color="#0000ff">-&gt;</font>pParam&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000ff">= </font>pParam<font color="#0000ff">;
+
+&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#008000">// Создаем новый поток.
+&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">return </font>CreateThread<font color="#0000ff">(</font>pSecurity<font color="#0000ff">, </font>dwStackSize<font color="#0000ff">, (</font>LPTHREAD_START_ROUTINE<font color="#0000ff">)</font>StartFunc<font color="#0000ff">, </font>pStartup<font color="#0000ff">, </font>dwFlags<font color="#0000ff">, </font>pdwThreadID<font color="#0000ff">);
+}
+
+</font><font color="#008000">// В новом потоке вначале вызывается функция CMyClass::StartFunc(...)
+// А она запускает наш метод.
+</font>DWORD CMyClass<font color="#0000ff">::</font>StartFunc<font color="#0000ff">(</font>LPSTARTUP_PARAM pStartup<font color="#0000ff">)
+{
+&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#008000">// Распаковываем данные в новом потоке.
+&nbsp;&nbsp;&nbsp;&nbsp;// Получаем указатель на класс и на метод класса.
+&nbsp;&nbsp;&nbsp;&nbsp;</font>CMyClass<font color="#0000ff">* </font>pClass&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000ff">= </font>pStartup<font color="#0000ff">-&gt;</font>pClass<font color="#0000ff">;
+&nbsp;&nbsp;&nbsp;&nbsp;</font>LPTHREAD_METHOD pMethod <font color="#0000ff">= </font>pStartup<font color="#0000ff">-&gt;</font>pMethod<font color="#0000ff">;
+&nbsp;&nbsp;&nbsp;&nbsp;</font>LPVOID pParam&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000ff">= </font>pStartup<font color="#0000ff">-&gt;</font>pParam<font color="#0000ff">;
+
+&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#008000">// Запускаем метод класса в новом потоке.
+&nbsp;&nbsp;&nbsp;&nbsp;</font>DWORD dwResult <font color="#0000ff">= (</font>pClass<font color="#0000ff">-&gt;*</font>pMethod<font color="#0000ff">)(</font>pParam<font color="#0000ff">);
+
+&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#008000">// Удаляем временные данные и возвращаем код возврата из нового потока.
+&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">delete </font>pStartup<font color="#0000ff">;
+&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">return </font>dwResult<font color="#0000ff">;
+}
+</font></pre>Подробнее остановимся на функции <b>CMyClasss::StartThread</b><br>
+Функция создает новый поток в виртуальном адресном пространстве вызывающего процесса.<br>
+<pre class="code">HANDLE CMyClass<font color="#0000ff">::</font>StartThread<font color="#0000ff">(
+&nbsp;&nbsp;&nbsp;&nbsp;</font>LPTHREAD_METHOD pMethod<font color="#0000ff">, </font>LPVOID pParam<font color="#0000ff">, 
+&nbsp;&nbsp;&nbsp;&nbsp;</font>LPDWORD pdwThreadID <font color="#008000">/* = NULL */</font><font color="#0000ff">, 
+&nbsp;&nbsp;&nbsp;&nbsp;</font>LPSECURITY_ATTRIBUTES pSecurity <font color="#008000">/* = NULL */</font><font color="#0000ff">, 
+&nbsp;&nbsp;&nbsp;&nbsp;</font>DWORD dwStackSize <font color="#008000">/* = 0 */</font><font color="#0000ff">, 
+&nbsp;&nbsp;&nbsp;&nbsp;</font>DWORD dwFlags <font color="#008000">/* = 0 */</font>
+<font color="#0000ff">);</font></pre>Эта функция аналогична функции Win32 API <pre class="code">HANDLE CreateThread<font color="#0000ff">(
+&nbsp;&nbsp;&nbsp;&nbsp;</font>LPSECURITY_ATTRIBUTES lpThreadAttributes<font color="#0000ff">,
+&nbsp;&nbsp;&nbsp;&nbsp;</font>SIZE_T dwStackSize<font color="#0000ff">,
+&nbsp;&nbsp;&nbsp;&nbsp;</font>LPTHREAD_START_ROUTINE lpStartAddress<font color="#0000ff">,
+&nbsp;&nbsp;&nbsp;&nbsp;</font>LPVOID lpParameter<font color="#0000ff">,
+&nbsp;&nbsp;&nbsp;&nbsp;</font>DWORD dwCreationFlags<font color="#0000ff">,
+&nbsp;&nbsp;&nbsp;&nbsp;</font>LPDWORD lpThreadId
+<font color="#0000ff">);</font></pre><b>Параметры:</b><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<b>pMethod [in]</b> указатель на метод класса, для вызова в новом потоке.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<b>pParam [in]</b> указатель на данные для нового потока.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<b>pdwThreadID [out]</b> указатель на переменную, которая получит идентификатор потока.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<b>pSecurity [in]</b> указатель на структуру <b>SECURITY_ATTRIBUTES</b>, которая устанавливает, может ли дочерний процесс унаследовать возвращаемый хендл потока. Если pSecurity равно NULL, хендл не может быть унаследован. <b>Windows NT/2000/XP:</b> Поле <b>lpSecurityDescriptor</b> структуры, устанавливает атрибуты безопастности для нового потока. Если pSecurity равно NULL, потоку даются атрибуты по умолчанию. <br>
+&nbsp;&nbsp;&nbsp;&nbsp;<b>dwStackSize [in]</b> Изначальный размер стека, в байтах. Система округлит это значение до ближайшей страницы. Если значение равно нулю, новый поток возьмет размер по умолчанию. <br>
+&nbsp;&nbsp;&nbsp;&nbsp;<b>dwCreationFlags [in]</b> Флаги для создания потока. Если установлен флаг CREATE_SUSPENDED, поток создается в приостановленном состоянии и не будет запущен, пока не будет вызвана фугкция <b>ResumeThread</b>. Если значение равно нулю, то поток запустится сразу после создания.<br>
+<b>Результат:</b><br>
+&nbsp;&nbsp;&nbsp;&nbsp;В случае успеха, возвратится хендл созданного потока.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;В случае неудачи, возвратится NULL. <br>
+<br>
+<b>Пример:</b><pre class="code">CMyClass MyClass<font color="#0000ff">;
+
+</font><font color="#000080">char</font><font color="#0000ff">* </font>pStr <font color="#0000ff">= </font><font color="#000080">new char </font><font color="#0000ff">[6];
+</font>strcpy<font color="#0000ff">(</font>pStr<font color="#0000ff">, </font><font color="#ff00ff">"Hello"</font><font color="#0000ff">);
+
+</font>DWORD dwThreadID<font color="#0000ff">;
+</font>HANDLE hThread <font color="#0000ff">= </font>MyClass<font color="#0000ff">.</font>StartThread<font color="#0000ff">(</font>CMyClass<font color="#0000ff">::</font>Process<font color="#0000ff">, (</font>LPVOID<font color="#0000ff">)</font>pStr<font color="#0000ff">, &</font>dwThreadID<font color="#0000ff">);</font></pre>Метод <b>CMyClass::Process</b>, запустится в новом потоке и значение <font color="#0000ff">this</font> будет равно указателю на класс MyClass.<br>
+<br>
+<b>Примечание:</b> При работе с классами в разных потоках не забывайте о синхронизации.<br>
+<br>
+Если есть какие-то замечания, предложения или что-то еще, то пишите: <br>
+<a href="mailto:leprecon@pisem.net">leprecon@pisem.net</a>.
+<br></td></tr>
+<tr><td bgcolor=#dee7ef>
+<table cellpadding=0 cellspacing=0 width=100%><tr><td width=33%><a href="index.htm">Содержание</a></td>
+<td align=center class="underfoot"><a href="http://pascal.sources.ru/cgi-bin/forum/YaBB.cgi?board=cpp">Обсудить на форуме</a></td>
+<td align=right class="underfoot">« <a href=88.htm> Предыдущая статья</a> | <a href=99.htm> Следующая статья</a> »</font></td></tr></table></td></tr></table>
+
+<tt class="foot"><div align=right><form>Перейти к FAQ:&nbsp;&nbsp;<br>
+<select name="values" onChange="if(this.options[this.selectedIndex].value) window.location.href=this.options[this.selectedIndex].value;">
+<option value="">Программирование</option>
+<option value="">-----------------------------</option>
+<option selected value="http://www.sources.ru/cpp/faqs/index.htm">=> C / C++ / Visual C++</option>
+<option value="http://pascal.sources.ru/cgi-bin/forum/YaBB.cgi?board=delphi;action=display;num=1037272197">Delphi</option>
+<option value="http://pascal.sources.ru/vb/faq/index.html">Visual Basic</option>
+<option value="http://pascal.sources.ru/asm/faq/index.htm">Assembler</option>
+<option value="http://pascal.sources.ru/faq/index.htm">Pascal</option>
+<option value="">                             </option>
+<option value="">Системы, Сети, Технологии</option>
+<option value="">-----------------------------</option>
+<option value="http://pascal.sources.ru/yabb/www_faq.htm">WWW Masters</option>
+<option value="http://pascal.sources.ru/database/faq/index.html">Базы Данных</option>
+<option value="">                             </option>
+<option value="">General</option>
+<option value="">-----------------------------</option>
+<option value="http://pascal.sources.ru/yabb/flame_faq.htm">Много шуму и... ничего</option>
+</select></form></div></tt>
+
+<table cellspacing=1 cellpadding=3 class="tabletop" width=100%>
+<tr><td bgcolor=#ffffff class="foot">
+FAQ составлен по материалам <a href="http://pascal.sources.ru/cgi-bin/forum/YaBB.cgi">Форума на Исходниках.Ру</a>.<br>
+Copyright © 2002 by <a href="http://www.sources.ru">Sources.ru</a>. All rights reserved.<br>
+</td></tr></table></td></tr></table>
+</body>
+</html>

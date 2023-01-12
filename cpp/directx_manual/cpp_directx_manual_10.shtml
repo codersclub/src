@@ -1,0 +1,1001 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <p><font face="Arial" size="6"><b>Глава 7 Проверка попадания</b></font>
+    </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">Одна из распространенных
+    задач, возникающих при работе с трехмерной
+    графикой, - выяснить, принадлежит ли точка в
+    трехмерном окне какому-либо из видимых объектов.
+    Иногда этот процесс называют выделением (selection)
+    или выбором (picking). В документации по DirecQD он
+    назван выбором, однако я буду именовать его
+    проверкой попадания (hit testing), потому что я
+    пользовался этим термином с первых дней
+    программирования для Microsoft Windows.</font> </p>
+    <p><font face="Times New Roman" size="2">Существует несколько
+    стандартных применений проверки попадания. В
+    первом примере этой главы мы будем пользоваться
+    ей для выделения объекта (в макете), чтобы
+    управлять им с помощью мыши или джойстика. Выбрав
+    отдельный объект, мы сможем перемещать его
+    независимо от других и строить макет по своему
+    усмотрению.</font> </p>
+    <p><font face="Times New Roman" size="2">Во втором примере мы
+    научимся определять грань объекта, в которую
+    попала указанная точка. Это может пригодиться,
+    например, если вы хотите задать цвет отдельной
+    грани объекта. В третьем примере мы определим
+    фактическое положение точки попадания в объекте.
+    Зная точные координаты точки попадания, можно
+    модифицировать объект тем или иным образом -
+    скажем, добавить выпуклость на плоской
+    поверхности.</font> </p>
+    <p><font face="Times New Roman" size="2">Примеры приложений для
+    этой главы находятся в каталоге Select. И снова я
+    предлагаю вам сесть за компьютер и запускать
+    необходимые программы по мере развития сюжета.</font>
+    </p>
+    <p><font face="Arial" size="4"><b>Процесс выделения</b></font> </p>
+    <p><font face="Times New Roman" size="2">Выделение объектов мышью
+    выглядит очень естественно - пользователь
+    наводит указатель мыши на объект и нажимает
+    кнопку. Тем не менее приложению не так просто
+    определить, какой же объект был выделен. Прежде
+    всего, пользователь может применять мышь для
+    манипуляций с объектами, поэтому сообщения,
+    посылаемые Windows главному окну (о том, где
+    находится указатель мыши и какая кнопка была
+    нажата), должны попадать сразу в несколько мест.
+    Обычно это делается следующим образом: некий
+    центральный фрагмент программы перехватывает
+    сообщения мыши и направляет их всем другим
+    фрагментам, которым они могут понадобиться. Вы
+    сохраняете текущее состояние мыши в глобальной
+    переменной и позволяете всему коду
+    непосредственно обращаться к ней.
+    Альтернативный вариант - реализовать
+    предложенную мной схему, то есть написать
+    простую функцию, которая обрабатывает сообщения
+    мыши и обращается к другим фрагментам
+    приложения, уведомляя их о наступлении того или
+    иного события.</font> </p>
+    <p><font face="Times New Roman" size="2">Предположим, вы знаете, в
+    какой точке экрана находится указатель мыши и
+    что пользователь нажал кнопку, желая выделить
+    объект в макете. Но как же определить, в каком
+    объекте пользователь произвел щелчок мышью?
+    Первым делом необходимо привести экранные
+    координаты мыши к координатам клиент-ной области
+    вашего окна. Затем вам фактически понадобится
+    обратить проекционное преобразование, которым
+    пользуется механизм визуализации, и перевести
+    двумерные координаты на вашем экране в
+    пространственные. Сделать это не так просто, как
+    может показаться с первого взгляда. Как мы вскоре
+    увидим, меха-</font> </p>
+    <p><font face="Arial" size="2">Процесс выделения <i>'тЦЦ</i><b> 165</b></font>
+    </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">низм DirectSD способен
+    выполнить подобную процедуру за нас - в
+    определенной степени. Вместо того чтобы
+    преобразовать экранные координаты мыши в
+    трехмерные, он выдает список всех объектов,
+    которые находятся ниже выбранной точки. Кроме
+    того, список сортируется по глубине, чтобы вы
+    могли определить, какой объект находится перед
+    остальными - именно его (будем надеяться!) и
+    пытается выделить пользователь. Все эти операции
+    требуют довольно сложного жонглирования
+    матрицами преобразований.</font> </p>
+    <p><font face="Times New Roman" size="2">В наших
+    приложениях-примерах в любой момент времени
+    разрешается выделить только один объект.
+    Подобное ограничение упрощает код, поскольку
+    можно завести переменную-указатель (m_pCurShape),
+    которая ссылается на текущий выделенный объект
+    или равна NULL, если выделенных объектов нет.
+    Позднее мы увидим, что в наших приложениях также
+    поддерживается концепция <i>текущей выделенной
+    грани объекта -</i> грани текущего выделенного
+    объекта, над которой находился указатель мыши в
+    момент выделения.</font> </p>
+    <p><font face="Times New Roman" size="2">Для того чтобы реализовать
+    проверку попаданий в приложениях-примерах, мне
+    пришлось включить в них немало фрагментов,
+    рассредоточенных по разным местам. В последующих
+    разделах я постараюсь объяснить, где должен
+    находиться тот или иной фрагмент и как он
+    работает. Если вы не следите за моими
+    объяснениями и хотите самостоятельно
+    разобраться, как работает программа, советую
+    запустить приложение под отладчиком, установить
+    точку прерывания в функции C3dWnd::OnWndMsg (файл 3dWnd.cpp в
+    библиотеке 3dPlus) и следить за выполнением
+    программы. Еще раз хочу подчеркнуть, что эту
+    задачу можно было решить множеством способов,
+    причем выбранное мною решение, вероятно, ничуть
+    не лучше любого другого. Если вам кажется, что
+    ваша собственная идея даст сто очков вперед
+    предложенной мною, - наверное, вы правы и именно
+    ей вам следует пользоваться в ваших программах.</font>
+    </p>
+    <p><font face="Arial" size="4"><b>Выделение всего объекта</b></font> </p>
+    <p><font face="Times New Roman" size="2">Основная часть задачи
+    выделения объектов выполняется механизмом
+    визуализации в рамках интерфейса ракурса. Тем не
+    менее перед тем, как приступать к изучению его
+    работы, я бы хотел кратко описать
+    последовательность событий, происходящих с
+    момента щелчка мышью на объекте макета. Мы
+    пройдемся по различным фрагментам программы,
+    начиная с трехмерного окна, в котором
+    отображается макет.</font> </p>
+    <p><font face="Times New Roman" size="2">Перед тем как ваше
+    приложение сможет воспользоваться средствами
+    проверки попадания, заложенными в классе C3dWnd, оно
+    должно вызвать функцию, назначение которой -
+    установка уведомляющей функции, вызываемой при
+    каждом попадании в объект. Наверное, нет особого
+    смысла возиться с проверкой попаданий, если
+    потом ничего не делать с ее результатами. Начнем
+    с создания главного обрамленного окна программы:</font>
+    </p>
+    <p><font face="Times New Roman" size="2">int CMainFrame::OnCreate(LPCREATESTRUCT
+    IpCreateStruct) {</font> </p>
+    <p><font face="Times New Roman" size="2">// Разрешить выделение
+    объектов мышью m_wnd3d.EnableMouseSelection(OnSelChange, this);</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Arial" size="2"><b>166</b> lly Глава 7. Проверка
+    попадания</font> </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">В приведенной выше строке
+    программы устанавливается уведомляющая функция
+    OnSelChange. Функция OnSelChange является статической
+    функцией класса CMainFrame, и потому значение
+    указателя this для нее не определено. Как мы вскоре
+    увидим, второй аргумент функции EnableMouseSetection
+    передается в виде аргумента рАгд при вызове
+    уведомляющей функции - в данном случае мы
+    передаем указатель на объект C++ (если этот момент
+    покажется вам непонятным, просмотрите код
+    функции EnableMouseSelection в файле C3dWnd.cpp). Давайте
+    посмотрим, как щелчок мышью обрабатывается в
+    классе C3dWnd - это снова приведет нас к обсуждению
+    уведомляющей функции. Ниже приведен фрагмент
+    обработчика сообщений окна, связанный с
+    проверкой попадания:</font> </p>
+    <p><font face="Times New Roman" size="2">BOOL C3dWnd::OnWndMsg(UINT message, WPARAM
+    wParam,</font> </p>
+    <p><font face="Times New Roman" size="2">LPARAM IParam, LRESULT* pResult ) {</font> </p>
+    <p><font face="Times New Roman" size="2">// Разрешено ли выделение
+    объектов мышью?</font> </p>
+    <p><font face="Times New Roman" size="2">if (m_bEnableMouseSelection</font> </p>
+    <p><font face="Times New Roman" size="2">&amp;&amp; (message == WM_LBUTTONDOWN)) (</font> </p>
+    <p><font face="Times New Roman" size="2">CPoint pt(LOWORDfIParam), HIWORD(IParam));</font>
+    </p>
+    <p><font face="Times New Roman" size="2">C3dShape* pShape = HitTest(pt);</font> </p>
+    <p><font face="Times New Roman" size="2">if (m_p3elChangeFn) {</font> </p>
+    <p><font face="Times New Roman" size="2">// Вызвать уведомляющую
+    функцию m_pSelChangeFn(pShape, pt, m pSelChangeArg);</font> </p>
+    <p><font face="Arial" size="2">} }</font> </p>
+    <p><font face="Times New Roman" size="2">return CWnd::OnWndMsg(message, wParam, IParam,
+    pResult);</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Times New Roman" size="2">Если выделение мышью было
+    разрешено (рассматривается именно этот случай),
+    мы создаем объект CPoint по координатам мыши,
+    содержащимся в сообщении WM_LBUTTONDOWN, а затем
+    вызываем функцию HitTest, чтобы определить,
+    произошло ли попадание в фигуру. Результат
+    проверки (который равен NULL, если под мышью не
+    оказалось ни одного объекта) возвращается
+    приложению через уведомляющую функцию (которая
+    была указана при разрешении выделения мышью).
+    Давайте посмотрим, как уведомляющая функция
+    используется в приложении:</font> </p>
+    <p align="center"><font face="Times New Roman" size="2">void
+    CMainFrame::OnSelChange(C3dShape* pShape, CPoint pt,</font> </p>
+    <p><font face="Times New Roman" size="2">void* pArg) (</font> </p>
+    <p><font face="Times New Roman" size="2">// Получить указатель на
+    класс</font> </p>
+    <p><font face="Times New Roman" size="2">CMainFrame* pThis = (CMainFrame*) pArg;</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT(pThis) ;</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT (pThis-&gt;IsKindOf (RUNTIME_CLASS
+    (CMainFrame) ) ) ;</font> </p>
+    <p><font face="Times New Roman" size="2">if (pShape) {</font> </p>
+    <p><font face="Times New Roman" size="2">// Убедиться, что попадание
+    пришлось</font> </p>
+    <p><font face="Arial" size="2">Выделение всего пбъеш-а тТО<b>
+    1&amp;7</b></font> </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">// не в рамку выделения и не
+    в фигуру-указатель if ( !pShape-&gt;IsPartO? (pThis-&gt;m_pSelBox)</font> </p>
+    <p align="center"><font face="Times New Roman" size="2">&amp;&amp; !pShape-&gt;IsPartOf
+    (pThis-&gt;m_pHitPtr) ) {</font> </p>
+    <p><font face="Times New Roman" size="2">// Определить грань, в
+    которую мы попали</font> </p>
+    <p><font face="Arial" size="2">C3dViewport* pViewport =</font> </p>
+    <p><font face="Times New Roman" size="2">pThis-&gt;m_wnd3d.GetStage() -&gt;GetViewport</font>
+    </p>
+    <p><font face="Times New Roman" size="2">p3hape-&gt;HitTest (pt, pViewport,</font> </p>
+    <p><font face="Times New Roman" size="2">&amp;pThis-&gt;m_iHitFace,
+    &amp;pThis-&gt;m_vHitPoint) ;</font> </p>
+    <p><font face="Arial" size="2">1 .'. i ^ i * <i>\</i></font> </p>
+    <p><font face="Times New Roman" size="2">pShape = NULL;</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Arial" size="2"><i>i</i></font> </p>
+    <p><font face="Times New Roman" size="2"><i>I /</i> Сделать выделенную
+    фигуру текущей pThis-&gt;MakeCurrent (pShape) ;</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Times New Roman" size="2">Выделенный объект
+    передается функции MakeCurrent, которая рисует вокруг
+    него рамку, чтобы отличить от других объектов (мы
+    подробнее рассмотрим функцию MakeCurrent на стр. 177).
+    Самая важная особенность этого фрагмента
+    заключается в том, что 41ункция OnSelChange является
+    статической, и потому, как было сказано выше, не
+    имеет указателя this. Мы справились с данным
+    затруднением, передавая адрес объекта C++ в
+    качестве аргумента функции, разрешившей
+    выделение объектов мышью (EnableMouseSelection). Значение,
+    полученное уведомляющей функцией, преобразуется
+    к типу указателя на наш класс. Хитро, не правда ли?
+    Реализация косвенного вызова (callback) функции
+    класса требует несколько больших усилий, поэтому
+    уведомляющая функция была сделана статической
+    для упрощения программы.</font> </p>
+    <p><font face="Times New Roman" size="2">Теперь давайте более
+    подробно рассмотрим, как же происходит проверка
+    попадания. Функция C3dWnd::HitTest просто передает
+    запрос ракурсу:</font> </p>
+    <p><font face="Times New Roman" size="2">// Проверить на попадание в
+    видимый объект C3dShape* C3dWnd::HitTest(CPoint pt) (</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT(m_p3tage) ;</font> </p>
+    <p><font face="Times New Roman" size="2">return m_pStage-&gt;GetViewport ()-&gt;HitTest
+    (pt) ;</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Times New Roman" size="2">Фактическая проверка
+    попадания производится в классе ракурса (код
+    которого находится в файле 3dStage.cpp):</font> </p>
+    <p><font face="Times New Roman" size="2">C3dShape* C3dViewport::HitTest(CPoint pt) {</font>
+    </p>
+    <p><font face="Times New Roman" size="2">IDirect3DRMPickedArray* pIPickArray = NULL;</font>
+    </p>
+    <p><font face="Arial" size="2"><b>168</b> <i>ЯНУ</i> Глава 7. Поовеока
+    попадания</font> </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">ASSERT(m_pIViewport) ;</font> </p>
+    <p><font face="Times New Roman" size="2">m_hr = m_pIViewport-&gt;Pick(pt.x, pt.y,
+    SpIPickArray);</font> </p>
+    <p><font face="Times New Roman" size="2">if (FAILED(m_hr)) return NULL;</font> </p>
+    <p><font face="Arial" size="2">// Проверить, есть ли в массиве
+    элементы if (pIPickArray-&gt;GetSize () == 0) { pIPickArray-&gt;Release () ;</font>
+    </p>
+    <p><font face="Arial" size="2">return NULL;</font> </p>
+    <p><font face="Arial" size="2">)</font> </p>
+    <p><font face="Times New Roman" size="2">// Получить первый (верхний)
+    элемент IDirect3DRMVisual* pIVisual = NULL;</font> </p>
+    <p><font face="Times New Roman" size="2">IDirect3DRMFrameArray* pIFrameList = NULL;</font>
+    </p>
+    <p><font face="Times New Roman" size="2">m hr = pIPickArray-&gt;GetPick(0, SpIVisual,
+    SpIFrameList, NULL) ;</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT(SUCCEEDED(m_hr)) ;</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT(pIVisual) ;</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT(pIFrameList) ;</font> </p>
+    <p><font face="Times New Roman" size="2">// Получить последний фрейм
+    в списке IDirect3DRMFrame* pIFrame - NULL;</font> </p>
+    <p align="center"><font face="Times New Roman" size="2">pIFrameList-&gt;GetEiement
+    (pIFrameList-&gt;GetSize () - 1, &amp;pI Frame);</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT(pIFrame) ;</font> </p>
+    <p><font face="Times New Roman" size="2">// Получить значение 'AppData'
+    фрейма, // которое должно быть указателем на класс
+    C++</font> </p>
+    <p align="center"><font face="Times New Roman" size="2">C3ctShape* pShape = (C3dShape*)
+    pIFrame-&gt;GetAppData () ;</font> </p>
+    <p><font face="Times New Roman" size="2">if (pShape) (</font> </p>
+    <p align="center"><font face="Times New Roman" size="2">if(!pShape-&gt;IsKindOf(RUNTIME_CLASS(C3dShape)))
+    { pShape <i>=</i> NULL;</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Courier New" size="2">pIFrame-&gt;Release () ;</font> </p>
+    <p><font face="Courier New" size="2">pIFrameList-&gt;Release () pIVisual-&gt;Release () ;</font>
+    </p>
+    <p><font face="Courier New" size="2">pIPickArray-&gt;Release ()</font> </p>
+    <p><font face="Courier New" size="2">return pShape;</font> </p>
+    <p><font face="Times New Roman" size="2">Первым делом мы требуем от
+    интерфейса ракурса создать то, что в механизме
+    визуализации называется списком выбора (pick list),
+    то есть список всех визуальных элементов,
+    находящихся под определенной точкой окна. Список
+    визуальных элементов (pIPickArray) упорядочен так,
+    чтобы верхний элемент находился в начале списка.
+    Затем мы определяем значение указателя (pIVisual) на
+    первый визуальный элемент и получаем по нему
+    список фреймов (pIFrameList), к которым присо-</font> </p>
+    <p><font face="Arial" size="1">&lt;::::й^</font> </p>
+    <p><font face="Arial" size="2">Выделение всего объекта тЃЃЃЃ<b>
+    169</b></font> </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">единен данный визуальный
+    элемент. На рис. 7-1 показано, как связаны между
+    собой объекты различных списков.</font> </p>
+    <p><font face="Times New Roman" size="2">Список фреймов начинается
+    с корневого фрейма (макета), за которым
+    последовательно перечисляются все
+    фреймы-потомки до самого последнего, содержащего
+    отмеченный визуальный элемент.</font> </p>
+    <p><a href="http://usinsk.parma.ru/directx/102.jpg"><img alt="102.jpg" border="0"
+    hspace="3" src="102_small.jpg" vspace="3" width="300" height="171"></a> <br clear="all">
+    </p>
+    <p><font face="Arial" size="2"><b>Рис. 7-1.</b> Структура списка
+    выбора</font> </p>
+    <p><font face="Times New Roman" size="2">Последнее, что нам
+    осталось сделать, - извлечь значение переменной
+    AppData из интерфейса фрейма. Объекты классов CSdFrame и
+    C3dShape хранят в этой переменной значения своих
+    указателей this. Мы преобразуем значение AppData к
+    типу указателя на объект C3dShape и проверяем, не
+    равен ли получившийся указатель NULL. Если не
+    равен, то выполняется дополнительная проверка
+    того, что данный указатель является указателем
+    на объект C3dShape, с использованием функции MFC,
+    возвращающей runtime-информацию о классе.</font> </p>
+    <p><font face="Times New Roman" size="2">AppData может принимать
+    значения трех типов: NULL, указатель на объект C3dFrame,
+    указатель на объект C3dShape. Код проверки попадания
+    работает лишь в том случае, если указатель
+    ссылается на объект C3dShape и если объект класса C++,
+    создавший визуальный элемент и фрейм, не был
+    уничтожен. Деструктор класса C3dFrame (базового для
+    C3dShape) присваивает AppData значение NULL, так что можно
+    не опасаться случайного получения указателя на
+    удаленный объект C++. Из всего сказанного следует,
+    что функция HitTest полезна лишь при работе с теми
+    трехмерными фигурами, с которыми связан текущий
+    объект класса C3dShape.</font> </p>
+    <p><font face="Arial" size="3"><b>Отображение выделения на
+    экране</b></font> </p>
+    <p><font face="Times New Roman" size="2">Если запустить приложение
+    Select и щелкнуть на каком-нибудь объекте, вокруг
+    последнего появляется рамка, похожая на
+    изображенную на рис. 7-2.</font> </p>
+    <p><font face="Times New Roman" size="2">Рамка расположена таким
+    образом, чтобы показать граничную область
+    объекта, то есть наименьшую кубическую область,
+    содержащую все вершины объекта. Одна стрелка,
+    состоящая из цилиндра и конуса, показывает
+    вектор направления объекта, а другая стрелка (с
+    конусом меньшей высоты) - его верхний вектор. Эти
+    два вектора пересекаются в начале координат -
+    точке объекта с координа-</font> </p>
+    <p><font face="Arial" size="2"><b>170</b></font> </p>
+    <p><font face="Arial" size="2">Глава 7. Проверка попадания</font> </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">тами О, О, О. В случае сферы
+    на рис. 7-2, начало координат находится внутри
+    объекта.</font> </p>
+    <p><a href="http://usinsk.parma.ru/directx/103.jpg"><img alt="103.jpg" border="0"
+    hspace="3" src="103_small.jpg" vspace="3" width="300" height="328"></a> <br clear="all">
+    </p>
+    <p><font face="Arial" size="2"><b>Рис. 7-2.</b> Выделенный объект</font>
+    </p>
+    <p><font face="Times New Roman" size="2">Функция, рисующая рамку,
+    несложна, хотя несколько длинна:</font> </p>
+    <p><font face="Times New Roman" size="2">void CMainFrame::ShowSelection() {</font> </p>
+    <p><font face="Times New Roman" size="2">// Определить граничную
+    область объекта double xl, x2, yl, y2, zl, z2;</font> </p>
+    <p><font face="Times New Roman" size="2">BOOL b = m_pCurShape-&gt;GetBox (xl, yl, zl, x2,
+    y2, z2);</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT(b) ;</font> </p>
+    <p><font face="Times New Roman" size="2">// Создать новую рамку
+    вокруг фигуры m_pSelBox = new CSdShape;</font> </p>
+    <p><font face="Times New Roman" size="2">double r = 0.03;</font> </p>
+    <p><font face="Times New Roman" size="2">double re = r * 2;</font> </p>
+    <p align="center"><font face="Times New Roman" size="2">C3dShape rl, r2, r3, r4, r5, r6,
+    r7, r8, r9,</font> </p>
+    <p><font face="Arial" size="2">rIO, rll, rl2, rd, ru, cd, cu;</font> </p>
+    <p><font face="Times New Roman" size="2">// Создать цилиндры, из
+    которых состоит рамка</font> </p>
+    <p><font face="Times New Roman" size="2">m_pSelBox-&gt;AddChild(&amp;r3) ;</font> </p>
+    <p><font face="Times New Roman" size="2">r4.CreateRod(xl, y2, zl, x2, y2, zl, r) ;</font> </p>
+    <p><font face="Times New Roman" size="2">m_pSelBox-&gt;AddChild(&amp;r4) ;</font> </p>
+    <p><font face="Times New Roman" size="2">r5.CreateRod(x2, yl, zl, x2, y2, zl, r) ;</font> </p>
+    <p><font face="Times New Roman" size="2">m_pSelBox-&gt;AddChild(&amp;r5) ;</font> </p>
+    <p align="center"><font face="Times New Roman" size="2">r6.CreateRod(xl, y2, zl, xl, y2,
+    z2, r) ;</font> </p>
+    <p><font face="Arial" size="2"><b>^йй ВЫЛРПЙНИА япйгп nfi'^Rkra <i>''m^.</i></b></font>
+    </p>
+    <p><font face="Times New Roman" size="2"><b>171</b></font> </p>
+    <hr>
+    <p><font face="Courier New" size="2">m_pSelBox-&gt;AddChild(&amp;r6) ;</font> </p>
+    <p><font face="Courier New" size="2">r7.CreateRod(x2, y2, zl, x2, y2, z2, r) ;</font> </p>
+    <p><font face="Courier New" size="2">m_pSelBox-&gt;AddChild(&amp;r7) ;</font> </p>
+    <p><font face="Courier New" size="2">r8.CreateRod(x2, yl, zl, x2, yl, z2, r) ;</font> </p>
+    <p><font face="Courier New" size="2">m_p3elBox-&gt;AddChild(&amp;r8) ;</font> </p>
+    <p><font face="Courier New" size="2">r9.CreateRod(xl, yl, z2, xl, y2, z2, r) ;</font> </p>
+    <p><font face="Courier New" size="2">m_pSelBox-&gt;AddChild(&amp;r9) ;</font> </p>
+    <p><font face="Courier New" size="2">rIO.CreateRodfxl, yl, z2, x2, yl, z2, r) ;</font> </p>
+    <p><font face="Courier New" size="2">m_pSelBox-&gt;AddChild(&amp;rlO) ; &#07;
+    rll.CreateRod(x2, yl, z2, x2, y2, z2, r) ;</font> </p>
+    <p><font face="Courier New" size="2">m_pSelBox-&gt;AddChild(&amp;rll) ;</font> </p>
+    <p><font face="Courier New" size="2">rl2.CreateRod(xl, y2, z2, x2, y2, z2, r) ;</font> </p>
+    <p><font face="Courier New" size="2">m_pSelBox-&gt;AddChild(&amp;rl2) ;</font> </p>
+    <p><font face="Courier New" size="2">//Создать цилиндры и конусы
+    для отображения векторов rd.CreateRod(0, 0, 0, 0, 0, z2 * 1.2, r) ;</font>
+    </p>
+    <p><font face="Courier New" size="2">m pSelBox-&gt;AddChild (&amp;rd) ;</font> </p>
+    <p align="center"><font face="Courier New" size="2">cd.CreateCone(0, 0, z2 * 1.2, re,
+    TRUE, О, О, z2 * 1.4, 0, FALSE);</font> </p>
+    <p><font face="Courier New" size="2">m_p3elBox-&gt;AddChild(&amp;cd) ;</font> </p>
+    <p><font face="Courier New" size="2">ru.CreateRod(0, 0, 0, 0, y2 * 1.1, 0, r) ;</font> </p>
+    <p><font face="Courier New" size="2">m_pSelBox-&gt;AddChild(&amp;ru) ;</font> </p>
+    <p><font face="Courier New" size="2">cu.CreateCone(0, y2 &#07; 1.1, 0, re, TRUE, 0, y2 *
+    1.2, О, О, FALSE) ;</font> </p>
+    <p><font face="Courier New" size="2">m_pSelBox-&gt;AddChild(&amp;cu) ;</font> </p>
+    <p><font face="Courier New" size="2">// Задать положение и
+    ориентацию рамки</font> </p>
+    <p><font face="Courier New" size="2">// в соответствии с
+    положением и ориентацией фигуры</font> </p>
+    <p><font face="Courier New" size="2">double х, у, z, xd, yd, zd, xu, yu, zu;</font> </p>
+    <p><font face="Courier New" size="2">m pCurShape-&gt;GetPosition (х, y, z) ;</font> </p>
+    <p><font face="Courier New" size="2">m_pCurShape-&gt;GetDirection (xd, yd, zd, xu, yu, zu)
+    ;</font> </p>
+    <p><font face="Courier New" size="2">m_pSelBox-&gt;SetPosition (х, y, z) ;</font> </p>
+    <p align="center"><font face="Courier New" size="2">m_pSelBox-&gt;SetDirection (xd, yd,
+    zd, xu, yu, zu) ;</font> </p>
+    <p><font face="Courier New" size="2">// Присоединить рамку к
+    текущей фигуре,</font> </p>
+    <p align="center"><font face="Courier New" size="2">// чтобы обеспечить
+    их совместное перемещение</font> </p>
+    <p><font face="Courier New" size="2">m_pCurShape-&gt;AddChild (m_pSelBox) ;</font> </p>
+    <p><font face="Times New Roman" size="2">Граничная область фигуры
+    используется для задания положения цилиндров,
+    образующих рамку, и пар конус/цилиндр, которые
+    изображают вектор направления и верхний вектор
+    объекта. Все цилиндры и конусы присоединяются к
+    одному объекту-рамке, имеющему то же положение и
+    ориентацию, что и выделенный объект. Затем рамка
+    присоединяется к выделенному объекту, чтобы она
+    перемещалась вместе с ним.</font> </p>
+    <p><font face="Times New Roman" size="2">Поскольку рамка также
+    состоит из нескольких визуальных элементов,
+    можно задать резонный вопрос - почему их нельзя
+    выделить мышью? В уведомляющей функции на стр. 167
+    можно найти следующий оператор:</font> </p>
+    <p><font face="Arial" size="2">pShape-&gt;IsPartOf (pThis-&gt;m_pSelBox) 172 ад1''
+    Глава 7. Проверка попадания</font> </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">Он является составной
+    частью проверки, которая не позволяет выделять
+    видимые элементы рамки. Функция IsPartOf проверяет,
+    совпадает ли данный фрейм с фреймом-аргументом
+    или с одним из его родителей. Другими словами, она
+    проверяет, входит ли данный фрейм в иерархию
+    другого фрейма.</font> </p>
+    <p><font face="Times New Roman" size="2">Возможно, вы также
+    вспомните мои слова о том, что видимые объекты, не
+    имеющие присоединенных объектов C++, нельзя
+    выделить. Если посмотреть на исходный текст
+    функции, которая строит рамку, можно убедиться в
+    том, что объекты C++, использованные при создании
+    цилиндров и конусов, уничтожаются после создания
+    рамки. Спрашивается, зачем же тогда нужна
+    проверка IsPartOf? Дело в том, что один объект C++ все
+    же остался - тот, на который ссылается переменная
+    m_pSelBox. Чтобы заведомо устранить все возможные
+    проблемы, мы идем на эту дополнительную проверку,
+    хотя она и не является абсолютно необходимой.
+    Кроме того, когда-нибудь в будущем функция,
+    которая создает рамку, может измениться, и
+    созданные объекты C++ не будут удаляться. Даже
+    если это произойдет, выделение должно работать
+    по-прежнему.</font> </p>
+    <p><font face="Times New Roman" size="2">Мы научились выделять
+    объекты. Запустите приложение Select, вставьте в
+    текущий макет несколько объектов и пощелкайте на
+    них мышью. При установке флажка Selection Box вы можете
+    перемещать текущий выделенный объект и при этом
+    видеть его рамку. Команда-флажок View Ѓ Selection Box
+    разрешает (и запрещает) отображение рамки в окне.</font>
+    </p>
+    <p><font face="Arial" size="4"><b>Выделение отдельной грани</b></font>
+    </p>
+    <p><font face="Times New Roman" size="2">Версия механизма
+    визуализации, которой я пользовался для
+    разработки программ к данной книге, не включала
+    никакой поддержки для выделения отдельных
+    граней, поэтому мне пришлось самостоятельно
+    реализовать такую возможность. Я хочу показать
+    вам, как я это сделал, чтобы продемонстрировать
+    хороший пример работы с преобразованиями
+    координат.</font> </p>
+    <p><font face="Times New Roman" size="2">Задача состоит в
+    следующем: зная координаты точки в трехмерном
+    окне, необходимо определить грань объекта,
+    находящуюся под данной точкой. Будем считать, что
+    под точкой находится некоторый объект, который
+    был найден с помощью методики, описанной в
+    предыдущем разделе. На рис. 7-3 изображено
+    графическое представление этой задачи.</font> </p>
+    <p><font face="Times New Roman" size="2">Зная положение указателя
+    мыши в окне, необходимо выяснить, какая грань
+    объекта будет содержать проекцию точки. Более
+    того, если под указателем мыши находится сразу
+    несколько граней, необходимо выбрать ближнюю (с
+    минимальным значением z).</font> </p>
+    <p><font face="Times New Roman" size="2">Делается это следующим
+    образом. Сначала мы получаем список всех граней
+    объекта, а затем по очереди проектируем вершины
+    каждой грани на плоскость вида и проверяем, лежит
+    ли точка попадания внутри многоугольника,
+    образованного проекциями вершин. Если будет
+    найдена грань, содержащая точку попадания,
+    необходимо выяснить, не находится ли она перед
+    предыдущей найденной гранью. После проверки всех
+    граней мы получим желаемый результат.</font> </p>
+    <p><font face="Times New Roman" size="2">Единственное затруднение
+    может возникнуть при проектировании вершин
+    грани на плоскость вида; этот процесс состоит из
+    трех шагов. Сначала необходимо преобразовать
+    координаты каждой вершины из локальных
+    координат фрейма в систему общих, &lt;мировых&gt;
+    координат. Затем мировые координаты
+    преобразуются в однородные координаты в
+    плоскости вида. Наконец, вектор однородных
+    координат преобразуется в точку окна.</font> </p>
+    <p><font face="Arial" size="2">Выделение отдельной грани 4Ѓ^i<b>
+    173</b></font> </p>
+    <hr>
+    <p><a href="http://usinsk.parma.ru/directx/104.jpg"><img alt="104.jpg" border="0"
+    hspace="3" src="104_small.jpg" vspace="3" width="300" height="240"></a> <br clear="all">
+    </p>
+    <p><font face="Arial" size="2"><b>Рис. 7-3.</b> Грань,
+    спроектированная в трехмерное окно</font> </p>
+    <p><font face="Times New Roman" size="2">Кроме того, необходимо
+    как-то определить, находится ли точка внутри
+    многоугольника вершин, спроектированных на
+    плоскость вида. Вскоре мы увидим, как это
+    делается, а пока давайте взглянем на функцию, в
+    которой проверяются попадания в грань:</font> </p>
+    <p><font face="Times New Roman" size="2">BOOL C3dShape::HitTest(CPoint pt,</font> </p>
+    <p><font face="Times New Roman" size="2">C3dViewport* pViewport, int* piFace, D3DVECTOR*
+    pvHit)</font> </p>
+    <p><font face="Courier New" size="2">int iHitFace = -1;</font> </p>
+    <p><font face="Courier New" size="2">double dHitZ = 0;</font> </p>
+    <p><font face="Courier New" size="2">// Просмотреть список граней
+    D3DVECTOR lv;</font> </p>
+    <p><font face="Courier New" size="2">D3DVECTOR wv;</font> </p>
+    <p><font face="Courier New" size="2">D3DRMVECTOR4D sv;</font> </p>
+    <p><font face="Courier New" size="2">for (int i = 0; i<NFACES; font {< i++)> </p>
+    <p><font face="Courier New" size="2">// Получить данные грани
+    IDirect3DRMFace* piFace њ NULL;</font> </p>
+    <p><font face="Courier New" size="2">m hr = pIFac@List-&gt;GetElement (i, spIFace) ;</font>
+    </p>
+    <p><font face="Courier New" size="2">ASSERT;SUCCEEDED(m_hr)) ;</font> </p>
+    <p><font face="Courier New" size="2">// Получить количество вершин
+    и разместить массив // для хранения экранных
+    координат int nVert = pIFace-&gt;GetVertexCount () ;</font> </p>
+    <p><font face="Courier New" size="2">ASSERT(nVert &gt; 2) ;</font> </p>
+    <p><font face="Times New Roman" size="2"><b>174</b></font> </p>
+    <p><font face="Arial" size="2">Глава 7. Проверка попадания</font> </p>
+    <hr>
+    <p><font face="Courier New" size="2">POINT* pScrnVert = new POINT [nVert];</font> </p>
+    <p><font face="Courier New" size="2">// Преобразовать каждую
+    вершину к экранным координатам double dZ <i>= 0;</i></font> </p>
+    <p><font face="Courier New" size="2">for (int v = 0; v<NVERT; font {< v++)> </p>
+    <p><font face="Courier New" size="2">// Получить вектор в
+    локальных координатах</font> </p>
+    <p><font face="Courier New" size="2">// (координатах фрейма)</font> </p>
+    <p><font face="Courier New" size="2">m_hr = pIFace-&gt;GetVertex(v, &amp;lv, NULL) ;</font>
+    </p>
+    <p><font face="Courier New" size="2">ASSERT(SUCCEEDED(m_hr)) ;</font> </p>
+    <p><font face="Courier New" size="2">// Преобразовать их в мировые
+    координаты m_hr = m_pIFrame-&gt;Transform(&amp;wv, &amp;lv) ;</font> </p>
+    <p><font face="Courier New" size="2">ASSERT(SUCCEEDED(m_hr)) ;</font> </p>
+    <p><font face="Courier New" size="2">// Преобразовать мировые
+    координаты // в экранные</font> </p>
+    <p><font face="Courier New" size="2">m_hr = pIViewport-&gt;Transform(&amp;sv, &amp;wv) ;</font>
+    </p>
+    <p><font face="Courier New" size="2">ASSERT(SUCCEEDED(m_hr)) ;</font> </p>
+    <p><font face="Courier New" size="2">// Преобразовать однородные
+    координаты</font> </p>
+    <p><font face="Courier New" size="2">// в абсолютные координаты
+    пикселей</font> </p>
+    <p><font face="Courier New" size="2">double w = sv.w;</font> </p>
+    <p><font face="Courier New" size="2">if (w != 0) {</font> </p>
+    <p><font face="Courier New" size="2">pScrnVert[v].x = (int) sv.x / w;</font> </p>
+    <p><font face="Courier New" size="2">pScrnVert[v].у = (int) sv.y / w;</font> </p>
+    <p><font face="Courier New" size="2">dZ += sv.z / w;</font> </p>
+    <p><font face="Courier New" size="2">) else {</font> </p>
+    <p align="center"><font face="Courier New" size="2">pScrnVert[v].x = 0;</font> </p>
+    <p align="center"><font face="Courier New" size="2">pScrnVert[v].у = 0;</font> </p>
+    <p><font face="Courier New" size="2">} } dZ /= nVert;</font> </p>
+    <p><font face="Times New Roman" size="2">// Проверить, лежит ли точка
+    попадания внутри // многоугольника на экране</font> </p>
+    <p><font face="Arial" size="2">if (::_3dPointInPolygon(pScrnVert, nVert, pt)) { if
+    (iHitFace &lt;0) { iHitFace=&quot;i;&lt;/font&quot;&gt; </p>
+    <p><font face="Arial" size="2">dHitZ = dZ;</font> </p>
+    <p><font face="Arial" size="2">} else (</font> </p>
+    <p><font face="Arial" size="2">if (dZ<DHITZ) font {<> </p>
+    <p><font face="Arial" size="2">iHitFace = i;</font> </p>
+    <p><font face="Arial" size="2">dHitZ &#07;= dZ;</font> </p>
+    <p><font face="Arial" size="2">} <b>} </b>)</font> </p>
+    <p><font face="Times New Roman" size="2">// Освободить грань после
+    завершения delete [] pScrnVert;</font> </p>
+    <p><font face="Arial" size="2">Выделение отдельной грани 'тЩ<b>
+    175</b></font> </p>
+    <hr>
+    <p><font face="Courier New" size="2">pIFace-&gt;Release () ;</font> </p>
+    <p><font face="Courier New" size="2">}</font> </p>
+    <p><font face="Courier New" size="2">// Установить возвращаемое
+    значение *piFace = iHitFace;</font> </p>
+    <p><font face="Courier New" size="2">return TRUE;</font> </p>
+    <p><font face="Courier New" size="2">}</font> </p>
+    <p><font face="Times New Roman" size="2">Некоторые фрагменты кода
+    опущены для экономии места, а также потому, что я
+    хочу оставить их для дальнейшего обсуждения.
+    Найдите то место, в котором координаты вершин
+    преобразуются в однородный вектор. Давайте
+    задержимся на нем.</font> </p>
+    <p><font face="Times New Roman" size="2">Однородный вектор состоит
+    из координат х, у, z и w. К чему так много координат,
+    когда для представления точки в окне достаточно
+    х и у? Причина заключается в том, что если вершина
+    окажется очень близко к камере, то
+    преобразование, отображающее координаты на
+    плоскость вида, приведет к состоянию, близкому к
+    делению на ноль, - разумеется, это нежелательно.
+    Использование однородного вектора для
+    представления результата позволяет избежать
+    деления на ноль (поверьте мне на слово или
+    покопайтесь в справочниках). При наличии
+    однородного вектора мы вычисляем координаты
+    точки в окне делением координат х, у и z на
+    величину w. Если значение w равно нулю, мы считаем,
+    что результат совпадает с точкой 0, 0. Но для чего
+    нам нужно значение z? Разве точка на экране может
+    обладать координатой z? Нет, не может, однако по
+    координате z можно судить о положении на оси z той
+    грани, которую мы проектируем на плоскость вида.
+    С помощью этой информации мы выберем из
+    множества возможных граней, содержащих точку
+    попадания, ту, что находится ближе остальных.</font> </p>
+    <p><font face="Times New Roman" size="2">Как видно из текста
+    программы, далее мы проверяем, лежит ли точка
+    попадания внутри многоугольника, образованного
+    спроектированными вершинами, после чего смотрим,
+    находится ли текущая грань впереди от уже
+    найденных граней.</font> </p>
+    <p><font face="Times New Roman" size="2">С проверкой
+    принадлежности точки многоугольнику мне
+    пришлось изрядно повозиться. Один из способов
+    выяснить, лежит ли точка внутри многоугольника, -
+    провести линию из данной точки в другую,
+    находящуюся внутри многоугольника, и подсчитать,
+    сколько раз эта линия будет пересекать его
+    стороны. Нечетное количество пересечений
+    означает, что точка находится за пределами
+    многоугольника, как показано на рис. 7-4.</font> </p>
+    <p><img alt="105.jpg" border="0" hspace="3" src="105.jpg" vspace="3" width="215"
+    height="169"> <br clear="all">
+    </p>
+    <p><font face="Arial" size="2"><b>Рис, 7-4.</b> Проверка
+    принадлежности точки многоугольнику</font> </p>
+    <p><font face="Arial" size="2"><b>176</b> ily Глава 7. Проверка
+    попадания</font> </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">Сначала я поступил,
+    немного глупо и решил написать код проверки
+    самостоятельно. Я провел несколько часов,
+    стараясь учесть все возможные случаи, и довольно
+    близко подошел к ответу, когда здравый смысл все
+    же взял верх. Я подумал, что на эту задача
+    наверняка уже есть ответ и что найти его,
+    вероятно, нетрудно. И оказался прав! Я отыскал
+    нужный код в серии книг<GRAPHIC Gems> (Academic Press) и приготовился
+    вставить его в свою программу, когда меня
+    посетила еще одна мысль. Вдруг такая функция уже
+    имеется в Windows? После быстрого просмотра Microsoft
+    Developer Library я нашел то, что искал, и окончательный
+    вариант функции проверки (которая находится в
+    файле SdMath.cpp) выглядит следующим образом:</font> </p>
+    <p><font face="Times New Roman" size="2">BOOL _3dPointInPolygon(POINT* Points, int
+    nPoints,</font> </p>
+    <p><font face="Times New Roman" size="2">CPoint pt) {</font> </p>
+    <p><font face="Times New Roman" size="2">HRGN hrgn = ::CreatePolygonRgn(Points, nPoints,
+    WINDING);</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT(hrgn) ;</font> </p>
+    <p><font face="Times New Roman" size="2">BOOL b = ::PtInRegion(hrgn, pt.x, pt.y);</font> </p>
+    <p><font face="Times New Roman" size="2">::DeleteObject(hrgn) ;</font> </p>
+    <p><font face="Times New Roman" size="2">return b;</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Times New Roman" size="2">Я воспользовался
+    интерфейсом GDI для создания многоугольной
+    области, а затем завершил проверку функцией
+    PtInRegion. Из всего этого я сделал один важный вывод:
+    то, что я не пользуюсь функциями GDI в основной
+    части своего проекта, еще не значит, что я вообще
+    не должен пользоваться ими.</font> </p>
+    <p><font face="Times New Roman" size="2">У меня получилось
+    красивое, компактное решение. Я даже не стал
+    возиться с измерением скорости работы, поскольку
+    проверка происходит только в ответ на отдельное
+    действие пользователя и даже низкая скорость
+    проверки не приведет к заметной задержке. Если
+    вам понадобится провести тысячу таких проверок,
+    то, возможно, предложенный вариант решения
+    уступит другим опубликованным алгоритмам.</font> </p>
+    <p><font face="Times New Roman" size="2">Последнее замечание:
+    реализованный мною код проверки попадания в
+    грань не учитывает направления, в котором она
+    обращена. Таким образом, теоретически можно
+    попасть в грань, повернутую от пользователя и
+    потому невидимую. Это может случиться тогда,
+    когда за невидимой гранью имеется другая,
+    видимая (если допустить, что до этого было
+    обнаружено попадание в объект), поскольку код
+    выбора, входящий в интерфейс, не возвращает
+    объектов, у которых попадания произошли только в
+    &lt;теневые&gt; грани.</font> </p>
+    <p><font face="Times New Roman" size="2">В приложении Select грани, в
+    которые происходит попадание, окрашиваются в
+    красный цвет. Кроме того, в строке состояния
+    выводится имя выделенного объекта, номер грани и
+    координаты точки попадания в объекте (в
+    следующем разделе мы узнаем, как определить
+    координаты точки попадания). Все это происходит в
+    приведенной ниже функции MakeCurrent:</font> </p>
+    <p><font face="Times New Roman" size="2">void CMainFrame::MakeCurrent(C3dShape* pShape) f</font>
+    </p>
+    <p><font face="Times New Roman" size="2">HideSelection() ;</font> </p>
+    <p><font face="Times New Roman" size="2">m pCurShape = pShape;</font> </p>
+    <p><font face="Arial" size="2">Выделение отдельной грани ''до<b>
+    177</b></font> </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">ShowSelectionf) ;</font> </p>
+    <p><font face="Times New Roman" size="2">if (m_pCurShape != NULL) { if (m_iHitFace &gt;=
+    0) {</font> </p>
+    <p><font face="Arial" size="2">Status(&quot;Selected: %s (%d @ %3.1f,%3.1f,%3 if)&quot;</font>
+    </p>
+    <p><font face="Times New Roman" size="2">ni_pCurShape-&gt;GetName () , m_iHitFace,
+    ni_vHitPoint.x, m_vHitPoint.y, m_vHitPoint.z) ;</font> </p>
+    <p><font face="Times New Roman" size="2">&quot;PCurShape-&gt;SetFaceColor(m_iHitFace, 1,
+    О, О).</font> </p>
+    <p><font face="Times New Roman" size="1">J <i>Q</i> -L SG { '</font> </p>
+    <p><font face="Arial" size="2">^ Status (&quot;Selected: %s&quot;, m_pCurShape-&gt;GetMame
+    () ) ;</font> </p>
+    <p><font face="Arial" size="2">) else {</font> </p>
+    <p><font face="Times New Roman" size="2">Status(&quot;No selection&quot;);</font> </p>
+    <p><font face="Courier New" size="4"><b>Определение точки
+    попадания</b></font> </p>
+    <p><a href="http://usinsk.parma.ru/directx/106.jpg"><img alt="106.jpg" border="0"
+    hspace="3" src="106_small.jpg" vspace="3" width="300" height="275"></a> <br clear="all">
+    </p>
+    <p><font face="Arial" size="2"><b>Рис. 7-5.</b> Проектирование точки
+    попадания на объект</font> </p>
+    <p><font face="Arial" size="2"><b>178</b></font> </p>
+    <p><font face="Arial" size="2">Глава/. Проверка попадания</font> </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">Для этого необходимо взять
+    экранные координаты точки попадания и
+    последовательно преобразовать их в однородный
+    вектор, затем в мировые координаты и снова в
+    локальные координаты объекта. Ниже приведен
+    завершающий фрагмент функции C3dShape::HitTest:</font> </p>
+    <p><font face="Courier New" size="2">// Вычислить положение точки
+    попадания на грани // Подготовить вектор,
+    описывающий точку экрана // В качестве z
+    используется среднее значение. sv.x = pt.x;</font> </p>
+    <p><font face="Courier New" size="2">sv.y = pt.y;</font> </p>
+    <p><font face="Courier New" size="2">sv.z = dHitZ;</font> </p>
+    <p><font face="Courier New" size="2">sv.w = 1.0;</font> </p>
+    <p><font face="Courier New" size="2">// Привести к мировым
+    координатам m hr = pIViewport-&gt;InverseTransform ( &amp;wv, &amp;sv) ;</font>
+    </p>
+    <p><font face="Courier New" size="2">ASSERT(SUCCEEDED(m_hr)) ;</font> </p>
+    <p><font face="Courier New" size="2">// Привести к локальным
+    координатам фрейма m_hr = m_pIFrame-&gt;InverseTransform(&amp;lv, <i>&amp;wv);</i></font>
+    </p>
+    <p><font face="Courier New" size="2">ASSERT(SUCCEEDED(m_hr));</font> </p>
+    <p><font face="Courier New" size="2">// Вернуть результат *pvHit == Iv;</font>
+    </p>
+    <p><font face="Times New Roman" size="2">Для упрощения кода я
+    воспользовался грубой аппроксимацией значения z
+    для точки на экране. В программе это значение
+    определяется как среднее арифметическое
+    координат z всех вершин, образующих грань
+    проекции. На самом деле такой способ неверен,
+    поскольку в нем никак не учитывается положение
+    точки попадания в многоугольнике. Более
+    корректный способ определения z изображен на рис.
+    7-6.</font> </p>
+    <p><font face="Times New Roman" size="2"><b>р</b></font> </p>
+    <p><img alt="107.jpg" border="0" hspace="3" src="107.jpg" vspace="3" width="244"
+    height="248"> <br clear="all">
+    </p>
+    <p><font face="Arial" size="2"><b>Рис. 7-6&gt;</b> Вычисление
+    координаты z точки Р</font> </p>
+    <p><font face="Arial" size="2">Определение точки попадания
+    ''&quot;Щ<b> 179</b></font> </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">Точки А, В и С на рис. 7-6 -
+    вершины грани. Соединим точку А с С, а В - с точкой
+    попадания Р. Отношение длин отрезков АХ и ХС
+    используется для вычисления координаты z точки Х
+    по значениям координат z точек А и С. Отношение
+    длин отрезков РВ и ХВ используется для
+    вычисления координаты z точки Р по значениям
+    координат z точек В и X. Оставляю вам завершить
+    рассуждение в качестве домашнего задания.</font> </p>
+    <p><font face="Times New Roman" size="2">В приложении Select имеется
+    команда меню, которая показывает положение точки
+    попадания на объекте (View Ѓ Hit Point). Соответствующий
+    фрагмент кода, расположенный в конце функции
+    CMainFrame-:ShowSelection, создает конус и присоединяет его
+    вершину к точке попадания, при этом ориентация
+    конуса задается по нормали к выделенной грани:</font>
+    </p>
+    <p><font face="Courier New" size="2">// Получить точку попадания
+    на фигуре</font> </p>
+    <p><font face="Courier New" size="2">// и перейти от локальных
+    координат к мировым</font> </p>
+    <p align="center"><font face="Courier New" size="2">C3dVector vh <i>=</i> m
+    pCurShape-&gt;Transform(m vHitPoint);</font> </p>
+    <p><font face="Courier New" size="2">// Определить направление
+    нормали к грани ASSERT(m_pCurShape) ;</font> </p>
+    <p align="center"><font face="Courier New" size="2">C3dVector vn =
+    m_pCurShape-&gt;GetFaceNormal (m iHitFace);</font> </p>
+    <p><font face="Courier New" size="2">// Изменить длину нормали,
+    прибавить нормаль к точке // попадания и
+    преобразовать в мировые координаты C3dVector vx = vn * 0.5
+    + m vHitPoint;</font> </p>
+    <p><font face="Courier New" size="2">vx = m pCurShape-&gt;Transform (vx) ;</font> </p>
+    <p><font face="Courier New" size="2">// Направить вершину конуса в
+    точку попадания m_pHitPtr = new C3dShape;</font> </p>
+    <p align="center"><font face="Courier New" size="2">m_pHitPtr-&gt;CreateCone (vh.x, vh.y,
+    vh.z, 0, FALSE, vx.x, vx.y, vx.z, 0.1, TRUE);</font> </p>
+    <p><font face="Courier New" size="2">// Присоединить конус к
+    фигуре m_pCurShape-&gt;AddChild(m_pHitPtr) ;</font> </p>
+    <p><font face="Courier New" size="2">}</font> </p>
+    <p><font face="Courier New" size="2">}</font> </p>
+    <p><font face="Times New Roman" size="2">Чтобы правильно
+    определить положение конуса, необходимо
+    привести локальные координаты объекта к системе
+    мировых координат. На рис. 7-7 показано, как
+    выглядит экран с конусом (кроме того, на цветной
+    вкладке имеется изображение конуса,
+    указывающего на выделенную сферу).</font> </p>
+    <p><font face="Times New Roman" size="2">Вы можете легко убедиться
+    в том, что усреднение координат z вершин неточно
+    определяет положение точки попадания.
+    Попробуйте выделить одну из боковых граней
+    конуса. Вы увидите, что вершина конуса либо
+    уходит внутрь грани, либо отходит на некоторое
+    расстояние, вместо того, чтобы лежать точно на
+    ней.</font> </p>
+    <p><font face="Arial" size="4"><b>Проверка попадания на
+    практике</b></font> </p>
+    <p><font face="Times New Roman" size="2">Чтобы показать, как
+    проверка попадания используется на практике, я
+    создал приложение Blobs, в котором можно нарисовать
+    на экране потрясающее космичес-</font> </p>
+    <p><font face="Arial" size="2"><b>180</b> ЦУ Глава 7. Проверка
+    попадания</font> </p>
+    <hr>
+    <p><a href="http://usinsk.parma.ru/directx/108.jpg"><img alt="108.jpg" border="0"
+    hspace="3" src="108_small.jpg" vspace="3" width="300" height="322"></a> <br clear="all">
+    </p>
+    <p><font face="Arial" size="2"><b>Рис. 7-7.</b> Конус, показывающий
+    положение точки попадания на объекте</font> </p>
+    <p><font face="Times New Roman" size="2">кое существо, наподобие
+    изображенного на рис. 7-8 (более качественная
+    иллюстрация из приложения Blobs приведена на
+    цветной вкладке).</font> </p>
+    <p><a href="http://usinsk.parma.ru/directx/109.jpg"><img alt="109.jpg" border="0"
+    hspace="3" src="109_small.jpg" vspace="3" width="300" height="354"></a> <br clear="all">
+    </p>
+    <p><font face="Arial" size="2"><b>Рис. 7-8.</b> Приложение Blobs</font> </p>
+    <p><font face="Times New Roman" size="2">Приложение добавляет
+    новое &lt;пятно&gt; к объекту, в точке где вы
+    щелкаете мышью. Пятна на самом деле являются
+    сферами, состоящими из четырех полос;</font> </p>
+    <p><font face="Times New Roman" size="2">даже при небольшом
+    количестве граней такая сфера выглядит неплохо.
+    Чтобы создать это приложение, я взял пример Select,
+    удалил все лишние команды меню</font> </p>
+    <p><font face="Arial" size="2"><b>181</b></font> </p>
+    <p><font face="Arial" size="2">Проверка попадания на практике</font>
+    </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">и изменил уведомляющую
+    функцию, чтобы она добавляла к макету новые
+    пятна. Новая функция выглядит следующим образом:</font>
+    </p>
+    <p align="center"><font face="Times New Roman" size="2">void
+    CMainFrame::OnSelChange(C3dShape* pShape, CPoint pt,</font> </p>
+    <p><font face="Times New Roman" size="2">void* pArg) {</font> </p>
+    <p><font face="Times New Roman" size="2">// Получить указатель на
+    объект класса</font> </p>
+    <p><font face="Times New Roman" size="2">CMainFrame* pThis = (CMainFrame*) pArg;</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT(pThis);</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT(pThis-&gt;IsKindOf
+    (RUNTIME_CLASS(CMainFrame))) ;</font> </p>
+    <p><font face="Times New Roman" size="2">if (pShape) {</font> </p>
+    <p><font face="Times New Roman" size="2">// Определить, в какую грань
+    пришлось попадание C3dViewport* pViewport =</font> </p>
+    <p align="center"><font face="Times New Roman" size="2">pThis-&gt;m_wnd3d.GetStage ()
+    -&gt;GetViewport () ;</font> </p>
+    <p><font face="Times New Roman" size="2">int iFace;</font> </p>
+    <p><font face="Times New Roman" size="2">C3dVector vHit;</font> </p>
+    <p><font face="Times New Roman" size="2">if (pShape-&gt;HitTest (pt, pViewport,
+    &amp;iFace, &amp;vHit) ) ( pThis-&gt;AddBlob (pShape, vHit) ;</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Arial" size="2">l</font> </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Times New Roman" size="2">Как видно из листинга,
+    после определения точки попадания вызывается
+    функция AddBlob, которая присоединяет к фигуре новое
+    пятно:</font> </p>
+    <p><font face="Times New Roman" size="2">void CMainFrame::AddBlob(C3dShape* pShape,
+    C3dVector&amp; vHit) {</font> </p>
+    <p><font face="Times New Roman" size="2">// Определить точку
+    попадания</font> </p>
+    <p><font face="Times New Roman" size="2">// и перейти от локальных
+    координат к мировым</font> </p>
+    <p><font face="Times New Roman" size="2">ASSERT(pShape) ;</font> </p>
+    <p><font face="Times New Roman" size="2">C3dVector vh = pShape-&gt;Transform (vHit) ;</font>
+    </p>
+    <p><font face="Times New Roman" size="2">// Создать новое пятно C3dShape*
+    pBlob = new C3dShape;</font> </p>
+    <p><font face="Times New Roman" size="2">pBlob-&gt;CreateSphere (0.5, 4);</font> </p>
+    <p><font face="Times New Roman" size="2">// Установить его центр в
+    точке попадания pBlob-&gt;SetPosition(vh) ;</font> </p>
+    <p><font face="Times New Roman" size="2">// Присоединить пятно к
+    фигуре pShape-&gt;AddChild (pBlob) ;</font> </p>
+    <p><font face="Times New Roman" size="2">// Включить новое пятно в
+    список фигур,</font> </p>
+    <p><font face="Times New Roman" size="2">// чтобы можно было
+    проверять попадание в него</font> </p>
+    <p><font face="Times New Roman" size="2">m_pScene-&gt;m_ShapeList. Append (pBlob) ;</font>
+    </p>
+    <p><font face="Arial" size="2">}</font> </p>
+    <p><font face="Arial" size="2"><b>182</b> <i>Уу</i> Глава 7. Проверка
+    попадания</font> </p>
+    <hr>
+    <p><font face="Times New Roman" size="2">Координаты точки
+    попадания приводятся к мировым координатам. Мы
+    создаем новое пятно, задаем его положение и
+    присоединяем к текущей фигуре. Обратите внимание
+    на то, что новый объект (пятно) присоединяется к
+    списку фигур, тем самым мы обеспечиваем его
+    удаление при уничтожении всего макета. Помните,
+    что для правильной работы проверки попаданий
+    нельзя удалять использованные объекты C++.</font> </p>
+    <p><font face="Times New Roman" size="2">Предлагаю выполнить
+    небольшое упражнение. Посмотрите на исходный
+    текст функции AddBlob. Действительно ли необходимо
+    приводить точку попадания к мировым координатам?
+    Можно ли добиться того же результата, не выполняя
+    этого преобразования? Попробуйте модифицировать
+    программу и посмотрите, будет ли она работать.</font>
+    </p>
+    <p><font face="Arial" size="4"><b>Итоги</b></font> </p>
+    <p><font face="Times New Roman" size="2">Мы узнали, как выделять
+    объекты, щелкая мышью в окне, как определить
+    выделенную грань и положение точки попадания в
+    объекте. Теперь у нас есть все необходимые
+    инструменты для выделения трехмерных объектов и
+    работы с ними. Если вы не следите за моими
+    описаниями, я снова советую запустить отладчик и
+    посмотреть, как происходит обработка сообщений
+    мыши.</font></p>
+    <p align="center"><a href="cpp_directx_manual_11.shtml"><font size="3">Далее..</font></a></font></font></font></font></td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->
