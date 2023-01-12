@@ -1,0 +1,275 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Flaky exception in an Access/ODBC program.
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Derek F. Groft - UTL -- <A HREF="mailto:derek.groft@utiligent.com">derek.groft@utiligent.com</A>
+Sunday, October 27, 1996
+</B>
+Environment:  VC++4.2-flat, NT4.0
+	Access ODBC driver version would be whatever is shipped with 4.2-flat
+	
+I am having some problems hitting an Access Database through ODBC. I have
+simplified my code as much as possible, yet it still exhibits the problem. 
+Specifically, the code below works fine three or four times in a row; it
+gives me exactly the data that I would expect, but then it throws an
+exception (not a C++exception, but rather an "operating system shuts down
+your
+program" sort of exception) .
+
+I've found that if I change my Select statement to simply select ALL rows
+(i.e., no WHERE clause) and manually search the output for the particular
+row that I want, it causes no exceptions.  This solution is obviously
+suboptimal.
+
+First Question:  Is there anything obvious wrong with my code?  (below)
+
+Second Question:  If this is indeed some sort of Access ODBC driver bug,
+does anyone have much experience with the Access ODBC driver?  I can work
+around this *particular* problem, but if the driver is flaky, then maybe I
+should
+buy a more powerful/reliable database before I get too far into this.  I
+chose Access because a) it was there and b) I don't anticipate an extremely
+high volume of data for my application.
+
+Any suggestions??
+
+
+CString CTestDlg::getInfo(long nID, const CString& rPassword)
+{
+     CString sMessage;
+     CClientSet db;
+
+     try
+     {
+          CString sSelect;
+          sSelect.Format("SELECT * FROM `Client` WHERE `ID` = %lu "
+			"AND `Password` = '%s'", nID, rPassword);
+
+          if ( db.Open(CRecordset::snapshot, sSelect) == FALSE )
+          {
+              sMessage = "Open failed.";
+              return sMessage;
+          }
+
+          if ( db.IsEOF()) {
+               db.Close();
+               sMessage = "Row not found.";
+               return sMessage;
+          }
+
+         db.MoveFirst();
+         sMessage.Format("%ld, %s, %s", db.m_ID, 
+                                                db.m_First_Name,
+                                               db.m_Last_Name);
+          db.Close();
+     }
+     catch (CException* pEx)
+     {
+          if ( db.IsOpen() == TRUE ) db.Close();
+          sMessage="Exception thrown.";
+          pEx->Delete();
+     }
+     return sMessage;
+}
+
+I don't know if this will help anyone, but the exception information is:
+	
+Unhandled exception in Test.exe (NTDLL.DLL); 0xC0000005: Access Violation
+
+The only thing left on the stack at this point is:
+	NTDLL! 77f6cb4e()
+	NTDLL! 77f674c3()
+so there's not much to work with.  
+
+Derek
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Patrice Buriez -- <A HREF="mailto:patriceb@businessline.tm.fr">patriceb@businessline.tm.fr</A>
+Tuesday, October 29, 1996
+</B>
+[Mini-digest: 3 responses]
+
+Derek,
+
+I think there is a problem in the following two lines, from the code
+excerpt you've provided:
+>> sSelect.Format("SELECT * FROM `Client` WHERE `ID` = %lu AND `Password`
+>>= '%s'", nID, rPassword);
+>> sMessage.Format("%ld, %s, %s", db.m_ID, db.m_First_Name, db.m_Last_Name);
+In a debug session, you can figure out the problem by watching sSelect
+and sMessage just after the call to CString::Format().
+
+CString::Format() takes a variable number of arguments. There is an
+ellipsis in its prototype.
+Thus, the compiler _cannot_ convert the arguments you provide to the
+data type expected at runtime by the function according to the format
+string supplied.
+
+As a result, you _need_ to explicity convert any CString object you
+provide to an LPCTSTR, as follows:
+>sSelect.Format("SELECT * FROM `Client` WHERE `ID` = %lu AND `Password`
+>= '%s'", nID, (LPCTSTR)rPassword);
+>sMessage.Format("%ld, %s, %s", db.m_ID, (LPCTSTR)db.m_First_Name,
+>(LPCTSTR)db.m_Last_Name);
+(I assume here that m_First_Name and m_Last_Name are CString data
+members of CClientSet.)
+
+Notice that (LPCTSTR) doesn't act here as an ugly C-style cast: it
+actually makes the compiler call "CString::operator LPCTSTR()".
+Of course, you don't need to explicitly convert a CString when a
+function prototype requires an LPCTSTR argument: the compiler will call
+the conversion operator for you.
+
+BTW, I don't know if there is a problem with the Access ODBC driver...
+May be you should check your strings first !
+
+Hope this helps !
+Patrice
+
+>----- =8^) ------------------------------------------------------
+>Patrice BURIEZ
+>Phone:	+33 (0)1 30 84 43 16
+>Fax:	+33 (0)1 30 84 44 59
+>Email:	patriceb@businessline.tm.fr
+>Visit:	<A HREF="http://www.businessline.tm.fr">http://www.businessline.tm.fr</A>
+>-----------------------------------------------------------------
+>Disclaimer:
+>Opinions expressed are my own and are not those of my employer.
+>-----------------------------------------------------------------
+>
+-----From: Len <cw50@cityscape.co.uk>
+
+I've had this same problem and it's been driving me nuts!  I was using a
+number of Crecordset derived classes and in my hunt for  a solution I =
+decided
+to replace one with a CDaorecordset and the problem disappeared! When I=20
+get rid of the Dao one and put back the CRecorset the problem returns.
+
+I've since discovered that if I do something via Dao everything is fine. =
+It doesn't
+matter which CRecordset I replace. I thought there might be something =
+dodgy about my project files but I cannot find any DAO stuff lying =
+around.=20
+(I thought there may be a connection with the known Dao bug when used
+in a non-primary thread).
+
+Hope this helps.
+
+Len.
+
+-----From: Vincent Mascart <100425.1337@CompuServe.COM>
+
+What's really missing in your question is which line from your code throw the
+exception.
+
+This kind of exception look like using an uninitialized or invalid pointer.
+
+You should track down your code, and if needed dive into MFC's code to find
+where the exception is thrown.
+
+I'm working with Access ODBC drivers for a long and have no problem to handle
+databases (even complex and big one's).
+
+Vincent Mascart
+100425.1337@compuserve.com
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Andrew Lazarus -- <A HREF="mailto:DrLaz@advisorsw.com">DrLaz@advisorsw.com</A>
+Wednesday, October 30, 1996
+</B>
+[Mini-digest: 2 responses]
+
+
+>      try
+>      {
+>           CString sSelect;
+>           sSelect.Format("SELECT * FROM `Client` WHERE `ID` = %lu "
+> 			"AND `Password` = '%s'", nID, rPassword);
+
+I think that this line is bad. From the docs:
+
+When you pass a character string as an optional argument, you must
+cast it explicitly as LPCTSTR. 
+
+CString::Format seems to be a fancy printf which (like C in general)
+isn't type-safe so disaster probably comes when the CString
+reference is used where an LPCTSTR is expected. Try
+
+>           sSelect.Format("SELECT * FROM `Client` WHERE `ID` = %lu "
+> 			"AND `Password` = '%s'", nID,(LPCTSTR) rPassword);
+andrew lazarus
+senior software engineer
+DrLaz@advisorsw.com
+-----From: Ian Pepper <Ian@flexicom.ie>
+
+Hi Derek,
+
+It looks like the CString :: Format may the the cause of your problem. 
+Format is a vardic function and thus can do no type checking.  The %s
+format specifier means just that i.e. a char * (or const char *). 
+Therfore you need to cast your CString arguments to const char * to get
+this to work.  For example:
+
+>          sSelect.Format("SELECT * FROM `Client` WHERE `ID` = %lu "
+>			"AND `Password` = '%s'", nID, (const char *)rPassword);
+
+Incidently, I usually put the WHERE clause in the m_strFilter member of
+the derived CRecordset.
+
+Hope this helps,
+
+Ian
+ian@flexicom.ie
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

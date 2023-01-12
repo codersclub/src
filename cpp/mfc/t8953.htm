@@ -1,0 +1,1115 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Assertion in wincore.cpp...
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Mihir Dalal -- <A HREF="mailto:m_dalal@ECE.concordia.CA">m_dalal@ECE.concordia.CA</A>
+Sunday, January 12, 1997
+</B>
+
+               Environment : MSVC 1.52, Windows 95
+
+Hi,
+
+I have an assertion occuring in wincore.cpp soon after exiting from a 
+particular message handler in my CMainFrame.
+
+I traced in the debugging mode to see a fixed sequence of commands being 
+executed just before the assertion. I mention them below:
+
+// Trace showing execution of my message handler
+Init at WM_WL_RECEIVED is = 8 
+Incoming TAIP String = >Input 2;ID=1123;*0A<                   
+InComingMessage (inside init = 8) = >Input 2;ID=1123;*0A<              
+TempBuffer      (inside init = 8) = >Input 2;ID=1123;*0A<     
+Setting szComand8 = >QCST< 
+Setting init to 1 
+// End of my message handler
+SENDING command id 0xE100 to CWinApp target 
+SENDING command id 0xE101 to CWinApp target 
+SENDING command id 0x8003 to CMyAppView target 
+SENDING command id 0x8004 to CMyAppView target 
+SENDING command id 0x8005 to CMyAppView target 
+SENDING command id 0xE140 to CWinApp target 
+SENDING command id 0xE144 to CMainFrame target 
+SENDING command id 0xE141 to CMyAppDoc target 
+MyApp Windows Application: File wincore.cpp, Line 175, Assertion Failed!
+
+
+Firstly, 
+Where do I get the definitions of these command id's. I mean, if 
+the above means that after sending command id 0xE141 the assertion 
+occurs, from where do I know which command is 0xE141 ??
+
+Secondly,
+I mention the source at which the assertion occurs, if someone can 
+figure out what exactly is going wrong. Incidently, I have a number of similar 
+message handlers in my CMainFrame, but apparently, only this particular 
+message handler seems to be failing !!
+
+CWnd* PASCAL CWnd::FromHandlePermanent(HWND hWnd)
+{
+	// only look in the permanent map - does no allocations
+	CWnd* pWnd;
+	if (!_afxMapHWND.LookupPermanent(hWnd, (CObject*&)pWnd))
+		return NULL;
+	ASSERT(pWnd->m_hWnd == hWnd); <--- Assertion occurs here....
+	return pWnd;
+}
+
+As you can see, It is not asserting some window handle. As it stands, I 
+have not touched any of the window handles in my message handler after 
+which I get the assertion. Neither is the assertion being raised at any 
+other time in the application. Then why could it be raising this assertion. 
+
+As you can see, this is more of plain C Code rather than C++ code. 
+Also this particular message handler has nothing to do with window creation 
+and destruction, or window handle manipulation, neither does it call any of 
+the windows API related to window creation/destruction. Neither does 
+the assertion occur while executing any particular statement of this 
+loop. 
+
+The Assertion occurs AFTER executing the loop once, & WAITING 
+for another message from the windows queue which will cause handler 
+execution again. That is what is confusing me. 
+
+That is why I stressed on the command id's, which the "Output Window" is 
+tracing. If I can figure out which particular piece of code does 
+"SENDING command id 0xE141 to CMyAppDoc target" (the trace after which 
+immediately the assertion occurs) is referring to, I can think of a 
+possible solution. 
+
+Note that I am calling certain functions like OnDataReceived(), 
+OnAlarmReceived(), etc. which I have written myself & cause messages to be 
+sent to the view and inturn doucment classes. 
+
+BUT, I have tested them throughly by calling them from other handlers and 
+they work fine. 
+
+Also, as I mentioned before, the assertion does not occur soon after or 
+while calling any of these functions. It occurs when the loop is in an idle 
+state.
+
+Mihir. 
+
+//This particular message handler is activated in my SDI application 
+//upon receiving a WM_WL_RECEIVED (WM_USER+XXX) message.
+
+//The sequence of operation which causes this message to be received is 
+//as follows. The application starts up and is idle. There is a RING on the 
+//modem. My OnCommNotification() (=>WM_COMMNOTIFY) handler makes the 
+//modem to answer the incoming call. Once connection is established, 
+//We both (i.e. the calling application on the remote 
+//computer & my application) switch to a SPECIAL communication protocol. 
+//We both disable commnotification on our respective modems, and the new 
+//protocol causes WM_WL_RECEIVED messages to be sent by the modems to our 
+//respective applications. 
+
+// Once connection established with the remote computer, I get 
+// WM_WL_RECEIVED repeatedly. I use "init" variable as a switch
+// to decide what action to take.
+
+// There are bascially three cases which initate communication.
+// QUERY, CONFIGURE is when I dial from my application.
+// AUTO ANSWER is when the remote computer dials me. 
+
+// When I QUERY/CONFIGURE everyting works fine. 
+// The assertion occus only when I try to AUTO ANS.
+// For AUTO ANS, I have set "init=8" which means I directly jump to
+// case init=8 after reading from the comm port.
+
+
+LONG CMainFrame::OnWatReceived(UINT X, LONG Y)
+{
+   // Similar to ReadComm(), read the comm port 
+   c = wlGetMsg(handle, szBuffer, sizeof(szBuffer) - 1);
+   if (c > 0)
+    {
+      for (count=0;count<c;count++){
+      message[start]=szBuffer[count];
+      start=start+1;
+      if (szBuffer[count]=='<') // Look for the terminating "<" character
+       {
+        // "init" has been previously set in OnCreate() of the mainframe
+        TRACE("Init at WM_WL_RECEIVED is = %i\n", init);
+	TRACE("Incoming TAIP String = %s\n", szBuffer);
+	// Store in another buffer for later use...
+        strcpy(InComingMessage,szBuffer);
+        start=0;
+
+
+        // Switch to decide what action is to be taken when WM_WL_RECEIVED 
+        // is  received
+	    switch(init) {
+	       // Common case to shut down communications
+               // Note that SPECIAL protocol has to be shut down one 
+               // step before reaching here. Only MODEM communication shut 
+               // down is handled here. Whether reaching here from QUERY, 
+               // CONFIGURE or AUTOANS ensure that SPECIAL protocol 
+               // has been shut down by posting >QCST< in the previous case 
+               // statement.  
+	       case 2:        
+	              // Display that system is DISCONNECTING
+	              OnDisplayDisconnecting();
+	              // Set the SPECIAL session to OFF
+	              SetWatlinkOff(hWnd, idComDev); 
+	              (void) wlCloseSession(handle);
+		      handle = NULL;
+		      strcpy(telep,"ATH\r"); 
+    		      (void)WriteComm(idComDev, telep,strlen(telep));  
+		      strcpy(telep,"ATZ\r");
+		      (void)WriteComm(idComDev, telep,strlen(telep));
+	              strcpy(telep,"ATV\r");
+		      End_Flag = 1;
+		      (void)WriteComm(idComDev, telep,strlen(telep)); 
+	              start=0;
+                      init=1;
+		      stat=0;
+		      break;
+
+                   // case 1 for QUERY & to Serialize its data
+                   case 1:     
+                      if(InComingMessage[2] == 'P')
+                        { 
+                          strcpy(TempBuffer,InComingMessage);
+                          OnDataReceived();
+	   	          strcpy(szCommand,">QCST<");
+			  wlPutMsg(handle,szCommand,sizeof(szCommand));
+		        } 
+                      if(TempBuffer[2] == 'A')
+		        {
+		          OnAlarmReceived();
+		        }				
+		       strcpy(message," ");
+		       init=2;
+		       start=0;
+                       OnDisplayReceivedSuccessfully();
+	               break; 
+		
+          	  // Case 3, case 4 for CONFIGURE 
+   		  case 3:
+                      strcpy(message," ");
+		      // Initiate >SDS command on TAIP protocol
+		      strcpy(szCommand,">SDS");
+		      // Set the Telephone Number to Report
+		      strcat(szCommand,reportel);
+		      strcat(szCommand,";");   
+		      // Set the Alarm Reporting Enabled/Disabled 
+		      strcat(szCommand,alarms); 
+		      // Concatinate a string terminator ("<")
+		      strcat(szCommand,"<"); 
+		      // Send command to remote computer
+		      wlPutMsg(handle,szCommand,sizeof(szCommand));
+                      TRACE("szCommand3 = %s\n",szCommand);
+		      init=4;
+		      start=0;
+                      break;
+		
+	           // CONFIGURE Follow Up
+		   case 4:
+		      if (WrePort_Flag==FALSE)
+		       {
+                         strcpy(message," ");
+			 strcpy(szCommand,">SRM;ID_FLAG=T<");
+			 init=6;
+			 start=0;	  
+		       }
+		      else
+		       {
+                         strcpy(message," ");
+			 strcpy(szCommand,">SRM;ID_FLAG=F<");
+			 init=5;
+			 start=0;
+			}
+		       (void) wlPutMsg(handle,szCommand,sizeof(szCommand));
+                       TRACE("szCommand4 = %s\n",szCommand);
+                       OnDisplayConfiguredSuccessfully();
+		       break;
+		
+		 // CONFIGURE Follow Up
+		 case 5:
+		       // Build the DPV statement
+                       strcpy(message," ");
+		       strcpy(szCommand,">DPV00300000");
+		       strcat(szCommand,distance);   
+		       strcat(szCommand,times);
+		       strcat(szCommand,"<");
+		       // Send DPV Command to remote computer
+		       wlPutMsg(handle,szCommand,sizeof(szCommand));
+	               TRACE("szComand51 = %s\n",szCommand);
+	               strcpy(message," ");
+		       // Build the QCST (Disconnect) statement
+                       strcpy(szCommand,">QCST<");       
+	               // Send QCST Command to remote computer
+                       wlPutMsg(handle,szCommand,sizeof(szCommand)); 
+		       TRACE("szComand52 = %s\n",szCommand);
+		       // Display Disconnecting on Communication dialog box
+	               OnDisplayDisconnecting();
+	               start=0;
+	               init=7;
+	               break; 
+	           
+                  // CONFIGURE Follow Up				 
+                 case 6: 
+		       strcpy(message,"");
+		       strcpy(szCommand,">QCST<");
+		       wlPutMsg(handle,szCommand,sizeof(szCommand));
+		       TRACE("szComand6 = %s\n",szCommand);
+		       OnDisplayDisconnecting();
+		       start=0;
+	               init=7; 
+		       break; 
+			     
+                  // CONFIGURE Follow Up
+                  case 7:
+   	               OnDisplayDisconnecting();
+	               SetWatlinkOff(hWnd, idComDev); 
+	               (void) wlCloseSession(handle);
+	               handle = NULL;
+	               strcpy(telep,"ATH\r"); 
+    		       (void)WriteComm(idComDev, telep,strlen(telep));  
+                       strcpy(telep,"ATZ\r");
+                       (void)WriteComm(idComDev, telep,strlen(telep));
+		       End_Flag = 1;
+	               start=0;
+	               init=1;
+		       stat=0;
+	               break;
+		    
+                 // Jump here in case of AUTO ANSWER				
+		 case 8: 
+                     strcpy(TempBuffer,InComingMessage);
+         TRACE("InComingMessage (inside init = 8) = %s\n",InComingMessage);
+         TRACE("TempBuffer      (inside init = 8) = %s\n",TempBuffer);
+		     strcpy(szCommand,">QCST<");
+		     TRACE("szComand8 = %s\n",szCommand);
+                     wlPutMsg(handle,szCommand,sizeof(szCommand)); 
+   	             start=0;
+                     init=9;
+		     TRACE("Setting init to %i\n", init);
+		     break;        <--- ASSERTION in wincore occurs after
+                                     // breaking from here & waiting for
+                                     // the next WM_WL_RECEIVED.   
+           
+                // Serialize data after AUTO ANSWER
+               case 9:
+	             TRACE("TempBuffer (inside init = 9) = %s\n",TempBuffer);
+		     if(TempBuffer[2] == 'P')
+                      { 
+                        OnDataReceived();
+	                //strcpy(szCommand,">QCST<");
+		        //wlPutMsg(handle,szCommand,sizeof(szCommand));
+                      } 
+	             else if(TempBuffer[2] == 'A') 
+                      {
+		        OnAlarmReceived(); 
+   	              }
+	            else if(sizeof(InComingMessage) != 0)
+                      {
+		        OnMalFunction();
+	              }
+                    // Now that AUTO ANS is over shut down communications
+                    strcpy(message," ");
+	            init = 1; // Reset case switch
+                    start = 0; // Reset loop counter
+	            SetWatlinkOff(hWnd, idComDev); 
+	            (void) wlCloseSession(handle);
+	            handle = NULL;
+	            strcpy(telep,"ATH\r"); 
+    		    (void)WriteComm(idComDev, telep,strlen(telep));  
+		    strcpy(telep,"ATZ\r");
+	            (void)WriteComm(idComDev, telep,strlen(telep));
+	            strcpy(telep,"ATV\r");
+	            End_Flag = 1;
+	            (void)WriteComm(idComDev, telep,strlen(telep)); 
+		     break; 
+                  }
+              strcpy(szBuffer,"");
+	    }   
+        } 
+     }    
+    return TRUE;	  
+}   
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dulepov Dmitry -- <A HREF="mailto:dima@ssm6000.samsung.ru">dima@ssm6000.samsung.ru</A>
+Tuesday, January 14, 1997
+</B>
+[Mini-digest: 5 responses]
+
+        [Mailer: "Groupware E-Mail". Version 1.02.054]
+
+>        [From: Mihir Dalal
+>        [Address: m_dalal@ECE.concordia.CA
+>        [To: mfc-l@netcom.com
+>        [Date: Tue Jan 14 08:24:27 1997
+>
+>Firstly, 
+>Where do I get the definitions of these command id's. I mean, if 
+>the above means that after sending command id 0xE141 the assertion 
+>occurs, from where do I know which command is 0xE141 ??
+>
+
+In the AFXRES.H from \MSVC\MFC\INCLUDE directory. This is the ID_APP_EXIT command.
+
+Note: you also receive ID_FILE_NEW, ID_FILE_OPEN, ID_APP_ABOUT, ID_CONTEXT_HELP. Strange sequence of commands...
+
+>Secondly,
+>I mention the source at which the assertion occurs, if someone can 
+>figure out what exactly is going wrong. Incidently, I have a number of similar 
+>message handlers in my CMainFrame, but apparently, only this particular 
+>message handler seems to be failing !!
+
+You're right - something is wrong. Your document receive an app-exit command although noone sent it. Check if you have duplicate command IDs. This is in your resource file (*.RC).
+
+When your program is in idle state MFC removes some temporary pointers for windows. Possibly, you called somewhere "CWnd::FromHandle()" and keep this pointer (it should not be stored!). I saw a call to "wlPutMsg" function in your code but I don't know this function. If it is yours: do you do something with windows there?
+
+*** Now the important thing ***
+Try to run your program under MSVC under debugger. When an assertion occurs, use the call stack to find how you get to "CWnd::FromHandlePermanent()". If it was a call from your function, you may find a error quickly.
+
+
+Dmitry A. Dulepov
+Samsung Electronics Co., Ltd.
+Russian Research Center
+Phone: +7 (095) 213-9207
+Fax: +7 (095) 213-9196
+E-mail: dima@src.samsung.ru
+====================================
+
+-----From: hou@tfn.com (Bing Hou)
+
+     0xE141 is defined in afxres.h(MSVC1.52) as the ID_APP_EXIT, and is 
+     used as the ID for "Exit" command on the File menu.
+     
+     
+     -Bing Hou
+     hou@tfn.com
+     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      "Man is still the most extraordinary computer of all."
+                                          - JFK
+     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+______________________________ Reply Separator _________________________________
+Subject: Assertion in wincore.cpp...
+Author:  Mihir Dalal <m_dalal@ECE.concordia.CA> at Internet
+Date:    1/12/97 8:02 PM
+
+
+     
+               Environment : MSVC 1.52, Windows 95
+     
+Hi,
+     
+I have an assertion occuring in wincore.cpp soon after exiting from a 
+particular message handler in my CMainFrame.
+     
+I traced in the debugging mode to see a fixed sequence of commands being 
+executed just before the assertion. I mention them below:
+     
+// Trace showing execution of my message handler 
+Init at WM_WL_RECEIVED is = 8 
+Incoming TAIP String = >Input 2;ID=1123;*0A<                   
+InComingMessage (inside init = 8) = >Input 2;ID=1123;*0A<              
+TempBuffer      (inside init = 8) = >Input 2;ID=1123;*0A<     
+Setting szComand8 = >QCST< 
+Setting init to 1 
+// End of my message handler
+SENDING command id 0xE100 to CWinApp target 
+SENDING command id 0xE101 to CWinApp target 
+SENDING command id 0x8003 to CMyAppView target 
+SENDING command id 0x8004 to CMyAppView target 
+SENDING command id 0x8005 to CMyAppView target 
+SENDING command id 0xE140 to CWinApp target 
+SENDING command id 0xE144 to CMainFrame target 
+SENDING command id 0xE141 to CMyAppDoc target 
+MyApp Windows Application: File wincore.cpp, Line 175, Assertion Failed!
+     
+     
+Firstly, 
+Where do I get the definitions of these command id's. I mean, if 
+the above means that after sending command id 0xE141 the assertion 
+occurs, from where do I know which command is 0xE141 ??
+     
+Secondly,
+I mention the source at which the assertion occurs, if someone can 
+figure out what exactly is going wrong. Incidently, I have a number of similar 
+message handlers in my CMainFrame, but apparently, only this particular 
+message handler seems to be failing !!
+     
+CWnd* PASCAL CWnd::FromHandlePermanent(HWND hWnd) 
+{
+        // only look in the permanent map - does no allocations 
+        CWnd* pWnd;
+        if (!_afxMapHWND.LookupPermanent(hWnd, (CObject*&)pWnd))
+                return NULL;
+        ASSERT(pWnd->m_hWnd == hWnd); <--- Assertion occurs here.... 
+        return pWnd;
+}
+     
+As you can see, It is not asserting some window handle. As it stands, I 
+have not touched any of the window handles in my message handler after 
+which I get the assertion. Neither is the assertion being raised at any 
+other time in the application. Then why could it be raising this assertion. 
+     
+As you can see, this is more of plain C Code rather than C++ code. 
+Also this particular message handler has nothing to do with window creation 
+and destruction, or window handle manipulation, neither does it call any of 
+the windows API related to window creation/destruction. Neither does 
+the assertion occur while executing any particular statement of this 
+loop. 
+     
+The Assertion occurs AFTER executing the loop once, & WAITING 
+for another message from the windows queue which will cause handler 
+execution again. That is what is confusing me. 
+     
+That is why I stressed on the command id's, which the "Output Window" is 
+tracing. If I can figure out which particular piece of code does 
+"SENDING command id 0xE141 to CMyAppDoc target" (the trace after which 
+immediately the assertion occurs) is referring to, I can think of a 
+possible solution. 
+     
+Note that I am calling certain functions like OnDataReceived(), 
+OnAlarmReceived(), etc. which I have written myself & cause messages to be 
+sent to the view and inturn doucment classes. 
+     
+BUT, I have tested them throughly by calling them from other handlers and 
+they work fine. 
+     
+Also, as I mentioned before, the assertion does not occur soon after or 
+while calling any of these functions. It occurs when the loop is in an idle 
+state.
+     
+Mihir. 
+     
+//This particular message handler is activated in my SDI application 
+//upon receiving a WM_WL_RECEIVED (WM_USER+XXX) message.
+     
+//The sequence of operation which causes this message to be received is 
+//as follows. The application starts up and is idle. There is a RING on the 
+//modem. My OnCommNotification() (=>WM_COMMNOTIFY) handler makes the 
+//modem to answer the incoming call. Once connection is established, 
+//We both (i.e. the calling application on the remote 
+//computer & my application) switch to a SPECIAL communication protocol. 
+//We both disable commnotification on our respective modems, and the new 
+//protocol causes WM_WL_RECEIVED messages to be sent by the modems to our 
+//respective applications. 
+     
+// Once connection established with the remote computer, I get 
+// WM_WL_RECEIVED repeatedly. I use "init" variable as a switch 
+// to decide what action to take.
+     
+// There are bascially three cases which initate communication. 
+// QUERY, CONFIGURE is when I dial from my application.
+// AUTO ANSWER is when the remote computer dials me. 
+     
+// When I QUERY/CONFIGURE everyting works fine. 
+// The assertion occus only when I try to AUTO ANS.
+// For AUTO ANS, I have set "init=8" which means I directly jump to 
+// case init=8 after reading from the comm port.
+     
+     
+LONG CMainFrame::OnWatReceived(UINT X, LONG Y) 
+{
+   // Similar to ReadComm(), read the comm port 
+   c = wlGetMsg(handle, szBuffer, sizeof(szBuffer) - 1); 
+   if (c > 0)
+    {
+      for (count=0;count<c;count++){
+      message[start]=szBuffer[count];
+      start=start+1;
+      if (szBuffer[count]=='<') // Look for the terminating "<" character
+       {
+        // "init" has been previously set in OnCreate() of the mainframe 
+        TRACE("Init at WM_WL_RECEIVED is = %i\n", init);
+        TRACE("Incoming TAIP String = %s\n", szBuffer); 
+        // Store in another buffer for later use... 
+        strcpy(InComingMessage,szBuffer);
+        start=0;
+     
+     
+        // Switch to decide what action is to be taken when WM_WL_RECEIVED 
+        // is  received
+            switch(init) {
+               // Common case to shut down communications
+               // Note that SPECIAL protocol has to be shut down one 
+               // step before reaching here. Only MODEM communication shut 
+               // down is handled here. Whether reaching here from QUERY, 
+               // CONFIGURE or AUTOANS ensure that SPECIAL protocol 
+               // has been shut down by posting >QCST< in the previous case 
+               // statement.  
+               case 2:        
+                      // Display that system is DISCONNECTING 
+                      OnDisplayDisconnecting();
+                      // Set the SPECIAL session to OFF
+                      SetWatlinkOff(hWnd, idComDev); 
+                      (void) wlCloseSession(handle);
+                      handle = NULL;
+                      strcpy(telep,"ATH\r"); 
+                      (void)WriteComm(idComDev, telep,strlen(telep));  
+                      strcpy(telep,"ATZ\r");
+                      (void)WriteComm(idComDev, telep,strlen(telep)); 
+                      strcpy(telep,"ATV\r");
+                      End_Flag = 1;
+                      (void)WriteComm(idComDev, telep,strlen(telep)); 
+                      start=0;
+                      init=1;
+                      stat=0;
+                      break;
+     
+                   // case 1 for QUERY & to Serialize its data 
+                   case 1:     
+                      if(InComingMessage[2] == 'P')
+                        { 
+                          strcpy(TempBuffer,InComingMessage);
+                          OnDataReceived();
+                          strcpy(szCommand,">QCST<");
+                          wlPutMsg(handle,szCommand,sizeof(szCommand));
+                        } 
+                      if(TempBuffer[2] == 'A')
+                        {
+                          OnAlarmReceived();
+                        }                               
+                       strcpy(message," ");
+                       init=2;
+                       start=0;
+                       OnDisplayReceivedSuccessfully();
+                       break; 
+     
+                  // Case 3, case 4 for CONFIGURE 
+                  case 3:
+                      strcpy(message," ");
+                      // Initiate >SDS command on TAIP protocol 
+                      strcpy(szCommand,">SDS");
+                      // Set the Telephone Number to Report 
+                      strcat(szCommand,reportel);
+                      strcat(szCommand,";");   
+                      // Set the Alarm Reporting Enabled/Disabled 
+                      strcat(szCommand,alarms); 
+                      // Concatinate a string terminator ("<") 
+                      strcat(szCommand,"<"); 
+                      // Send command to remote computer
+                      wlPutMsg(handle,szCommand,sizeof(szCommand)); 
+                      TRACE("szCommand3 = %s\n",szCommand);
+                      init=4;
+                      start=0;
+                      break;
+     
+                   // CONFIGURE Follow Up
+                   case 4:
+                      if (WrePort_Flag==FALSE)
+                       {
+                         strcpy(message," ");
+                         strcpy(szCommand,">SRM;ID_FLAG=T<"); 
+                         init=6;
+                         start=0;         
+                       }
+                      else
+                       {
+                         strcpy(message," ");
+                         strcpy(szCommand,">SRM;ID_FLAG=F<"); 
+                         init=5;
+                         start=0;
+                        }
+                       (void) wlPutMsg(handle,szCommand,sizeof(szCommand)); 
+                       TRACE("szCommand4 = %s\n",szCommand); 
+                       OnDisplayConfiguredSuccessfully();
+                       break;
+     
+                 // CONFIGURE Follow Up
+                 case 5:
+                       // Build the DPV statement
+                       strcpy(message," ");
+                       strcpy(szCommand,">DPV00300000");
+                       strcat(szCommand,distance);   
+                       strcat(szCommand,times);
+                       strcat(szCommand,"<");
+                       // Send DPV Command to remote computer 
+                       wlPutMsg(handle,szCommand,sizeof(szCommand)); 
+                       TRACE("szComand51 = %s\n",szCommand); 
+                       strcpy(message," ");
+                       // Build the QCST (Disconnect) statement 
+                       strcpy(szCommand,">QCST<");       
+                       // Send QCST Command to remote computer 
+                       wlPutMsg(handle,szCommand,sizeof(szCommand)); 
+                       TRACE("szComand52 = %s\n",szCommand);
+                       // Display Disconnecting on Communication dialog box 
+                       OnDisplayDisconnecting();
+                       start=0;
+                       init=7;
+                       break; 
+     
+                  // CONFIGURE Follow Up                                 
+                 case 6: 
+                       strcpy(message,"");
+                       strcpy(szCommand,">QCST<");
+                       wlPutMsg(handle,szCommand,sizeof(szCommand)); 
+                       TRACE("szComand6 = %s\n",szCommand); 
+                       OnDisplayDisconnecting();
+                       start=0;
+                       init=7; 
+                       break; 
+     
+                  // CONFIGURE Follow Up
+                  case 7:
+                       OnDisplayDisconnecting();
+                       SetWatlinkOff(hWnd, idComDev); 
+                       (void) wlCloseSession(handle);
+                       handle = NULL;
+                       strcpy(telep,"ATH\r"); 
+                       (void)WriteComm(idComDev, telep,strlen(telep));  
+                       strcpy(telep,"ATZ\r");
+                       (void)WriteComm(idComDev, telep,strlen(telep)); 
+                       End_Flag = 1;
+                       start=0;
+                       init=1;
+                       stat=0;
+                       break;
+     
+                 // Jump here in case of AUTO ANSWER                            
+                 case 8: 
+                     strcpy(TempBuffer,InComingMessage);
+         TRACE("InComingMessage (inside init = 8) = %s\n",InComingMessage); 
+         TRACE("TempBuffer      (inside init = 8) = %s\n",TempBuffer);
+                     strcpy(szCommand,">QCST<");
+                     TRACE("szComand8 = %s\n",szCommand); 
+                     wlPutMsg(handle,szCommand,sizeof(szCommand)); 
+                     start=0;
+                     init=9;
+                     TRACE("Setting init to %i\n", init);
+                     break;        <--- ASSERTION in wincore occurs after
+                                     // breaking from here & waiting for
+                                     // the next WM_WL_RECEIVED.   
+     
+                // Serialize data after AUTO ANSWER
+               case 9:
+                     TRACE("TempBuffer (inside init = 9) = %s\n",TempBuffer); 
+                     if(TempBuffer[2] == 'P')
+                      { 
+                        OnDataReceived();
+                        //strcpy(szCommand,">QCST<");
+                        //wlPutMsg(handle,szCommand,sizeof(szCommand));
+                      } 
+                     else if(TempBuffer[2] == 'A') 
+                      {
+                        OnAlarmReceived(); 
+                      }
+                    else if(sizeof(InComingMessage) != 0)
+                      {
+                        OnMalFunction();
+                      }
+                    // Now that AUTO ANS is over shut down communications 
+                    strcpy(message," ");
+                    init = 1; // Reset case switch
+                    start = 0; // Reset loop counter
+                    SetWatlinkOff(hWnd, idComDev); 
+                    (void) wlCloseSession(handle);
+                    handle = NULL;
+                    strcpy(telep,"ATH\r"); 
+                    (void)WriteComm(idComDev, telep,strlen(telep));  
+                    strcpy(telep,"ATZ\r");
+                    (void)WriteComm(idComDev, telep,strlen(telep)); 
+                    strcpy(telep,"ATV\r");
+                    End_Flag = 1;
+                    (void)WriteComm(idComDev, telep,strlen(telep)); 
+                     break; 
+                  }
+              strcpy(szBuffer,"");
+            }   
+        } 
+     }    
+    return TRUE;          
+}   
+     
+     
+     
+     
+     
+     
+     
+     
+     
+     
+     
+     
+     
+-----From: Syed <sxs296@psu.edu>
+
+>I traced in the debugging mode to see a fixed sequence of commands being 
+>executed just before the assertion. I mention them below:
+>SENDING command id 0xE141 to CMyAppDoc target 
+>MyApp Windows Application: File wincore.cpp, Line 175, Assertion Failed!
+>
+>
+>Firstly, 
+>Where do I get the definitions of these command id's. I mean, if 
+>the above means that after sending command id 0xE141 the assertion 
+>occurs, from where do I know which command is 0xE141 ??
+That's not difficult actually. 0xE141 is hexadecimal value and after
+converting to base 10 decimal, you can lookup the number in the resource.h.
+>
+>Secondly,
+>I mention the source at which the assertion occurs, if someone can 
+>figure out what exactly is going wrong. Incidently, I have a number of similar 
+>message handlers in my CMainFrame, but apparently, only this particular 
+>message handler seems to be failing !!
+You might want to use Call Stack soon after the assertion occurs. Note that
+it's still in debugging mode right after assertion, theregore press Alt-7 to
+view the Call Stack. CAll Stack shows what functions have been called prior
+to where the current cp is.
+>
+>CWnd* PASCAL CWnd::FromHandlePermanent(HWND hWnd)
+>{
+>	// only look in the permanent map - does no allocations
+>	CWnd* pWnd;
+>	if (!_afxMapHWND.LookupPermanent(hWnd, (CObject*&)pWnd))
+>		return NULL;
+>	ASSERT(pWnd->m_hWnd == hWnd); <--- Assertion occurs here....
+>	return pWnd;
+>}
+
+Hope those help you in locating the appropriate line.
+
+-----From: Mihir Dalal <m_dalal@ECE.concordia.CA>
+
+
+On 14 Jan 1997, Dulepov Dmitry wrote:
+
+> >Firstly, 
+> >Where do I get the definitions of these command id's. I mean, if 
+> >the above means that after sending command id 0xE141 the assertion 
+> >occurs, from where do I know which command is 0xE141 ??
+> >
+> 
+> In the AFXRES.H from \MSVC\MFC\INCLUDE directory. This is the ID_APP_EXIT command.
+> 
+> Note: you also receive ID_FILE_NEW, ID_FILE_OPEN, ID_APP_ABOUT, 
+> ID_CONTEXT_HELP. Strange sequence of commands...
+ 
+
+> You're right - something is wrong. Your document receive an app-exit
+> command although noone sent it. Check if you have duplicate command IDs.
+> This is in your resource file (*.RC). >
+> When your program is in idle state MFC removes some temporary pointers 
+for wi$
+>
+> *** Now the important thing ***
+> Try to run your program under MSVC under debugger. When an assertion
+> occurs, use the call stack to find how you get to
+> "CWnd::FromHandlePermanent()". If it was a call from your function, you
+> may find a error quickly. >
+
+
+I understand that, but what is really confusing me is that I am tracing 
+that particular sequence of commands in my "Output Window" at regular 
+intervals right from the moment I bring up my application on the screen. 
+
+Does, this mean that there is something fundamentally wrong in my 
+application ??
+
+Also, at no other time when the command 0xE141 is sent to MyAppDoc does 
+the assertion in wincore.cpp occur. To further elobarate, I show some 
+more part of my debug trace below: right from the start of my application:
+
+Initial Speaker Setting x = 3 
+Modem Command ATM1L3   executed 
+Failed to load bitmap for selected image 
+Failed to load bitmap for selected image 
+Failed to load bitmap for selected image 
+Failed to load bitmap for selected image 
+SENDING command id 0xE100 to CWinApp target 
+SENDING command id 0xE101 to CWinApp target 
+SENDING command id 0x8003 to CUnitrackView target 
+SENDING command id 0x8004 to CUnitrackView target 
+SENDING command id 0x8005 to CUnitrackView target 
+SENDING command id 0xE140 to CWinApp target 
+SENDING command id 0xE144 to CMainFrame target 
+SENDING command id 0xE141 to CUnitrackDoc target 
+SENDING command id 0x801C to CUnitrackView target 
+Modem OutPut = ATV  
+Init = 1 
+SENDING command id 0xE100 to CWinApp target 
+SENDING command id 0xE101 to CWinApp target 
+SENDING command id 0x8003 to CUnitrackView target 
+SENDING command id 0x8004 to CUnitrackView target 
+SENDING command id 0x8005 to CUnitrackView target 
+SENDING command id 0xE140 to CWinApp target 
+SENDING command id 0xE144 to CMainFrame target 
+SENDING command id 0xE141 to CUnitrackDoc target 
+SENDING command id 0x801C to CUnitrackView target 
+SENDING command id 0xE100 to CWinApp target 
+SENDING command id 0xE101 to CWinApp target 
+........
+........
+// Trace showing execution of my message handler
+Init at WM_WL_RECEIVED is = 8
+Incoming TAIP String = >Input 2;ID=1123;*0A<
+InComingMessage (inside init = 8) = >Input 2;ID=1123;*0A<
+TempBuffer      (inside init = 8) = >Input 2;ID=1123;*0A<
+Setting szComand8 = >QCST<
+Setting init to 1
+// End of my message handler
+SENDING command id 0xE100 to CWinApp target
+SENDING command id 0xE101 to CWinApp target
+SENDING command id 0x8003 to CMyAppView target
+SENDING command id 0x8004 to CMyAppView target
+SENDING command id 0x8005 to CMyAppView target
+SENDING command id 0xE140 to CWinApp target
+SENDING command id 0xE144 to CMainFrame target
+SENDING command id 0xE141 to CMyAppDoc target
+MyApp Windows Application: File wincore.cpp, Line 175, Assertion Failed!
+
+
+You see that regular pattern of commands being sent right from the 
+beginnning to CMyAppDoc !!
+
+I also put down the call stack below, just before the assertion occurs: 
+Maybe that can give you & others some more hints on what exactly is 
+happening:
+
+CWnd:FromHandleParent()
+CWnd:SendMessagetoDescendents()
+CWnd:SendMessageToDescendents()
+CWinApp:OnIdle()
+CMyApp:OnIdle()
+CWinApp:Run()
+WinMain
+_astubmain
+_astart
+
+This raises a few more fundamental questions in my mind. I am sure that the 
+program has passed through one or two of my CMainFrame functions like 
+CMainFrame::OnCommNotification() before reaching the end state. 
+
+Why doesn't the stack show me those functions ??
+
+As for your doubt on wlPutMsg(), well it is incorported in a dll and has 
+been tested with a number of other programs and is definitely bug free. 
+
+Also, its job is similar to WriteComm() except that it writes to the comm 
+port in a special format, and has nothing to do with window handle 
+manipulation.
+
+Mihir.
+(University Researcher)
+
+-----From: dima@ssm6000.samsung.ru (Dulepov Dmitry)
+
+        [Mailer: "Groupware E-Mail". Version 1.02.054]
+
+>        [From: Mihir Dalal
+>
+>I understand that, but what is really confusing me is that I am tracing 
+>that particular sequence of commands in my "Output Window" at regular 
+>intervals right from the moment I bring up my application on the screen. 
+>
+>Does, this mean that there is something fundamentally wrong in my 
+>application ??
+>
+
+I don't know. I know nothing about your program and its architecture. You have to think about it yourself.
+
+>
+>This raises a few more fundamental questions in my mind. I am sure that the 
+>program has passed through one or two of my CMainFrame functions like 
+>CMainFrame::OnCommNotification() before reaching the end state. 
+>
+>Why doesn't the stack show me those functions ??
+>
+
+1. Why do you think so ?
+2. Did you turn on 'Main message dispatch' in TRACER application ? You see commands because 'WM_COMMAND dispatch' is turned on. WM_COMMNOTIFY is windows message, but commands are received through WM_COMMAND message.
+
+>
+>I also put down the call stack below, just before the assertion occurs: 
+>Maybe that can give you & others some more hints on what exactly is 
+>happening:
+>
+>CWnd:FromHandleParent()
+>CWnd:SendMessagetoDescendents()
+>CWnd:SendMessageToDescendents()
+>CWinApp:OnIdle()
+>CMyApp:OnIdle()
+>CWinApp:Run()
+>WinMain
+>_astubmain
+>_astart
+>
+
+1. Did you correctly process OnIdle() function? You MUST always pass execution to CWinApp::OnIdle() with the same 'lCount' as you receive. I's importamt because MFC implementations does some work based on the 'lCount' value.
+
+2. CWinApp::OnIdle() calls SendMessageToDescendants() and SendMessageToDescendants() calls CWnd::FromHandlePermanent() for each child of the main frame. Possibly. something wrong with them (destroyed using MFC function or destructor / recreated using Windows function)
+
+
+
+Dmitry A. Dulepov
+Samsung Electronics Co., Ltd.
+Russian Research Center
+Phone: +7 (095) 213-9207
+Fax: +7 (095) 213-9196
+E-mail: dima@src.samsung.ru
+====================================
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mihir Dalal -- <A HREF="mailto:m_dalal@ECE.concordia.CA">m_dalal@ECE.concordia.CA</A>
+Thursday, January 16, 1997
+</B>
+[Mini-digest: 2 responses]
+
+
+On 15 Jan 1997, Dulepov Dmitry wrote:
+
+> >CWnd:FromHandleParent()
+> >CWnd:SendMessagetoDescendents()
+> >CWnd:SendMessageToDescendents()
+> >CWinApp:OnIdle()
+> >CMyApp:OnIdle()
+> >CWinApp:Run()
+> >WinMain
+> >_astubmain
+> >_astart
+> >
+> 
+> 1. Did you correctly process OnIdle() function? You MUST always pass 
+> execution to CWinApp::OnIdle() with the same 'lCount' as you receive. 
+> I's importamt because MFC implementations does some work based on the 
+> 'lCount' value. 
+> 2. CWinApp::OnIdle() calls SendMessageToDescendants() and 
+> SendMessageToDescendants() calls CWnd::FromHandlePermanent() for each 
+> child of the main frame. Possibly. something wrong with them (destroyed 
+> using MFC function or destructor / recreated using Windows function) 
+
+Dimitry,
+
+Yes, I checked my OnIdle() processing in CMyApp, thats just fine. 
+
+I was wondering why do I see CWnd:SendMessageToDescendents() twice in my 
+call stack.
+
+Can you throw some light on this ??
+
+Since, I have an SDI application, I believe, SendMessageToDescendents() 
+needs to be called only once by the CWindApp:OnIdle(). Could that be the 
+key to the problem ??
+
+Mihir. 
+(University Researcher)
+-----From: "Dmitry A. Dulepov" <dima@ssm6000.samsung.ru>
+
+        [Mailer: "Groupware E-Mail". Version 1.02.054]
+
+>        [From: Mihir Dalal
+
+>> >CWnd:FromHandlePermanent()
+>> >CWnd:SendMessagetoDescendants()
+>> >CWnd:SendMessageToDescendants()
+>> >CWinApp:OnIdle()
+>> >CMyApp:OnIdle()
+>> >CWinApp:Run()
+>> >WinMain
+>> >_astubmain
+>> >_astart
+>> >
+>> 
+>> 1. Did you correctly process OnIdle() function? You MUST always pass 
+>> execution to CWinApp::OnIdle() with the same 'lCount' as you receive. 
+>> I's importamt because MFC implementations does some work based on the 
+>> 'lCount' value. 
+>> 2. CWinApp::OnIdle() calls SendMessageToDescendants() and 
+>> SendMessageToDescendants() calls CWnd::FromHandlePermanent() for each 
+>> child of the main frame. Possibly. something wrong with them (destroyed 
+>> using MFC function or destructor / recreated using Windows function) 
+>
+>Dimitry,
+>
+>Yes, I checked my OnIdle() processing in CMyApp, thats just fine. 
+>
+>I was wondering why do I see CWnd:SendMessageToDescendents() twice in my 
+>call stack.
+>
+>Can you throw some light on this ??
+>
+>Since, I have an SDI application, I believe, SendMessageToDescendents() 
+>needs to be called only once by the CWindApp:OnIdle(). Could that be the 
+>key to the problem ??
+>
+>Mihir. 
+>(University Researcher)
+
+CWinApp::SendMessageToDescedants() calls itself for all child windows and they will do the same thing. I think it's not a problem. There's something else.
+
+Try to find windows with handles in 'm_hWnd' (both!) from FromHandlePremanent() using SPYXX. Are they both exist?
+
+
+Dmitry A. Dulepov
+Samsung Electronics Co., Ltd.
+Russian Research Center
+Phone: +7 (095) 213-9207
+Fax: +7 (095) 213-9196
+E-mail: dima@src.samsung.ru
+====================================
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

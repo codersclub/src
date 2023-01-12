@@ -1,0 +1,348 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+COleDataSource::DoDragDrop
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Tim Philip -- <A HREF="mailto:philip@cs.usask.ca">philip@cs.usask.ca</A>
+Wednesday, February 12, 1997
+</B>
+
+
+Environment:  MSVC 4.0, NT 4.0
+
+
+I am implementing drag and drop in an owner-draw CListCtrl subclass.  I
+am initiating a drag and drop operating using a COleDataSource object,
+and calling the DoDragDrop member from my OnLButtonDown member.
+
+I have two problems.
+
+1.  The drag and drop operation does not seem to start the same way the
+documentation suggests.  It says that if the user stays within a 
+certain bounding rectangle, the drag and drop operation is not
+initiated.  If there is no bounding rectangle, it waits for a short
+period of time.  However, this does not seem to be the case.  I
+have the following code in my OnLButtonDown function.  I have tried
+several different values for the rectangle, none of them seem to make
+any difference.
+
+	RECT ItemRect;
+	GetItemRect(lvHitTest.iItem, &ItemRect, LVIR_BOUNDS); // get items rect
+	ClientToScreen(&ItemRect);  // try screen coordinates
+	CWnd *pDesktop = GetDesktopWindow();
+	pDesktop->GetClientRect(&ItemRect);  // heck, try the whole screen?
+	
+	// allocate global string
+	HGLOBAL hGlobal = GlobalAlloc(0, 20);
+	LPVOID lpVoid = GlobalLock(hGlobal);
+	strcpy((LPSTR)lpVoid, "tim rox");
+	GlobalUnlock(hGlobal);
+
+	// initialize OLE data source and begin drag and drop
+	COleDataSource *pSource = new COleDataSource;
+	pSource->CacheGlobalData(CF_TEXT, hGlobal);
+	DROPEFFECT dropEffect = pSource->DoDragDrop(DROPEFFECT_COPY, &ItemRect);
+
+What I find is that if I just click the button and let go (without
+moving the mouse) it performs a drag and drop operation.  If I move
+the mouse within the items rectangle, it still does a drag and drop
+operation.  In other words, it always does a drag and drop operation.
+This doesn't seem to be what the docs say.  Can someone tell me what I
+am doing wrong?  Should I move this into an OnMouseMove and track when
+to start a drag/drop operation myself?!
+
+2.  When it is in drag/drop mode, I don't get any OnMouseMove messages
+so I cannot determine what element of my list control the user is
+holding the mouse over.  After the drag and drop operation the select
+is the same as when it began.
+
+Also, does anyone know how to change the cursor/drag image used?  I
+really like how internet explorer does it but I am not sure how they
+do that.
+
+Any information greatly appreciated!
+
+Thanks!
+
+Tim.
+
+-------
+Tim Philip, B.Sc. (Hon)                   philip@cs.usask.ca
+Consultant, Graduate Student              <A HREF="http://www.cs.usask.ca/grads/philip">http://www.cs.usask.ca/grads/philip</A>
+
+"... magic has a habit of lying low, like a rake in the grass." - T. Pratchet
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Oksana Lien -- <A HREF="mailto:lien@ares.csd.net">lien@ares.csd.net</A>
+Friday, February 14, 1997
+</B>
+[Mini-digest: 2 responses]
+
+At 04:28 PM 2/12/97 -0600, you wrote:
+>
+>
+>Environment:  MSVC 4.0, NT 4.0
+>
+>
+>I am implementing drag and drop in an owner-draw CListCtrl subclass.  I
+>am initiating a drag and drop operating using a COleDataSource object,
+>and calling the DoDragDrop member from my OnLButtonDown member.
+
+Process the OnMouseMove message. When the left mouse button is pressed for
+the first time, the MK_LBUTTON flag will be set in nFlags. When it is -
+initiate your drag'n'drop. If it isn't set, call the base class method.
+Here's the code:
+
+void CYourListCtrl::OnMouseMove(UINT nFlags, CPoint point) 
+{
+	if (!(nFlags & MK_LBUTTON))
+	{
+		CListCtrl::OnMouseMove(nFlags, point);
+		return;
+	}	
+	
+        CRuntimeClass *pItemClass = RUNTIME_CLASS(CYourListItem);
+	int index;
+	if ((index = HitTest(point)) > -1)
+	{	
+		CYourListItem *pItem = (CYourListItem *)GetItemData(index);
+		if (pRtu->IsKindOf(pItemClass))
+		{
+			HGLOBAL hItem = GlobalAlloc(GMEM_FIXED | GMEM_SHARE, sizeof(CYourListItem));
+			CYourListItem *pOleItem = (CYourListItem*)GlobalLock(hItem);
+
+			if (pOleItem)
+			{
+			 	// Do what you need to do - copy the item, etc.
+
+				// Cash the data
+                                m_dataSource.CacheGlobalData(CF_TEXT, (void
+*)hItem);
+
+				// drag & drop
+				DROPEFFECT dropEffect = m_dataSource.DoDragDrop(
+					DROPEFFECT_COPY | DROPEFFECT_MOVE );
+
+				CListCtrl::OnMouseMove(nFlags, point);
+				PostMessage(WM_LBUTTONUP, nFlags, MAKELONG(point.x, point.y));
+			}
+		}
+	}
+}
+
+
+I think this should be all you need, assuming the rest of your code -
+OleDropTarget declaration, OnDragEnter, OnDragOver and OnDrop - is allright.
+
+>Also, does anyone know how to change the cursor/drag image used?  I
+>really like how internet explorer does it but I am not sure how they
+>do that.
+
+I haven't done that. But have you tryed changing it on in OnDragEnter,
+OnDragOver and OnDrop? Let me know if you get it working.
+
+_________________________
+Oksana Lien
+Dimension Softek, Inc.
+lien@ares.csd.net
+
+-----From: "Hill, Les" <les.hill@FMR.COM>
+
+Tim,
+
+>2.  When it is in drag/drop mode, I don't get any OnMouseMove messages
+>so I cannot determine what element of my list control the user is
+>holding the mouse over.  After the drag and drop operation the select
+>is the same as when it began.
+>
+>Also, does anyone know how to change the cursor/drag image used?  I
+>really like how internet explorer does it but I am not sure how they
+>do that.
+
+These are features of the COleDropTarget (wrapping IDropTarget).  Simply
+put, it is up to the target to handle these
+issues.  The mouse move messages are 'replaced' with calls to DragOver()
+and the cursor can be manipulated there.
+
+Les
+leh@cybercom.net
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+John and Cecilia -- <A HREF="mailto:jandce@iglobal.net">jandce@iglobal.net</A>
+Friday, February 14, 1997
+</B>
+[Mini-digest: 2 responses]
+
+In an app I wrote, I check the message LVN_BEGINDRAG [OnBeginDrag()] to
+start a drag and drop operation. I have not set up any bounding rectangles
+and it seems to work just fine.
+
+I also use a class derived from COleDropSource. In this class I override
+QueryContinueDrag() which is continuously called until the operation is
+complete and gives me a code on the last call that I can check to see if
+the user has performed a drop. It does not give you the cursor position of
+the drop however.
+
+If you need some source, let me know. But by comparing your code to mine,
+there is not much difference. Just try using LVN_BEGINDRAG instead. Good
+luck.
+
+John Boehme
+<A HREF="http://www.iglobal.net/pub/johnandce/">http://www.iglobal.net/pub/johnandce/</A>
+
+For a really cool Windows 95 ftp client, check out:
+<A HREF="http://www.iglobal.net/pub/johnandce/desktopftp.htm">http://www.iglobal.net/pub/johnandce/desktopftp.htm</A>
+
+----------
+> From: Tim Philip <philip@cs.usask.ca>
+> To: MFC Mailing List <mfc-l@netcom.com>
+> Subject: COleDataSource::DoDragDrop
+> Date: Wednesday, February 12, 1997 4:28 PM
+> 
+> 
+> 
+> Environment:  MSVC 4.0, NT 4.0
+> 
+> 
+> I am implementing drag and drop in an owner-draw CListCtrl subclass.  I
+> am initiating a drag and drop operating using a COleDataSource object,
+> and calling the DoDragDrop member from my OnLButtonDown member.
+> 
+> I have two problems.
+> 
+> 1.  The drag and drop operation does not seem to start the same way the
+> documentation suggests.  It says that if the user stays within a 
+> certain bounding rectangle, the drag and drop operation is not
+> initiated.  If there is no bounding rectangle, it waits for a short
+> period of time.  However, this does not seem to be the case.  I
+> have the following code in my OnLButtonDown function.  I have tried
+> several different values for the rectangle, none of them seem to make
+> any difference.
+> 
+> 	RECT ItemRect;
+> 	GetItemRect(lvHitTest.iItem, &ItemRect, LVIR_BOUNDS); // get items rect
+> 	ClientToScreen(&ItemRect);  // try screen coordinates
+> 	CWnd *pDesktop = GetDesktopWindow();
+> 	pDesktop->GetClientRect(&ItemRect);  // heck, try the whole screen?
+> 	
+> 	// allocate global string
+> 	HGLOBAL hGlobal = GlobalAlloc(0, 20);
+> 	LPVOID lpVoid = GlobalLock(hGlobal);
+> 	strcpy((LPSTR)lpVoid, "tim rox");
+> 	GlobalUnlock(hGlobal);
+> 
+> 	// initialize OLE data source and begin drag and drop
+> 	COleDataSource *pSource = new COleDataSource;
+> 	pSource->CacheGlobalData(CF_TEXT, hGlobal);
+> 	DROPEFFECT dropEffect = pSource->DoDragDrop(DROPEFFECT_COPY, &ItemRect);
+> 
+> What I find is that if I just click the button and let go (without
+> moving the mouse) it performs a drag and drop operation.  If I move
+> the mouse within the items rectangle, it still does a drag and drop
+> operation.  In other words, it always does a drag and drop operation.
+> This doesn't seem to be what the docs say.  Can someone tell me what I
+> am doing wrong?  Should I move this into an OnMouseMove and track when
+> to start a drag/drop operation myself?!
+> 
+> 2.  When it is in drag/drop mode, I don't get any OnMouseMove messages
+> so I cannot determine what element of my list control the user is
+> holding the mouse over.  After the drag and drop operation the select
+> is the same as when it began.
+> 
+> Also, does anyone know how to change the cursor/drag image used?  I
+> really like how internet explorer does it but I am not sure how they
+> do that.
+> 
+> Any information greatly appreciated!
+> 
+> Thanks!
+> 
+> Tim.
+> 
+> -------
+> Tim Philip, B.Sc. (Hon)                   philip@cs.usask.ca
+> Consultant, Graduate Student             
+<A HREF="http://www.cs.usask.ca/grads/philip">http://www.cs.usask.ca/grads/philip</A>
+> 
+> "... magic has a habit of lying low, like a rake in the grass." - T.
+Pratchet
+
+-----From: "=?ISO-8859-1?Q?Ignacio_Nicol=E1s_Rodr=EDguez?=" <irodriguez@envirolink.org>
+
+Hi!
+Windows 95 list controls send a LVN_BEGINDRAG message when the user is
+moving one of the items.
+With MFC's reflection, you can override the list's response to the user's
+request, right on the subclass.
+That should solve both your problems.
+
+Ignacio.
+I never said I didn't like Hockey.
+
+----------
+> From: Tim Philip <philip@cs.usask.ca>
+> To: MFC Mailing List <mfc-l@netcom.com>
+> Subject: COleDataSource::DoDragDrop
+> Date: Wednesday, February 12, 1997 7:28 PM
+> 
+> I have two problems.
+> 
+> 1.  The drag and drop operation does not seem to start the same way the
+> documentation suggests.  It says that if the user stays within a 
+> 
+> 2.  When it is in drag/drop mode, I don't get any OnMouseMove messages
+> so I cannot determine what element of my list control the user is
+> holding the mouse over.  After the drag and drop operation the select
+> is the same as when it began.
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+    <A HREF="http://www.digiday.com/mfcpro/joinmfcl.htm">Become an MFC-L member</A>
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

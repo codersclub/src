@@ -1,0 +1,240 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Can't create a CFrameWnd without a caption bar.
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Dmitry Zinchenko -- <A HREF="mailto:zidi@ipii.donetsk.ua">zidi@ipii.donetsk.ua</A>
+Sunday, April 14, 1996
+</B>
+Environment: Windows 95. [Version 4.00.950]
+             MSVC++ 2.2 with MFC
+
+I'm unsuccessfully trying to create a main application's window (derived
+from CFrameWnd) WITHOUT a caption bar.
+
+
+class CMathWnd : public CFrameWnd
+{
+public:
+
+  CMathWnd();
+
+  //{{AFX_MSG( CMathWnd )
+  //}}AFX_MSG
+
+  DECLARE_MESSAGE_MAP()
+};
+
+
+CMathWnd::CMathWnd()
+{
+  // do create a frame window
+  ASSERT( Create(NULL, NULL, WS_OVERLAPPED, CRect(30,30,300,300) );
+}
+
+
+The window is created fine but WITH a CAPTION BAR even though
+I specify dwStyle = WS_OVERLAPPED !!!
+
+I know about Frame Window Style attribute FWS_ADDTOTITLE, but as you
+see, I neither use it nor call CFrameWnd::LoadFrame() which uses
+the window style WS_OVERLAPPEDWINDOW|FWS_ADDTOTITLE by default.
+
+So what do I wrong or what have I to do to create a main window
+without a caption bar ?
+
+Any idea will be appreciated. Please make a carbon copy (CC:) when you
+will answer.
+
+Thanks.
+
+--
+When a man has no longer any conception of excellence above
+his own, his voyage is done, he is dead.
+
+                        Henry Ward Beecher (USA, 1813-1887)
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Tommy Hui -- <A HREF="mailto:thui@slip.net">thui@slip.net</A>
+Tuesday, April 16, 1996
+</B>
+[Mini-digest: 7 responses]
+
+Hi Dmitry,
+
+WS_OVERLAPPED implies a WS_CAPTION. Try creating the window with WS_POPUP
+style ORed with any additional styles such as WS_MINIMIZEBOX.
+
+Tommy
+
+-----From: "Grant Shirreffs (Great Elk)" <Grant.S@greatelk.co.nz>
+
+Try overriding PreCreateWindow(CREATESTRUCT& cs) and modifying the   
+cs.style member.  I've always found this a good place to remove the   
+FWS_ADDTOTITLE attribute, as any changes MFC makes to the window style   
+are made before this call.
+
+Grant Shirreffs
+grant.s@greatelk.co.nz
+
+-----From: "michael" <Michael@datatree.com>
+
+Try overriding PreCreateWindow instead of using Create.  Also, use
+WS_POPUPWINDOW instead of WS_OVERLAPPED.
+
+Sample code follows:
+----------------------------------------------------------------------------
+--------------------------
+// size app window to full screen without caption bar
+
+BOOL CMainFrame::PreCreateWindow(CREATESTRUCT& cs)
+{
+    cs.style = WS_POPUPWINDOW & ~WS_CAPTION;
+    cs.cx = GetSystemMetrics(SM_CXSCREEN);
+    cs.cy = GetSystemMetrics(SM_CYSCREEN);
+    return CFrameWnd::PreCreateWindow(cs); 
+}
+----------------------------------------------------------------------------
+--------------------------
+
+-----From: "John Elsbree" <elsbree@msn.com>
+
+Dmitry -
+
+I'm not sure how WS_CAPTION is getting added in (I don't have a copy of MSVC 
+2.2 handy, and I'm not sure what might have changed since then). But I can 
+suggest a way to get rid of it: override PreCreateWindow.
+
+BOOL CMath::PreCreateWindow(CREATESTRUCT& cs)
+{
+    if (!CFrameWnd::PreCreateWindow(cs))
+        return FALSE;
+
+    cs.style &= ~WS_CAPTION;
+    return TRUE;
+}
+
+Hope this helps...
+
+John (not speaking for Microsoft)
+
+-----From: "Mike Blaszczak" <mikeblas@msn.com>
+
+From: 	owner-mfc-l@netcom.com on behalf of Dmitry Zinchenko
+Sent: 	Sunday, April 14, 1996 05:49
+
+> Environment: Windows 95. [Version 4.00.950]
+>              MSVC++ 2.2 with MFC
+
+Thanks.
+
+> I'm unsuccessfully trying to create a main application's window (derived
+> from CFrameWnd) WITHOUT a caption bar.
+
+> CMathWnd::CMathWnd()
+> {
+>   // do create a frame window
+>  ASSERT( Create(NULL, NULL, WS_OVERLAPPED, CRect(30,30,300,300) );
+> }
+
+This code will break badly when compiled for release mode.  You should fix it 
+if you intend to build it for release mode.
+
+The default style for a CFrameWnd-derived class will have a caption.  You've
+done nothing to change that.  You need to override PreCreateWindow() in your 
+CFrameWnd-derived class and set the style bits the way you want them.
+
+> The window is created fine but WITH a CAPTION BAR even though
+> I specify dwStyle = WS_OVERLAPPED !!!
+
+If you trace in to the Create() call you're making, you'll see how MFC tweaks 
+the style bits.
+
+.B ekiM
+TCHAR szSpringtime[] = _T("Check twice and save a life: motorcycles are 
+everywehere!");
+
+-----From: B Apps <ensba@bath.ac.uk>
+
+The documentation is unclear what WS_OVERLAPPED actually means.  The MFC 
+help files say it usually has a title bar and border.  winuser.h defines 
+this as 0L I guess it's the default style and depends on whether the 
+window is a child, an owner window or a top level one.  
+
+Use 
+
+CMathWnd::CMathWnd()
+{
+    Create(NULL, NULL, WS_POPUPWINDOW | WS_THICKFRAME, 
+        CRect(30, 30, 300, 300));
+}
+
+or something similiar with WS_POPUP
+
+Bri
+-----From: "David W. Gillett" <DGILLETT@expertedge.com>
+
+  And the help file entry for WS_OVERLAPPED consists of one line:
+
+"Creates an overlapped window.  An overlapped window has a caption 
+and a border."  It seems to me that that's exactly what you're 
+seeing.
+
+
+  Hint:  If you want a top-level window without a caption, try 
+WS_POPUP instead of WS_OVERLAPPED.  [This is not an MFC issue.]
+
+  Bonus hint:  Don't put code you want executed inside ASSERT().  At 
+very least, change it to VERIFY(), or your release build will 
+mysteriously fail.
+
+Dave
+
+ 
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

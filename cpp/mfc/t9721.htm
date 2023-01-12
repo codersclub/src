@@ -1,0 +1,1674 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CFileDialog Problem Again...
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Mihir Dalal -- <A HREF="mailto:m_dalal@ECE.concordia.CA">m_dalal@ECE.concordia.CA</A>
+Monday, February 24, 1997
+</B>
+
+                     Environment: MSVC 1.52, Windows 95
+
+Hi,
+
+I have fully customized by CMyFileDialog to work in a restricted 
+directory on a restricted type of files (*.dbf), on a restricted drive. 
+
+I was using the GetFileName() member function to get the file name 
+selected by the user and further take appropriate action in one of my 
+CMyApp message handlers like this:
+
+
+ CMyFileDlg dlg;
+ if (dlg.DoModal() == IDOK)
+  {
+   strcpy(szFileName, dlg.GetFileName());
+   .....
+   .....
+  }
+
+ 
+Fine, but now due to some additional requirements of my application, I 
+need to get the file name in the CMyFileDlg class itself. 
+
+Accordingly, I tried to use the GetFileName() in my overridden 
+CFileDlg::OnOK(), like this:
+
+CMyFileDlg::OnOK()
+{
+  CString szFileName;
+  szFileName = GetFileName();
+  ....
+  ....
+  ....
+  EndDialog(TRUE);  
+}
+
+
+What I don't understand that GetFileName now always returns the file type 
+(i.e. "(*.dbf)") instead or returning me the actual file name as it 
+appears in the file edit box on the CMyFileDlg. 
+
+Is it inappropriate to call the GetFileName in the overridden OnOk() or 
+am I missing out on something ??
+
+Any way of getting around this ??
+
+Mihir. 
+
+ _________________________________________________________________________
+     Mihir Dalal <m_dalal@ECE.Concordia.CA>, M.Engg. (Electrical) Student
+              Department of Electrical and Computer Engineering
+                   Concordia University, Montreal, Canada
+                <A HREF="http://www.ECE.Concordia.CA/~m_dalal/addr.html">http://www.ECE.Concordia.CA/~m_dalal/addr.html</A>
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Jeremy H. Griffith -- <A HREF="mailto:jeremy@omsys.com">jeremy@omsys.com</A>
+Tuesday, February 25, 1997
+</B>
+[Mini-digest: 3 responses]
+
+On Mon, 24 Feb 1997 18:05:56 -0500 (EST), Mihir Dalal <m_dalal@ECE.concordia.CA>
+wrote:
+
+>CMyFileDlg::OnOK()
+>{
+>  CString szFileName;
+>  szFileName = GetFileName();
+>  ....
+
+>What I don't understand that GetFileName now always returns the file type 
+>(i.e. "(*.dbf)") instead of returning me the actual file name as it 
+>appears in the file edit box on the CMyFileDlg. 
+>
+>Is it inappropriate to call the GetFileName in the overridden OnOk() or 
+>am I missing out on something ??
+
+Here's the implementation in DLGFILE.CPP:
+
+CString CFileDialog::GetFileName() const
+{
+  ASSERT_VALID(this);
+  char szFile[_MAX_PATH];
+
+  if (m_ofn.nFileExtension == 0 ||
+            m_ofn.lpstrFile[m_ofn.nFileExtension] == '\0')
+    return m_ofn.lpstrFile + m_ofn.nFileOffset;
+  else
+  {
+    ASSERT(m_ofn.nFileExtension - m_ofn.nFileOffset < sizeof(szFile));
+    _AfxStrCpy(szFile, m_ofn.lpstrFile + m_ofn.nFileOffset,
+                    m_ofn.nFileExtension - m_ofn.nFileOffset);
+    return szFile;
+  }
+}
+
+As you see, the function returns the address of a string allocated
+on the *stack*, which will hopefully be used by the compiler to
+create a temporary CString as a return value.  From your report,
+it would seem that this process isn't working as intended.  I'd
+consider it too risky to use in a commercial product, myself.
+
+>Any way of getting around this ??
+
+Try accessing m_ofn directly; it *is* a public member, and is not part
+of the "implementation", so it is safe to use:
+
+class CFileDialog : public CDialog
+{
+  DECLARE_DYNAMIC(CFileDialog)
+
+public:
+// Attributes
+  // open file parameter block
+  OPENFILENAME m_ofn;
+...
+}
+
+and in DLGS.H, we have:
+
+typedef struct tagOFN
+{
+    DWORD   lStructSize;
+    HWND    hwndOwner;
+    HINSTANCE hInstance;
+    LPCSTR  lpstrFilter;
+    LPSTR   lpstrCustomFilter;
+    DWORD   nMaxCustFilter;
+    DWORD   nFilterIndex;
+    LPSTR   lpstrFile;
+    DWORD   nMaxFile;
+    LPSTR   lpstrFileTitle;
+    DWORD   nMaxFileTitle;
+    LPCSTR  lpstrInitialDir;
+    LPCSTR  lpstrTitle;
+    DWORD   Flags;
+    UINT    nFileOffset;
+    UINT    nFileExtension;
+    LPCSTR  lpstrDefExt;
+    LPARAM  lCustData;
+    UINT    (CALLBACK *lpfnHook)(HWND, UINT, WPARAM, LPARAM);
+    LPCSTR  lpTemplateName;
+}   OPENFILENAME;
+
+so you should be able to use:
+
+  CString szFileName;
+  szFileName = m_ofn.lpstrFile[m_ofn.nFileOffset];
+  if (m_ofn.nFileExtension > 0) {  // if you want to trim ext off
+	int len = m_ofn.nFileExtension - m_ofn.nFileOffset;
+	szFileName.GetBufferSetLength(len);
+	szFileName.ReleaseBuffer(len);
+  }
+
+HTH!
+
+--Jeremy
+-----From: "Hord,Mark" <MHORD@cerner.com>
+
+I don't know if this is too simplistic an answer but...
+
+You might try:
+
+UpdateData(TRUE);
+
+as the first line of code in your OnOK member function.  It appears to
+me as though it is not updating the member variable that GetFileName()
+is dependent upon from the filename edit box.  I'm no windows guru but
+that is something simple you can try and it was something I ran into a
+few times in other dialog box applications.
+
+Mark;
+CPP_Programmer::J_Mark_Hord() {	mhord@cerner.com;
+&Cerner_Corporation =         	<A HREF="http://www.cerner.com;">http://www.cerner.com;</A>
+2800_Rock_Creek_Pkwy;
+Kansas_City->MO_64117-2551 = 	(816)472-1024 x2384; }
+
+
+>-----Original Message-----
+>From:	Mihir Dalal [SMTP:m_dalal@ECE.concordia.CA]
+>Sent:	Monday, February 24, 1997 5:06 PM
+>To:	mfc-l@netcom.com
+>Subject:	CFileDialog Problem Again...
+>
+>
+>                     Environment: MSVC 1.52, Windows 95
+>
+>Hi,
+>
+>I have fully customized by CMyFileDialog to work in a restricted 
+>directory on a restricted type of files (*.dbf), on a restricted drive. 
+>
+>I was using the GetFileName() member function to get the file name 
+>selected by the user and further take appropriate action in one of my 
+>CMyApp message handlers like this:
+>
+>
+> CMyFileDlg dlg;
+> if (dlg.DoModal() == IDOK)
+>  {
+>   strcpy(szFileName, dlg.GetFileName());
+>   .....
+>   .....
+>  }
+>
+> 
+>Fine, but now due to some additional requirements of my application, I 
+>need to get the file name in the CMyFileDlg class itself. 
+>
+>Accordingly, I tried to use the GetFileName() in my overridden 
+>CFileDlg::OnOK(), like this:
+>
+>CMyFileDlg::OnOK()
+>{
+>  CString szFileName;
+>  szFileName = GetFileName();
+>  ....
+>  ....
+>  ....
+>  EndDialog(TRUE);  
+>}
+>
+>
+>What I don't understand that GetFileName now always returns the file type 
+>(i.e. "(*.dbf)") instead or returning me the actual file name as it 
+>appears in the file edit box on the CMyFileDlg. 
+>
+>Is it inappropriate to call the GetFileName in the overridden OnOk() or 
+>am I missing out on something ??
+>
+>Any way of getting around this ??
+>
+>Mihir. 
+>
+> _________________________________________________________________________
+>     Mihir Dalal <m_dalal@ECE.Concordia.CA>, M.Engg. (Electrical) Student
+>              Department of Electrical and Computer Engineering
+>                   Concordia University, Montreal, Canada
+>                <A HREF="http://www.ECE.Concordia.CA/~m_dalal/addr.html">http://www.ECE.Concordia.CA/~m_dalal/addr.html</A>
+>
+-----From: Ian Pepper <Ian@flexicom.ie>
+
+Hi,
+
+Try calling UpdateData(TRUE) in OnOK before calling GetFileName().  This
+should exchange the data between the control and any member variables.
+
+Ian
+
+-------------------------------------------------------------------------
+----------
+Ian Pepper,                 Tel:    +353-1-6766188
+Flexicom Ltd,               Fax:   +353-1-6766199
+32 Leeson St Lwr,       URL:  <A HREF="http://www.flexicom.ie">http://www.flexicom.ie</A>
+Dublin 2,                     email:  ian@flexicom.ie
+Ireland.
+                 ________________  ~ ~
+                ( _(#)____________}}}}
+
+-------------------------------------------------------------------------
+----------
+
+
+>----------
+>From: 	Mihir Dalal[SMTP:m_dalal@ECE.concordia.CA]
+>Sent: 	24 February 1997 11:05 PM
+>To: 	mfc-l@netcom.com
+>Subject: 	CFileDialog Problem Again...
+>
+>
+>                     Environment: MSVC 1.52, Windows 95
+>
+>Hi,
+>
+>I have fully customized by CMyFileDialog to work in a restricted 
+>directory on a restricted type of files (*.dbf), on a restricted drive.
+>
+>
+>I was using the GetFileName() member function to get the file name 
+>selected by the user and further take appropriate action in one of my 
+>CMyApp message handlers like this:
+>
+>
+> CMyFileDlg dlg;
+> if (dlg.DoModal() == IDOK)
+>  {
+>   strcpy(szFileName, dlg.GetFileName());
+>   .....
+>   .....
+>  }
+>
+> 
+>Fine, but now due to some additional requirements of my application, I 
+>need to get the file name in the CMyFileDlg class itself. 
+>
+>Accordingly, I tried to use the GetFileName() in my overridden 
+>CFileDlg::OnOK(), like this:
+>
+>CMyFileDlg::OnOK()
+>{
+>  CString szFileName;
+>  szFileName = GetFileName();
+>  ....
+>  ....
+>  ....
+>  EndDialog(TRUE);  
+>}
+>
+>
+>What I don't understand that GetFileName now always returns the file
+>type 
+>(i.e. "(*.dbf)") instead or returning me the actual file name as it 
+>appears in the file edit box on the CMyFileDlg. 
+>
+>Is it inappropriate to call the GetFileName in the overridden OnOk() or
+>
+>am I missing out on something ??
+>
+>Any way of getting around this ??
+>
+>Mihir. 
+>
+> _______________________________________________________________________
+>__
+>     Mihir Dalal <m_dalal@ECE.Concordia.CA>, M.Engg. (Electrical)
+>Student
+>              Department of Electrical and Computer Engineering
+>                   Concordia University, Montreal, Canada
+>                <A HREF="http://www.ECE.Concordia.CA/~m_dalal/addr.html">http://www.ECE.Concordia.CA/~m_dalal/addr.html</A>
+>
+>
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Tuesday, February 25, 1997
+</B>
+At 13:53 2/25/97 GMT, Jeremy H. Griffith wrote:
+>Here's the implementation in DLGFILE.CPP:
+
+>CString CFileDialog::GetFileName() const
+>{
+>  ASSERT_VALID(this);
+>  char szFile[_MAX_PATH];
+>
+>  if (m_ofn.nFileExtension == 0 ||
+>            m_ofn.lpstrFile[m_ofn.nFileExtension] == '\0')
+>    return m_ofn.lpstrFile + m_ofn.nFileOffset;
+>  else
+>  {
+>    ASSERT(m_ofn.nFileExtension - m_ofn.nFileOffset < sizeof(szFile));
+>    _AfxStrCpy(szFile, m_ofn.lpstrFile + m_ofn.nFileOffset,
+>                    m_ofn.nFileExtension - m_ofn.nFileOffset);
+>    return szFile;   //THIS ONE!
+>  }
+>}
+
+>As you see, the function returns the address of
+
+No, it doesn't.  The function returns a CString object. The
+return statement I've commented with "//THIS ONE!" is semantically
+equivalent to
+
+	return CString(szFile);
+
+and ends up returning a CString object by value, not by reference.
+No addresses of any objects or strings are directly involved in the
+return mechanism.
+
+>a string allocated on the *stack*,
+
+It only does that in certain circumstances.  There's an if()
+statement which tests for a particular condition. Other times,
+it ends up initializing the CString from member data.
+
+>which will hopefully be used by the compiler to
+>create a temporary CString as a return value.  
+
+"Hopefully"?  By the definition of the language and the
+implementation of CString, the content of szFile is used to
+initialize a temporary CString object.  The content of szFile
+is copied by CString, and held by that temporary CString object.
+The CString object is then returned, by value, to the caller.
+
+>From your report, it would seem that this process isn't working
+>as intended. 
+
+The process works just fine.  There's no doubt in my mind that the
+original poster has some problem other than the one you've made
+up here.
+
+The original poster seems to have created their own customized
+CFileDialog box and is writing an OnOK() handler for the box. 
+People who do this often don't realize that the common dialog code,
+which manages the OPENFILENAME structure where all of these file
+names and extensions come from, isn't initialized or managed by
+MFC.  Instead, the data comes from the common dialog--and since this
+person has overridden OnOK(), they're not allowing the Windows code
+that manages those structures to actually run.  They need to find
+a way to hook the OK button message _after_ Windows has processed
+it, or they need to find a way to call the OK button message
+handler in the common dialog code before they expect anything
+in m_ofn to be initialized.
+
+Conjecture about addresses that aren't involved in the return
+handling is just a red herring, and will do nothing but confuse
+the original questioner.
+
+>I'd consider it too risky to use in a commercial product, myself.
+
+That means about a third of MFC is off-limits to you, since about
+a third of MFC uses this mechanism, even if only indirectly. 
+This mechanism isn't at all risky--it's guaranteed by the language
+to work.
+
+Please get a good book on C++ and read up on what's _really_ going on.
+You could also read the assembler code associated with the lines of
+code that you quote. Either way, you'll quickly learn that the code
+isn't "risky".  If you try to do what the original questioner did,
+you'll actually find out that the code in question works just as
+designed, and the problem is that the data in m_ofn isn't
+initialized in the first place.
+
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+These words are my own. I do not speak on behalf of Microsoft.
+           This performance was not lip-synched.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mihir Dalal -- <A HREF="mailto:m_dalal@ECE.concordia.CA">m_dalal@ECE.concordia.CA</A>
+Wednesday, February 26, 1997
+</B>
+
+Hello,
+Jeremy H. Griffith" <jeremy@omsys.com>
+Bruce DeGraaf <bdegraaf@datx.com>
+Ehab Bassilli <ehab@total.net>
+"Dmitry A. Dulepov" <dima@src.samsung.ru>
+"Hord,Mark" <MHORD@cerner.com>
+Ian Pepper <Ian@flexicom.ie>
+Mike Blaszczak <mikeblas@nwlink.com>
+
+Thanks for all the responses, concerning this post. I tried with almost 
+every technique which you'll have suggested. Accordingly, I would like to 
+share my experiences. 
+
+1. The technique of calling UpdateData(TRUE) before attemting to use 
+   GetFileName() in the overriden OnOK() doesn't work. 
+
+2. Directly accessing the m_ofn members also doesn't work, since as Mike
+   has rightly pointed out, the m_ofn members are not updated until a call
+   to the base class OnOK() is made.
+
+3. Something very simple like this solved my problem partly:
+
+   CMyFileDlg::OnOK()
+   {
+     char szFileName[12];
+     GetDlgItemText(1152,szFileName,12); // 1152 is the resource ID for 
+     .....                               // the file list box as set up 
+     .....                               // by Microsoft. 
+     EndDialog(TRUE); 
+   }
+
+
+This is good, but that is only part of the problem. What I really want is 
+that all the GetTitleName, GetPathName, GetFileName to work before 
+killing the dialog. As per my understanding, from your posts, 
+I would reword my problem something like this:
+
+
+
+I understand the the base class OnOK() member function of the CFileDialog 
+does the following two things (relevant to this discussion):
+           
+         1. Updates the m_ofn data structure.
+         2. Calls the EndDialog() to kill the dialog. 
+
+What I would now be looking for is a technique that prevents the base 
+class OnOK() from killing the dialog, so that I can then code something 
+like this:
+
+CMyFileDialog::OnOK()
+{
+  CFileDialog::OnOK();  // Somehow should not kill the dialog
+  
+  CString szFileName;
+  szFileName = GetFileName();
+}   
+ 
+Hope that brings up some better solutions to this problem:
+
+Mihir. 
+ 
+Note to Mike: You are right in pointing out that as the original poster, 
+              I have not called the MFC code to update the m_ofn member
+              in my overriden OnOK(). 
+              The reason, most developers like me who write customized 
+              dialogs don't call the MFC coded OnOK() is that it, 
+              it forcefully kills the dialog box. Quite a few developers 
+              would agree to the fact that customized CFileDialog boxes 
+              often need to do processing of the dialog data before 
+              killing it. 
+              For that the GetTitleName, GetFileName, GetPathName 
+              functions are inevitable. 
+              What the MFC developers could have done, is somehow 
+              seperated the call to the code that updates the m_ofn 
+              members and the call to EndDialog(), instead of doing both 
+              in the implementation of OnOK().
+              I would see this as a major handicapp of the CFileDialog 
+              class.   
+
+
+
+On Tue, 25 Feb 1997, Mike Blaszczak wrote:
+
+> At 13:53 2/25/97 GMT, Jeremy H. Griffith wrote:
+> >Here's the implementation in DLGFILE.CPP:
+> 
+> >CString CFileDialog::GetFileName() const
+> >{
+> >  ASSERT_VALID(this);
+> >  char szFile[_MAX_PATH];
+> >
+> >  if (m_ofn.nFileExtension == 0 ||
+> >            m_ofn.lpstrFile[m_ofn.nFileExtension] == '\0')
+> >    return m_ofn.lpstrFile + m_ofn.nFileOffset;
+> >  else
+> >  {
+> >    ASSERT(m_ofn.nFileExtension - m_ofn.nFileOffset < sizeof(szFile));
+> >    _AfxStrCpy(szFile, m_ofn.lpstrFile + m_ofn.nFileOffset,
+> >                    m_ofn.nFileExtension - m_ofn.nFileOffset);
+> >    return szFile;   //THIS ONE!
+> >  }
+> >}
+> 
+> >As you see, the function returns the address of
+> 
+> No, it doesn't.  The function returns a CString object. The
+> return statement I've commented with "//THIS ONE!" is semantically
+> equivalent to
+> 
+> 	return CString(szFile);
+> 
+> and ends up returning a CString object by value, not by reference.
+> No addresses of any objects or strings are directly involved in the
+> return mechanism.
+> 
+> >a string allocated on the *stack*,
+> 
+> It only does that in certain circumstances.  There's an if()
+> statement which tests for a particular condition. Other times,
+> it ends up initializing the CString from member data.
+> 
+> >which will hopefully be used by the compiler to
+> >create a temporary CString as a return value.  
+> 
+> "Hopefully"?  By the definition of the language and the
+> implementation of CString, the content of szFile is used to
+> initialize a temporary CString object.  The content of szFile
+> is copied by CString, and held by that temporary CString object.
+> The CString object is then returned, by value, to the caller.
+> 
+> >From your report, it would seem that this process isn't working
+> >as intended. 
+> 
+> The process works just fine.  There's no doubt in my mind that the
+> original poster has some problem other than the one you've made
+> up here.
+> 
+> The original poster seems to have created their own customized
+> CFileDialog box and is writing an OnOK() handler for the box. 
+> People who do this often don't realize that the common dialog code,
+> which manages the OPENFILENAME structure where all of these file
+> names and extensions come from, isn't initialized or managed by
+> MFC.  Instead, the data comes from the common dialog--and since this
+> person has overridden OnOK(), they're not allowing the Windows code
+> that manages those structures to actually run.  They need to find
+> a way to hook the OK button message _after_ Windows has processed
+> it, or they need to find a way to call the OK button message
+> handler in the common dialog code before they expect anything
+> in m_ofn to be initialized.
+> 
+> Conjecture about addresses that aren't involved in the return
+> handling is just a red herring, and will do nothing but confuse
+> the original questioner.
+> 
+> >I'd consider it too risky to use in a commercial product, myself.
+> 
+> That means about a third of MFC is off-limits to you, since about
+> a third of MFC uses this mechanism, even if only indirectly. 
+> This mechanism isn't at all risky--it's guaranteed by the language
+> to work.
+> 
+> Please get a good book on C++ and read up on what's _really_ going on.
+> You could also read the assembler code associated with the lines of
+> code that you quote. Either way, you'll quickly learn that the code
+> isn't "risky".  If you try to do what the original questioner did,
+> you'll actually find out that the code in question works just as
+> designed, and the problem is that the data in m_ofn isn't
+> initialized in the first place.
+> 
+> 
+> .B ekiM
+> <A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+> These words are my own. I do not speak on behalf of Microsoft.
+>            This performance was not lip-synched.
+> 
+
+ _________________________________________________________________________
+     Mihir Dalal <m_dalal@ECE.Concordia.CA>, M.Engg. (Electrical) Student
+              Department of Electrical and Computer Engineering
+                   Concordia University, Montreal, Canada
+                <A HREF="http://www.ECE.Concordia.CA/~m_dalal/addr.html">http://www.ECE.Concordia.CA/~m_dalal/addr.html</A>
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mahipati -- <A HREF="mailto:Mahipati.Dixit@Cognos.COM">Mahipati.Dixit@Cognos.COM</A>
+Tuesday, February 25, 1997
+</B>
+[Mini-digest: 2 responses]
+
+CFileDialog::GetFileName() is supposed to return you the file name with
+ext.If you want only the file name without the extn you have to use
+CFileDialog::GetFileTitle(),which will return you the file name without
+extn.(see help on GetFileTitle for more details)
+
+Thanks..
+- Mahesh
+Software Consultant,
+Cognos Inc,
+Ottawa,Canada.
+
+>----------
+>From: 	Mihir Dalal[SMTP:m_dalal@ECE.concordia.CA]
+>Sent: 	Monday, February 24, 1997 6:05 PM
+>To: 	mfc-l@netcom.com
+>Subject: 	CFileDialog Problem Again...
+>
+>
+>                     Environment: MSVC 1.52, Windows 95
+>
+>Hi,
+>
+>I have fully customized by CMyFileDialog to work in a restricted 
+>directory on a restricted type of files (*.dbf), on a restricted drive. 
+>
+>I was using the GetFileName() member function to get the file name 
+>selected by the user and further take appropriate action in one of my 
+>CMyApp message handlers like this:
+>
+>
+> CMyFileDlg dlg;
+> if (dlg.DoModal() == IDOK)
+>  {
+>   strcpy(szFileName, dlg.GetFileName());
+>   .....
+>   .....
+>  }
+>
+> 
+>Fine, but now due to some additional requirements of my application, I 
+>need to get the file name in the CMyFileDlg class itself. 
+>
+>Accordingly, I tried to use the GetFileName() in my overridden 
+>CFileDlg::OnOK(), like this:
+>
+>CMyFileDlg::OnOK()
+>{
+>  CString szFileName;
+>  szFileName = GetFileName();
+>  ....
+>  ....
+>  ....
+>  EndDialog(TRUE);  
+>}
+>
+>
+>What I don't understand that GetFileName now always returns the file type 
+>(i.e. "(*.dbf)") instead or returning me the actual file name as it 
+>appears in the file edit box on the CMyFileDlg. 
+>
+>Is it inappropriate to call the GetFileName in the overridden OnOk() or 
+>am I missing out on something ??
+>
+>Any way of getting around this ??
+>
+>Mihir. 
+>
+> _________________________________________________________________________
+>     Mihir Dalal <m_dalal@ECE.Concordia.CA>, M.Engg. (Electrical) Student
+>              Department of Electrical and Computer Engineering
+>                   Concordia University, Montreal, Canada
+>                <A HREF="http://www.ECE.Concordia.CA/~m_dalal/addr.html">http://www.ECE.Concordia.CA/~m_dalal/addr.html</A>
+>
+>
+-----From: Ben Burnett <benner@supernet.ab.ca>
+
+Mihir Dalal wrote:
+> 
+>                      Environment: MSVC 1.52, Windows 95
+
+> What I don't understand that GetFileName now always returns the file type
+> (i.e. "(*.dbf)") instead or returning me the actual file name as it
+> appears in the file edit box on the CMyFileDlg.
+> 
+> Is it inappropriate to call the GetFileName in the overridden OnOk() or
+> am I missing out on something ??
+> 
+> Any way of getting around this ??
+
+try using GetFileTitle() it will return "filename.ext"
+
+hope that fixes your problem.
+Ben
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mihir Dalal -- <A HREF="mailto:m_dalal@ECE.concordia.CA">m_dalal@ECE.concordia.CA</A>
+Tuesday, March 04, 1997
+</B>
+[Mini-digest: 2 responses]
+
+
+On Fri, 28 Feb 1997, Shane Triem wrote:
+
+> 
+> Do you really want to prevent the dialog from being terminated or do you   
+> simply want to update the m_ofn member, do some processing and then allow   
+> the dialog to be terminated?  
+
+What I am really looking for is this. The user enters some data in the 
+CMyFileDialog edit controls and hits OK. As soon as the user hits OK, I 
+want to validate the path and file name which he has selected. If the 
+wrong file and path name are selected, I want to pop up an appropriate 
+message box and give the user another chance to enter the file name and 
+select the path. 
+
+> If you want the latter I would suggest   
+> calling the base class OnOK() (which you say updates the m_ofn member and   
+> calls EndDialog), do your data processing and return from OnOK.  I have   
+> not tried this but according to the CDialog::OnOK() documentation:
+> 
+> EndDialog does not close the dialog box immediately. Instead, it sets a   
+> flag that directs the dialog box to close as soon as the current message   
+> handler returns.
+
+I am not sure, to what extent, the documentation you have referred above 
+is correct. A very simple experiment done with the CMyFileDialog::OnOK() 
+proved the incorrectness of the above:
+
+void CMySaveAsDlg::OnOK()
+{
+
+  CFileDialog::OnOK();
+
+  CString szFileName;
+  GetDlgItemText(1152,szFileName.GetBuffer(12),12);
+  szFileName.ReleaseBuffer();
+  CString szPathName;
+  szPathName = GetPathName();  
+  CString rqPathName; 
+  rqPathName = szPathName.Left(10);
+  
+  if(rqPathName.CompareNoCase("c:\\Windows")==0) 
+   {  
+     m_bValidFlag = FALSE;
+     MessageBox("It is recommended that you store your alarms log \r\n   \
+             file in some other directory", "Warning", \
+                              MB_OK|MB_ICONEXCLAMATION);
+   } 
+  else
+   {
+     m_bValidFlag = TRUE;
+   } 
+} 
+
+The CMyFileDlg gets killed before the MessageBox pops up in case the user 
+selects the c:\Windows directory for saving his file. This proves that the 
+CFileDilag:OnOK() has instantly killed the dialog box. 
+
+> This implies that you should be able to safely manipulate data after the   
+> call to the base class and before returning from your overridden OnOK   
+> function.
+
+Yes, but the unforturnate thing about this is that by the time I return 
+from CMyFileDlg:OnOK(), the dialog box has been forcefully killed by 
+CFileDialog:OnOK().
+
+>  ----------
+> From:  Mihir Dalal
+> Sent:  Thursday, February 27, 1997 11:19 PM
+> To:  SHANE; 'MFC-L@SMTP <mfc-l@netcom.com>'
+> Subject:  Re: CFileDialog Problem Again...
+> 
+> 
+> Hello,
+> Jeremy H. Griffith" <jeremy@omsys.com>
+> Bruce DeGraaf <bdegraaf@datx.com>
+> Ehab Bassilli <ehab@total.net>
+> "Dmitry A. Dulepov" <dima@src.samsung.ru>
+> "Hord,Mark" <MHORD@cerner.com>
+> Ian Pepper <Ian@flexicom.ie>
+> Mike Blaszczak <mikeblas@nwlink.com>
+> 
+> Thanks for all the responses, concerning this post. I tried with almost
+> every technique which you'll have suggested. Accordingly, I would like to   
+> 
+> share my experiences.
+> 
+> 1. The technique of calling UpdateData(TRUE) before attemting to use
+>    GetFileName() in the overriden OnOK() doesn't work.
+> 
+> 2. Directly accessing the m_ofn members also doesn't work, since as Mike
+>    has rightly pointed out, the m_ofn members are not updated until a   
+> call
+>    to the base class OnOK() is made.
+> 
+> 3. Something very simple like this solved my problem partly:
+> 
+>    CMyFileDlg::OnOK()
+>    {
+>      char szFileName[12];
+>      GetDlgItemText(1152,szFileName,12); // 1152 is the resource ID for
+>      .....                               // the file list box as set up
+>      .....                               // by Microsoft.
+>      EndDialog(TRUE);
+>    }
+> 
+> 
+> This is good, but that is only part of the problem. What I really want is   
+> 
+> that all the GetTitleName, GetPathName, GetFileName to work before
+> killing the dialog. As per my understanding, from your posts,
+> I would reword my problem something like this:
+> 
+> 
+> 
+> I understand the the base class OnOK() member function of the CFileDialog   
+> 
+> does the following two things (relevant to this discussion):
+>              
+> 
+>          1. Updates the m_ofn data structure.
+>          2. Calls the EndDialog() to kill the dialog.
+> 
+> What I would now be looking for is a technique that prevents the base
+> class OnOK() from killing the dialog, so that I can then code something
+> like this:
+> 
+> CMyFileDialog::OnOK()
+> {
+>   CFileDialog::OnOK();  // Somehow should not kill the dialog
+>     
+> 
+>   CString szFileName;
+>   szFileName = GetFileName();
+> }
+>    
+> 
+> Hope that brings up some better solutions to this problem:
+> 
+> Mihir.
+>    
+> 
+> Note to Mike: You are right in pointing out that as the original poster,
+>               I have not called the MFC code to update the m_ofn member
+>               in my overriden OnOK().
+>               The reason, most developers like me who write customized
+>               dialogs don't call the MFC coded OnOK() is that it,
+>               it forcefully kills the dialog box. Quite a few developers
+>               would agree to the fact that customized CFileDialog boxes
+>               often need to do processing of the dialog data before
+>               killing it.
+>               For that the GetTitleName, GetFileName, GetPathName
+>               functions are inevitable.
+>               What the MFC developers could have done, is somehow
+>               seperated the call to the code that updates the m_ofn
+>               members and the call to EndDialog(), instead of doing both
+>               in the implementation of OnOK().
+>               I would see this as a major handicapp of the CFileDialog
+>               class.
+> 
+> 
+> 
+> On Tue, 25 Feb 1997, Mike Blaszczak wrote:
+> 
+> > At 13:53 2/25/97 GMT, Jeremy H. Griffith wrote:
+> > >Here's the implementation in DLGFILE.CPP:
+> >
+> > >CString CFileDialog::GetFileName() const
+> > >{
+> > >  ASSERT_VALID(this);
+> > >  char szFile[_MAX_PATH];
+> > >
+> > >  if (m_ofn.nFileExtension == 0 ||
+> > >            m_ofn.lpstrFile[m_ofn.nFileExtension] == '\0')
+> > >    return m_ofn.lpstrFile + m_ofn.nFileOffset;
+> > >  else
+> > >  {
+> > >    ASSERT(m_ofn.nFileExtension - m_ofn.nFileOffset < sizeof(szFile));
+> > >    _AfxStrCpy(szFile, m_ofn.lpstrFile + m_ofn.nFileOffset,
+> > >                    m_ofn.nFileExtension - m_ofn.nFileOffset);
+> > >    return szFile;   //THIS ONE!
+> > >  }
+> > >}
+> >
+> > >As you see, the function returns the address of
+> >
+> > No, it doesn't.  The function returns a CString object. The
+> > return statement I've commented with "//THIS ONE!" is semantically
+> > equivalent to
+> >
+> >  return CString(szFile);
+> >
+> > and ends up returning a CString object by value, not by reference.
+> > No addresses of any objects or strings are directly involved in the
+> > return mechanism.
+> >
+> > >a string allocated on the *stack*,
+> >
+> > It only does that in certain circumstances.  There's an if()
+> > statement which tests for a particular condition. Other times,
+> > it ends up initializing the CString from member data.
+> >
+> > >which will hopefully be used by the compiler to
+> > >create a temporary CString as a return value.
+> >
+> > "Hopefully"?  By the definition of the language and the
+> > implementation of CString, the content of szFile is used to
+> > initialize a temporary CString object.  The content of szFile
+> > is copied by CString, and held by that temporary CString object.
+> > The CString object is then returned, by value, to the caller.
+> >
+> > >From your report, it would seem that this process isn't working
+> > >as intended.
+> >
+> > The process works just fine.  There's no doubt in my mind that the
+> > original poster has some problem other than the one you've made
+> > up here.
+> >
+> > The original poster seems to have created their own customized
+> > CFileDialog box and is writing an OnOK() handler for the box.
+> > People who do this often don't realize that the common dialog code,
+> > which manages the OPENFILENAME structure where all of these file
+> > names and extensions come from, isn't initialized or managed by
+> > MFC.  Instead, the data comes from the common dialog--and since this
+> > person has overridden OnOK(), they're not allowing the Windows code
+> > that manages those structures to actually run.  They need to find
+> > a way to hook the OK button message _after_ Windows has processed
+> > it, or they need to find a way to call the OK button message
+> > handler in the common dialog code before they expect anything
+> > in m_ofn to be initialized.
+> >
+> > Conjecture about addresses that aren't involved in the return
+> > handling is just a red herring, and will do nothing but confuse
+> > the original questioner.
+> >
+> > >I'd consider it too risky to use in a commercial product, myself.
+> >
+> > That means about a third of MFC is off-limits to you, since about
+> > a third of MFC uses this mechanism, even if only indirectly.
+> > This mechanism isn't at all risky--it's guaranteed by the language
+> > to work.
+> >
+> > Please get a good book on C++ and read up on what's _really_ going on.
+> > You could also read the assembler code associated with the lines of
+> > code that you quote. Either way, you'll quickly learn that the code
+> > isn't "risky".  If you try to do what the original questioner did,
+> > you'll actually find out that the code in question works just as
+> > designed, and the problem is that the data in m_ofn isn't
+> > initialized in the first place.
+> >
+> >
+> > .B ekiM
+> > <A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+> > These words are my own. I do not speak on behalf of Microsoft.
+> >            This performance was not lip-synched.
+> >
+> 
+>  _________________________________________________________________________  
+> 
+>      Mihir Dalal <m_dalal@ECE.Concordia.CA>, M.Engg. (Electrical) Student
+>               Department of Electrical and Computer Engineering
+>                    Concordia University, Montreal, Canada
+>                 <A HREF="http://www.ECE.Concordia.CA/~m_dalal/addr.html">http://www.ECE.Concordia.CA/~m_dalal/addr.html</A>
+> 
+> 
+> 
+> 
+
+ _________________________________________________________________________
+     Mihir Dalal <m_dalal@ECE.Concordia.CA>, M.Engg. (Electrical) Student
+              Department of Electrical and Computer Engineering
+                   Concordia University, Montreal, Canada
+                <A HREF="http://www.ECE.Concordia.CA/~m_dalal/addr.html">http://www.ECE.Concordia.CA/~m_dalal/addr.html</A>
+
+-----From: Mihir Dalal <m_dalal@ECE.concordia.CA>
+
+
+No, trapping WM_CLOSE or WM_DESTROY also doesn't work. It is too late by 
+the time I reach these message handlers. the CFileDialog::OnOK() has 
+already killled the dialog by the time I reach there. 
+
+I tried to SendMessage(WM_INITDIALOG,0,0) in WM_DESTROY handler to bring 
+the dialog back to its original state but it is just too late, and my 
+program performed an illegal operation. 
+  
+Can someone suggest some other way of bringing the dialog back to its 
+original state just before quitting the box, say in the OnDestroy handler ??
+
+Mihir. 
+
+On Fri, 28 Feb 1997, Regis NICOLAS wrote:
+
+> >What I would now be looking for is a technique that prevents the base 
+> >class OnOK() from killing the dialog, so that I can then code something 
+> >like this:
+> >
+> >CMyFileDialog::OnOK()
+> >{
+> >  CFileDialog::OnOK();  // Somehow should not kill the dialog
+> >  
+> >  CString szFileName;
+> >  szFileName = GetFileName();
+> >}   
+> > 
+> May be you could call OnOK but override OnClose or OnDestroy to avoid the
+> window to be destroyed. May be something like this:
+> m_bCanClose is a member of CMyFileDialog initialized to TRUE in the ctor
+> 
+> CMyFileDialog::OnOK()
+> {
+>   m_bCanClose = FALSE;  
+>   CFileDialog::OnOK();  // Somehow should not kill the dialog
+>   m_bCanClose = TRUE;
+> 
+>   CString szFileName;
+>   szFileName = GetFileName();
+>   EndDialog(0);
+> }   
+> 
+> CMyFileDialog::OnDestroy()
+> {
+>   if (m_bCanClose)
+>     CDialog::OnDestroy();
+> }
+> 
+> If it does not work with OnDestroy may be with OnClose ???
+> 
+> Hope this helps...
+> 
+> ------------------------------
+> Regis NICOLAS -    R&D Windows
+> Smartcode Technologie
+> 
+> <A HREF="mailto:nicolas@smartcode.fr">mailto:nicolas@smartcode.fr</A>
+> <A HREF="http://www.smartcode.fr/">http://www.smartcode.fr/</A>
+> <A HREF="http://www.smartcodesoft.com/">http://www.smartcodesoft.com/</A>
+> Tel.: (33) (0)4 67 59 30 16
+> 
+
+ _________________________________________________________________________
+     Mihir Dalal <m_dalal@ECE.Concordia.CA>, M.Engg. (Electrical) Student
+              Department of Electrical and Computer Engineering
+                   Concordia University, Montreal, Canada
+                <A HREF="http://www.ECE.Concordia.CA/~m_dalal/addr.html">http://www.ECE.Concordia.CA/~m_dalal/addr.html</A>
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mario Contestabile -- <A HREF="mailto:Mario_Contestabile.UOS__MTL@UOSMTL2.universal.com">Mario_Contestabile.UOS__MTL@UOSMTL2.universal.com</A>
+Wednesday, March 05, 1997
+</B>
+[Mini-digest: 4 responses]
+
+[Snip->Start()]
+void CMySaveAsDlg::OnOK()
+{
+CFileDialog::OnOK();  // don't use here
+
+[snip]
+  
+  if(rqPathName.CompareNoCase("c:\\Windows")==0) 
+   {  
+     m_bValidFlag = FALSE;
+     MessageBox("It is recommended that you store your alarms log \r\n   \
+             file in some other directory", "Warning", \
+                              MB_OK|MB_ICONEXCLAMATION);
+   } 
+  else
+   {
+     m_bValidFlag = TRUE; // call CFileDialog::OnOK(); here
+   } 
+} 
+
+The CMyFileDlg gets killed before the MessageBox pops up in case the user 
+selects the c:\Windows directory for saving his file. This proves that the 
+CFileDilag:OnOK() has instantly killed the dialog box. 
+
+[Snip->End()]
+
+As a general rule, I tend to avoid things like a messagebox in cases such as 
+during a menu
+selection since the message boxs' loop will be competing with that of the menu 
+(in USER).
+But in the above case, coding the changes shown in comments should prevent the 
+dialog
+from ending should your condition prove true.
+
+mcontest@universal.com
+
+
+-----From: "lee@rocsinc.com" <lee@rocsinc.com>
+
+There is a virtual function CFileDialog::OnFileNameOK () that might help =
+you.  Online help describes it as follows :
+
+virtual BOOL OnFileNameOK( );
+ =20
+Return Value
+1 if the filename is not a valid filename; otherwise 0.
+Remarks
+Override this function only if you want to provide custom validation of =
+filenames that are entered into a common file dialog box. This function =
+allows you to reject a filename for any application-specific reason. =
+Normally, you do not need to use this function because the framework =
+provides default validation of filenames and displays a message box if =
+an invalid filename is entered.=20
+If 1 is returned, the dialog box will remain displayed for the user to =
+enter another filename. The dialog procedure dismisses the dialog if the =
+return is 0. Other nonzero return values are currently reserved and =
+should not be used.
+
+Lee
+=20
+
+
+----------
+From: 	Mihir Dalal
+Sent: 	Monday, March 03, 1997 10:38 PM
+To: 	mfc-l@netcom.com
+Subject: 	RE: CFileDialog Problem Again...
+
+
+
+[Mini-digest: 2 responses]
+
+
+On Fri, 28 Feb 1997, Shane Triem wrote:
+
+>=20
+> Do you really want to prevent the dialog from being terminated or do =
+you  =20
+> simply want to update the m_ofn member, do some processing and then =
+allow  =20
+> the dialog to be terminated? =20
+
+What I am really looking for is this. The user enters some data in the=20
+CMyFileDialog edit controls and hits OK. As soon as the user hits OK, I=20
+want to validate the path and file name which he has selected. If the=20
+wrong file and path name are selected, I want to pop up an appropriate=20
+message box and give the user another chance to enter the file name and=20
+select the path.=20
+
+> If you want the latter I would suggest  =20
+> calling the base class OnOK() (which you say updates the m_ofn member =
+and  =20
+> calls EndDialog), do your data processing and return from OnOK.  I =
+have  =20
+> not tried this but according to the CDialog::OnOK() documentation:
+>=20
+> EndDialog does not close the dialog box immediately. Instead, it sets =
+a  =20
+> flag that directs the dialog box to close as soon as the current =
+message  =20
+> handler returns.
+
+I am not sure, to what extent, the documentation you have referred above =
+
+is correct. A very simple experiment done with the CMyFileDialog::OnOK() =
+
+proved the incorrectness of the above:
+
+void CMySaveAsDlg::OnOK()
+{
+
+  CFileDialog::OnOK();
+
+  CString szFileName;
+  GetDlgItemText(1152,szFileName.GetBuffer(12),12);
+  szFileName.ReleaseBuffer();
+  CString szPathName;
+  szPathName =3D GetPathName(); =20
+  CString rqPathName;=20
+  rqPathName =3D szPathName.Left(10);
+ =20
+  if(rqPathName.CompareNoCase("c:\\Windows")=3D=3D0)=20
+   { =20
+     m_bValidFlag =3D FALSE;
+     MessageBox("It is recommended that you store your alarms log \r\n   =
+\
+             file in some other directory", "Warning", \
+                              MB_OK|MB_ICONEXCLAMATION);
+   }=20
+  else
+   {
+     m_bValidFlag =3D TRUE;
+   }=20
+}=20
+
+The CMyFileDlg gets killed before the MessageBox pops up in case the =
+user=20
+selects the c:\Windows directory for saving his file. This proves that =
+the=20
+CFileDilag:OnOK() has instantly killed the dialog box.=20
+
+> This implies that you should be able to safely manipulate data after =
+the  =20
+> call to the base class and before returning from your overridden OnOK  =
+=20
+> function.
+
+Yes, but the unforturnate thing about this is that by the time I return=20
+from CMyFileDlg:OnOK(), the dialog box has been forcefully killed by=20
+CFileDialog:OnOK().
+
+>  ----------
+> From:  Mihir Dalal
+> Sent:  Thursday, February 27, 1997 11:19 PM
+> To:  SHANE; 'MFC-L@SMTP <mfc-l@netcom.com>'
+> Subject:  Re: CFileDialog Problem Again...
+>=20
+>=20
+> Hello,
+> Jeremy H. Griffith" <jeremy@omsys.com>
+> Bruce DeGraaf <bdegraaf@datx.com>
+> Ehab Bassilli <ehab@total.net>
+> "Dmitry A. Dulepov" <dima@src.samsung.ru>
+> "Hord,Mark" <MHORD@cerner.com>
+> Ian Pepper <Ian@flexicom.ie>
+> Mike Blaszczak <mikeblas@nwlink.com>
+>=20
+> Thanks for all the responses, concerning this post. I tried with =
+almost
+> every technique which you'll have suggested. Accordingly, I would like =
+to  =20
+>=20
+> share my experiences.
+>=20
+> 1. The technique of calling UpdateData(TRUE) before attemting to use
+>    GetFileName() in the overriden OnOK() doesn't work.
+>=20
+> 2. Directly accessing the m_ofn members also doesn't work, since as =
+Mike
+>    has rightly pointed out, the m_ofn members are not updated until a  =
+=20
+> call
+>    to the base class OnOK() is made.
+>=20
+> 3. Something very simple like this solved my problem partly:
+>=20
+>    CMyFileDlg::OnOK()
+>    {
+>      char szFileName[12];
+>      GetDlgItemText(1152,szFileName,12); // 1152 is the resource ID =
+for
+>      .....                               // the file list box as set =
+up
+>      .....                               // by Microsoft.
+>      EndDialog(TRUE);
+>    }
+>=20
+>=20
+> This is good, but that is only part of the problem. What I really want =
+is  =20
+>=20
+> that all the GetTitleName, GetPathName, GetFileName to work before
+> killing the dialog. As per my understanding, from your posts,
+> I would reword my problem something like this:
+>=20
+>=20
+>=20
+> I understand the the base class OnOK() member function of the =
+CFileDialog  =20
+>=20
+> does the following two things (relevant to this discussion):
+>             =20
+>=20
+>          1. Updates the m_ofn data structure.
+>          2. Calls the EndDialog() to kill the dialog.
+>=20
+> What I would now be looking for is a technique that prevents the base
+> class OnOK() from killing the dialog, so that I can then code =
+something
+> like this:
+>=20
+> CMyFileDialog::OnOK()
+> {
+>   CFileDialog::OnOK();  // Somehow should not kill the dialog
+>    =20
+>=20
+>   CString szFileName;
+>   szFileName =3D GetFileName();
+> }
+>   =20
+>=20
+> Hope that brings up some better solutions to this problem:
+>=20
+> Mihir.
+>   =20
+>=20
+> Note to Mike: You are right in pointing out that as the original =
+poster,
+>               I have not called the MFC code to update the m_ofn =
+member
+>               in my overriden OnOK().
+>               The reason, most developers like me who write customized
+>               dialogs don't call the MFC coded OnOK() is that it,
+>               it forcefully kills the dialog box. Quite a few =
+developers
+>               would agree to the fact that customized CFileDialog =
+boxes
+>               often need to do processing of the dialog data before
+>               killing it.
+>               For that the GetTitleName, GetFileName, GetPathName
+>               functions are inevitable.
+>               What the MFC developers could have done, is somehow
+>               seperated the call to the code that updates the m_ofn
+>               members and the call to EndDialog(), instead of doing =
+both
+>               in the implementation of OnOK().
+>               I would see this as a major handicapp of the CFileDialog
+>               class.
+>=20
+>=20
+>=20
+> On Tue, 25 Feb 1997, Mike Blaszczak wrote:
+>=20
+> > At 13:53 2/25/97 GMT, Jeremy H. Griffith wrote:
+> > >Here's the implementation in DLGFILE.CPP:
+> >
+> > >CString CFileDialog::GetFileName() const
+> > >{
+> > >  ASSERT_VALID(this);
+> > >  char szFile[_MAX_PATH];
+> > >
+> > >  if (m_ofn.nFileExtension =3D=3D 0 ||
+> > >            m_ofn.lpstrFile[m_ofn.nFileExtension] =3D=3D '\0')
+> > >    return m_ofn.lpstrFile + m_ofn.nFileOffset;
+> > >  else
+> > >  {
+> > >    ASSERT(m_ofn.nFileExtension - m_ofn.nFileOffset < =
+sizeof(szFile));
+> > >    _AfxStrCpy(szFile, m_ofn.lpstrFile + m_ofn.nFileOffset,
+> > >                    m_ofn.nFileExtension - m_ofn.nFileOffset);
+> > >    return szFile;   //THIS ONE!
+> > >  }
+> > >}
+> >
+> > >As you see, the function returns the address of
+> >
+> > No, it doesn't.  The function returns a CString object. The
+> > return statement I've commented with "//THIS ONE!" is semantically
+> > equivalent to
+> >
+> >  return CString(szFile);
+> >
+> > and ends up returning a CString object by value, not by reference.
+> > No addresses of any objects or strings are directly involved in the
+> > return mechanism.
+> >
+> > >a string allocated on the *stack*,
+> >
+> > It only does that in certain circumstances.  There's an if()
+> > statement which tests for a particular condition. Other times,
+> > it ends up initializing the CString from member data.
+> >
+> > >which will hopefully be used by the compiler to
+> > >create a temporary CString as a return value.
+> >
+> > "Hopefully"?  By the definition of the language and the
+> > implementation of CString, the content of szFile is used to
+> > initialize a temporary CString object.  The content of szFile
+> > is copied by CString, and held by that temporary CString object.
+> > The CString object is then returned, by value, to the caller.
+> >
+> > >From your report, it would seem that this process isn't working
+> > >as intended.
+> >
+> > The process works just fine.  There's no doubt in my mind that the
+> > original poster has some problem other than the one you've made
+> > up here.
+> >
+> > The original poster seems to have created their own customized
+> > CFileDialog box and is writing an OnOK() handler for the box.
+> > People who do this often don't realize that the common dialog code,
+> > which manages the OPENFILENAME structure where all of these file
+> > names and extensions come from, isn't initialized or managed by
+> > MFC.  Instead, the data comes from the common dialog--and since this
+> > person has overridden OnOK(), they're not allowing the Windows code
+> > that manages those structures to actually run.  They need to find
+> > a way to hook the OK button message _after_ Windows has processed
+> > it, or they need to find a way to call the OK button message
+> > handler in the common dialog code before they expect anything
+> > in m_ofn to be initialized.
+> >
+> > Conjecture about addresses that aren't involved in the return
+> > handling is just a red herring, and will do nothing but confuse
+> > the original questioner.
+> >
+> > >I'd consider it too risky to use in a commercial product, myself.
+> >
+> > That means about a third of MFC is off-limits to you, since about
+> > a third of MFC uses this mechanism, even if only indirectly.
+> > This mechanism isn't at all risky--it's guaranteed by the language
+> > to work.
+> >
+> > Please get a good book on C++ and read up on what's _really_ going =
+on.
+> > You could also read the assembler code associated with the lines of
+> > code that you quote. Either way, you'll quickly learn that the code
+> > isn't "risky".  If you try to do what the original questioner did,
+> > you'll actually find out that the code in question works just as
+> > designed, and the problem is that the data in m_ofn isn't
+> > initialized in the first place.
+> >
+> >
+> > .B ekiM
+> > <A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+> > These words are my own. I do not speak on behalf of Microsoft.
+> >            This performance was not lip-synched.
+> >
+>=20
+>  =
+_________________________________________________________________________=
+ =20
+>=20
+>      Mihir Dalal <m_dalal@ECE.Concordia.CA>, M.Engg. (Electrical) =
+Student
+>               Department of Electrical and Computer Engineering
+>                    Concordia University, Montreal, Canada
+>                 <A HREF="http://www.ECE.Concordia.CA/~m_dalal/addr.html">http://www.ECE.Concordia.CA/~m_dalal/addr.html</A>
+>=20
+>=20
+>=20
+>=20
+
+ =
+_________________________________________________________________________=
+
+     Mihir Dalal <m_dalal@ECE.Concordia.CA>, M.Engg. (Electrical) =
+Student
+              Department of Electrical and Computer Engineering
+                   Concordia University, Montreal, Canada
+                <A HREF="http://www.ECE.Concordia.CA/~m_dalal/addr.html">http://www.ECE.Concordia.CA/~m_dalal/addr.html</A>
+
+-----From: Mihir Dalal <m_dalal@ECE.concordia.CA>
+
+
+No, trapping WM_CLOSE or WM_DESTROY also doesn't work. It is too late by =
+
+the time I reach these message handlers. the CFileDialog::OnOK() has=20
+already killled the dialog by the time I reach there.=20
+
+I tried to SendMessage(WM_INITDIALOG,0,0) in WM_DESTROY handler to bring =
+
+the dialog back to its original state but it is just too late, and my=20
+program performed an illegal operation.=20
+ =20
+Can someone suggest some other way of bringing the dialog back to its=20
+original state just before quitting the box, say in the OnDestroy =
+handler ??
+
+Mihir.=20
+
+On Fri, 28 Feb 1997, Regis NICOLAS wrote:
+
+> >What I would now be looking for is a technique that prevents the base =
+
+> >class OnOK() from killing the dialog, so that I can then code =
+something=20
+> >like this:
+> >
+> >CMyFileDialog::OnOK()
+> >{
+> >  CFileDialog::OnOK();  // Somehow should not kill the dialog
+> > =20
+> >  CString szFileName;
+> >  szFileName =3D GetFileName();
+> >}  =20
+> >=20
+> May be you could call OnOK but override OnClose or OnDestroy to avoid =
+the
+> window to be destroyed. May be something like this:
+> m_bCanClose is a member of CMyFileDialog initialized to TRUE in the =
+ctor
+>=20
+> CMyFileDialog::OnOK()
+> {
+>   m_bCanClose =3D FALSE; =20
+>   CFileDialog::OnOK();  // Somehow should not kill the dialog
+>   m_bCanClose =3D TRUE;
+>=20
+>   CString szFileName;
+>   szFileName =3D GetFileName();
+>   EndDialog(0);
+> }  =20
+>=20
+> CMyFileDialog::OnDestroy()
+> {
+>   if (m_bCanClose)
+>     CDialog::OnDestroy();
+> }
+>=20
+> If it does not work with OnDestroy may be with OnClose ???
+>=20
+> Hope this helps...
+>=20
+> ------------------------------
+> Regis NICOLAS -    R&D Windows
+> Smartcode Technologie
+>=20
+> <A HREF="mailto:nicolas@smartcode.fr">mailto:nicolas@smartcode.fr</A>
+> <A HREF="http://www.smartcode.fr/">http://www.smartcode.fr/</A>
+> <A HREF="http://www.smartcodesoft.com/">http://www.smartcodesoft.com/</A>
+> Tel.: (33) (0)4 67 59 30 16
+>=20
+
+ =
+_________________________________________________________________________=
+
+     Mihir Dalal <m_dalal@ECE.Concordia.CA>, M.Engg. (Electrical) =
+Student
+              Department of Electrical and Computer Engineering
+                   Concordia University, Montreal, Canada
+                <A HREF="http://www.ECE.Concordia.CA/~m_dalal/addr.html">http://www.ECE.Concordia.CA/~m_dalal/addr.html</A>
+
+
+
+
+
+-----From: Joe Willcoxson <joew@statsoft.com>
+
+At 01:38 AM 3/4/97 -0500, you wrote:
+>What I am really looking for is this. The user enters some data in the 
+>CMyFileDialog edit controls and hits OK. As soon as the user hits OK, I 
+>want to validate the path and file name which he has selected. If the 
+>wrong file and path name are selected, I want to pop up an appropriate 
+>message box and give the user another chance to enter the file name and 
+>select the path. 
+
+Doesn't setting OFN_FILEMUSTEXIST accomplish this?
+--
+Gloria in excelsius Deo
+Joe Willcoxson (joew@statsoft.com), Senior Software Engineer
+Work: <A HREF="http://www.statsoft.com,">http://www.statsoft.com,</A> Home: http://users.aol.com/chinajoe
+#define STD_DISCLAIMER "I speak only for myself"
+
+
+-----From: Syed <sxs296@psu.edu>
+
+>> Do you really want to prevent the dialog from being terminated or do you   
+>> simply want to update the m_ofn member, do some processing and then allow   
+>> the dialog to be terminated?  
+>
+>What I am really looking for is this. The user enters some data in the 
+>CMyFileDialog edit controls and hits OK. As soon as the user hits OK, I 
+>want to validate the path and file name which he has selected. If the 
+>wrong file and path name are selected, I want to pop up an appropriate 
+>message box and give the user another chance to enter the file name and 
+>select the path. 
+
+I did not watch the previous threads but try this one out:-
+
+void CMySaveAsDlg::OnOK()
+{
+        if (!UpdateData(TRUE))
+        {
+                TRACE0("UpdateData failed during dialog termination.\n");
+                // the UpdateData routine will set focus to correct item
+                return;
+        }
+        // do your data validation here...
+        // if data is valid then call CFileDialog::OnOK()
+        // if not simply return..
+}
+
+My suggestion is based on my examination on MFC's CFileDialog::OnOK. I
+didn't step through the code but merely find all ocurrences of OnOK. I found
+that CFileDialog::OnOK() does not exist - the call simply goes down to
+CCommonDialog::OnOK(). I copy and paste the whole code in CCommonDialog::OnOK()
+and paste it to CMySaveAsDLg::OnOK except for the last line which is Default
+(DefaultProcessing). I think (I don't realy know) Default is the one that
+closes your common dialog. So, by stripping off that particular line,
+hopefully you can overcome your problem.
+
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+    <A HREF="http://www.digiday.com/mfcpro/joinmfcl.htm">Become an MFC-L member</A>
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

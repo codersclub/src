@@ -1,0 +1,161 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CWebBrowser control in CView doesn't paint correctly
+</B></FONT>
+<BR>
+<PRE>
+<B>
+jtc -- <A HREF="mailto:jtc@why.net">jtc@why.net</A>
+Thursday, February 06, 1997
+</B>
+
+Environment: VC++ 4.2b, Win 95
+
+I have a CView that has a Microsoft CWebBrowser control as its 
+sole content.  When a document is loaded everything looks fine, 
+but when I resize the view, the scroll bars (and most controls 
+in the HTML if any) aren't painted.
+
+Just about the only message that I have mapped is OnSize, to 
+have the CWebBrowser control resize with the view. When the 
+user finishes resizing, the content of the HTML is there, but 
+the scroll bars are not painted.  The areas are just grey (my 
+window background color).  The OnDraw method is empty since I 
+don't have anything I need to paint.  Forcing another repaint 
+by dragging another window over it fixes the unpainted area.  
+Is there some message I need to be responding to to handle 
+these nonclient areas painting?
+
+int CWebbrowsView::OnCreate(LPCREATESTRUCT lpCreateStruct) 
+{
+    BOOL    bResult;
+
+    if (CView::OnCreate(lpCreateStruct) == -1)
+        return -1;
+
+    bResult = m_browser.Create (NULL, WS_VISIBLE, 
+        CRect (0, 0, 0, 0), this, IDC_HTML);
+
+    if (bResult)
+        return 0;
+    else
+        return -1;
+}
+
+void CWebbrowsView::OnSize(UINT nType, int cx, int cy) 
+{
+    CView::OnSize (nType, cx, cy);
+    if ((nType != SIZE_MAXIMIZED) && (nType != SIZE_MINIMIZED))
+    {
+        if (GetDlgItem (IDC_HTML))
+        {
+            CRect    rect;
+
+            GetWindowRect (&rect);
+            m_browser.SetWidth (rect.right - rect.left);
+            m_browser.SetHeight (rect.bottom - rect.top);
+//          m_browser.Invalidate ();
+//          Invalidate ();
+        }
+    }
+}
+
+void CWebbrowsView::OnDraw(CDC* pDC)
+{
+}
+
+As shown above, even though they should already be invalid, I 
+have tried invalidating the browser and view with no effect.  I 
+have also tried using a SetWindowPos call instead of the browsers 
+SetWidth and SetHeight.  The result was the same.
+
+When watching the window drag (wth full window drag) I can see 
+the scrollbars flashing, but they are never there after the final 
+paint.
+
+This seems like it would be so simple.  Anyone have any ideas?
+
+Jason
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dave Lorde -- <A HREF="mailto:dlorde@cix.compulink.co.uk">dlorde@cix.compulink.co.uk</A>
+Saturday, February 08, 1997
+</B>
+In-Reply-To: <19970206153719625.AAA70@jason.anet-dfw.com>
+
+I've had a play around with this control, and the redrawing tends to be pretty messy. 
+
+I found the best results using this way of sizing (below), and disabling background erase. There 
+are other ways of doing it, but currently I prefer this:
+
+void CWebView::OnSize(UINT nType, int cx, int cy) 
+{
+    // Disable redraw until all messy sizing is finished
+    SetRedraw(FALSE);
+    CMDIChildWnd::OnSize(nType, cx, cy);
+    if (m_WebBrowser.m_hWnd)
+    {
+        m_WebBrowser.SetWindowPos(&wndTop, 0, 0, cx, cy, SWP_SHOWWINDOW);
+    }
+    // Force immediate redraw of view and child control
+    SetRedraw(TRUE);
+    RedrawWindow(0, 0, RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN |RDW_NOERASE);
+}
+
+BOOL CWebView::OnEraseBkgnd(CDC* pDC) 
+{
+    // The control does the background
+    return TRUE;
+}
+
+Your mileage may vary ;-)
+
+Dave
+
+Dave
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+    <A HREF="http://www.digiday.com/mfcpro/joinmfcl.htm">Become an MFC-L member</A>
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

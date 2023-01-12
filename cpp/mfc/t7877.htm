@@ -1,0 +1,417 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+mult. inheritance ambiguity on MFC generated delete
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Todd Davis -- <A HREF="mailto:tigger@idir.net">tigger@idir.net</A>
+Thursday, November 21, 1996
+</B>
+Environment: VC++ 4.1, Win 95
+
+I'm trying to create a class which can be "mixed in" with a control to
+support special resizing functions within a CFormView.  Here is an example
+of how the class is used:
+
+        CWnd
+       /    \
+CListCtrl   CResizableCtrl
+       \    /
+     CMyListCtrl
+
+I have a CFormView derived class, CTestForm, with a couple of subclassed
+list conrols and a couple of subclassed buttons that add in this new
+CResizableCtrl class.
+
+class CTestForm : public CFormView
+{
+...
+  private:
+    CMyListCtrl m_cList1,
+                m_cList2;
+    CMyButton   m_cButton1,
+                m_cButton2;
+}
+
+My problem lies with the MFC supplied constructor for CTestForm.
+
+IMPLEMENT_DYNCREATE(CTestForm, CFormView)
+
+CTestForm::CTestForm()
+   : CFormView(CTestForm::IDD)
+{
+        //{{AFX_DATA_INIT(CTestForm)
+        //}}AFX_DATA_INIT
+}  <-
+
+I get an error for both CMyListCtrl and CMyButton at the line pointed to by
+the "<-" stating that CMyListCtrl::delete (or CMyButton::delete) is
+ambiguous between the CObject ultimate base class for CListCtrl and the
+CObject ultimate base class for CResizableCtrl.  Where is this call to
+delete coming from?  These controls aren't dynamically created, so why call
+delete for them?  C++ isn't supposed to complain about ambiguity unless the
+function being CALLED is ambiguous.
+
+I could make put my CResizableCtrl functions in the control specific derived
+classes and take out the mulitple inheritance, but this seemed like such a
+slick solution.  Any ideas?  Am I crazy for trying to use multiple
+inheritance in the first place with MFC library classes?
+
+"Thank You"s to be sent upon a solution,
+Todd Davis
+Software Engineer
+Gateway 2000
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Eugenio Miro -- <A HREF="mailto:emiro@datamarkets.com.ar">emiro@datamarkets.com.ar</A>
+Saturday, November 23, 1996
+</B>
+[Mini-digest: 5 responses]
+
+Hi
+I think you are not CALLING delete, you are DECLARING two deletes in =
+your base classes, if you declare two virtual delete functions, compiler =
+don't know who to call when automatically destroys your object, that is =
+derived from those classes. you must declare your delete function to =
+break de discussion. For more info this problem is expained in Bjarne =
+Stroustroup's book The C++ Programming Language.=20
+I hope this helps.
+
+----------
+From: 	Todd Davis
+Sent: 	Thursday, November 21, 1996 1:11 PM
+To: 	mfc-l@netcom.com
+Subject: 	mult. inheritance ambiguity on MFC generated delete
+
+Environment: VC++ 4.1, Win 95
+
+I'm trying to create a class which can be "mixed in" with a control to
+support special resizing functions within a CFormView.  Here is an =
+example
+of how the class is used:
+
+        CWnd
+       /    \
+CListCtrl   CResizableCtrl
+       \    /
+     CMyListCtrl
+
+I have a CFormView derived class, CTestForm, with a couple of subclassed
+list conrols and a couple of subclassed buttons that add in this new
+CResizableCtrl class.
+
+class CTestForm : public CFormView
+{
+..
+  private:
+    CMyListCtrl m_cList1,
+                m_cList2;
+    CMyButton   m_cButton1,
+                m_cButton2;
+}
+
+My problem lies with the MFC supplied constructor for CTestForm.
+
+IMPLEMENT_DYNCREATE(CTestForm, CFormView)
+
+CTestForm::CTestForm()
+   : CFormView(CTestForm::IDD)
+{
+        //{{AFX_DATA_INIT(CTestForm)
+        //}}AFX_DATA_INIT
+}  <-
+
+I get an error for both CMyListCtrl and CMyButton at the line pointed to =
+by
+the "<-" stating that CMyListCtrl::delete (or CMyButton::delete) is
+ambiguous between the CObject ultimate base class for CListCtrl and the
+CObject ultimate base class for CResizableCtrl.  Where is this call to
+delete coming from?  These controls aren't dynamically created, so why =
+call
+delete for them?  C++ isn't supposed to complain about ambiguity unless =
+the
+function being CALLED is ambiguous.
+
+I could make put my CResizableCtrl functions in the control specific =
+derived
+classes and take out the mulitple inheritance, but this seemed like such =
+a
+slick solution.  Any ideas?  Am I crazy for trying to use multiple
+inheritance in the first place with MFC library classes?
+
+"Thank You"s to be sent upon a solution,
+Todd Davis
+Software Engineer
+Gateway 2000
+
+
+-----From: Richard Braley <braley@sky.net>
+
+Refer to Technical Note 16: Using C++ Multiple Inheritance(MI) with the =
+Microsoft Foundation Classes in the MFC 3.1 Technical Notes found on the =
+MSDN CD. The information should still be applicable for the current MFC =
+Class Library. Your graphic shows you are deriving your "mixin" class =
+from CWnd which is ultimately derived from CObject. Therefore, the info =
+in this tech note should apply to you! Or, you can try and not derive =
+your mixin class from CWnd? Since I do not know exactly what you are =
+doing in this class you will have to make this determination.
+
+-----From: "Michael S. Scherotter" <michael@charette.com>
+
+You cannot have a diamond shaped inheritance in C++
+
+
+-- 
+_________________________________________________________________
+Michael S. Scherotter                 |            (415) 824-9647
+Software Developer                    |      125 Fair Oaks Street
+The Charette Project                  |   San Francisco, CA 94110
+Architectural Design Tools            |__________________________
+www.charette.com                       mscherotter@mailmasher.com
+_____________________                              mss@tartus.com
+Michael@charette.com |                  71035.1675@compuserve.com
+               "Work as if you may live forever, 
+              live as if you might die tomorrow."
+-----From: Mike Kurtinitis <moosh@halcyon.com>
+
+>From what you've described it sounds like your mix-in class is derived from
+CObject. Since CListCtrl is also derived from CObject there *is* an
+ambiguity with certain member functions (namely new, delete and Dump).
+CObject is not a virtual base class, nor can it be made one, but there are
+ways to resolve the ambiguities (see TN16).
+
+Good luck,
+
+Mike Kurtinitis
+Mooshwerks
+moosh@halcyon.com
+
+-----From: cugr1@gd.swissptt.ch (Cunningham Graham, IT347)
+
+If you take a look at the technical note TN016 It describes the steps   =
+that you need to take to implement c++ multiple inheritence with mfc, in   =
+particular with multple CObject derived base classes.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Sunday, November 24, 1996
+</B>
+At 09:46 11/23/96 -0000, you wrote:
+
+-----From: "Michael S. Scherotter" <michael@charette.com>
+>You cannot have a diamond shaped inheritance in C++
+
+Yes, you can.  Your asseriton is wrong.
+
+Please see (for starters) section 6.5.1 of "The C++ Programming
+Language" (2ed) by Bjarne Stroustrup.  There, Stroustrup says:
+
+"With the ability of specifying more than one base class comes
+the possibility of having a class as a base class twice. For
+example, had _task_ and _displayed_ each been derived from a link
+class, a satellite [which multiply inherits from _task_ and
+_displayed_] would have two _link_s. [...] This causes no problems."
+
+Of course, Stroustrup is as idealistic as ever in saying that "This
+causes no problems", because it confuses everyone and results in
+some ugly and pesky ambiguity problems. But he means only that this
+construct causes no problems with the definition of the language.
+
+There's nothing in the language specification which says you can't
+do this.  There's nothing in the C++ UnStandard Working Papers that
+say you can't, either.
+
+Section 6.5.3 goes on to discuss how virtual base classes work,
+and that demonstrates a way to have a _truly_ diamond-shaped 
+inheritance tree.
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+I'm afraid I've become some sort of speed freak.
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Gareth Jones -- <A HREF="mailto:gaj@i2.co.uk">gaj@i2.co.uk</A>
+Monday, November 25, 1996
+</B>
+[Mini-digest: 4 responses]
+
+On 21 November 1996 16:11, Todd Davis[SMTP:tigger@idir.net] wrote:
+>> Environment: VC++ 4.1, Win 95
+>>
+>> I'm trying to create a class which can be "mixed in" with a control to
+>> support special resizing functions within a CFormView.  Here is an 
+example
+>> of how the class is used:
+>>
+>>         CWnd
+>>        /    \
+>> CListCtrl   CResizableCtrl
+>>        \    /
+>>      CMyListCtrl
+>>
+>> I could make put my CResizableCtrl functions in the control specific 
+derived
+>> classes and take out the mulitple inheritance, but this seemed like such 
+a
+>> slick solution.  Any ideas?  Am I crazy for trying to use multiple
+>> inheritance in the first place with MFC library classes?
+This isn't an answer to your specific question, rather a pointer on using 
+MI with MFC.
+
+I have used MI reasonably extensively and successfully with MFC, but (and I 
+can't stress this too much) ONLY for MIXIN classes.
+
+This is OK as that's what you want to do.  The deal is that your mixin 
+shouldn't derive from CWnd, CObject or any other MFC class
+(that's a bit f a broad generalization, but stick with me)
+
+If you have non-derived, dataless mixins , or mixins only derived from 
+other mixin classes, and you put them second in the
+inheritance order (i.e. : public CWnd, public CMixinClass) then you should 
+have very few problems.
+
+This is a very neat solution to adding enterprise-wide standard 
+functionality to MFC control classes or dialog classes.
+The only slight bugbear is that C++ being what it is you can't specify what 
+this class can be mixed into and thus can't cast across
+the hierarchy (i.e. from CResizable Control to CListCtrl or even CWnd).
+
+To get around this, you need to provide a pure virtual 'AccessThisAsCWnd' 
+or similar method on your mixin, which all derived classes must implement, 
+returning their this pointer.  You obviously must comment your mixin well 
+that it is only designed to be mixed into a
+CWnd-based class otherwise all hell will break loose.
+
+You can now access the CWnd side of your composite object from the Mixin.
+
+For going the other way around, you will need to do something along the 
+lines of intercepting various OnXXXMesaage in your derived classes and 
+forwarding them to the mixin first.  This is much less elegant than the 
+first part, but I think worth the hassle if
+you just want dialogs with a corporate standard behaviour or standard 
+control's with extra methods on all.
+
+Hope this helps,
+
+Gareth
+
+
+-----From: Stuart Downing <sdowning@fame.com>
+
+Not true.  This is accomplished with virtual base classes.
+class V;
+class A : virtual public V;
+class B : virtual public V;
+class C : public A, public B;
+
+class C's inheritance tree looks like
+      V
+     / \
+    A   B
+     \ /
+      C
+
+Now, whether you want to attempt this using virtual MFC bases, is another
+question.  This is left as an exercise for the reader. :)
+-----
+Stuart Downing
+sdowning@fame.com
+FAME Information Services, Inc.
+----------
+
+-----From: Ash Williams <ash@digitalworkshop.co.uk>
+
+Todd,
+
+You're not crazy for using multiple inheritance. However there are a 
+couple of points you need to bear in mind:
+    
+1- DO NOT multiply derive from CWnd via two classes as you are here    
+since the windows messaging will fail.
+
+2- The mfc runtime information won't work 100%. In fact it will only 
+return information regarding the left-most derived class, eg CListCtrl 
+in your diagram.
+
+The ambiguity comes from the fact that you have inherited a member 
+function called delete via two classes (Look at the header for CObject 
+to confirm this), and as such the compiler is entitled to complain just 
+as it would for any other ambiguous function, hence you must provide an 
+override.
+
+For a fuller explanation with examples see technical note 16.
+
+Good luck, Ash
+
+-----From: "Bradley V. Pohl" <brad.pohl@pobox.com>
+
+      >-----From: "Michael S. Scherotter" <michael@charette.com>
+>You cannot have a diamond shaped inheritance in C++
+
+What?!?  That is flat out wrong!  The language does not in any way forbid this, and even
+provides virtual inheritence to remove extra instances of multiply-inherited common base classes.
+
+Check out section 6.5 of Bjarne Stroustroup's _The_C++_Programming_Language_, 2nd ed, to
+improve your knowledge of C++.
+
+--Brad
+
+Brad Pohl
+brad.pohl@pobox.com
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,537 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Owner draw CListCtrl row height
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Rob Warner -- <A HREF="mailto:rhwarner@southeast.net">rhwarner@southeast.net</A>
+Monday, January 20, 1997
+</B>
+Environment: VC++ 4.2b, Win95, Win NT 4.0
+
+I have a CListCtrl-derived class (always in Report view) in which I need to
+display two different fonts, which are user-configurable at run time.  So,
+I make it owner draw, override DrawItem(), and do my drawing.  When the
+user changes one or the other font, I calculate which font is taller, so I
+know how tall my row height needs to be to properly display the row. 
+Unfortunately, I can't figure out how to set the row height.
+
+I tried the obvious and created the appropriate font (with the proper
+scope), and used SetFont().  This works like a champ in a non-owner draw
+CListCtrl.  In my owner draw, however, it sets the height of the Header
+Cntrl, but doesn't change the height of the rect I'm passed in DrawItem().
+
+Any ideas, before I give up and rewrite it as a CListBox with a CHeaderCtrl
+and have to handle all the column resizing myself?
+<<<<<>>>>>
+Rob Warner
+rhwarner@southeast.net
+<A HREF="http://users.southeast.net/~rhwarner">http://users.southeast.net/~rhwarner</A>
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Lubimov Alexey -- <A HREF="mailto:Lubimov@softlab.r-style.ru">Lubimov@softlab.r-style.ru</A>
+Wednesday, January 22, 1997
+</B>
+[Mini-digest: 2 responses]
+
+One of the ways to dynamically change listview's item height, provided
+that the listview has LVS_OWNERDRAWFIXED style, is as follows:
+
+You have to provoke system to send WM_MEASUREITEM to the control.
+Normally, this message is sent only when the control is created. To
+force system to re-send this message, you have to change the window's
+size (this is probably undocumented method, but it works, 'cause I use
+it for the same reason):
+
+---cut here---
+
+     CRect rect;
+     GetWindowRect( &rect );
+     if ( GetParent() )
+        {
+         // Adjust coordinates to client area
+
+         GetParent()->ScreenToClient( &rect.TopLeft() );
+         GetParent()->ScreenToClient( &rect.BottomRight() );
+        
+         // Change window size - this will provoke WM_MEASUREITEM
+
+         SetWindowPos( NULL, 
+                       rect.left, rect.top, rect.Width()+1,
+rect.Height(),
+                       SWP_NOACTIVATE|SWP_NOMOVE|SWP_NOOWNERZORDER|
+                       SWP_NOREDRAW|SWP_NOZORDER );
+
+         // Restore window size - this will provoke WM_MEASUREITEM too
+
+         SetWindowPos( NULL, 
+                       rect.left, rect.top, rect.Width(), rect.Height(),
+                       SWP_NOACTIVATE|SWP_NOMOVE|SWP_NOOWNERZORDER|
+                       SWP_NOREDRAW|SWP_NOZORDER );
+        }
+
+---cut here---
+
+The only drawback of this method is that WM_MEASUREITEM message is sent
+_twice_; otherwise it's quite acceptable (to my taste).
+
+Hope this helps,
+Alex
+
+
+>-----Original Message-----
+>From:	Rob Warner [SMTP:rhwarner@southeast.net]
+>Sent:	Monday, January 20, 1997 7:19 PM
+>To:	MFC List
+>Subject:	Owner draw CListCtrl row height
+>
+>Environment: VC++ 4.2b, Win95, Win NT 4.0
+>
+>I have a CListCtrl-derived class (always in Report view) in which I need to
+>display two different fonts, which are user-configurable at run time.  So,
+>I make it owner draw, override DrawItem(), and do my drawing.  When the
+>user changes one or the other font, I calculate which font is taller, so I
+>know how tall my row height needs to be to properly display the row. 
+>Unfortunately, I can't figure out how to set the row height.
+>
+>I tried the obvious and created the appropriate font (with the proper
+>scope), and used SetFont().  This works like a champ in a non-owner draw
+>CListCtrl.  In my owner draw, however, it sets the height of the Header
+>Cntrl, but doesn't change the height of the rect I'm passed in DrawItem().
+>
+>Any ideas, before I give up and rewrite it as a CListBox with a CHeaderCtrl
+>and have to handle all the column resizing myself?
+><<<<<>>>>>
+>Rob Warner
+>rhwarner@southeast.net
+><A HREF="http://users.southeast.net/~rhwarner">http://users.southeast.net/~rhwarner</A>
+>
+-----From: Amir Shoval <amirs@ncc.co.il>
+
+Try overriding MeasureItem.
+
+--------------------------------------------------
+Amir Shoval          N.C.C. ISRAEL
+                amirs@ncc.co.il
+--------------------------------------------------
+
+>----------
+>From: 	Rob Warner[SMTP:rhwarner@southeast.net]
+>Sent: 	=E9=E5=ED =F9=F0=E9 20 =E9=F0=E5=E0=F8 1997 18:19
+>To: 	MFC List
+>Subject: 	Owner draw CListCtrl row height
+>
+>Environment: VC++ 4.2b, Win95, Win NT 4.0
+>
+>I have a CListCtrl-derived class (always in Report view) in which I =
+need to
+>display two different fonts, which are user-configurable at run time.  =
+So,
+>I make it owner draw, override DrawItem(), and do my drawing.  When the
+>user changes one or the other font, I calculate which font is taller, =
+so I
+>know how tall my row height needs to be to properly display the row.=20
+>Unfortunately, I can't figure out how to set the row height.
+>
+>I tried the obvious and created the appropriate font (with the proper
+>scope), and used SetFont().  This works like a champ in a non-owner =
+draw
+>CListCtrl.  In my owner draw, however, it sets the height of the Header
+>Cntrl, but doesn't change the height of the rect I'm passed in =
+DrawItem().
+>
+>Any ideas, before I give up and rewrite it as a CListBox with a =
+CHeaderCtrl
+>and have to handle all the column resizing myself?
+><<<<<>>>>>
+>Rob Warner
+>rhwarner@southeast.net
+><A HREF="http://users.southeast.net/~rhwarner">http://users.southeast.net/~rhwarner</A>
+>
+>
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Rob Warner -- <A HREF="mailto:rhwarner@southeast.net">rhwarner@southeast.net</A>
+Thursday, January 23, 1997
+</B>
+[Mini-digest: 2 responses]
+
+I had tried the MeasureItem() route, but unless I'm sadly mistaken,
+WM_MEASUREITEM is never sent for a CListCtrl.  Perhaps the suggestions
+listed below were based on CListBox?  I tried using ClassWizard to add a
+handler for WM_MEASUREITEM, then set a breakpoint in OnMeasureItem(), and
+never hit it.  I also tried overriding MeasureItem(), set a breakpoint, and
+never hit that.  In both functions I tried setting the
+LPMEASUREITEMSTRUCT->itemHeight to various values, but no discernible
+effect occurred.
+BTW, I also tried resizing the list control, as suggested below, to force
+the WM_MEASUREITEM, but no dice.
+I'm still open for suggestions.
+<<<<<>>>>>
+Rob Warner
+rhwarner@southeast.net
+<A HREF="http://users.southeast.net/~rhwarner">http://users.southeast.net/~rhwarner</A>
+
+
+----------
+> From: Lubimov Alexey <Lubimov@softlab.r-style.ru>
+> To: 'mfc-l@netcom.com'
+> Subject: RE: Owner draw CListCtrl row height
+> Date: Wednesday, January 22, 1997 9:06 AM
+> 
+> [Mini-digest: 2 responses]
+> 
+> One of the ways to dynamically change listview's item height, provided
+> that the listview has LVS_OWNERDRAWFIXED style, is as follows:
+> 
+> You have to provoke system to send WM_MEASUREITEM to the control.
+> Normally, this message is sent only when the control is created. To
+> force system to re-send this message, you have to change the window's
+> size (this is probably undocumented method, but it works, 'cause I use
+> it for the same reason):
+> 
+> ---cut here---
+> 
+>      CRect rect;
+>      GetWindowRect( &rect );
+>      if ( GetParent() )
+>         {
+>          // Adjust coordinates to client area
+> 
+>          GetParent()->ScreenToClient( &rect.TopLeft() );
+>          GetParent()->ScreenToClient( &rect.BottomRight() );
+>         
+>          // Change window size - this will provoke WM_MEASUREITEM
+> 
+>          SetWindowPos( NULL, 
+>                        rect.left, rect.top, rect.Width()+1,
+> rect.Height(),
+>                        SWP_NOACTIVATE|SWP_NOMOVE|SWP_NOOWNERZORDER|
+>                        SWP_NOREDRAW|SWP_NOZORDER );
+> 
+>          // Restore window size - this will provoke WM_MEASUREITEM too
+> 
+>          SetWindowPos( NULL, 
+>                        rect.left, rect.top, rect.Width(), rect.Height(),
+>                        SWP_NOACTIVATE|SWP_NOMOVE|SWP_NOOWNERZORDER|
+>                        SWP_NOREDRAW|SWP_NOZORDER );
+>         }
+> 
+> ---cut here---
+> 
+> The only drawback of this method is that WM_MEASUREITEM message is sent
+> _twice_; otherwise it's quite acceptable (to my taste).
+> 
+> Hope this helps,
+> Alex
+> 
+> 
+> >-----Original Message-----
+> >From:	Rob Warner [SMTP:rhwarner@southeast.net]
+> >Sent:	Monday, January 20, 1997 7:19 PM
+> >To:	MFC List
+> >Subject:	Owner draw CListCtrl row height
+> >
+> >Environment: VC++ 4.2b, Win95, Win NT 4.0
+> >
+> >I have a CListCtrl-derived class (always in Report view) in which I need
+to
+> >display two different fonts, which are user-configurable at run time. 
+So,
+> >I make it owner draw, override DrawItem(), and do my drawing.  When the
+> >user changes one or the other font, I calculate which font is taller, so
+I
+> >know how tall my row height needs to be to properly display the row. 
+> >Unfortunately, I can't figure out how to set the row height.
+> >
+> >I tried the obvious and created the appropriate font (with the proper
+> >scope), and used SetFont().  This works like a champ in a non-owner draw
+> >CListCtrl.  In my owner draw, however, it sets the height of the Header
+> >Cntrl, but doesn't change the height of the rect I'm passed in
+DrawItem().
+> >
+> >Any ideas, before I give up and rewrite it as a CListBox with a
+CHeaderCtrl
+> >and have to handle all the column resizing myself?
+> ><<<<<>>>>>
+> >Rob Warner
+> >rhwarner@southeast.net
+> ><A HREF="http://users.southeast.net/~rhwarner">http://users.southeast.net/~rhwarner</A>
+> >
+> -----From: Amir Shoval <amirs@ncc.co.il>
+> 
+> Try overriding MeasureItem.
+> 
+> --------------------------------------------------
+> Amir Shoval          N.C.C. ISRAEL
+>                 amirs@ncc.co.il
+> --------------------------------------------------
+> 
+> >----------
+> >From: 	Rob Warner[SMTP:rhwarner@southeast.net]
+> >Sent: 	=E9=E5=ED =F9=F0=E9 20 =E9=F0=E5=E0=F8 1997 18:19
+> >To: 	MFC List
+> >Subject: 	Owner draw CListCtrl row height
+> >
+> >Environment: VC++ 4.2b, Win95, Win NT 4.0
+> >
+> >I have a CListCtrl-derived class (always in Report view) in which I =
+> need to
+> >display two different fonts, which are user-configurable at run time.  =
+> So,
+> >I make it owner draw, override DrawItem(), and do my drawing.  When the
+> >user changes one or the other font, I calculate which font is taller, =
+> so I
+> >know how tall my row height needs to be to properly display the row.=20
+> >Unfortunately, I can't figure out how to set the row height.
+> >
+> >I tried the obvious and created the appropriate font (with the proper
+> >scope), and used SetFont().  This works like a champ in a non-owner =
+> draw
+> >CListCtrl.  In my owner draw, however, it sets the height of the Header
+> >Cntrl, but doesn't change the height of the rect I'm passed in =
+> DrawItem().
+> >
+> >Any ideas, before I give up and rewrite it as a CListBox with a =
+> CHeaderCtrl
+> >and have to handle all the column resizing myself?
+> ><<<<<>>>>>
+> >Rob Warner
+> >rhwarner@southeast.net
+> ><A HREF="http://users.southeast.net/~rhwarner">http://users.southeast.net/~rhwarner</A>
+> >
+> >
+-----From: "Rob Warner" <rhwarner@southeast.net>
+
+I stand corrected.  I looked at the MFC code a little closer, and realized
+that CListCtrl::OnChildNotify() doesn't call MeasureItem for a
+WM_MEASUREITEM as CListBox does.  Why is that?  Anyway, I added a handler
+for WM_MEASUREITEM in my dialog class and called CMyListCtrl::MeasureItem()
+myself and everything works.  Thanks for the help!
+<<<<<>>>>>
+Rob Warner
+rhwarner@southeast.net
+<A HREF="http://users.southeast.net/~rhwarner">http://users.southeast.net/~rhwarner</A>
+
+
+----------
+> From: Lubimov Alexey <Lubimov@softlab.r-style.ru>
+> To: 'mfc-l@netcom.com'
+> Subject: RE: Owner draw CListCtrl row height
+> Date: Wednesday, January 22, 1997 9:06 AM
+> 
+> [Mini-digest: 2 responses]
+> 
+> One of the ways to dynamically change listview's item height, provided
+> that the listview has LVS_OWNERDRAWFIXED style, is as follows:
+> 
+> You have to provoke system to send WM_MEASUREITEM to the control.
+> Normally, this message is sent only when the control is created. To
+> force system to re-send this message, you have to change the window's
+> size (this is probably undocumented method, but it works, 'cause I use
+> it for the same reason):
+> 
+> ---cut here---
+> 
+>      CRect rect;
+>      GetWindowRect( &rect );
+>      if ( GetParent() )
+>         {
+>          // Adjust coordinates to client area
+> 
+>          GetParent()->ScreenToClient( &rect.TopLeft() );
+>          GetParent()->ScreenToClient( &rect.BottomRight() );
+>         
+>          // Change window size - this will provoke WM_MEASUREITEM
+> 
+>          SetWindowPos( NULL, 
+>                        rect.left, rect.top, rect.Width()+1,
+> rect.Height(),
+>                        SWP_NOACTIVATE|SWP_NOMOVE|SWP_NOOWNERZORDER|
+>                        SWP_NOREDRAW|SWP_NOZORDER );
+> 
+>          // Restore window size - this will provoke WM_MEASUREITEM too
+> 
+>          SetWindowPos( NULL, 
+>                        rect.left, rect.top, rect.Width(), rect.Height(),
+>                        SWP_NOACTIVATE|SWP_NOMOVE|SWP_NOOWNERZORDER|
+>                        SWP_NOREDRAW|SWP_NOZORDER );
+>         }
+> 
+> ---cut here---
+> 
+> The only drawback of this method is that WM_MEASUREITEM message is sent
+> _twice_; otherwise it's quite acceptable (to my taste).
+> 
+> Hope this helps,
+> Alex
+> 
+> 
+> >-----Original Message-----
+> >From:	Rob Warner [SMTP:rhwarner@southeast.net]
+> >Sent:	Monday, January 20, 1997 7:19 PM
+> >To:	MFC List
+> >Subject:	Owner draw CListCtrl row height
+> >
+> >Environment: VC++ 4.2b, Win95, Win NT 4.0
+> >
+> >I have a CListCtrl-derived class (always in Report view) in which I need
+to
+> >display two different fonts, which are user-configurable at run time. 
+So,
+> >I make it owner draw, override DrawItem(), and do my drawing.  When the
+> >user changes one or the other font, I calculate which font is taller, so
+I
+> >know how tall my row height needs to be to properly display the row. 
+> >Unfortunately, I can't figure out how to set the row height.
+> >
+> >I tried the obvious and created the appropriate font (with the proper
+> >scope), and used SetFont().  This works like a champ in a non-owner draw
+> >CListCtrl.  In my owner draw, however, it sets the height of the Header
+> >Cntrl, but doesn't change the height of the rect I'm passed in
+DrawItem().
+> >
+> >Any ideas, before I give up and rewrite it as a CListBox with a
+CHeaderCtrl
+> >and have to handle all the column resizing myself?
+> ><<<<<>>>>>
+> >Rob Warner
+> >rhwarner@southeast.net
+> ><A HREF="http://users.southeast.net/~rhwarner">http://users.southeast.net/~rhwarner</A>
+> >
+> -----From: Amir Shoval <amirs@ncc.co.il>
+> 
+> Try overriding MeasureItem.
+> 
+> --------------------------------------------------
+> Amir Shoval          N.C.C. ISRAEL
+>                 amirs@ncc.co.il
+> --------------------------------------------------
+> 
+> >----------
+> >From: 	Rob Warner[SMTP:rhwarner@southeast.net]
+> >Sent: 	=E9=E5=ED =F9=F0=E9 20 =E9=F0=E5=E0=F8 1997 18:19
+> >To: 	MFC List
+> >Subject: 	Owner draw CListCtrl row height
+> >
+> >Environment: VC++ 4.2b, Win95, Win NT 4.0
+> >
+> >I have a CListCtrl-derived class (always in Report view) in which I =
+> need to
+> >display two different fonts, which are user-configurable at run time.  =
+> So,
+> >I make it owner draw, override DrawItem(), and do my drawing.  When the
+> >user changes one or the other font, I calculate which font is taller, =
+> so I
+> >know how tall my row height needs to be to properly display the row.=20
+> >Unfortunately, I can't figure out how to set the row height.
+> >
+> >I tried the obvious and created the appropriate font (with the proper
+> >scope), and used SetFont().  This works like a champ in a non-owner =
+> draw
+> >CListCtrl.  In my owner draw, however, it sets the height of the Header
+> >Cntrl, but doesn't change the height of the rect I'm passed in =
+> DrawItem().
+> >
+> >Any ideas, before I give up and rewrite it as a CListBox with a =
+> CHeaderCtrl
+> >and have to handle all the column resizing myself?
+> ><<<<<>>>>>
+> >Rob Warner
+> >rhwarner@southeast.net
+> ><A HREF="http://users.southeast.net/~rhwarner">http://users.southeast.net/~rhwarner</A>
+> >
+> >
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Lubimov Alexey -- <A HREF="mailto:Lubimov@softlab.r-style.ru">Lubimov@softlab.r-style.ru</A>
+Monday, January 27, 1997
+</B>
+Rob,
+
+Make sure that your listview control has LVS_OWNERDRAWFIXED style when
+the window is created. If necessary, overload PreCreateWindow function
+to force this style.
+
+You don't have to add WM_MEASUREITEM handler to your class, because
+you'd better use virtual method MeasureItem.
+
+
+>-----Original Message-----
+>From:	Rob Warner [SMTP:rhwarner@southeast.net]
+>Sent:	Friday, January 24, 1997 5:57 AM
+>To:	mfc-l@netcom.com
+>Subject:	Re: Owner draw CListCtrl row height
+>
+>[Mini-digest: 2 responses]
+>
+>I had tried the MeasureItem() route, but unless I'm sadly mistaken,
+>WM_MEASUREITEM is never sent for a CListCtrl.  Perhaps the suggestions
+>listed below were based on CListBox?  I tried using ClassWizard to add a
+>handler for WM_MEASUREITEM, then set a breakpoint in OnMeasureItem(), and
+>never hit it.  I also tried overriding MeasureItem(), set a breakpoint, and
+>never hit that.  In both functions I tried setting the
+>LPMEASUREITEMSTRUCT->itemHeight to various values, but no discernible
+>effect occurred.
+>BTW, I also tried resizing the list control, as suggested below, to force
+>the WM_MEASUREITEM, but no dice.
+>I'm still open for suggestions.
+><<<<<>>>>>
+>Rob Warner
+>rhwarner@southeast.net
+><A HREF="http://users.southeast.net/~rhwarner">http://users.southeast.net/~rhwarner</A>
+>
+>[ skipped ]
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

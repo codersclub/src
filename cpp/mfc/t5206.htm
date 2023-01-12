@@ -1,0 +1,314 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Implementing CTabCtrl in a dialog app
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Terry Wellmann -- <A HREF="mailto:wellmatl@cs.purdue.edu">wellmatl@cs.purdue.edu</A>
+Thursday, May 16, 1996
+</B>
+Env:  Win 95, VC++ 4.0
+
+I've created a dialog application and have added a CTabCtrl to the dialog.
+I've also create a dialog that will be used as my page and derived it from
+CPropertyPage.
+
+The dialog has the following properties: 
+style: child
+border: none
+Checked items: Titlebar, Visable, Disabeled
+
+In my OnInitDialog() function I have the following code:
+
+	// set up the tab control
+	TC_ITEM TabItem;
+	char szTitle[80];
+
+	CSearchRange *pSearchRange;
+	pSearchRange = new CSearchRange;
+
+	TabItem.mask = TCIF_PARAM | TCIF_TEXT;
+	TabItem.lParam = (LPARAM)pSearchRange;
+	VERIFY(pSearchRange->Create(CSearchRange::IDD, &m_SettingsTabCtrl));
+	pSearchRange->GetWindowText(szTitle, sizeof(szTitle));
+	TabItem.pszText = szTitle;
+	m_SettingsTabCtrl.InsertItem(0,&TabItem);
+	pSearchRange->SetWindowPos(NULL, 10, 30, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+	pSearchRange->ShowWindow(SW_SHOW);
+	pSearchRange->EnableWindow(TRUE);
+
+	// show the first tab
+	m_SettingsTabCtrl.SetCurSel(0);
+
+
+When I run the app I get the dialog box drawn inside the CTabCtrl with the
+title bar intact and you can move it around as if it were a normal dialog box.
+
+What am I doing wrong in my implementation?  I quickly searched the April 96
+eddition of MSDN and didn't find any implementation schemes. The one
+mentioned above came from "Programming Windows 95 Unleashed" by SAM's
+publishing.  The book was published before VC++ 4.0 was released and some
+things don't correspond.
+
+Thanks,
+
+Terry
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Matthias Bohlen -- <A HREF="mailto:MATTES@logotec.com">MATTES@logotec.com</A>
+Tuesday, May 21, 1996
+</B>
+[Mini-digest: 2 responses]
+
+Hello Terry,
+
+I have the same environment as you have and have had the same 
+problem:
+
+> I've created a dialog application and have added a CTabCtrl to the
+> dialog. I've also create a dialog that will be used as my page and
+> derived it from CPropertyPage.
+> 
+> The dialog has the following properties: 
+> style: child
+> border: none
+> Checked items: Titlebar, Visable, Disabeled
+> 
+
+.... some code removed here
+
+> When I run the app I get the dialog box drawn inside the CTabCtrl
+> with the title bar intact and you can move it around as if it were a
+> normal dialog box.
+> 
+> What am I doing wrong in my implementation? 
+
+I think, both you and me were not doing something significantly 
+wrong. I solved the problem with one additional call to 
+ModifyStyle():
+
+pDialogPage->GetWindowText(szTitle, sizeof(szTitle));
+TabItem.pszText = szTitle;
+---> added: -----> pDialogPage->ModifyStyle (WS_CAPTION, 0);
+
+One minor difference from your solution to mine was: I did not use 
+CPropertyPage as a base class for my dialog class but a plain vanilla 
+"CDialog".
+
+Hope this helps...
+Matthias
+
+-------------------------------------------------------
+Matthias Bohlen             |  Logotec Software GmbH
+Phone: +49 228 64 80 520    |  Chateauneufstr. 10 
+FAX:   +49 228 64 80 525    |  D-53347 Alfter, Germany
+                            |
+E-mail: mattes@logotec.com  |  CAD systems development
+-------------------------------------------------------
+-----From: "David W. Gillett" <DGILLETT@expertedge.com>
+
+  The CPropertyPage docs call for a caption and a thin border -- 
+because if you don't have a border, you don't have a caption in the 
+template.  The CPropertySheet code extracts the caption to use as a 
+tab label, and strips off the border.  
+
+  (a) Since you're trying to use a "naked" CTabCtrl, you don't get 
+any of this CPropertySheet functionality.  Deriving your child dialog 
+from CPropertyPage is therefore inheriting a bunch of functionality 
+that you can't use without a whole lot more work.
+  (b) By the time it's displayed, a page should have neither border 
+nor caption.  Supplying a titlebar is probably causing a lot of the 
+unwanted behaviour you're seeing.
+
+
+> What am I doing wrong in my implementation?  I quickly searched
+> the April 96 eddition of MSDN and didn't find any implementation
+> schemes. The one mentioned above came from "Programming Windows 95
+> Unleashed" by SAM's publishing.  The book was published before VC++
+> 4.0 was released and some things don't correspond.
+
+  CPropertySheet provides a whole bunch of glue to connect 
+notifications from its embedded tab control to handlers in its 
+sheets.  Trying to reproduce this functionality by hand is probably a 
+waste of time.  Instead of creating a CTabCtrl, I create a static 
+rectangle (not visible), and create a borderless WS_CHILD 
+CPropertySheet-derivative positioned over it, and add the DS_CONTROL 
+and WS_EX_CONTROLPARENT styles to it (in its OnWinitDialog()).  I may 
+need to fiddle with size/position issues, but I take advantage of a 
+whole lot of CPropertySheet functionality that connects to 
+CPropertyPage objects.
+  [There's a method to get at the embedded CTabCtrl object inside a 
+CPropertySheet, so even for cases where you need to manipulate that 
+control directly, you are still usually much further ahead to use a 
+property sheet instead.]
+
+Dave
+
+ 
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Terry Wellmann -- <A HREF="mailto:wellmatl@cs.purdue.edu">wellmatl@cs.purdue.edu</A>
+Thursday, May 23, 1996
+</B>
+Follow-up:
+
+Env. is still Win 95 VC 4.0
+
+I've played with some of the suggestions, although haven't had much
+time but when I tried to implement my pages derived from CDialog
+in the CTabCtrl I had troubles with the centering.  It didn't want to
+automatically center my dialog box.  
+
+As I look at the workspace setting that Microsoft gives and wonder. Just
+how do they do it so nicely?  I would prefer to use CTabCtrl because I
+don't want the tabs overlapping themselves like in a typical 
+CPropertySheet.  
+
+Thank you all for replying to my plea.  I've just got to set aside
+some time to play with it.
+
+Terry
+
+
+
+>[Mini-digest: 2 responses]
+>
+>Hello Terry,
+>
+>I have the same environment as you have and have had the same 
+>problem:
+>
+>> I've created a dialog application and have added a CTabCtrl to the
+>> dialog. I've also create a dialog that will be used as my page and
+>> derived it from CPropertyPage.
+>> 
+>> The dialog has the following properties: 
+>> style: child
+>> border: none
+>> Checked items: Titlebar, Visable, Disabeled
+>> 
+>
+>.... some code removed here
+>
+>> When I run the app I get the dialog box drawn inside the CTabCtrl
+>> with the title bar intact and you can move it around as if it were a
+>> normal dialog box.
+>> 
+>> What am I doing wrong in my implementation? 
+>
+>I think, both you and me were not doing something significantly 
+>wrong. I solved the problem with one additional call to 
+>ModifyStyle():
+>
+>pDialogPage->GetWindowText(szTitle, sizeof(szTitle));
+>TabItem.pszText = szTitle;
+>---> added: -----> pDialogPage->ModifyStyle (WS_CAPTION, 0);
+>
+>One minor difference from your solution to mine was: I did not use 
+>CPropertyPage as a base class for my dialog class but a plain vanilla 
+>"CDialog".
+>
+>Hope this helps...
+>Matthias
+>
+>-------------------------------------------------------
+>Matthias Bohlen             |  Logotec Software GmbH
+>Phone: +49 228 64 80 520    |  Chateauneufstr. 10 
+>FAX:   +49 228 64 80 525    |  D-53347 Alfter, Germany
+>                            |
+>E-mail: mattes@logotec.com  |  CAD systems development
+>-------------------------------------------------------
+>-----From: "David W. Gillett" <DGILLETT@expertedge.com>
+>
+>  The CPropertyPage docs call for a caption and a thin border -- 
+>because if you don't have a border, you don't have a caption in the 
+>template.  The CPropertySheet code extracts the caption to use as a 
+>tab label, and strips off the border.  
+>
+>  (a) Since you're trying to use a "naked" CTabCtrl, you don't get 
+>any of this CPropertySheet functionality.  Deriving your child dialog 
+>from CPropertyPage is therefore inheriting a bunch of functionality 
+>that you can't use without a whole lot more work.
+>  (b) By the time it's displayed, a page should have neither border 
+>nor caption.  Supplying a titlebar is probably causing a lot of the 
+>unwanted behaviour you're seeing.
+>
+>
+>> What am I doing wrong in my implementation?  I quickly searched
+>> the April 96 eddition of MSDN and didn't find any implementation
+>> schemes. The one mentioned above came from "Programming Windows 95
+>> Unleashed" by SAM's publishing.  The book was published before VC++
+>> 4.0 was released and some things don't correspond.
+>
+>  CPropertySheet provides a whole bunch of glue to connect 
+>notifications from its embedded tab control to handlers in its 
+>sheets.  Trying to reproduce this functionality by hand is probably a 
+>waste of time.  Instead of creating a CTabCtrl, I create a static 
+>rectangle (not visible), and create a borderless WS_CHILD 
+>CPropertySheet-derivative positioned over it, and add the DS_CONTROL 
+>and WS_EX_CONTROLPARENT styles to it (in its OnWinitDialog()).  I may 
+>need to fiddle with size/position issues, but I take advantage of a 
+>whole lot of CPropertySheet functionality that connects to 
+>CPropertyPage objects.
+>  [There's a method to get at the embedded CTabCtrl object inside a 
+>CPropertySheet, so even for cases where you need to manipulate that 
+>control directly, you are still usually much further ahead to use a 
+>property sheet instead.]
+>
+>Dave
+>
+> 
+>
+>
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,248 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Dialog-box behavior for a view ?
+</B></FONT>
+<BR>
+<PRE>
+<B>
+<A HREF="mailto:Serge.Potteck@lune.cst.cnes.fr">Serge.Potteck@lune.cst.cnes.fr</A>
+Monday, January 06, 1997
+</B>
+
+Environment: Windows 3.1, VC++ 1.51
+
+I want to create a view derived-class that allow to create either :
+* views with a normal behavior
+* or views with a non-modal dialog-box behaviour, that is :
+   - they can't be desactivated, and no user's action is taken into 
+   account out of the dialog box, until 'OK' or cancel has been chosen.
+   - the 2 buttons at their upper-right corner are not present.
+
+I had the following ideas :
+* override the OnMDIActivate function of the view's frame, and activate 
+the frame again when it is beeing desactivated. I tried that, where Fenetap 
+is the frame for the view, and "IsDialogSpecial" a function returning true if
+the view is in a dialog-bow mode  :
+
+//////////////////
+void Fenetap::OnMDIActivate(BOOL bActivate,CWnd* pActivateWnd,CWnd*
+pDeactivateWnd)
+{
+if(!bActivate && IsDialogSpecial())  
+	{
+        ShowWindow(SW_RESTORE);  //for the case the view has been iconized
+	BringWindowToTop();
+	}
+}
+//////////////////
+
+But it doesn't work : the two views (the newly activaded one and the 
+newly desactivated one seem to be both activated, and the newly activated 
+one is on the top). I guess their is something to send to the newly
+activated view, but nothing I tried is working.
+
+* lock the menu at the creation of the view, and de-lock it at the destruction
+of the view (I don't know how to do it precisly at the moment).
+
+*remove the 2 buttons at thee upper-right corner of the non-client area (I
+couldn't
+find how to do it in the help). 
+
+Many thanks for any help
+
+Serge Potteck
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dong Chen -- <A HREF="mailto:d_chen@ix.netcom.com">d_chen@ix.netcom.com</A>
+Tuesday, January 07, 1997
+</B>
+There is a sample with source code in Per Ghosh's MFC page about creating a
+modal window:
+<A HREF="http://www.algonet.se/~hulken/dmfc.htm">http://www.algonet.se/~hulken/dmfc.htm</A>
+File name is modal.zip.
+It might be helpful to you.
+Dong
+d_chen@ix.netcom.com
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Roma -- <A HREF="mailto:roma@neonet.lv">roma@neonet.lv</A>
+Wednesday, January 08, 1997
+</B>
+[Mini-digest: 2 responses]
+
+Hello!
+
+
+Serge.Potteck@lune.cst.cnes.fr wrote:
+> 
+> Environment: Windows 3.1, VC++ 1.51
+> 
+> I want to create a view derived-class that allow to create either :
+> * views with a normal behavior
+> * or views with a non-modal dialog-box behaviour, that is :
+>    - they can't be desactivated, and no user's action is taken into
+>    account out of the dialog box, until 'OK' or cancel has been chosen.
+>    - the 2 buttons at their upper-right corner are not present.
+> 
+  You probably mean MODAL dialog-box behaviour, isn't it?
+  
+  Try to set-up a mouse capture on the view like this:
+
+void Fenetap::OnMDIActivate(BOOL bActivate,CWnd* pActivateWnd,CWnd*
+pDeactivateWnd)
+{
+  if(bActivate && IsDialogSpecial())  
+  {
+     this->SetCapture();
+  }
+}
+  
+ This way, when your view will be activated ALL mouse input will go to
+your view window
+including attempts to click at menu, etc. All mouse events inside your
+window will be handled as usual, other mouse messages will be simply
+ignored.But you will have to catch
+mouse clicks outside your application windows, to allow user switch
+applications with mouse.
+Also you will have to override OnSysCommand() to catch switching to
+other MDI childs with
+Ctrl-F6 Ctrl-Shift-F6, calling of the task list with Ctrl-Esc and maybe
+something else.
+Don't forget to call this->ReleaseCapture(); in your OK/Cancel buttons
+handlers.
+
+> *remove the 2 buttons at thee upper-right corner of the non-client area (I
+> couldn't find how to do it in the help).
+> 
+  I don't know exactly, but you could try to call ::SetWindowLong() with
+GWL_STYLE to
+change the styles of the window on the fly. This is SDK function - not
+part of the MFC.
+
+*************************
+
+Other possible solution is to create real DialogBox on top of your View
+window. 
+You can create a dialog template, which looks exactly like you MDIFrame
+window (w/o Min/Max buttons), than
+at the moment when you need to enter 'DialogSpecial mode', get
+coordinates of you MDI Child
+and DoModal your dialog. In the OnInitDialog move it exactly over the
+view's frame.
+
+
+> Many thanks for any help
+> 
+> Serge Potteck
+
+
+ I've never tried to do such things. Everithing above is just an ideas, 
+but I
+ hope this ideas will somehow help you.
+
+-Roma
+-----From: Serge.Potteck@lune.cst.cnes.fr
+
+Thanks a lot for your answer.
+
+I would never have found it on my own. 
+
+Serge Potteck
+France
+
+At 20:52 07/01/1997 -0600, you wrote:
+>There is a sample with source code in Per Ghosh's MFC page about creating a
+>modal window:
+><A HREF="http://www.algonet.se/~hulken/dmfc.htm">http://www.algonet.se/~hulken/dmfc.htm</A>
+>File name is modal.zip.
+>It might be helpful to you.
+>Dong
+>d_chen@ix.netcom.com
+>
+>
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dulepov Dmitry -- <A HREF="mailto:dima@ssm6000.samsung.ru">dima@ssm6000.samsung.ru</A>
+Friday, January 10, 1997
+</B>
+        [Mailer: "Groupware E-Mail". Version 1.02.051]
+
+
+Look at DLGPROP.CPP in MFC source directory, class CPropertySheet. It does all that you need (a window that works as modal/modeless dialog)
+
+
+Dmitry A. Dulepov
+Samsung Electronics Co., Ltd.
+Russian Research Center
+Phone: +7 (095) 213-9207
+Fax: +7 (095) 213-9196
+E-mail: dima@src.samsung.ru
+====================================
+
+--------------------------------------------------------------------------------
+>Serge.Potteck@lune.cst.cnes.fr wrote:
+> 
+> Environment: Windows 3.1, VC++ 1.51
+> 
+> I want to create a view derived-class that allow to create either :
+> * views with a normal behavior
+> * or views with a non-modal dialog-box behaviour, that is :
+>    - they can't be desactivated, and no user's action is taken into
+>    account out of the dialog box, until 'OK' or cancel has been chosen.
+>    - the 2 buttons at their upper-right corner are not present.
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

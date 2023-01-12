@@ -1,0 +1,116 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <span class="clsCap"><p>TaskKeyMgr.h</span></p>
+    <pre>////////////////////////////////////////////////////////////////
+// MSDN Magazine — September 2002
+// If this code works, it was written by Paul DiLascia.
+// If not, I don't know who wrote it.
+// Compiles with Visual Studio 6.0 and Visual Studio .NET on Windows XP.
+//
+#pragma once
+#include &quot;TaskKeyHook.h&quot;
+
+//////////////////
+// Use this class to disable task keys, task manager and/or the taskbar.
+// Call Disable with flags for items you want to disable; for example:
+//
+// CTaskMgrKeys::Disable(CTaskMgrKeys::ALL);
+// 
+class CTaskKeyMgr {
+public:
+   enum {
+      TASKMGR  = 0x01,  // disable task manager (Ctrl+Alt+Del)
+      TASKKEYS = 0x02,  // disable task keys (Alt-TAB, etc)
+      TASKBAR  = 0x04,  // disable task bar
+      ALL=0xFFFF        // disable everything :(
+   };
+   static void Disable(DWORD dwItem,BOOL bDisable,BOOL bBeep=FALSE);
+
+   static BOOL IsTaskMgrDisabled();
+   static BOOL IsTaskBarDisabled();
+   static BOOL AreTaskKeysDisabled() {
+      return ::AreTaskKeysDisabled(); // call DLL 
+   }
+};
+</pre>
+    <p><span class="clsCap">&nbsp;</p>
+    <p>TaskKeyMgr.cpp</span></p>
+    <pre>////////////////////////////////////////////////////////////////
+// MSDN Magazine — September 2002
+// If this code works, it was written by Paul DiLascia.
+// If not, I don't know who wrote it.
+// Compiles with Visual Studio 6.0 and Visual Studio .NET on Windows XP.
+//
+#include &quot;StdAfx.h&quot;
+#include &quot;TaskKeyMgr.h&quot;
+
+#define HKCU HKEY_CURRENT_USER
+
+// Magic registry key/value for &quot;Remove Task Manager&quot; policy.
+LPCTSTR KEY_DisableTaskMgr =
+   &quot;Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System&quot;;
+LPCTSTR VAL_DisableTaskMgr = &quot;DisableTaskMgr&quot;;
+
+//////////////////
+// Disable task-key related stuff.
+// 
+// dwFlags  = what to disable
+// bDisable = disable (TRUE) or enable (FALSE)
+// bBeep    = whether to beep for illegal keys (TASKKEYS only)
+//
+void CTaskKeyMgr::Disable(DWORD dwFlags, BOOL bDisable, BOOL bBeep)
+{
+   // task manager (Ctrl+Alt+Del)
+   if (dwFlags &amp; TASKMGR) {
+      HKEY hk;
+      if (RegOpenKey(HKCU, KEY_DisableTaskMgr,&amp;hk)!=ERROR_SUCCESS)
+         RegCreateKey(HKCU, KEY_DisableTaskMgr, &amp;hk);
+
+      if (bDisable) { // disable TM: set policy = 1
+         DWORD val=1;
+         RegSetValueEx(hk, VAL_DisableTaskMgr, NULL,
+            REG_DWORD, (BYTE*)&amp;val, sizeof(val));
+
+      } else { // enable TM: remove policy 
+         RegDeleteValue(hk,VAL_DisableTaskMgr);
+      }
+   }
+
+   // task keys (Alt-TAB etc)
+   if (dwFlags &amp; TASKKEYS)
+      ::DisableTaskKeys(bDisable,bBeep); // install keyboard hook
+
+   // task bar
+   if (dwFlags &amp; TASKBAR) {
+      HWND hwnd = FindWindow(&quot;Shell_traywnd&quot;, NULL);
+      EnableWindow(hwnd, !bDisable);
+   }
+}
+
+BOOL CTaskKeyMgr::IsTaskBarDisabled()
+{
+   HWND hwnd = FindWindow(&quot;Shell_traywnd&quot;, NULL);
+   return IsWindow(hwnd) ? !IsWindowEnabled(hwnd) : TRUE;
+}
+
+BOOL CTaskKeyMgr::IsTaskMgrDisabled()
+{
+   HKEY hk;
+   if (RegOpenKey(HKCU, KEY_DisableTaskMgr, &amp;hk)!=ERROR_SUCCESS)
+      return FALSE; // no key ==&gt; not disabled
+
+   DWORD val=0;
+   DWORD len=4;
+   return RegQueryValueEx(hk, VAL_DisableTaskMgr,
+      NULL, NULL, (BYTE*)&amp;val, &amp;len)==ERROR_SUCCESS &amp;&amp; val==1;
+}</pre>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

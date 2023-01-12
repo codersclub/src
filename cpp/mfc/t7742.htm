@@ -1,0 +1,150 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Print Preview zoom problem
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Peter T. O'Neill -- <A HREF="mailto:oneillpt@acadamh.ucd.ie">oneillpt@acadamh.ucd.ie</A>
+Thursday, November 14, 1996
+</B>
+Environment: VC++ 4.0, Win 95
+
+I have a problem with zooming in print preview, if the document 
+prints less than one full page. 
+
+The printed output will be fine, print preview will initially be fine, 
+but zooming give a blank page. 
+
+If the document runs past one page, zooming in print preview works on 
+the full pages, but again fails on the last, part full, page. If I 
+keep in zoomed mode until I reach the last page, it will display in 
+zoomed mode, but then display as blank when I return to normal mode. 
+
+Any suggestions?
+-----------------------------------------------------------------
+Peter O'Neill, Mech. Eng. Dept., UCD, Belfield, Dublin 4, Ireland
+Phone: +353-1-706 1889
+Fax:   +353-1-283 0534
+<A HREF="http://poneill.ucd.ie/">http://poneill.ucd.ie/</A>
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Peter T. O'Neill -- <A HREF="mailto:oneillpt@acadamh.ucd.ie">oneillpt@acadamh.ucd.ie</A>
+Monday, November 25, 1996
+</B>
+> Date:          Thu, 14 Nov 1996 16:40:53 +0000 (GMT)
+> From:          "Peter T. O'Neill" <oneillpt@acadamh.ucd.ie>
+> Subject:       Print Preview zoom problem
+
+> Environment: VC++ 4.0, Win 95
+> 
+> I have a problem with zooming in print preview, if the document 
+> prints less than one full page. 
+> 
+> The printed output will be fine, print preview will initially be fine, 
+> but zooming give a blank page. 
+> 
+> If the document runs past one page, zooming in print preview works on 
+> the full pages, but again fails on the last, part full, page. If I 
+> keep in zoomed mode until I reach the last page, it will display in 
+> zoomed mode, but then display as blank when I return to normal mode. 
+> 
+---------------------------------------------------------------------
+Followup information on fixing this problem from myself, as posted to 
+microsoft.public.vc.mfc, where someone else posted the same problem: 
+---------------------------------------------------------------------
+patmac@suba.com wrote in article <328C7DCD.28A2@suba.com>...
+> Here's an interesting problem, perhaps it makes sense to you.  The
+> following is my OnDraw function for a CView derived view.  It works
+> fine for text mode changing the font size on the fly is no problem. 
+> But, when I do print preview it works fine for the initial display,
+> but when the <ZOOM> button is pressed, the display goes to pot and
+> never returns even when I zoom out.
+> 
+I have this problem also, and have found a fix (below) for my case.
+Specifically, the displayed preview page goes blank when there is ONLY
+ONE page to display, or when the page to be displayed is THE LAST OF A
+NUMBER OF PAGES. If the page to be displayed is one of a number of
+pages, but preceeds the last page, there is never a problem. In my
+case, my view is derived from CListView, and prints a formatted
+version of the displayed List control, with page header, WingDing font
+characters replacing small icons for printing, and a few other
+options. I must calculate the document length myself, in my OnPrint
+function (OnDraw is not modified). I set a member variable BOOL
+m_bPrintingComplete by comparing the y coordinate of the last line
+overall with the y coordinate of the last line on the page just
+printed (or presumably previewed), and use this in OnPrepareDC to set
+CPrintInfo m_bContinuePrinting.
+
+My problem is solved by making pInfo->m_bContinuePrinting TRUE
+whenever OnPrepareDC is called in preview mode, as below. I have not
+the time to work through the implementation of CPreviewView, but my
+guess is that having m_bContinuePrinting set to FALSE in OnPrepareDC,
+which is called for the zoomed page, prevents painting of the zoomed
+page, even where it is the SAME page as has just been displayed
+unzoomed. 
+---------- 
+void CFavWatchView2::OnPrepareDC(CDC* pDC, CPrintInfo* pInfo) {
+ // TODO: Add your specialized code here and/or call the base class
+ if (pInfo) 
+ {
+  if (m_bPrintingComplete) pInfo->m_bContinuePrinting = FALSE;
+  else pInfo->m_bContinuePrinting = TRUE;
+  //
+  // fix single/last page problem here
+  if (pInfo->m_bPreview) pInfo->m_bContinuePrinting = TRUE; 
+  //
+  pDC->SetMapMode( MM_TWIPS );
+ }
+ else CListView::OnPrepareDC(pDC, pInfo);
+}
+-----------------------------------------------------------------
+Peter O'Neill, Mech. Eng. Dept., UCD, Belfield, Dublin 4, Ireland
+Phone: +353-1-706 1889
+Fax:   +353-1-283 0534
+<A HREF="http://poneill.ucd.ie/">http://poneill.ucd.ie/</A>
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

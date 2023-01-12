@@ -1,0 +1,1280 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+One instance of an application only- How to post the
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Monday, January 13, 1997
+</B>
+[Mini-digest: 4 responses]
+
+At 23:25 1/12/97 -0200, Ari Villaca wrote:
+>Environment: MSVC 4.0/Win95
+
+>I have an application which is supposed to have only one instance running.
+>I know how to activate the 1st instance of the application when a 2nd one
+>is started by the user.
+
+>But the solution I have just do it, ie, activates the 1st instance. If the
+>user has used Explorer to click on a saved application document name in
+>order to open that document, the document won't be opened.
+
+>How can I post the 2nd instance creation message arguments ( maybe the
+>CWinApp::m_lpCmdLine ) to the 1st instance already running? 
+
+>Any pointer to related documentation or solution is greatelly appreciated. 
+
+My book outlines a technique for doing this that doesn't involve posting 
+messages, which has several disadvantages.  The idea is to spawn a
+new thread that does nothing but sleep on the object which is being
+used to make the application instances run exlusively.  If the object
+becomes signalled, the waiting thread can react by doing what ever it
+wants to within the answering application.
+
+If you need to pass data from one application to the other, you
+might do so by using shared memory or named pipes.
+
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+Why does the "new" Corvette look like a 1993 RX-7?
+These words are my own. I do not speak on behalf of Microsoft.
+
+-----From: Jim Lawson Williams <jimlw@mail.ccur.com.au>
+
+At 11:25 PM 12/01/97 -0200, "Ari Villaca" <villaca@correionet.com.br> wrote:
+>Environment: MSVC 4.0/Win95
+>
+>I have an application which is supposed to have only one instance running.
+>I know how to activate the 1st instance of the application when a 2nd one
+>is started by the user.
+
+  <snip>
+
+>	//determines if another window with our class name exists
+>	HWND hWnd;
+>	hWnd = ::FindWindow( ( LPCSTR ) csClassName, NULL );
+>	if ( hWnd )
+>	{
+>		AfxMessageBox( "The application is already running..." );
+>
+  <snip>
+
+You might consider something along the lines of the following (requires afxadv.h):
+
+//allocate memory for the text, and a handle to go with it:
+m_HGLOBALpath = GlobalAlloc(GMEM_DDESHARE|GMEM_MOVEABLE,512);
+
+//tie that to the CSharedFile to store the pathname:
+m_pSharedFileToPass->SetHandle(m_HGLOBALpath, /*BOOL bAllowGrow=*/ TRUE);
+
+//store the pathname in the memory file:
+m_pSharedFileToPass->Write(lpPathBuf,nCount);  
+
+//identify the original thread:
+DWORD firstThreadID = GetWindowThreadProcessId(hWnd,NULL);
+
+//post that message!
+PostThreadMessage( firstThreadID,myPathNameMsg,
+                  (WPARAM)m_HGLOBALpath,
+                  (LPARAM)nCount);//or perhaps sender's threadID
+	
+
+and, per PSS ID Number: Q142415, catch the posted message through
+
+PreTranslateMessage(MSG* pMsg);
+
+and terminate the posting process either by return post, or by polling the shared file at
+(say) 1 sec. intervals for a NULL string.
+
+Hope this is what you seek, blunders excepted!
+
+Regards,
+Jim LW
+  
+
+
+
+
+>From the BBC's "Barchester Chronicles":
+
+    "I know that ultimately we are not supposed to understand.
+    But I also know that we must try."
+
+       -- the Reverend Septimus Harding, crypt-analyst, clog-dancer, C++ programmer
+-----From: Kostya Sebov <sebov@is.kiev.ua>
+
+>   Environment: MSVC 4.0/Win95
+>
+>   I have an application which is supposed to have only one instance running.
+>   I know how to activate the 1st instance of the application when a 2nd one
+>   is started by the user.
+>
+>   But the solution I have just do it, ie, activates the 1st instance. If th=
+>   e
+>   user has used Explorer to click on a saved application document name in
+>   order to open that document, the document won't be opened.
+>
+>   How can I post the 2nd instance creation message arguments ( maybe the
+>   CWinApp::m_lpCmdLine ) to the 1st instance already running?=20
+>
+>   The code for limiting the application to one instance is:
+>
+>   Bool CMyApp::InitInstance() {
+>   ....
+>   ....
+>   ....
+>       SetRegistryKey( "MyCompanyName" );
+>       csClassName =3D GetProfileString( "Initialization", "ClassName", "None" =
+>   );
+>
+>       //determines if another window with our class name exists
+>       HWND hWnd;
+>       hWnd =3D ::FindWindow( ( LPCSTR ) csClassName, NULL );
+>       if ( hWnd )
+>       {
+>           AfxMessageBox( "The application is already running..." );
+>
+>           SetForegroundWindow( hWnd );
+>           CWnd* PrevWindow =3D CWnd::FromHandle( hWnd );
+>           PrevWindow->SetForegroundWindow();
+>
+>           //does it have a popup?
+>           CWnd* ChildWnd =3D PrevWindow->GetLastActivePopup();
+>
+>           //bring the main window to the top
+>           PrevWindow->BringWindowToTop();
+>
+>           //if iconic, restore the main window
+>           if ( PrevWindow->IsIconic() )
+>               PrevWindow->ShowWindow( SW_RESTORE );
+>
+>           //if there are popups, bring them along too
+>           if ( PrevWindow !=3D ChildWnd )
+>               ChildWnd->BringWindowToTop();
+>
+>           //here seems to be the place to post the 2nd instance creation argument=
+>   s
+>   (maybe m_lpCmdLine )
+>           //to the 1st instance, so they are processed
+>           //for now, send a File/New message
+>           PrevWindow->PostMessage( WM_COMMAND, ID_FILE_NEW );
+>   =09
+>
+>           //
+>           return FALSE;
+>       }
+>
+>   ....
+>   ....
+>   ....
+>   }
+>
+>   Any pointer to related documentation or solution is greatelly appreciated=
+>   .=20
+>
+>   Regards,
+>
+>   Ari
+>
+>   -------------------------------------------------------------------------=
+>   ---
+>   ---
+>    Ari de Moura Villa=E7a
+>                       e-Mail: villaca@correionet.com.br
+>
+>    Av. Moraes Sales, 987 Apto.113     fone:   +55 19 232-2440
+>    13010-001 - Campinas, SP       fax:    +55 19 232-2440
+>    Brasil
+>   -------------------------------------------------------------------------=
+>   ---
+>   ---
+>
+>
+Look at the WORDPAD sample on the Visual's CD.
+
+The basic idea is using atoms for passing a string when Sending the message to
+the original instance.
+
+HTH,
+--- 
+Kostya Sebov. 
+----------------------------------------------------------------------------
+Tel: (38 044) 266-6387 | Fax: (38 044) 266-6195 | E-mail: sebov@is.kiev.ua
+-----From: Ted <Ted@www.Ibex.com>
+
+To the Moderator: If nobody else points it out, please point out to Ari=20
+that this isn't perfect-the vagaries of multiple threads/processes=20
+imply that a second process could be launched at the exact moment this=20
+process is launched, which means that the code will be executing in=20
+parallel, the FindWindow() call fails for each, and you now have two=20
+instances running. (Mike will probably point this out, but if he=20
+doesn't, then you can include this in the mini-digest.)
+
+----------
+From:  Ari Villaca[SMTP:villaca@correionet.com.br]
+Sent:  Sunday, January 12, 1997 5:26 PM
+To:  MFC-L
+Subject:  One instance of an application only- How to post the creation=20
+message from the 2nd to the 1st instance
+
+Environment: MSVC 4.0/Win95
+
+I have an application which is supposed to have only one instance=20
+running.
+I know how to activate the 1st instance of the application when a 2nd=20
+one
+is started by the user.
+
+But the solution I have just do it, ie, activates the 1st instance. If=20
+the
+user has used Explorer to click on a saved application document name in
+order to open that document, the document won't be opened.
+
+How can I post the 2nd instance creation message arguments ( maybe the
+CWinApp::m_lpCmdLine ) to the 1st instance already running?=20
+
+The code for limiting the application to one instance is:
+
+Bool CMyApp::InitInstance() {
+....
+....
+....
+	SetRegistryKey( "MyCompanyName" );
+	csClassName =3D GetProfileString( "Initialization", "ClassName", "None" =
+
+);
+
+	//determines if another window with our class name exists
+	HWND hWnd;
+	hWnd =3D ::FindWindow( ( LPCSTR ) csClassName, NULL );
+	if ( hWnd )
+	{
+		AfxMessageBox( "The application is already running..." );
+
+		SetForegroundWindow( hWnd );
+		CWnd* PrevWindow =3D CWnd::FromHandle( hWnd );
+		PrevWindow->SetForegroundWindow();
+
+		//does it have a popup?
+		CWnd* ChildWnd =3D PrevWindow->GetLastActivePopup();
+
+		//bring the main window to the top
+		PrevWindow->BringWindowToTop();
+
+		//if iconic, restore the main window
+		if ( PrevWindow->IsIconic() )
+			PrevWindow->ShowWindow( SW_RESTORE );
+
+		//if there are popups, bring them along too
+		if ( PrevWindow !=3D ChildWnd )
+			ChildWnd->BringWindowToTop();
+
+		//here seems to be the place to post the 2nd instance creation=20
+arguments
+(maybe m_lpCmdLine )
+		//to the 1st instance, so they are processed
+		//for now, send a File/New message
+		PrevWindow->PostMessage( WM_COMMAND, ID_FILE_NEW );
+=09
+
+		//
+		return FALSE;
+	}
+
+....
+....
+....
+}
+
+Any pointer to related documentation or solution is greatelly=20
+appreciated.=20
+
+Regards,
+
+Ari
+
+-----------------------------------------------------------------------  =
+
+-----
+---
+ Ari de Moura Villa=E7a
+ 					e-Mail:	villaca@correionet.com.br
+
+ Av. Moraes Sales, 987 Apto.113		fone:	+55 19 232-2440
+ 13010-001 - Campinas, SP		fax:	+55 19 232-2440
+ Brasil
+-----------------------------------------------------------------------  =
+
+-----
+---
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Gforce -- <A HREF="mailto:gforce@liquidaudio.com">gforce@liquidaudio.com</A>
+Wednesday, January 15, 1997
+</B>
+    I have a similar problem, I have an app that should only have one
+instance running at any time,
+I send the command line to the first instance with no problems, Problem
+arises if the
+user double clicks on a file associated with my app and a second
+instance tries to launch, sends
+command line info (path and filename) to the first instances, the first
+instances acts on the
+command line but gets a sharing volation error attempting to open the
+file...
+
+    Any ideas ?, thanks in advance.
+
+t 23:25 1/12/97 -0200, Ari Villaca wrote:
+>Environment: MSVC 4.0/Win95
+>I have an application which is supposed to have only one instance
+running.
+>I know how to activate the 1st instance of the application when a 2nd
+one
+>is started by the user.
+>But the solution I have just do it, ie, activates the 1st instance. If
+the
+>user has used Explorer to click on a saved application document name in
+>order to open that document, the document won't be opened.
+>How can I post the 2nd instance creation message arguments ( maybe the
+>CWinApp::m_lpCmdLine ) to the 1st instance already running?
+>Any pointer to related documentation or solution is greatelly
+appreciated.
+My book outlines a technique for doing this that doesn't involve
+posting  messages, which has several disadvantages.  The idea is to
+spawn a new thread that does nothing but sleep on the object which is
+being used to make the application instances run exlusively.  If the
+object becomes signalled, the waiting thread can react by doing what
+ever it wants to within the answering application.
+If you need to pass data from one application to the other, you might do
+so by using shared memory or named pipes.
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Jim Lawson Williams -- <A HREF="mailto:jimlw@mail.ccur.com.au">jimlw@mail.ccur.com.au</A>
+Sunday, February 02, 1997
+</B>
+G'day!
+
+I'm requesting reviews of a (well outside Microsoft guidelines) approach to=
+=20
+SharedMemory originally sparked by this problem:
+
+At 11:25 PM 12/01/97 -0200, Ari Villaca <villaca@correionet.com.br> wrote:
+>Environment: MSVC 4.0/Win95
+>
+>I have an application which is supposed to have only one instance running.
+>I know how to activate the 1st instance of the application when a 2nd one
+>is started by the user.
+>
+>But the solution I have just do it, ie, activates the 1st instance. If the
+>user has used Explorer to click on a saved application document name in
+>order to open that document, the document won't be opened.
+>
+>How can I post the 2nd instance creation message arguments ( maybe the
+>CWinApp::m_lpCmdLine ) to the 1st instance already running?=20
+>
+>The code for limiting the application to one instance is:
+>
+>Bool CMyApp::InitInstance() {
+>....
+>....
+>....
+>	SetRegistryKey( "MyCompanyName" );
+>	csClassName =3D GetProfileString( "Initialization", "ClassName", "None" );
+>
+>	//determines if another window with our class name exists
+>	HWND hWnd;
+>	hWnd =3D ::FindWindow( ( LPCSTR ) csClassName, NULL );
+
+  <snip>
+
+Marko K=F6nig <koenig@spiess.com> and Mats Manhav=
+ <manhav@connectum.skurup.se>=20
+suggested FileMapping as the solution, and independent of ClassName.  I=20
+proposed a CSharedFile, which would do the job here because csClassName can=
+=20
+be resolved.  However, as a general solution I like it less because it will=
+=20
+always require fiddling window ClassNames somehow-or-other  --  either in=20
+the "real" windows, or perhaps a "dummy" per Mike B.'s "Revolutionary=20
+Guide..." Chapter 11.=20
+
+Without a ClassName, no ::FindWindow(), no window-handle, no=20
+GetWindowThreadProcessId, and ultimately, the CSharedFile can't be shared=20
+without passing the requisite HGLOBAL.  Sadly there's no direct correlation=
+=20
+between FileMapping and SharedFiles:  stuff a string into m_strFileName, and=
+=20
+the SharedFile forgets about Memory and thinks "disk"!
+
+Hence the experimental code following: treating a buffer associated with one
+handle as if it belonged to another.  I've ended up posting the lot so=20
+there's less chance of misunderstanding what I've been doing.
+
+Why all this trouble to pass one simple string?  Anyone who thinks that this=
+=20
+is a sledge-hammer approach to nut-cracking is right.  It's really a=20
+test-bed for more complex exchanges between loosely-coupled processes.  The=
+=20
+"navigation by programmer" required in FileMapping is just too clumsy for my=
+=20
+taste, but at the momemt CSharedFile is too limited.
+
+Criticism, and suggestions on how not to walk the razor's edge, welcomed.
+
+Regards,
+Jim LW
+
+/////////////////////////////////////////////////////////////////////////
+// Fred is a bog-standard MDI project
+
+CFredApp::CFredApp()
+         :m_oNoDupes("The One and Only Fred")
+/*
+where Fred.h includes
+=09
+	  CNoDupes m_oNoDupes;//ensures but 1 instance
+*/
+{
+}
+
+// CFredApp initialization
+
+BOOL CFredApp::InitInstance()
+{
+	// Standard initialization, changed between //>>>> and //<<<<
+	//
+ <snip>
+	//>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+	//No new doc. here...
+	if  (cmdInfo.m_nShellCommand =3D=3D CCommandLineInfo::FileNew)
+	     cmdInfo.m_nShellCommand =3D  CCommandLineInfo::FileNothing;
+
+	if  (!m_oNoDupes.OkToProceed(&cmdInfo))
+		return FALSE;
+	//<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+	// Dispatch commands specified on the command line
+ <snip>
+}
+
+BOOL CFredApp::PreTranslateMessage(MSG* pMsg)=20
+{
+	if  (pMsg->hwnd	=3D=3D NULL)
+	{
+		//then it's not from around here:
+		if  (m_oNoDupes.PreTranslateMessage(pMsg))
+			return TRUE;
+	}
+
+	return CWinApp::PreTranslateMessage(pMsg);
+}
+/////////////////////////////////////////////////////////////////////////
+// NoDupes.h : header file, ex-Class Wizard, with thanks to CStatic
+//
+#include <afxmt.h>
+#include "GlobalMemoryFile.h"
+
+#define SHMEMSIZE	512
+#define PARANOIA	0xdeadface
+#define AVAILABLE	0xcafef00d
+#define UNAVAILABLE     0xfeedbabe
+
+/////////////////////////////////////////////////////////////////////////
+// CNoDupes=20
+
+class CNoDupes : public CObject
+{
+// Construction
+public:
+	CNoDupes(LPCSTR WhoIsMe);
+
+// Overrides
+	// ClassWizard generated virtual function overrides
+	//{{AFX_VIRTUAL(CNoDupes)
+	public:
+	virtual BOOL PreTranslateMessage(MSG* pMsg);
+	//}}AFX_VIRTUAL
+
+// Implementation
+public:
+	virtual ~CNoDupes();
+
+protected:
+	BOOL	  m_bFileIsMine;//who created this?
+	CString	  m_sErrMsg;    //dump this compound msg. on error
+	CString   m_sFileName;
+	LPCSTR	  m_psMe;  //from App, used to create mutex & m_aHash
+	UINT	  m_nNoDupesMsg;	//our inter-process message
+	CMutex	  m_mutex; //to lock "if there's no m_aHash, create one"
+	ATOM	  m_aHash;	//Global atom for this application
+	CGlobalMemoryFile m_sharedFile;	//for the interchange
+
+	void HandOffCommand(CCommandLineInfo* pCmd);
+       //posts our bits to original copy =20
+	void DumpError(int nErr);
+	BOOL RestoreViewIfIconic(LPTSTR lpStr);		//for doc.s
+
+public:
+	BOOL OkToProceed(CCommandLineInfo* pCmd);
+       //called by App. to check m_aHash
+};
+/////////////////////////////////////////////////////////////////////////
+
+// NoDupes.cpp : implementation file, derived from CStatic via //ClassWizard
+//
+// The first copy of the App. receives any file-name parameter passed.
+
+//
+
+#include "stdafx.h"
+#include "NoDupes.h"
+
+#ifdef _DEBUG
+#define new DEBUG_NEW
+#undef THIS_FILE
+static char THIS_FILE[] =3D __FILE__;
+#endif
+
+////////////////////////////////////////////////////////////////////////////=
+/
+// CNoDupes
+
+CNoDupes::CNoDupes(LPCSTR WhoIsMe)
+:m_sErrMsg("Unable to establish 'Duplicate Applications' protocol:\n"),
+ m_psMe(WhoIsMe),
+ m_sFileName("Q:\\NoDupes.QQQ"),
+ m_mutex(FALSE,WhoIsMe),
+ m_sharedFile(/*nGrowBytes=3D*/ SHMEMSIZE),
+ m_bFileIsMine(FALSE)
+
+{
+}
+
+CNoDupes::~CNoDupes()
+{
+	if  (m_bFileIsMine)
+	{
+		//clean up meticulously:
+		int result;
+		do=20
+		{
+			result =3D GlobalDeleteAtom(m_aHash);
+		}
+		while (result =3D=3D 0);
+	}
+}
+
+BOOL CNoDupes::OkToProceed(CCommandLineInfo* pCmd)
+{
+	CString sNoDupes("S");//a single char. should suffice
+
+	//Set up our registered message  --
+	//if we're the 1st, this is what we'll get,
+	//otherwise it's what we'll send
+	m_nNoDupesMsg =3D RegisterWindowMessage(m_psMe);
+	if  (m_nNoDupesMsg =3D=3D 0)
+	{
+		m_sErrMsg+=3D"error in creation";
+		AfxMessageBox(m_sErrMsg);
+		return FALSE;
+	}
+
+	//Establish whether we're the 1st:
+	//
+	//Sadly, there seems to be no way to "test and set" in a single=20
+	//operation.  Hence the	need to lock the separate testing &             =20
+        //setting.
+
+	//Gain control, then check whether or not we are to create  --
+	//or to use  --  the pseudo-disk:
+	m_mutex.Lock();
+
+	//the string to generate the atom must differ from the mutex
+	sNoDupes +=3D m_psMe;
+	m_aHash =3D GlobalFindAtom((LPCTSTR)sNoDupes);
+	if  (m_aHash !=3D 0)
+	{
+		//then We Are Not Alone!
+		HandOffCommand(pCmd);//give 'em to the original
+		//relinquish control:
+		m_mutex.Unlock();
+		//as an exception may have set m_bFileIsMine for                        =
+=20
+                //cleanup...
+		return FALSE;
+	}
+
+	//we are #1!
+	CWinThread* threadObj =3D AfxGetThread();
+	SetLastError(0);//perhaps overcautious
+	try
+	{
+		//Set up the "you are #2" test:
+		m_aHash =3D GlobalAddAtom(sNoDupes);
+		if  (m_aHash =3D=3D 0)
+		{
+			//something is drastically wrong!
+			m_sErrMsg+=3D"results are contradictory";
+			AfxThrowUserException();
+		}
+
+		//do the equivalent of "Open, Create"
+		if                                             =20
+                (!m_sharedFile.Allocate(m_sFileName,(DWORD)SHMEMSIZE))
+		{
+			m_sErrMsg+=3D"not enough memory";
+			AfxThrowUserException();
+		}	=09
+
+		//now set up the data for any subsequent copies:
+		m_sharedFile.Write(&threadObj->m_nThreadID,sizeof(int));
+		int i;	=09
+		i =3D PARANOIA;
+		m_sharedFile.Write(&i,sizeof(int));
+		i =3D AVAILABLE;
+		m_sharedFile.Write(&i,sizeof(int));
+		m_bFileIsMine =3D TRUE;
+	}
+
+	catch (CException* ex)
+	{
+		TCHAR	szCause[255];
+		ex->GetErrorMessage(szCause, 255);
+		m_sErrMsg +=3D "  --  ";
+		m_sErrMsg +=3D szCause;
+		AfxMessageBox(m_sErrMsg);
+		ex->Delete();
+	}
+
+	//relinquish control:
+	m_mutex.Unlock();
+	return m_bFileIsMine;
+}
+
+void CNoDupes::HandOffCommand(CCommandLineInfo* pCmd)
+{
+	//NB: executed with m_mutex locked
+	int  nErr;
+
+	//Prepare to store the file-id portion of the command in the            =20
+        //memory file:
+	int lenFileName    =3D pCmd->m_strFileName.GetLength();
+
+	try
+	{
+		if  (!m_sharedFile.Assign(m_sFileName))
+               //an "Open, Existing"
+		{
+			nErr=3DGetLastError();
+			if  (nErr !=3D ERROR_ALREADY_EXISTS)
+                              //the file from the prime run =20
+			{
+			    DumpError(nErr);
+			    m_sErrMsg+=3D"problem with shared file";
+		            AfxThrowUserException();
+			}
+		}
+
+		int firstThreadID, //where to post our "Look at the                       =
+=20
+                                   //shared-file!" message
+			i;	   //integer I/O buffer
+		m_sharedFile.Read(&firstThreadID,sizeof(int));
+
+		//Do Paranoia checks:
+		m_sharedFile.Read(&i,sizeof(int));
+		if  ( i !=3D PARANOIA)
+		{
+			m_sErrMsg+=3D"invalid shared file";
+			AfxThrowUserException();
+		}
+		m_sharedFile.Read(&i,sizeof(int));//flag field
+		if  ( i !=3D AVAILABLE)
+		{
+			m_sErrMsg+=3D"prime copy stalled";
+			AfxThrowUserException();
+		}
+
+		//Reposition for output
+		m_sharedFile.Seek(sizeof(int)+sizeof(int),CFile::begin);
+
+		i=3DUNAVAILABLE;
+		m_sharedFile.Write(&i,sizeof(int));//flag field=20
+		//now the real data:
+		m_sharedFile.Write(&lenFileName,sizeof(int));
+
+		LPCSTR lpStr =3D                                                          =
+  =20
+                         pCmd->m_strFileName.GetBuffer(lenFileName);
+		m_sharedFile.Write(lpStr,lenFileName);
+		pCmd->m_strFileName.ReleaseBuffer();
+
+		//post that message!
+		if  (!PostThreadMessage( firstThreadID,m_nNoDupesMsg,
+					(WPARAM)AVAILABLE,0))
+		{
+			m_sErrMsg +=3D"can't post message";
+			AfxThrowUserException();
+		}
+
+	=09
+		//OK.  If we got this far, the message has gone.
+		//Give the original copy 12 seconds to process it,
+		//checking every 300 millisec.s
+
+		BOOL bCleared=3DFALSE;
+		int j;
+		for (i=3D0;i<40;i++)
+		{
+			Sleep(300);
+			//Reposition for input			                         =20
+                       =
+ m_sharedFile.Seek(sizeof(int)+sizeof(int),CFile::begin);
+			m_sharedFile.Read(&j,sizeof(int));
+			//now check flag:
+			if  (j=3D=3DAVAILABLE)
+			{
+				//flag has been set by the other end:
+				bCleared=3DTRUE;
+				break;
+			}
+		}
+		if  (!bCleared)
+		{
+			m_sErrMsg +=3D"no response";
+			AfxThrowUserException();
+		}
+	}
+
+	catch (CFileException* ex)
+	{
+		ex->Delete();
+	}
+	catch (CException* ex)
+	{
+		TCHAR	szCause[255];
+		ex->GetErrorMessage(szCause, 255);
+		m_sErrMsg +=3D "  --  ";
+		m_sErrMsg +=3D szCause;
+		AfxMessageBox(m_sErrMsg);
+		ex->Delete();
+		m_bFileIsMine =3D TRUE; //set for unconditional clean-up
+	}
+}
+
+void CNoDupes::DumpError(int nErr)
+{
+	LPVOID lpMsgBuf;
+
+	FormatMessage(=20
+		FORMAT_MESSAGE_ALLOCATE_BUFFER                               =20
+                | FORMAT_MESSAGE_FROM_SYSTEM,
+		NULL,
+		nErr,
+		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),=20
+                // Default language
+		(LPTSTR) &lpMsgBuf,
+		0,
+		NULL);
+
+	m_sErrMsg+=3D(LPTSTR) lpMsgBuf;
+	AfxMessageBox(m_sErrMsg);
+	LocalFree(lpMsgBuf);
+}
+////////////////////////////////////////////////////////////////////////////=
+/
+
+// CNoDupes message handlers
+
+BOOL CNoDupes::PreTranslateMessage(MSG* pMsg)=20
+{
+	if  (pMsg->message!=3Dm_nNoDupesMsg)
+		return FALSE;
+	//else we must act on it:
+
+	//Get the control data:
+	UINT nIDThread,
+		 nParanoia,
+		 nAvailability,
+		 lenFileName;
+
+	CString strFileName;
+
+	try
+	{
+		m_sharedFile.Seek(0,CFile::begin);//necessary!
+		m_sharedFile.Read(&nIDThread,     sizeof(int));
+		m_sharedFile.Read(&nParanoia,	  sizeof(int));
+		m_sharedFile.Read(&nAvailability, sizeof(int));
+		m_sharedFile.Read(&lenFileName,	  sizeof(int));
+
+		if  ( nIDThread !=3D AfxGetThread()->m_nThreadID
+			||nParanoia !=3D PARANOIA
+			||nAvailability !=3D UNAVAILABLE)
+		{
+			m_sErrMsg+=3D"shared memory is corrupt";
+			AfxThrowUserException();
+		}
+
+		//Get to the foreground before we ask for a window for                =20
+                //any new doc.
+		CWnd* mainWnd =3D AfxGetThread()->GetMainWnd();
+		if  (mainWnd->IsIconic())
+			mainWnd->ShowWindow(SW_RESTORE);
+		else
+		{
+			mainWnd->SetForegroundWindow();
+			mainWnd->BringWindowToTop();
+		}
+		if  (lenFileName !=3D 0)
+		{
+			LPTSTR lpStr =3D                 =20
+                                    =
+ strFileName.GetBufferSetLength(lenFileName);
+			m_sharedFile.Read(lpStr,lenFileName);
+			ASSERT(AfxIsValidString(lpStr));
+			TRACE("Opening %s\n",strFileName);
+	                AfxGetApp()->OpenDocumentFile(strFileName);		=09
+			//but if it's already resident, but Iconic, nowt                        =
+=20
+                        //will have happened..
+			BOOL bRestored =3D RestoreViewIfIconic(lpStr);
+			strFileName.ReleaseBuffer();
+			if  (!bRestored)
+			{
+				m_sErrMsg+=3D"view-check failed";
+				AfxThrowUserException();
+			}
+		}
+
+		//OK, now signal success  --  reposition & set flag:			                   =
+            =20
+                m_sharedFile.Seek(sizeof(int)+sizeof(int),CFile::begin);
+		int i =3D AVAILABLE;
+		m_sharedFile.Write(&i,sizeof(int));
+		}
+
+	catch (CException* ex)
+		{
+			TCHAR	szCause[255];
+			ex->GetErrorMessage(szCause, 255);
+			m_sErrMsg +=3D "  --  ";
+			m_sErrMsg +=3D szCause;
+			AfxMessageBox(m_sErrMsg);
+			ex->Delete();
+		}
+	return TRUE;
+}
+
+BOOL CNoDupes::RestoreViewIfIconic(LPTSTR lpStr)
+{
+	CDocument*	pDoc;
+	CView*		pView;
+	CFrameWnd*	pFrame;=09
+	CWnd*		pSomeWnd  =3D AfxGetMainWnd();
+
+	ASSERT_VALID(pSomeWnd);
+=09
+	pDoc =3D ((CFrameWnd*)pSomeWnd)->GetActiveDocument();
+	if  (pDoc =3D=3D NULL)
+	{
+		//then hopefully this is an MDI application:
+		pFrame =3D ((CMDIFrameWnd*)pSomeWnd)->MDIGetActive();
+		pDoc =3D pFrame->GetActiveDocument();
+		if  (pDoc =3D=3D NULL)
+			return FALSE;
+	}
+	CString strPath =3D pDoc->GetPathName();
+	if  (lpStr !=3D strPath)
+		return FALSE;//VERRRRY strange...
+=09
+	POSITION pos =3D pDoc->GetFirstViewPosition();
+	while (pos !=3D NULL)
+	{
+		pView  =3D pDoc->GetNextView(pos);
+		pFrame =3D pView->GetParentFrame();
+		if  (pFrame->IsIconic())
+			pFrame->ShowWindow(SW_RESTORE);
+	}
+
+	return TRUE;
+}
+
+/////////////////////////////////////////////////////////////////////////
+// GlobalMemoryFile.h : header file
+//
+
+#include <afxadv.h>
+#define  PSEUDO_SECTOR 256
+
+////////////////////////////////////////////////////////////////////////////=
+/
+// CGlobalMemoryFile
+
+class CGlobalMemoryFile : public CSharedFile
+{
+	DECLARE_DYNAMIC(CGlobalMemoryFile)
+// Construction, stage 1:
+public:
+	CGlobalMemoryFile(UINT nGrowBytes =3D PSEUDO_SECTOR,
+			UINT nAllocFlags=3D GMEM_DDESHARE | GMEM_MOVEABLE);
+
+
+// Attributes
+protected:
+	HGLOBAL	m_hGlobalMemory;//GlobalAlloc(), GlobalFree()
+	UCHAR*  m_lpGlobal;	//store/restore	CMemFile::m_lpBuffer
+	HANDLE	m_hFileMap;	//CreateFileMapping(),MapViewOfFile()
+	LPVOID	m_lpMapAddress; //[Un]MapViewOfFile(),=20
+                                //=3D=3D> CMemFile::m_lpBuffer
+public:
+
+// Operations
+public:
+// Construction, stage 2:
+	BOOL Allocate(LPCTSTR lpszFileName,
+                      DWORD nBytes =3D PSEUDO_SECTOR);//~=3D Open,Create
+	BOOL Assign  (LPCTSTR lpszFileName);	    //~=3D Open Existing
+
+
+// Overrides
+
+// Implementation
+public:
+	virtual ~CGlobalMemoryFile();
+};
+
+////////////////////////////////////////////////////////////////////////////=
+/
+// GlobalMemoryFile.cpp : implementation file
+//
+
+#include "stdafx.h"
+#include "GlobalMemoryFile.h"
+
+#ifdef _DEBUG
+#define new DEBUG_NEW
+#undef THIS_FILE
+static char THIS_FILE[] =3D __FILE__;
+#endif
+
+////////////////////////////////////////////////////////////////////////////=
+/
+// CGlobalMemoryFile
+
+CGlobalMemoryFile::CGlobalMemoryFile(UINT nGrowBytes, UINT nAllocFlags)
+	:CSharedFile(nAllocFlags,nGrowBytes),
+	m_hGlobalMemory(NULL),	//handle for CSharedFile
+	m_hFileMap(NULL),	//handle for SDK File-mapping
+	m_lpMapAddress(NULL)	//^working I/O buffer
+
+{
+}
+
+CGlobalMemoryFile::~CGlobalMemoryFile()
+{
+	if  (m_lpMapAddress !=3D NULL)
+		UnmapViewOfFile(m_lpMapAddress);
+	if  (m_hFileMap !=3D NULL)
+		CloseHandle(m_hFileMap);
+	if  (m_hGlobalMemory !=3D NULL)
+	{
+		m_lpBuffer =3D m_lpGlobal;//put it back...
+		GlobalFree(m_hGlobalMemory);
+	}
+}
+
+BOOL CGlobalMemoryFile::Allocate(LPCTSTR lpszFileName,DWORD nBytes)
+{
+	ASSERT(AfxIsValidString(lpszFileName));
+
+	int nErr;=09
+=20
+	m_strFileName =3D lpszFileName;
+	m_hGlobalMemory =3D ::GlobalAlloc(m_nAllocFlags, nBytes);
+	if  (m_hGlobalMemory =3D=3D NULL)
+		return FALSE;
+
+	m_lpGlobal =3D m_lpBuffer;//to put it back at dtor time...
+	SetHandle(m_hGlobalMemory, /*BOOL bAllowGrow=3D*/ TRUE);
+
+	m_hFileMap =3D CreateFileMapping(
+				(HANDLE) 0xFFFFFFFF, //the paging file
+			        /*LPSECURITY_ATTRIBUTES =3D */ NULL,
+				PAGE_READWRITE,
+				0,GlobalSize(m_hGlobalMemory),
+				lpszFileName);
+	=09
+	nErr =3D GetLastError();
+	if  (nErr =3D=3D 0)
+	{
+		m_lpMapAddress =3D MapViewOfFile(
+			m_hFileMap,
+			FILE_MAP_ALL_ACCESS,   // Read/write permission=20
+			0,                     // Max. object size.=20
+			0,                     // Size of hFile.=20
+			0);                    // Map entire file.
+		nErr =3D GetLastError();
+	}
+
+	if  (nErr =3D=3D 0)
+	{
+		m_lpBuffer =3D (UCHAR*)m_lpMapAddress;
+		return TRUE;
+	}
+	else
+		return FALSE;
+}
+
+BOOL CGlobalMemoryFile::Assign(LPCTSTR lpszFileName)
+{
+	ASSERT(AfxIsValidString(lpszFileName));
+	m_strFileName =3D lpszFileName;
+	//m_hGlobalMemory =3D ::GlobalAlloc(m_nAllocFlags, nBytes);
+	m_hGlobalMemory =3D               =20
+                 ::GlobalAlloc(m_nAllocFlags,(DWORD)PSEUDO_SECTOR);
+	if  (m_hGlobalMemory =3D=3D NULL)
+		return FALSE;
+
+	m_lpGlobal =3D m_lpBuffer;
+	SetHandle(m_hGlobalMemory, /*BOOL bAllowGrow=3D*/ TRUE);
+
+
+	HANDLE hFileMap =3D OpenFileMapping(FILE_MAP_READ | FILE_MAP_WRITE,
+					/*BOOL bInheritHandle =3D */FALSE,
+					lpszFileName);
+	int nErr =3D GetLastError();
+
+	if  (nErr =3D=3D 0)
+	{
+		m_lpMapAddress =3D (UCHAR*)MapViewOfFile(
+			hFileMap,
+			FILE_MAP_ALL_ACCESS, // Read/write permission=20
+			0,                   // Max. object size.=20
+			0,                   // Size of hFile.=20
+			0);                  // Map entire file.
+		nErr =3D GetLastError();
+	}
+
+	if  (nErr =3D=3D 0)
+	{
+		m_lpBuffer =3D (UCHAR*)m_lpMapAddress;
+		return TRUE;
+	}
+	else
+		return FALSE;
+}
+
+IMPLEMENT_DYNAMIC(CGlobalMemoryFile, CSharedFile)
+////////////////////////////////////////////////////////////////////////////
+
+
+
+
+
+
+>From the BBC's "Barchester Chronicles":
+
+    "I know that ultimately we are not supposed to understand.
+    But I also know that we must try."
+
+       -- the Reverend Septimus Harding,=20
+          tax-consultant, crypt-analyst, clog-dancer, C++ programmer
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Jim Lawson Williams -- <A HREF="mailto:jimlw@mail.ccur.com.au">jimlw@mail.ccur.com.au</A>
+Thursday, February 06, 1997
+</B>
+At 09:15 AM 3/02/97 -0500, you wrote:
+
+>What we do is:
+
+> - register a window class
+
+> - override OnDDECommand in the App class 
+
+> - use CWnd::FindWindow to find a previous invocation
+
+> - use DDE to send the file name to open (or any other 
+
+>   sort of message) to the already running application.
+
+>
+
+>The OnDDECommand routine in the first invocation receives
+
+>the string sent by the second invocation, and then you 
+
+>can process it any way you wish.
+
+>
+
+>What is outlined below seems needlessly complicated, unless
+
+>I am missing something. Registering and using a window class
+
+>is not a big deal - we register the class in InitInstance,
+
+>and override CMainFrame::PreCreateWindow, where we set the
+
+>window's class when the frame gets created.
+
+>
+
+>-charlie way
+
+> cway@viatech-inc.com
+
+>
+
+You're absolutely right re a simple file-name.  Let me repeat what I
+posted earlier:
+
+<paraindent><param>left</param>
+
+Why all this trouble to pass one simple string?  Anyone
+
+who thinks that this is a sledge-hammer approach to 
+
+nut-cracking is right.  It's really a test-bed for more 
+
+complex exchanges between loosely-coupled processes.  The 
+
+"navigation by programmer" required in FileMapping is 
+
+just too clumsy for my taste, but at the moment 
+
+CSharedFile is too limited.
+
+
+</paraindent>Message-exchange is fine for simple protocols. As
+Peter.Walker@ubs.com said, 
+
+a WM_COPYDATA could be made to do the job; to suit me, with the addition
+of a 
+
+<<ACK> to tie off loose ends.  Note in particular the recommendation that
+SendMessage() be used, not PostMessage().  If you ignore that, you
+obviously risk modifying the data before the recipient has a chance to
+use them.  The sender is suspended until the receiver accepts the
+message.  Not a problem with shipping a file-name to a primary copy as in
+the instance with which I elected to experiment. A serious one if the
+sender is supposed to be responsive, and
+
+cannot "go to sleep" for an unpredictable amount of time.
+
+
+Of course response-time is ultimately limited by the reponsiveness of the
+receiver/server, but in the system I'm concerned with all efforts needs
+must be made to smooth out that response-time, recognizing differences
+between "put" and "get" requests.
+
+
+Your suggestion of CWinApp::OnDDECommand() would also open the nominated
+document in this selected case, and could do a few more things besides. 
+Doing anything more complex via the SDK functions leaves me confused. 
+I've just re-read the stuff on XTYP_ADVDATA, XTYP_ADVREQ, XTYP_ADVSTART,
+XTYP_ADVSTOP, XTYP_CONNECT, XTYP_CONNECT_CONFIRM,
+XTYP_DISCONNECT,XTYP_ERROR, XTYP_EXECUTE, XTYP_MONITOR, XTYP_POKE,
+XTYP_REGISTER, XTYP_REQUEST, XTYP_UNREGISTER, XTYP_WILDCONNECT,
+XTYP_XACT_COMPLETE, and after re-studying those 16 functions I'm still
+none the wiser in terms of what I would need to do to approximate
+multiple queue-management in good old FORTRAN named COMMON, or
+equivalent.  Or, indeed, if I really could obtain totally asynchronous
+execution via DDE.
+
+
+Multi-threading is not the total answer since it assumes the "client"
+must be integrated with the "server" in a single process.  That is, any
+new client cannot be developed as a separate project, and must be
+integrated with the original source  --  inflexible, and not what I seek.
+ For "futures" I need separate processes, with "run-time" access to the
+particular server.
+
+
+Forget about the file-name exchange in the test-bed.  My only interest is
+in the CSharedFile buffer-pointer-fiddling, or some viable alternatve. 
+If I can reliably manipulate a (comparartively large) area with "lock",
+"read", and "write", then I can manage multiple complex queues of "things
+to do".
+
+
+Regards,
+
+Jim LW
+
+
+ 
+
+
+
+
+
+
+>From the BBC's "Barchester Chronicles":
+
+
+    "I know that ultimately we are not supposed to understand.
+
+    But I also know that we must try."
+
+
+       -- the Reverend Septimus Harding, 
+
+          tax-consultant, crypt-analyst, clog-dancer, C++ programmer
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

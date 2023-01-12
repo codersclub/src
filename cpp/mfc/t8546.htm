@@ -1,0 +1,330 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Two or more views of a single document.
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Hans Wedemeyer -- <A HREF="mailto:hansw@sprintmail.com">hansw@sprintmail.com</A>
+Tuesday, December 17, 1996
+</B>
+Environment: MSVC++ 4.2b, Win NT 4.0
+
+Two or more views of a single document....
+
+Trying to make the second view have the same attributes as the first
+view.
+Using the "TANGRAM" example and examples from my new found treasure,
+"The Revolutionary Guide to MFC" by Mike Blaszczak, I ventured forth...
+After many hours of stepping with the debugger, reading lots more "stuf"
+I'm confused, why is the call that's made when the second view is
+created ignored! ( see code fragments )
+
+My call to CreateOrActivateFrame() seems correct, at least a view
+appears!, but not the style I need. In this routine there's a call to
+CreateNewFrame()and I tried giving it a pointer to the first view, as
+the doucmentation implies
+quote ...
+    "It provides a frame window on which to model the new frame window."
+
+This does not seem to work either....
+Finding out how MFC is used, is like swimming in syrup! I have read some
+code that was written by a so called professional, and even with my
+limited knowledge I know don't want to make the same mess that he
+made... I guess I've started the " got to pay the due's" phase, and I'm
+impatient to get going. My first attempt is now history.... after much
+more reading I re-grouped and planned a new strategy, helped along with
+Blaszczak's book.
+
+Where am I going wrong ?
+
+When will the changes to CREATESTRUCT be used, and why are they ignored?
+
+Why are the first changes to CREATESTRUCT used and not the second ?
+
+Even the AppWizard left behind a TODO: that implies this is where I
+should be able to change the style...
+
+      // TODO: Modify the Window class or styles here by modifying
+      //  the CREATESTRUCT cs
+
+Any tips or pointers are welcome..
+regards
+Hans Wedemeyer
+code fragments follow:-
+
+BOOL CScan3App::InitInstance()
+{
+   ......
+        //pDocTemplate;
+        pDataTemplate = new CMultiDocTemplate(
+                IDR_SCAN3TYPE,
+                RUNTIME_CLASS(CScan3Doc),
+                RUNTIME_CLASS(CChildFrame),
+                RUNTIME_CLASS(CScan3View));
+        AddDocTemplate(pDataTemplate);
+
+        pScaleTemplate = new CMultiDocTemplate(
+                IDR_SCAN3TYPE2,
+                RUNTIME_CLASS(CScan3Doc),
+                RUNTIME_CLASS(CMDIChildWnd),
+                RUNTIME_CLASS(CScale3View));
+        AddDocTemplate(pScaleTemplate);
+
+        // create main MDI Frame window
+        CMainFrame* pMainFrame = new CMainFrame;
+        if (!pMainFrame->LoadFrame(IDR_MAINFRAME))
+                return FALSE;
+        m_pMainWnd = pMainFrame;
+        ........
+
+        // now create and display the second view
+        pMainFrame->CreateOrActivateFrame(theApp.pScaleTemplate,
+                                          RUNTIME_CLASS(CScale3View));
+}
+////////////////////////////////////////////////////////////////////////
+// In the default CChildFrame Class
+// gets called THREE times !
+BOOL CChildFrame::PreCreateWindow(CREATESTRUCT& cs)
+{
+     cs.y  = 0;   // hard coded values for test only
+     cs.x  = 30;
+     cs.cx = 100;
+     cs.cy = 200;
+     cs.style = WS_CHILD | WS_VISIBLE | WS_THICKFRAME;
+     return CMDIChildWnd::PreCreateWindow(cs);
+}   // this changes the appearance and position of the FIRST window
+
+////////////////////////////////////////////////////////////////////////
+// In the new class for the second view  CScale3View : CView
+// Gets called ONCE ! has no effect! ie does not changes the style
+// gets ignored !
+BOOL CScale3View::PreCreateWindow(CREATESTRUCT& cs)
+{
+        cs.y  = 1;
+        cs.x  = 1; // hard coded values for test only
+        cs.cx = 20;
+        cs.cy = 20;
+        cs.style = WS_CHILD | WS_VISIBLE ;
+        return CView::PreCreateWindow(cs);
+
+}  This has NO effect on the first Window gets ignored !
+
+///////////////////////////////////////////////////////////////////////////
+// CMainFrame Helper Functions
+void CMainFrame::CreateOrActivateFrame(CDocTemplate* pTemplate,
+                                       CRuntimeClass* pViewClass)
+{
+    CMDIChildWnd* pMDIActive = MDIGetActive();
+    ASSERT(pMDIActive != NULL);
+    CDocument* pDoc = pMDIActive->GetActiveDocument();
+    ASSERT(pDoc != NULL);
+
+    CView* pView;
+    POSITION pos = pDoc->GetFirstViewPosition();
+    while (pos)
+    {
+        pView = pDoc->GetNextView(pos);
+        if (pView->IsKindOf(pViewClass))
+        {
+            pView->GetParentFrame()->ActivateFrame();
+            return;
+        }
+    }
+        CMainFrame *pMainFrame = (CMainFrame *) AfxGetMainWnd();
+        CView* pVCur = pMainFrame->GetActiveView();
+
+    CMDIChildWnd* pNewFrame
+        = (CMDIChildWnd*)(pTemplate->CreateNewFrame( pDoc, pMDIActive
+));
+    if (pNewFrame == NULL)                                     ^
+    {    return;   }  // not created                           |
+    ASSERT(pNewFrame->IsKindOf(RUNTIME_CLASS(CMDIChildWnd)));  |
+    pTemplate->InitialUpdateFrame(pNewFrame, pDoc);            |
+}                                                              |
+ //   Make a copy of the first view ----------------------------
+ // does not work either !
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+ГЦ °ж ·Д -- <A HREF="mailto:listen@klnet.co.kr">listen@klnet.co.kr</A>
+Friday, January 24, 1997
+</B>
+Hans Wedemeyer wrote:
+> 
+> Environment: MSVC++ 4.2b, Win NT 4.0
+> 
+>.....
+>
+> BOOL CScan3App::InitInstance()
+> {
+>    ......
+>         //pDocTemplate;
+>         pDataTemplate = new CMultiDocTemplate(
+>                 IDR_SCAN3TYPE,
+>                 RUNTIME_CLASS(CScan3Doc),
+>                 RUNTIME_CLASS(CChildFrame),
+>                 RUNTIME_CLASS(CScan3View));
+>         AddDocTemplate(pDataTemplate);
+> 
+>         pScaleTemplate = new CMultiDocTemplate(
+>                 IDR_SCAN3TYPE2,
+>                 RUNTIME_CLASS(CScan3Doc),
+>                 RUNTIME_CLASS(CMDIChildWnd),
+>                 RUNTIME_CLASS(CScale3View));
+>         AddDocTemplate(pScaleTemplate);
+> 
+>         // create main MDI Frame window
+>         CMainFrame* pMainFrame = new CMainFrame;
+>         if (!pMainFrame->LoadFrame(IDR_MAINFRAME))
+>                 return FALSE;
+>         m_pMainWnd = pMainFrame;
+>         ........
+> 
+>         // now create and display the second view
+>         pMainFrame->CreateOrActivateFrame(theApp.pScaleTemplate,
+>                                           RUNTIME_CLASS(CScale3View));
+> }
+> ////////////////////////////////////////////////////////////////////////
+> // In the default CChildFrame Class
+> // gets called THREE times !
+> BOOL CChildFrame::PreCreateWindow(CREATESTRUCT& cs)
+> {
+>      cs.y  = 0;   // hard coded values for test only
+>      cs.x  = 30;
+>      cs.cx = 100;
+>      cs.cy = 200;
+>      cs.style = WS_CHILD | WS_VISIBLE | WS_THICKFRAME;
+>      return CMDIChildWnd::PreCreateWindow(cs);
+> }   // this changes the appearance and position of the FIRST window
+> 
+> ////////////////////////////////////////////////////////////////////////
+> // In the new class for the second view  CScale3View : CView
+> // Gets called ONCE ! has no effect! ie does not changes the style
+> // gets ignored !
+> BOOL CScale3View::PreCreateWindow(CREATESTRUCT& cs)
+> {
+>         cs.y  = 1;
+>         cs.x  = 1; // hard coded values for test only
+>         cs.cx = 20;
+>         cs.cy = 20;
+>         cs.style = WS_CHILD | WS_VISIBLE ;
+>         return CView::PreCreateWindow(cs);
+> 
+> }  This has NO effect on the first Window gets ignored !
+> 
+> ///////////////////////////////////////////////////////////////////////////
+> // CMainFrame Helper Functions
+> void CMainFrame::CreateOrActivateFrame(CDocTemplate* pTemplate,
+>                                        CRuntimeClass* pViewClass)
+> {
+>     CMDIChildWnd* pMDIActive = MDIGetActive();
+>     ASSERT(pMDIActive != NULL);
+>     CDocument* pDoc = pMDIActive->GetActiveDocument();
+>     ASSERT(pDoc != NULL);
+> 
+>     CView* pView;
+>     POSITION pos = pDoc->GetFirstViewPosition();
+>     while (pos)
+>     {
+>         pView = pDoc->GetNextView(pos);
+>         if (pView->IsKindOf(pViewClass))
+>         {
+>             pView->GetParentFrame()->ActivateFrame();
+>             return;
+>         }
+>     }
+>         CMainFrame *pMainFrame = (CMainFrame *) AfxGetMainWnd();
+>         CView* pVCur = pMainFrame->GetActiveView();
+> 
+>     CMDIChildWnd* pNewFrame
+>         = (CMDIChildWnd*)(pTemplate->CreateNewFrame( pDoc, pMDIActive
+> ));
+>     if (pNewFrame == NULL)                                     ^
+>     {    return;   }  // not created                           |
+>     ASSERT(pNewFrame->IsKindOf(RUNTIME_CLASS(CMDIChildWnd)));  |
+>     pTemplate->InitialUpdateFrame(pNewFrame, pDoc);            |
+> }                                                              |
+>  //   Make a copy of the first view ----------------------------
+>  // does not work either !
+
+Hi! Hans.
+Maybe it's too late.
+However, I have met a problem like you.
+
+I use 3 Views for one Document.
+And I want 3 views can change frame size or style individually.
+So I override PreCreateWindow() in ChildFrame and 3 Views.
+But the PreCreateWindow() Function in 3 views doesn't work.
+Only PreCreateWindow() Function in ChildFrame works.
+When situation like those above the PreCreateWindow() Function
+in 3 views doesn't called.
+
+So I added code to OnInitialUpdate() in 3 views
+like this:
+	CChildFrame* pwnd = (CChildFrame*)GetParentFrame();
+	pwnd->ModifyStyle(0,WS_MAXIMIZEBOX | WS_SIZEBOX);
+	GetClientRect(&clientRect);
+
+And when I want to resize the Frame, set the clientRect with
+proper size and use MoveWindow() Function.
+
+try like this:
+
+BOOL CScale3View::OnInitialUpdate()
+{
+	CRect clientRect;
+
+	CChildFrame* pwnd = (CChildFrame*)GetParentFrame();
+	pwnd->ModifyStyle(0,WS_CHILD | WS_VISIBLE);
+	GetClientRect(&clientRect);         
+	clientRect.SetRect(1,1,20,20);
+	MoveWindow(clientRect);
+	.....
+}
+
+;-)
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

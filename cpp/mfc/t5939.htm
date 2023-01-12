@@ -1,0 +1,273 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Explicit DLL Handling
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Michael D. Hill -- <A HREF="mailto:uly@mindspring.com">uly@mindspring.com</A>
+Monday, July 22, 1996
+</B>
+Environment:  VC++ 4.0, Win95
+
+Folks...
+
+I have a situation where I need to have several modules which are plug-ins
+to my base app.  My first thought is to use explicit DLLs, something like this:
+
+BaseApp       PlugInDll
+   \               /
+    \             /
+     \           /
+      \         /
+      BaseDLL(s)
+
+The idea here is that the BaseApp has private profile info that tells it
+which PlugInDLLs are installed (by dll name).  During BaseApp.InitInstance
+it builds an array of plugins.  It explicitly loads the PlugInDLLs, and for
+each one does some GetProcAddress(es) to give it function pointer(s) into
+the DLL.  Of course, all plugin DLL's must have the same basic interface
+functions exported at the same ordinals.
+
+Being older and wiser than I once was, I decided to test this scheme before
+I committed to it irrevocably.  I created BaseApp with an InitInstance like so:
+
+        // Open a dll
+	HINSTANCE db=LoadLibrary("PLUGIN.DLL");
+        // Grab it's ordinal 3 function
+	DBProc=GetProcAddress(db,(LPCSTR)(0x03));
+
+Later on, in an event handler, I call:
+        (DBProc)();
+
+The actual DBProc is:
+
+void TakesVoidReturnsVoid()
+{
+        afxMessageBox("Inside TVRV");
+}
+
+All's more or less well.  If I build the (debug) app and the (debug) dll,
+copy the dll into \WINDOWS, and run, everything's fine, and if I debug I
+even get to see the code in the dll (they're both in one project).
+Furthermore, if I build the (release) app and the (release) dll, copy the
+dll into \WINDOWS and run, everything's *also* fine.  
+
+But if I try to run (debug) app with (release) dll or (release) app with
+(debug) dll, I get an access violation exception.  This happens even if I
+invoke the app from outside VC++, so it's not the presence of the debugger
+that's causing the problem.
+
+My conclusion is that debug and release versions are incompatible, even
+across the DLL-boundary.
+
+My questions are:
+        Am I right?
+        Why?
+        Do I care?
+
+And on a related theme:
+        Can I create a factory in a plug-in that returns a CView-derived
+class that can then be used by my baseapp as it would an ordinary CView?
+
+Thanks much for your time and effort!
+Hill
+
+Michael Hill
+uly@mindspring.com
+Feral Software, Inc.
+KaizenSoft Inc.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:David.Lowndes@bj.co.uk">David.Lowndes@bj.co.uk</A>
+Friday, July 26, 1996
+</B>
+[Mini-digest: 2 responses]
+
+>But if I try to run (debug) app with (release) dll or (release) app with
+>(debug) dll, I get an access violation exception.
+>
+>My conclusion is that debug and release versions are incompatible, even
+>across the DLL-boundary.
+>
+>My questions are:
+>        Am I right?
+
+Yes.
+
+>        Why?
+
+I'm not sure, but there are obviously differences between MFC things
+in debug & release builds. Have a look at "Debugging Custom AppWizards"
+in the VC on-line help. It says the memory allocations are different.
+
+>        Do I care?
+
+Obviously - it's a bit of a bind!
+-----From: CraigTT@ccmail01.PE-Nelson.COM
+
+     
+With MFC you can't mix debug and release components of your project.  At least 
+part of it has to do with how inline functions are handled; inlined for release 
+and out of line for debug.
+
+You should be able to export a CView derived pointer via a function in your DLL 
+and use it in your app.  I had a similar situation where we needed "plug and 
+play" of certain components providing similar functionality.  In my case I 
+exported one function the app called after loading the DLL.  This function 
+returned an interface pointer to the app and the app passed in its version of a 
+client interface so the DLL could communicate back to the app.  Inheritance and 
+the VTable took care of the rest.  It ended up looking a whole lot like inproc 
+COM which was the intent (I expected to convert it to COM when my "colleagues" 
+and OEM customers came up to speed).
+
+Tim Craig
+CraigTT@PE-Nelson.com
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Jeremy Smith -- <A HREF="mailto:jeremy_smith@mentec.ie">jeremy_smith@mentec.ie</A>
+Monday, July 29, 1996
+</B>
+ Michael
+ 
+ I have a similar technique without the problem you mention.  However, I do some 
+ things differently.  I GetProcAddress() by name not ordinal (Richter suggests 
+ this as you lose no performance on the PE format and you wouldn't need a .DEF 
+ file to prevent versionitis when you re-compile DLL's).
+ 
+ However, the compiler mangles the function names by prepending an underscore 
+ and adding @nnn where nnn is the # bytes pushed to stack - the way to stop this 
+ is the .DEF file with the unmangled file names.  So I use a .DEF file afer all.
+ 
+ You don't say where you get your access violation, nor do you seemingly check 
+ the return value of GetProcAddress().  If GetProcAddress() is failing then your 
+ ordinal doesn't exist in the DLL - you can use DUMPBIN to examine the DLL.  If 
+ GetProcAddress() is succeeding then maybe you have more than 1 fcn in DLL and 
+ you are calling the wrong one.
+ 
+ 
+ Jeremy
+ 
+ [These are personal views and not those of my employer]
+ 
+     
+     
+     
+>Folks...
+
+>I have a situation where I need to have several modules which are plug-ins
+>to my base app.  My first thought is to use explicit DLLs, something like this:
+
+>BaseApp       PlugInDll
+>\               /
+>\             /
+>\           /
+>\         /
+>BaseDLL(s)
+>
+>The idea here is that the BaseApp has private profile info that tells it which 
+>PlugInDLLs are installed (by dll name).  During BaseApp.InitInstance it builds 
+>an array of plugins.  It explicitly loads the PlugInDLLs, and for each one does
+>some GetProcAddress(es) to give it function pointer(s) into the DLL.  Of 
+>course, all plugin DLL's must have the same basic interface functions exported 
+>at the same ordinals.
+>
+>Being older and wiser than I once was, I decided to test this scheme before
+>I committed to it irrevocably.  I created BaseApp with an InitInstance like so:
+>
+>// Open a dll
+>HINSTANCE db=LoadLibrary("PLUGIN.DLL");
+>// Grab it's ordinal 3 function
+>DBProc=GetProcAddress(db,(LPCSTR)(0x03));
+>
+>Later on, in an event handler, I call:
+>(DBProc)();
+>
+>The actual DBProc is:
+>
+>void TakesVoidReturnsVoid()
+>{
+>afxMessageBox("Inside TVRV");
+>}
+>
+>All's more or less well.  If I build the (debug) app and the (debug) dll, copy 
+>the dll into \WINDOWS, and run, everything's fine, and if I debug I even get to
+>see the code in the dll (they're both in one project). Furthermore, if I build 
+>the (release) app and the (release) dll, copy the dll into \WINDOWS and run, 
+>everything's *also* fine.  
+>
+>But if I try to run (debug) app with (release) dll or (release) app with 
+>(debug) dll, I get an access violation exception.  This happens even if I 
+>invoke the app from outside VC++, so it's not the presence of the debugger 
+>that's causing the problem.
+>
+>My conclusion is that debug and release versions are incompatible, even across 
+>the DLL-boundary.
+>
+>My questions are:
+>Am I right?
+>Why?
+>Do I care?
+>
+>And on a related theme:
+>Can I create a factory in a plug-in that returns a CView-derived
+>class that can then be used by my baseapp as it would an ordinary CView?
+>
+>Thanks much for your time and effort! Hill
+>
+>Michael Hill
+>uly@mindspring.com
+>Feral Software, Inc.
+>KaizenSoft Inc.
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

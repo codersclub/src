@@ -1,0 +1,368 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Changing the paper orientaion from the OnPrint function
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Shahram Pourmakhdomi -- <A HREF="mailto:d2pouss@seldon.dtek.chalmers.se">d2pouss@seldon.dtek.chalmers.se</A>
+Thursday, November 14, 1996
+</B>
+Environment: VC++ 1.52 Windows 3.11
+
+Hi folks!
+
+I would like to change the paper orientation from OnPrint function of my
+view class instead of letting the user choose Printer setup from the file
+menu. I would like to know how this is possible. From what I've heard I
+have to call the CDC::Escape function but I don't seem to be able to find
+the right escape code (first parameter of Escape) for this purpose.
+Please let me know if the information I've got is correct and in that case
+what parameters I should use or if there are other ways of doin' this.
+
+Thanx in advance
+
+Sharam Pourmakhdomi
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Gajendra Prasad Yadav -- <A HREF="mailto:gajendra@aditi.com">gajendra@aditi.com</A>
+Saturday, November 16, 1996
+</B>
+[Mini-digest: 2 responses]
+
+To change the default printer settings in an MFC application, you must
+retrieve the system default settings in a CWinApp derived object and
+modify those defaults before a print job is invoked.
+ 
+    Code snippet (taken from MSKB #Q126897):
+
+void CMyWinApp::SetLandscape()
+    {
+    // Get default printer settings.
+    PRINTDLG   pd;
+ 
+    pd.lStructSize = (DWORD) sizeof(PRINTDLG);
+    if (GetPrinterDeviceDefaults(&pd))
+        {
+        // Lock memory handle.
+        DEVMODE FAR* pDevMode =
+            (DEVMODE FAR*)::GlobalLock(m_hDevMode);
+        LPDEVNAMES lpDevNames;
+        LPTSTR lpszDriverName, lpszDeviceName, lpszPortName;
+        HANDLE hPrinter;
+ 
+        if (pDevMode)
+            {
+            // Change printer settings in here.
+            pDevMode->dmOrientation = DMORIENT_LANDSCAPE;
+           // Unlock memory handle.
+       lpDevNames = (LPDEVNAMES)GlobalLock(pd.hDevNames);
+       lpszDriverName = (LPTSTR )lpDevNames + lpDevNames->wDriverOffset;
+       lpszDeviceName = (LPTSTR )lpDevNames + lpDevNames->wDeviceOffset;
+       lpszPortName   = (LPTSTR )lpDevNames + lpDevNames->wOutputOffset;
+ 
+       ::OpenPrinter(lpszDeviceName, &hPrinter, NULL);
+       ::DocumentProperties(NULL,hPrinter,lpszDeviceName,pDevMode,
+                           pDevMode, DM_IN_BUFFER|DM_OUT_BUFFER);
+ 
+       // Sync the pDevMode.
+       // See SDK help for DocumentProperties for more info.
+       ::ClosePrinter(hPrinter);
+       ::GlobalUnlock(m_hDevNames);
+       ::GlobalUnlock(m_hDevMode);
+       }
+    }
+}
+
+
+Gajendra,
+Aditi Technologies.
+
+
+
+>----------
+>From: 	Shahram Pourmakhdomi[SMTP:d2pouss@seldon.dtek.chalmers.se]
+>Sent: 	Thursday, November 14, 1996 4:59 PM
+>To: 	mfc-mailninglist
+>Subject: 	Changing the paper orientaion from the OnPrint function
+>
+>Environment: VC++ 1.52 Windows 3.11
+>
+>Hi folks!
+>
+>I would like to change the paper orientation from OnPrint function of my
+>view class instead of letting the user choose Printer setup from the file
+>menu. I would like to know how this is possible. From what I've heard I
+>have to call the CDC::Escape function but I don't seem to be able to find
+>the right escape code (first parameter of Escape) for this purpose.
+>Please let me know if the information I've got is correct and in that case
+>what parameters I should use or if there are other ways of doin' this.
+>
+>Thanx in advance
+>
+>Sharam Pourmakhdomi
+>
+>
+-----From: CADD Design Solutions <cds59@mail.idt.net>
+
+Environment: VC++ 1.52 Windows 3.11
+
+
+I have the same problem, for which I THOUGHT I had found a solution.  The
+paper orientation change must be done from within the OnPreparePrinting()
+function.  I have included the following code in my OnPreparePrinting()
+function:
+
+BOOL CVersesView::OnPreparePrinting(CPrintInfo* pInfo)
+{
+   //the following 5 lines set orientation to landscape - the first get
+   //memory for a PRINTDLG structure. The second fills the structure with
+   //the printer defaults. 
+   
+   LPPRINTDLG pPrintDlg = new PRINTDLG;
+   AfxGetApp()->GetPrinterDeviceDefaults(pPrintDlg);
+   
+   //PRINTDLG contains handle of DEVMODE structure - the ::GlobalLock
+   //and Unlock are required by windows - GlobalLock returns a pointer to
+   //the DEVMODE structure given its handle    
+   LPDEVMODE lpDevmode = (LPDEVMODE)::GlobalLock(pPrintDlg->hDevMode);
+   if(!lpDevmode)
+   {
+      MessageBox("Memory allocation failure");
+      return FALSE;
+   }
+   
+   //dmOrientation is a member of the DEVMODE structure
+   //choices are DMORIENT_LANDSCAPE or DMORIENT_PORTRAIT
+   lpDevmode->dmOrientation = PrintOrientation;
+
+   //Clean up by freeing memory
+   if(::GlobalUnlock(pPrintDlg->hDevMode))
+   {
+      MessageBox("Failed to unlock memory object");
+      return FALSE;
+   }
+   delete pPrintDlg;
+   
+   //by-pass print dialog box during printing by setting m_bPreview to
+   //TRUE, thus causing the framework to not display the print dialog
+   if(!pInfo->m_bPreview) pInfo->m_bPreview = TRUE;
+
+   return DoPreparePrinting(pInfo);
+}
+
+My problem, however, is that this function causes a memory leak that I have
+yet to be able to figure out why.  The following message shows up in my
+debugging window:
+	Warning: CFormView does not support printing
+	Detected memory leaks!
+	Dumping objects ->
+	{109} non-object block at $2EE77A52, 52 bytes long
+	Object dump complete.
+
+If I reduce the function to nothing but:
+BOOL CVersesView::OnPreparePrinting(CPrintInfo* pInfo)
+{
+   return DoPreparePrinting(pInfo);
+}
+
+all works just fine.  Can anyone explain what I'm doing wrong??
+
+Thanks.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Karl Edwall -- <A HREF="mailto:karl@hs.com.au">karl@hs.com.au</A>
+Monday, November 18, 1996
+</B>
+Shahram Pourmakhdomi wrote:
+> Environment: VC++ 1.52 Windows 3.11
+> 
+> Hi folks!
+> 
+> I would like to change the paper orientation from OnPrint function of my
+> view class instead of letting the user choose Printer setup from the file
+> menu. I would like to know how this is possible. From what I've heard I
+> have to call the CDC::Escape function but I don't seem to be able to find
+> the right escape code (first parameter of Escape) for this purpose.
+> Please let me know if the information I've got is correct and in that case
+> what parameters I should use or if there are other ways of doin' this.
+> 
+> Thanx in advance
+> 
+> Sharam Pourmakhdomi
+> 
+
+Try reading article PSS ID Number: Q126897.
+
+In short in order to change the default printer settings in an MFC application,
+you must retrieve the system default settings in a CWinApp derived object and modify those defaults before a print job is invoked.
+
+Below is some code I wrote that does what you want but please read the KB article
+mentioned above too for a more complete understanding of the subject.
+
+// Set default orientation
+void SetupPrinter(BOOL fLandscape)
+{
+	// Get default printer settings.
+	CWinApp *app = AfxGetApp();
+	PRINTDLG   pd;
+	pd.lStructSize = (DWORD) sizeof(PRINTDLG);
+	if (app->GetPrinterDeviceDefaults(&pd))
+	{
+		// Lock memory handle.
+		DEVMODE FAR* pDevMode =	(DEVMODE FAR*)::GlobalLock(pd.hDevMode);
+		if (pDevMode)
+		{
+			// Change printer settings in here.
+			if(fLandscape)
+				pDevMode->dmOrientation = DMORIENT_LANDSCAPE;
+			else
+				pDevMode->dmOrientation = DMORIENT_PORTRAIT;
+			
+			pDevMode->dmFields |= DM_PAPERSIZE;
+			// Unlock memory handle.
+			::GlobalUnlock(pd.hDevMode);
+		}
+		app->SelectPrinter(pd.hDevNames, pd.hDevMode, TRUE);
+	}
+}
+
+---------------------------------------
+Human Solutions Pty Ltd
+DATA + PEOPLE = INFORMATION
+Ph: (03) 62335536    Fax: (03) 62335535
+Karl Edwall - karl@hs.com.au
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Carol Tumey -- <A HREF="mailto:carol.tumey@mail.mei.com">carol.tumey@mail.mei.com</A>
+Tuesday, November 19, 1996
+</B>
+At 12:29 PM 11/14/96 +0100, you wrote:
+>Environment: VC++ 1.52 Windows 3.11
+>
+>Hi folks!
+>
+>I would like to change the paper orientation from OnPrint function of my
+>view class instead of letting the user choose Printer setup from the file
+>menu. I would like to know how this is possible. From what I've heard I
+>have to call the CDC::Escape function but I don't seem to be able to find
+>the right escape code (first parameter of Escape) for this purpose.
+>Please let me know if the information I've got is correct and in that case
+>what parameters I should use or if there are other ways of doin' this.
+
+Its been a while since I've written this code, but try the following in
+your OnPrepareDC:
+ 
+    LPDEVMODE pDevMode = (LPDEVMODE) GlobalLock(pInfo->m_pPD->m_pd.hDevMode) ;
+    pDevMode->dmOrientation = (pageOrientation==R4B_ORIENT_LANDSCAPE)?2:1 ;
+    pDC->ResetDC(pDevMode) ;
+
+If this doesn't solve the problem let me know and I'll scope my sources 
+with a bit more scrutiny.
+
+Carol
+ 
+-----------------------------------------------------------------
+This is space.  It's sometimes called the final frontier.
+(Except that of course you can't have a *final* frontier, because
+there'd be nothing for it to be a frontier *to*, but as frontiers 
+go, it's pretty penultimate . . .)
+                   Terry Pratchett 
+                   _Moving Pictures_
+-----------------------------------------------------------------
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Carol Tumey -- <A HREF="mailto:carol.tumey@mail.mei.com">carol.tumey@mail.mei.com</A>
+Tuesday, November 19, 1996
+</B>
+At 12:29 PM 11/14/96 +0100, you wrote:
+>Environment: VC++ 1.52 Windows 3.11
+>
+>Hi folks!
+>
+>I would like to change the paper orientation from OnPrint function of my
+>view class instead of letting the user choose Printer setup from the file
+>menu. I would like to know how this is possible. From what I've heard I
+>have to call the CDC::Escape function but I don't seem to be able to find
+>the right escape code (first parameter of Escape) for this purpose.
+>Please let me know if the information I've got is correct and in that case
+>what parameters I should use or if there are other ways of doin' this.
+
+Its been a while since I've written this code, but try the following in
+your OnPrepareDC:
+ 
+    LPDEVMODE pDevMode = (LPDEVMODE) GlobalLock(pInfo->m_pPD->m_pd.hDevMode) ;
+    pDevMode->dmOrientation = (pageOrientation==R4B_ORIENT_LANDSCAPE)?2:1 ;
+    pDC->ResetDC(pDevMode) ;
+
+If this doesn't solve the problem let me know and I'll scope my sources 
+with a bit more scrutiny.
+
+Carol
+ 
+-----------------------------------------------------------------
+This is space.  It's sometimes called the final frontier.
+(Except that of course you can't have a *final* frontier, because
+there'd be nothing for it to be a frontier *to*, but as frontiers 
+go, it's pretty penultimate . . .)
+                   Terry Pratchett 
+                   _Moving Pictures_
+-----------------------------------------------------------------
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

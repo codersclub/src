@@ -1,0 +1,375 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Toolbar in a dialog box?
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Richard Steadman -- <A HREF="mailto:rsteadma@mmltd.com">rsteadma@mmltd.com</A>
+Monday, October 21, 1996
+</B>
+Environment: VC++ 1.52 on Win95
+
+Hi.
+
+I'm having trouble trying to create toolbars in a dialog box. I
+don't know if this is even possible, since the documentation says
+"CToolBar objects are usually embedded members of frame-window objects 
+derived from the class CFrameWnd or CMDIFrameWnd", but it doesn't
+mention using them in dialog boxes.
+
+Can anyone point me in the right direction? Is there any sample code
+regarding this on the VC distibution CD or at Microsoft's ftp site?
+
+Thanks,
+Richard Steadman
+rsteadma@micromedia.on.ca
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Michael Patterson -- <A HREF="mailto:patterso@sprynet.com">patterso@sprynet.com</A>
+Tuesday, October 22, 1996
+</B>
+[Mini-digest: 9 responses]
+
+I think there is one called tooltest or toolbar at the
+ftp site.  I think it might use a .DLL, so you might not
+want it.  I've had the same problem.  I ended up having
+to write a toolbar for dialogs.  As long as the dialog is not
+sizeable, you're OK.  I got sidetracked from finishing it,
+but it worked (except for a few things, which I hadn't implemented).
+This may be a bad way to do it, but it was easier.  There could
+be something out there that I don't know about, so you might want
+to check before taking it on.  Forgive me if I don't explain it
+well.
+
+1) Derive a toolbar from CWnd
+2) You will also have to have a derived CButton - you might be
+   able to use a CBitmap Button - I didn't try
+2) Set up an array containing the ID's (such as) - and put it in
+the dialog .cpp file
+
+static UINT dlgbtns1[] = // toolbar buttons - Menu ID's & Bitmap ID's
+{ // first start w/menu ID then put three bitmap ID's after - 1) UP, 2)
+DOWN, 3) DISABLED
+	0, // "0" is like an ID_SEPARATOR
+	IDC_NEW,IDB_ADDREC_UP,IDB_ADDREC_DOWN,IDB_ADDREC_DISABLED,
+	IDC_EDIT,IDB_EDIT_UP,IDB_EDIT_DOWN,IDB_EDIT_DISABLED,
+	IDC_DELETE,IDB_DELETE_UP,IDB_DELETE_DOWN,IDB_DELETE_DISABLED,
+	0,
+	IDC_SAVE,IDB_SAVE_UP,IDB_SAVE_DOWN,IDB_SAVE_DISABLED,
+	IDC_CANCEL,IDB_CANCEL_UP,IDB_CANCEL_DOWN,IDB_CANCEL_DISABLED,
+	0,
+	IDC_FIND,IDB_FIND_UP,IDB_FIND_DOWN,IDB_FIND_DISABLED,
+	0,
+	IDC_HELP,IDB_HELP_UP,IDB_HELP_DOWN,IDB_HELP_DISABLED
+};
+
+3) SET THESE 'public' TOOLBAR MEMBERS AS FOLLOWS IN THE DIALOGS 'OnCreate'
+
+       m_tbar.m_iArrayTotal = sizeof(dlgbtns1)/sizeof(UINT); // num items in
+array
+       m_tbar.m_pArray = dlgbtns1;// point to array
+       m_tbar.m_hWndDlg = m_hWnd; // assign dialog box window handle to
+toolbar member
+       //
+       m_tbar.Create(NULL, NULL, WS_VISIBLE|WS_CHILD, r, this, IDC_TOOLBARDLG);
+       m_tbar.m_rect = r; // assign values to member
+
+4) In the dialogs MESSAGE_MAP - set up something to handle the messages from
+   the button(s) such as
+   ON_MESSAGE(WM_BUTTONS_SEND, OnToolbarBtn)
+   and the function
+   LONG OnToolbarBtn(UINT nID, LONG lValue);  // The nID would countain the
+   button ID, then you can do what ever you like with it - it's been awhile,
+   but I think I may have done that for scrolling, but that's another story!
+5) have a function to use in your toolbar that will change the buttons,
+   so your dailog might call a function such as:
+   m_tbar.ChangeButtonState(IDC_FIND, FALSE); // to disable it
+6) In the toolbar CWnd - 'OnCreate' sort through the array and assign
+   the array items to the CButton members (that you dynamically
+   create in this function) - maybe something like below - you're going have to
+   change some of this stuff because I changed some stuff above
+
+  for (int iT = 0; iT < m_iArrayTotal; iT++)
+  {
+        nMenuItem = *m_pArray++;
+        //
+        if (nMenuItem != 0)
+        {
+           m_pButton[m_iButtons] = new CToolBarDlgBtn; // make sure to
+delete!@#$%
+          m_pButton[m_iButtons]->m_nID = nMenuItem; // store menu ID
+associated w/each button
+          m_pButton[m_iButtons]->m_hWndDlg = m_hWndDlg; // store dialog box
+HWND
+          m_pButton[m_iButtons]->m_bEnabled = TRUE; // initially set button to
+enabled
+          //
+          m_nMenuID[m_iButtons] = nMenuItem; // store menu ID associated w/
+each button
+          //
+          nBitmapID = *m_pArray++;
+          m_pButton[m_iButtons]->m_nBitmapUp = nBitmapID;
+          nBitmapID = *m_pArray++;
+          m_pButton[m_iButtons]->m_nBitmapDown = nBitmapID;
+          nBitmapID = *m_pArray++;
+          m_pButton[m_iButtons]->m_nBitmapDisabled = nBitmapID;
+          //
+//          nBitmapID = *m_pArray++; // NOT a menu ID; tells whether scrollable
+button or not - don't need this because I took it out
+//          if (nBitmapID == 1) // NOT scrollable
+//                m_pButton[m_iButtons]->m_bScroll = FALSE;
+//          else // scrollable
+//                m_pButton[m_iButtons]->m_bScroll = TRUE;
+          //
+          iT += 3; // incremented four ID's of m_pArray, so don't want "for"
+to loop
+extra times (would cause error)
+          //
+          r.left = r.right; // left boundary of button
+          r.right = r.left + 24; // right boundary of button
+	  //
+	  m_pButton[m_iButtons]->Create(NULL, WS_CHILD|WS_VISIBLE|BS_OWNERDRAW,
+	       r, this, ID_BTN1 + (UINT)m_iButtons);
+          //
+          m_hButton[m_iButtons] = m_pButton[m_iButtons]->m_hWnd; // store
+          button's window handle
+          //
+          m_iButtons++; // add one button to sum of total buttons
+        }
+        else // seperator which is equal to 12 pixels
+        {
+                r.left = r.right;
+                r.right = r.left + 12;
+        }
+  }
+
+// sorry about the mess
+
+7) Your dialog will comminicate with the toolbar by using the toolbar's public
+   member function.  So, the button (that you dynamically create) will
+   have in it's message map - ON_MESSAGE(WM_BTNSTATE, OnButtonState)
+   and you can act upon the button state, nState -
+   LONG OnButtonState(UINT nState, LONG lValue);
+   If I remember correctly, then the toolbar will send a message to
+   the appropriate CButton???
+
+** I know I have probably left a lot out, but you can get a general
+   idea of how I did it.  If you need some more help let me know.
+   Sorry about the mess - but it might give you some general ideas.
+
+Take care,
+Mike
+
+
+At 01:59 PM 10/21/96 -0400, you wrote:
+>Environment: VC++ 1.52 on Win95
+>
+>Hi.
+>
+>I'm having trouble trying to create toolbars in a dialog box. I
+>don't know if this is even possible, since the documentation says
+>"CToolBar objects are usually embedded members of frame-window objects 
+>derived from the class CFrameWnd or CMDIFrameWnd", but it doesn't
+>mention using them in dialog boxes.
+>
+>Can anyone point me in the right direction? Is there any sample code
+>regarding this on the VC distibution CD or at Microsoft's ftp site?
+>
+>Thanks,
+>Richard Steadman
+>rsteadma@micromedia.on.ca
+>
+>
+>
+********************
+Michael Patterson
+patterso@sprynet.com
+********************
+Phoenix, Arizona, USA
+
+-----From: "Brian Weeres" <bweeres@escape.ca>
+
+We do it in all of our dialogs (using vc 4.2 but 1.52 should work 
+similar.) 
+During OnInitDialog we call a loadtoolbar method which has the 
+following code.
+
+-------------------   code
+BOOL DLGBase::loadActionBar()
+{
+  CRect rectWnd;
+  GetWindowRect(rectWnd);
+
+ if (!m_wndActionBar.Create(this, WS_CHILD | WS_VISIBLE |
+ CBRS_ALIGN_RIGHT))
+  return FALSE;
+
+ if (!m_wndActionBar.LoadToolBar(m_nActionBarID))
+  return FALSE;
+
+  m_wndActionBar.SetBarStyle(m_wndActionBar.GetBarStyle() |
+    CBRS_TOOLTIPS | CBRS_FLYBY);
+
+  m_wndActionBar.SendMessage(TB_SETPARENT,(WPARAM) (HWND) m_hWnd);
+  RepositionBars(AFX_IDW_CONTROLBAR_FIRST, AFX_IDW_CONTROLBAR_LAST,  0);
+
+ // bar layout must be vertical
+ CSize csizeToolBar = m_wndActionBar.CalcFixedLayout(0, 0);
+
+ // default set the Toolbar to the right side of the dialog
+  m_wndActionBar.SetWindowPos(NULL, rectWnd.Width() - csizeToolBar.cx,
+  20,
+   csizeToolBar.cx,
+   csizeToolBar.cy,
+   SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+
+ return TRUE; 
+}
+
+We also do something very similar to put a toolbar on a property 
+sheet. 
+
+Hope this helps.
+
+--------------------------------
+Brian Weeres
+Rescom Ventures Inc.
+bweeres@rescom.com
+-----From: Roger Onslow/Newcastle/Computer Systems Australia/AU
+
+There is an entry in MS KB on doing just this:
+
+Q123158 - SAMPLE: Adding control bars to foundation classes dialogs
+
+Also, on Win95 you can also use a toolbar control (but not supported in MFC 
+1.52)
+
+Thanks,
+Richard Steadman
+rsteadma@micromedia.on.ca
+
+
+-----From: Gajendra Prasad Yadav <gajju@aditi.com>
+
+Hi, 
+
+You may want to refer to the DLGBAR(or DLGBAR32) sample which
+demonstrates how to add a status 
+bar and toolbar to a dialog. You can download this file from the
+following site:
+
+<A HREF="http://www.visionx.com/mfcpro/mskb.htm">http://www.visionx.com/mfcpro/mskb.htm</A>
+ 
+For downloading click on the "Adding control bars to dialog boxes in
+MFC" on the above page.
+
+Gajendra	 gajju@aditi.com
+
+
+-----From: Elemir Stevko <stevko@dcse.fee.vutbr.cz>
+
+There is an article in MSDN CD which deals with the problem of adding control bars
+to the dialogs. The article number is Q123158 and the sample code DLGCBR.EXE
+(or DLGCBR32.EXE) can be downloaded from the ftp.microsoft.com/softlib/mslfiles/
+directory.
+
+Elemir Stevko
+stevko@dcse.fee.vutbr.cz
+
+-----From: Wolfgang Loch <Wolfgang.Loch@RZ.TU-Ilmenau.DE>
+
+see KB Article Q123158:
+SAMPLE: Adding Control Bars to Foundation Classes Dialogs
+at:
+<A HREF="http://www.microsoft.com/kb/developr/visual_c/q123158.htm">http://www.microsoft.com/kb/developr/visual_c/q123158.htm</A>
+
+and maybe the 32-Bit version:
+SAMPLE: Adding Control Bars to Dialog Boxes in MFC 
+Article ID: Q141751
+<A HREF="http://www.microsoft.com/kb/developr/visual_c/Q141751.htm">http://www.microsoft.com/kb/developr/visual_c/Q141751.htm</A>
+
+Wolfgang
+-- 
+/-------------------------------------------------\
+| Wolgang Loch  (Technical University of Ilmenau) |
+|   e-mail: Wolfgang.Loch@rz.TU-Ilmenenau.DE      |
+|   www   : <A HREF="http://www.rz.tu-ilmenau.de/~wolo">http://www.rz.tu-ilmenau.de/~wolo</A>     |
+\-------------------------------------------------/
+-----From: Jeff Lindholm <JeffL@inter-intelli.com>
+
+Environment: VC++ 4.2, Win95/Win NT
+
+I use CToolBarCtrl with no problems. There are a few things you will
+have to do yourself, but I have it working on Dialogs, property sheets,
+and pages within TabCtrls. I would guess this should work with 1.52
+unless these controls/classes are unavailable.
+
+-----From: Igor Nedelko <Igor@omnitech-us.com>
+
+Hi Richard,
+Yes, there is a DLGBR32 sample application that shows how to use
+toolbars and status bars in a dialog box.
+You can easily find it in MSDN library.
+
+Regards,
+Igor 
+
+
+-----From: ganeshs@nationwide.com
+
+    Check out  MSKB article  Q123158: " SAMPLE:  Adding Control  Bars to
+Foundation Classes Dialogs" which has what you need...
+
+/ ___|    / ___| __ _ _ __   ___  ___| |    I do not speak for
+\___ \   | |  _ / _` | '_ \ / _ \/ __| '_ \ Tata   Unisys   or
+ ___) |  | |_| | (_| | | | |  __/\__ \ | | |Nationwide    Ins.
+|____(_)  \____|\__,_|_| |_|\___||___/_| |_|------------------
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,255 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Problem in opening recordset
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Glenn T. Jayaputera -- <A HREF="mailto:gtj@nunkeen.apana.org.au">gtj@nunkeen.apana.org.au</A>
+Tuesday, January 07, 1997
+</B>
+Environment: MSVC 1.52/Win 95
+
+Why the following section of the codes produce "Can't open any more tables or queries"
+Any help + pointer are greatly appreciated
+
+for ( int nIdx=0; nIdx < 500; nIdx++ )
+{
+  CDatabase SomeDB;
+  SomeDB.Open( .... );   // Assume successfull in opening the database
+
+   CRecordset *pSet = new CRecordset( &SomeDB );
+   pSet->Open( ...blah..blah..blah.. );
+   :
+   // do something..
+   :
+   pSet->Close();
+   delete pSet;
+   SomeDB.Close();
+}
+
+
+After a number of iteration I do get "Can't open any more tables or queries" message.  I just 
+dont quite understand why I do get that message where in fact I am closing the record set and 
+database in each of the iterations..
+
+thanks in advance
+glenn tesla
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dana M. Epp -- <A HREF="mailto:eppdm@uniserve.com">eppdm@uniserve.com</A>
+Wednesday, January 08, 1997
+</B>
+[Mini-digest: 2 responses]
+
+I believe it is very inefficient to open and close like this. Not only is
+this slow.. but you are causing so much extra load on the database, which I
+don't think is needed. I may be taking you on a tangent here, as most of
+this comes from experience with 4.x releases for the database stuff,
+however, I would assume the underlying principles still work back to 1.52.
+Someone in the list may be able to verifiy if this is do-able back at 1.52.
+
+Here is a few issues you may want to think about:
+
+1) You only need one instance of the CDatabase. As such, I would move the
+CDatabase outside of your loop. 
+
+2) For efficiency, it may be better by simply making one call to Open.
+
+3) Your methodology on opening the data seems very different. Why not simply
+open a CRecordSet (I usually use the ClassWizard and design a derived class
+to take care of this, which also will set up the Dynaset and bind fields for
+ya.), and work with it from there with requeries(See #4)?
+
+4) You may find simply requerying a better alternative. If you Requery
+instead of opening and closing each time.. you may get better results, and
+definetly speed up the loop. This may put you on a better direction... or a
+far off tangent <g>
+
+CDatabase SomeDB;      // You only need to create the Database once. 
+SomeDB.Open(...); // Assume successfull in opening the database
+
+CRecordset *pSet = new CRecordset( &SomeDB );
+try{
+   pSet->Open( .... ); // Make your inital opening of the RecordSet.
+}
+catch( CDBException* e )
+{
+    AfxMessageBox( e->m_strError, MB_OK|MB_ICONEXCLAMATION );
+    e->Delete();
+    return;
+}
+
+for ( int nIdx=0; nIdx < 500; nIdx++ )
+{
+   pSet->Requery();        
+   :
+   // do something..
+   :
+}
+
+pSet->Close();
+delete pSet;
+
+SomeDB.Close();
+
+
+At 06:02 PM 1/7/97 +1100, you wrote:
+>Environment: MSVC 1.52/Win 95
+>
+>Why the following section of the codes produce "Can't open any more tables
+or queries"
+>Any help + pointer are greatly appreciated
+>
+>for ( int nIdx=0; nIdx < 500; nIdx++ )
+>{
+>  CDatabase SomeDB;
+>  SomeDB.Open( .... );   // Assume successfull in opening the database
+>
+>   CRecordset *pSet = new CRecordset( &SomeDB );
+>   pSet->Open( ...blah..blah..blah.. );
+>   :
+>   // do something..
+>   :
+>   pSet->Close();
+>   delete pSet;
+>   SomeDB.Close();
+>}
+>
+>
+>After a number of iteration I do get "Can't open any more tables or
+queries" message.  I just 
+>dont quite understand why I do get that message where in fact I am closing
+the record set and 
+>database in each of the iterations..
+>
+>thanks in advance
+>glenn tesla
+>
+>
+PC'ing you,                     
+Dana M. Epp          
+eppdm@uniserve.com
+<A HREF="http://bedrock.cyberhq.com/dana">http://bedrock.cyberhq.com/dana</A>
+
+     "How can one work with the technology of today, using yesterdays
+      software and methods, and still be on the leading edge tomorrow?
+      Why settle for less... I won't! "
+
+-----From: "Michael J. Morel" <mmorel@mushroomsoft.com>
+
+I'm not sure if this is related, but I recall running into a similar 
+problem where CDatabase did not completely cleanup when closed.  My 
+solution was to allocate it on the heap also.  Does this work any 
+differently?
+for ( int nIdx=0; nIdx < 500; nIdx++ )
+{
+  CDatabase* pSomeDB = new CDatabase();
+  pSomeDB->Open( .... );   // Assume successfull in opening the database
+
+   CRecordset *pSet = new CRecordset( &SomeDB );
+   pSet->Open( ...blah..blah..blah.. );
+   :
+   // do something..
+   :
+   pSet->Close();
+   delete pSet;
+   pSomeDB->Close();
+         delete pSomeDB;
+}
+
+Mike Morel
+mmorel@mushroomsoft.com
+Mushroom Software
+Home of MFC For Yourself
+<A HREF="http://www.mushroomsoft.com">http://www.mushroomsoft.com</A>
+
+
+----------
+From: 	Glenn T. Jayaputera[SMTP:gtj@nunkeen.apana.org.au]
+Sent: 	Tuesday, January 07, 1997 1:02 PM
+To: 	mfc-l@netcom.com
+Subject: 	Problem in opening recordset
+
+Environment: MSVC 1.52/Win 95
+
+Why the following section of the codes produce "Can't open any more tables 
+or queries"
+Any help + pointer are greatly appreciated
+
+for ( int nIdx=0; nIdx < 500; nIdx++ )
+{
+  CDatabase SomeDB;
+  SomeDB.Open( .... );   // Assume successfull in opening the database
+
+   CRecordset *pSet = new CRecordset( &SomeDB );
+   pSet->Open( ...blah..blah..blah.. );
+   :
+   // do something..
+   :
+   pSet->Close();
+   delete pSet;
+   SomeDB.Close();
+}
+
+
+After a number of iteration I do get "Can't open any more tables or 
+queries" message.  I just
+dont quite understand why I do get that message where in fact I am closing 
+the record set and
+database in each of the iterations..
+
+thanks in advance
+glenn tesla
+
+
+
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

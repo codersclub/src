@@ -1,0 +1,274 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+How to Add Tooltips for Controls to an MFC Property Page
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Roger Onslow -- <A HREF="mailto:Roger_Onslow@compsys.com.au">Roger_Onslow@compsys.com.au</A>
+Thursday, June 06, 1996
+</B>
+<in the format of a MS KB entry...>
+Environment: VC++ 4.0 / Win 95
+
+How to Add Tooltips for Controls to an MFC Property Page
+
+PSS ID Number: <if I send this to MS and they include it in KB>
+
+Article last modified on 5-Jun-1996
+
+4.00 4.10
+
+-----------------------------------------------------------------------------
+The information in this article applies to:
+ - The Microsoft Foundation Classes (MFC) included with:
+   Microsoft Visual C++, 32-bit Edition, versions 4.0 and later
+-----------------------------------------------------------------------------
+
+SUMMARY
+=======
+Article Q140595 describes how to enable tool tips for child controls of a
+window (including a CDialog).  That article explains how you must call the
+CWnd::EnableToolTips function to enable tool tips, and provide a handler for
+the TTN_NEEDTEXT tool tip notification.
+
+Although the technique described works for dialogs and views, it does not
+work for dialogs derived from CPropertyPage.  You need to override the
+default CPropertyPage::PreTranslateMessage in order for the TTN_NEEDTEXT
+notifications to be generated.
+
+MORE INFORMATION
+================
+
+The CPropertyPage::PreTranslateMessage function always returns FALSE so that
+the property sheet will get to handle the message (for Ctrl+TAB etc).
+However this bypasses the automatic CWnd handling of tool tips.
+
+To work around this, only call the CPropertyPage::PreTranslateMessage
+function for the Ctrl+TAB etc keys.  All other messages can be processed by
+the CDialog::PreTranslateMessage function.
+
+Additional Steps to Enable Tool Tips for Child Controls in Property Pages
+-------------------------------------------------------------------------
+
+1) Perform the steps outlined in Q140595.
+
+2) Use the Class Wizard to provide a PreTranslateMessage function, and write
+an implementation that correctly dispatches to either CPropertyPage or
+CDialog as appropriate.
+
+Sample Code
+-----------
+
+BOOL CMyPropertyPage::PreTranslateMessage(MSG* pMsg) 
+{
+ // allow sheet to translate Ctrl+Tab, Shift+Ctrl+Tab,
+ //  Ctrl+PageUp, and Ctrl+PageDown
+ if (pMsg->message == WM_KEYDOWN && GetAsyncKeyState(VK_CONTROL) < 0 &&
+  (pMsg->wParam == VK_TAB ||
+   pMsg->wParam == VK_PRIOR ||
+   pMsg->wParam == VK_NEXT
+    ))
+ {
+  return CPropertyPage::PreTranslateMessage(pMsg);
+ }
+ return CDialog::PreTranslateMessage(pMsg);
+}
+
+=============================================================================
+Roger Onslow,  RogerO@compsys.com.au
+=============================================================================
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dean McCrory -- <A HREF="mailto:deanm@microsoft.com">deanm@microsoft.com</A>
+Saturday, June 08, 1996
+</B>
+Probably the better fix is to call CWnd::PreTranslateMessage from
+CPropertyPage::PreTranslateMessage.
+
+>BOOL CMyPropertyPage::PreTranslateMessage(MSG* pMsg) 
+>{
+            VERIFY(!CWnd::PreTranslateMessage(pMsg));
+
+            return FALSE;   // CPropertySheet handles
+PreTranslateMessage in this case
+>}
+
+Later,
+
+// Dean
+>----------
+>From: 	Roger Onslow/Newcastle/Computer Systems
+>Australia/AU[SMTP:Roger_Onslow@compsys.com.au]
+>Sent: 	Thursday, June 06, 1996 4:56 AM
+>To: 	mfc-l; scot_wingo
+>Cc: 	Dave Blatt/Newcastle/Computer Systems Australia/AU
+>Subject: 	How to Add Tooltips for Controls to an MFC Property Page
+>
+><in the format of a MS KB entry...>
+>Environment: VC++ 4.0 / Win 95
+>
+>How to Add Tooltips for Controls to an MFC Property Page
+>
+>PSS ID Number: <if I send this to MS and they include it in KB>
+>
+>Article last modified on 5-Jun-1996
+>
+>4.00 4.10
+>
+>------------------------------------------------------------------------
+>-----
+>The information in this article applies to:
+> - The Microsoft Foundation Classes (MFC) included with:
+>   Microsoft Visual C++, 32-bit Edition, versions 4.0 and later
+>------------------------------------------------------------------------
+>-----
+>
+>SUMMARY
+>=======
+>Article Q140595 describes how to enable tool tips for child controls of
+>a
+>window (including a CDialog).  That article explains how you must call
+>the
+>CWnd::EnableToolTips function to enable tool tips, and provide a
+>handler for
+>the TTN_NEEDTEXT tool tip notification.
+>
+>Although the technique described works for dialogs and views, it does
+>not
+>work for dialogs derived from CPropertyPage.  You need to override the
+>default CPropertyPage::PreTranslateMessage in order for the
+>TTN_NEEDTEXT
+>notifications to be generated.
+>
+>MORE INFORMATION
+>================
+>
+>The CPropertyPage::PreTranslateMessage function always returns FALSE so
+>that
+>the property sheet will get to handle the message (for Ctrl+TAB etc).
+>However this bypasses the automatic CWnd handling of tool tips.
+>
+>To work around this, only call the CPropertyPage::PreTranslateMessage
+>function for the Ctrl+TAB etc keys.  All other messages can be
+>processed by
+>the CDialog::PreTranslateMessage function.
+>
+>Additional Steps to Enable Tool Tips for Child Controls in Property
+>Pages
+>------------------------------------------------------------------------
+>-
+>
+>1) Perform the steps outlined in Q140595.
+>
+>2) Use the Class Wizard to provide a PreTranslateMessage function, and
+>write
+>an implementation that correctly dispatches to either CPropertyPage or
+>CDialog as appropriate.
+>
+>Sample Code
+>-----------
+>
+>BOOL CMyPropertyPage::PreTranslateMessage(MSG* pMsg) 
+>{
+> // allow sheet to translate Ctrl+Tab, Shift+Ctrl+Tab,
+> //  Ctrl+PageUp, and Ctrl+PageDown
+> if (pMsg->message == WM_KEYDOWN && GetAsyncKeyState(VK_CONTROL) < 0 &&
+>  (pMsg->wParam == VK_TAB ||
+>   pMsg->wParam == VK_PRIOR ||
+>   pMsg->wParam == VK_NEXT
+>    ))
+> {
+>  return CPropertyPage::PreTranslateMessage(pMsg);
+> }
+> return CDialog::PreTranslateMessage(pMsg);
+>}
+>
+>========================================================================
+>=====
+>Roger Onslow,  RogerO@compsys.com.au
+>========================================================================
+>=====
+>
+>
+>
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Roger Onslow -- <A HREF="mailto:Roger_Onslow@compsys.com.au">Roger_Onslow@compsys.com.au</A>
+Tuesday, June 11, 1996
+</B>
+>Probably the better fix is to call CWnd::PreTranslateMessage from
+>CPropertyPage::PreTranslateMessage.
+>
+>>BOOL CMyPropertyPage::PreTranslateMessage(MSG* pMsg) 
+>>{
+>>            VERIFY(!CWnd::PreTranslateMessage(pMsg));
+>>            return FALSE;   // CPropertySheet handles PreTranslateMessage in 
+this case
+>>}
+
+NO...
+
+We tried that, and tooltip DID appear, BUT....
+
+Behaviour of Ctrl+TAB etc was different from normal property sheets.
+The focus went from Tab to Tab ok... BUT THEN to OK button etc.
+(ie treated Ctrl+TAB as moving focus amongst all controls on the
+property sheet, not just between pages !!)
+
+The solution posted gave consistent handling of Ctrl+TAB.
+(ie: CPropertyPage handles Ctrl+TAB, and CWnd everything else)
+
+Roger Onslow
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

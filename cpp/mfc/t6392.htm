@@ -1,0 +1,357 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+User-Interface Threads with Doc/View inside
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Paulo Soares -- <A HREF="mailto:psoares@ip.pt">psoares@ip.pt</A>
+Thursday, August 22, 1996
+</B>
+Environment: VC++ 4.2, Windows95
+
+I need to provide an application with an RTF editing window. This window =
+should popup when a button is pressed and will edit text that will =
+go/come to/from a database. One solution would be to create a temporary =
+file and call wordpad or another editor. Other solution would be to =
+create a memory mapped file and call a modified wordpad to avoid the =
+creation of file on disk.
+I don't want to load another editor, it takes too much time.
+Creating an RTF editor with CRichEditCtrl in a dialog is possible but I =
+would loose the graphics and CRichEditView is so near.
+I thought (I'm so naive) that it would just be a matter of creating an =
+User-Interface thread, put the CRichEditView and friends inside and the =
+problem would be solved. After all, it's all derived from CWinThread. =
+Wrong! The doc/view model is tightly coupled to CWinApp and there can be =
+only one (like the Immortal).
+To make my tests I started with the application MyWord from Jeff =
+Prosise's book 'Programming Windows 95 in MFC'. This is a simple RTF =
+editor and works pretty well as a stand alone. It derives from =
+CRichEditView. I managed to get something to appear when I eliminated =
+the CSingleDocTemplate and replaced it with:
+
+BOOL CWordApp::InitInstance ()
+{
+/*    CSingleDocTemplate* pDocTemplate;
+    pDocTemplate =3D new CSingleDocTemplate (
+        IDR_MAINFRAME,
+        RUNTIME_CLASS (CWordDoc),
+        RUNTIME_CLASS (CMainFrame),
+        RUNTIME_CLASS (CWordView)
+    );
+
+    AddDocTemplate (pDocTemplate);
+*/
+    m_pDocManager->AddDocTemplate(pDocTemplate);*/
+    CMainFrame* pMainFrame =3D new CMainFrame;
+    pMainFrame->ShowWindow(SW_SHOWNORMAL);
+    pMainFrame->UpdateWindow();
+    m_pMainWnd =3D pMainFrame;
+    CWordView *wv =3D new CWordView;
+
+    wv->Create(NULL, NULL, AFX_WS_DEFAULT_VIEW,
+   	    CRect(0,0,0,0), pMainFrame, AFX_IDW_PANE_FIRST, NULL);
+=20
+    m_pMainWnd->DragAcceptFiles ();
+    CWordDoc *wd =3D new CWordDoc;
+    wd->AddView(wv);
+    pMainFrame->SetActiveView(wv);
+    return TRUE;
+}
+
+The view edits text and graphics but the tool bar and status bar don't =
+appear and if I call them explicitly they appear but ASSERT when =
+GetActiveView is called. The value in InitInstance is correct but is =
+changed somewhere to 0xfdfdfdfd.
+The books I have on MFC are OK when explaining the doc/view model in =
+CWinApp with CSingleDocTemplate but don't say anything about using the =
+model in a user-interface thread.=20
+
+Can anyone shed some light on this matter?
+
+Best Regards,
+Paulo Soares
+psoares@ip.pt
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Rommel Songco -- <A HREF="mailto:rsongco@spectrasoft.com">rsongco@spectrasoft.com</A>
+Monday, August 26, 1996
+</B>
+Hello there!
+
+	In multithreaded applications, you are going to have problems at times if
+you call member functions belonging to objects created by other threads. 
+You said that you get an ASSERT when GetActiveView is called.  I would
+guess that this is a member function of your CMainFrame in the main thread
+and that you're calling this from the child thread.
+
+Regards,
+
+Rommel
+rsongco@spectrasoft.com
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Gordon Weakliem -- <A HREF="mailto:gweakl@metronet.com">gweakl@metronet.com</A>
+Tuesday, August 27, 1996
+</B>
+Paulo Soares wrote:
+<...>
+> I thought (I'm so naive) that it would just be a matter of creating an User-Interface thread, 
+>put the CRichEditView and friends inside and the problem would be solved.  After all, it's all 
+>derived from CWinThread. Wrong! The doc/view model is tightly coupled to CWinApp and there can 
+>be only one (like the Immortal).
+
+One what?  CWinApp, CWinThread or CView?  You can have multiple threads per app.  You can have 
+as many views as you like per document.  But you already know that if you've gotten this far.  
+The trick is to define your doc so it encapsulates all the data you might want to view; then you 
+ can have each view display any piece of it it wants to.  Now, I haven't had any experience with 
+CRichEditView, and I've heard that it's not so easy to work with as the simpler views, but the 
+principle is still there.  
+
+>From your code sample, it looks like the problem is that you're not creating a CDocTemplate.  
+This is the heart of the framework; without it, you'll find that none of the free stuff you get 
+with MFC works anymore.  GetActiveView() ASSERTs because it is going to walk the view list that 
+AddDocTemplate() added your view to.  So unless you add a doc template, GetActiveView is going 
+to return NULL, it finds nothing on the list and ASSERTs that the value it's about to return 
+isn't NULL.  Furthermore, your toolbars are created in the CSingleDocTemplate constructor (the 
+2nd argument).  Since you don't call the constructor, these aren't created.
+
+The bottom line is that you need a Doc template.  If you've got an SDI app, this is going to be 
+tricky, but I suspect it can be done.  
+> 
+> BOOL CWordApp::InitInstance ()
+> {
+> /*    CSingleDocTemplate* pDocTemplate;
+>     pDocTemplate = new CSingleDocTemplate (
+>         IDR_MAINFRAME,
+>         RUNTIME_CLASS (CWordDoc),
+>         RUNTIME_CLASS (CMainFrame),
+>         RUNTIME_CLASS (CWordView)
+>     );
+> 
+>     AddDocTemplate (pDocTemplate);
+> */
+>     m_pDocManager->AddDocTemplate(pDocTemplate);*/
+>     CMainFrame* pMainFrame = new CMainFrame;
+>     pMainFrame->ShowWindow(SW_SHOWNORMAL);
+>     pMainFrame->UpdateWindow();
+>     m_pMainWnd = pMainFrame;
+>     CWordView *wv = new CWordView;
+> 
+>     wv->Create(NULL, NULL, AFX_WS_DEFAULT_VIEW,
+>             CRect(0,0,0,0), pMainFrame, AFX_IDW_PANE_FIRST, NULL);
+> 
+>     m_pMainWnd->DragAcceptFiles ();
+>     CWordDoc *wd = new CWordDoc;
+>     wd->AddView(wv);
+>     pMainFrame->SetActiveView(wv);
+>     return TRUE;
+> }
+> 
+> The view edits text and graphics but the tool bar and status bar don't appear and if I call them explicitly they appear but ASSERT when GetActiveView is called
+> The books I have on MFC are OK when explaining the doc/view model in CWinApp with CSingleDocTemplate but don't say anything about using the model in a user-int
+> 
+
+
+-- 
+Gordon Weakliem
+gweakl@metronet.com
+http://www.metronet.com/~gweakl
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Paulo Soares -- <A HREF="mailto:psoares@ip.pt">psoares@ip.pt</A>
+Thursday, August 29, 1996
+</B>
+[Mini-digest: 2 responses]
+
+On Tuesday, August 27, 1996 12:13 PM, Gordon =
+Weakliem[SMTP:gweakl@metronet.com] wrote:
+>>From your code sample, it looks like the problem is that you're not =
+creating a CDocTemplate. =20
+>This is the heart of the framework; without it, you'll find that none =
+of the free stuff you get=20
+>with MFC works anymore.  GetActiveView() ASSERTs because it is going to =
+walk the view list that=20
+>AddDocTemplate() added your view to.  So unless you add a doc template, =
+GetActiveView is going=20
+>to return NULL, it finds nothing on the list and ASSERTs that the value =
+it's about to return=20
+>isn't NULL.  Furthermore, your toolbars are created in the =
+CSingleDocTemplate constructor (the=20
+>2nd argument).  Since you don't call the constructor, these aren't =
+created.
+
+The problem is that I cannot use AddDocTemplate() as this is a member of =
+CWinApp and I cannot have a CWinApp in a user-interface thread. The =
+documentation states that there can only be one CWinApp in the =
+application. Perhaps there's a way to have two or more as it derives =
+from CWinThread but I could not do it.
+
+Best Regards,
+Paulo Soares
+psoares@ip.pt
+-----From: drt@ebt.com (Randy Taylor)
+
+Hi Gordon & All,
+  Generally speaking, I don't think think the DocMgr/DocTemplate part of the
+MFC is required
+if all I want from the Doc/View model is the "view management" portion, but
+I'm looking for
+confirmation from people who know this better than I do. I found the
+DocMgr/DocTemplate code
+to be heavily oriented toward file system based data (my data is in an
+object database) : look
+at the way it uses the CRecentFileList class and the "file extensions". I
+found it to be a lot
+easier to just CFrameWnd::LoadFrame and CFrame::ActiveFrame rather than
+going thru the doc template
+stuff. Further, my app is SDI with multiple instances of the primary
+CFrameWnd... before I abandoned
+the DocMgr/DocTemplate stuff, I found that I had to override every virtual
+in CSingleDocTemplate
+and to use none of it's member data in order to launch additional top level
+CFrameWnd's !
+Then I simply abandoned the CDocMgr/CDocTemplate stuff altogether. 
+My current issue is that my application has excessive problems with
+view/data communication
+and update because we got rid of Doc/View altogether and we have multiple
+windows which
+display the same data in different ways and each window can affect the others. 
+I want to re-introduce Doc/View into my app but I am convinced that the
+DocMgr/DocTemplate
+won't work (the code gets too complicated for little benefit) for me.
+So... is the DocTemplate usage "required" for Doc/View ?
+
+Also, which GetActiveView function were you refering to in your post? The
+only one I know
+about is the CFrameWnd::GetActiveView. It's implementation looks like this
+in MFC 4.1
+
+CView* CFrameWnd::GetActiveView() const
+{
+	ASSERT(m_pViewActive == NULL ||
+		m_pViewActive->IsKindOf(RUNTIME_CLASS(CView)));
+	return m_pViewActive;
+}
+
+I don't see it walking any list of CView derivatives. What am I missing here?
+
+Cheers.
+
+randy_taylor@ebt.com
+
+
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Gordon Weakliem -- <A HREF="mailto:gweakl@metronet.com">gweakl@metronet.com</A>
+Thursday, September 12, 1996
+</B>
+I know this response is about 2 weeks late, but here goes... 
+> Hi Gordon & All,
+>   Generally speaking, I don't think think the DocMgr/DocTemplate part of the MFC is required
+> if all I want from the Doc/View model is the "view management" portion, but I'm looking for
+> confirmation from people who know this better than I do. I found the DocMgr/DocTemplate code
+> to be heavily oriented toward file system based data (my data is in an object database) : look
+> at the way it uses the CRecentFileList class and the "file extensions". I found it to be a lot
+> easier to just CFrameWnd::LoadFrame and CFrame::ActiveFrame rather than going thru the doc template
+> stuff. Further, my app is SDI with multiple instances of the primary CFrameWnd... before I abandoned
+> the DocMgr/DocTemplate stuff, I found that I had to override every virtual in CSingleDocTemplate
+> and to use none of it's member data in order to launch additional top level CFrameWnd's !
+
+I did some thinking & research into this and I've basically decided that the best way to do a VB-like 
+interface (That's what it sounds like your application is) is to derive a new class from CDocTemplate. 
+ The overview of the CDocTemplate class in books online says : "If your application requires a 
+user-interface paradigm that is fundamentally different from SDI or MDI, you can derive your own class 
+from CDocTemplate."
+
+> Then I simply abandoned the CDocMgr/CDocTemplate stuff altogether.
+> My current issue is that my application has excessive problems with
+> view/data communication
+> and update because we got rid of Doc/View altogether and we have multiple
+> windows which
+> display the same data in different ways and each window can affect the others.
+> I want to re-introduce Doc/View into my app but I am convinced that the
+> DocMgr/DocTemplate
+> won't work (the code gets too complicated for little benefit) for me.
+> So... is the DocTemplate usage "required" for Doc/View ?
+
+Well, I sat down and wrote a sample MDI program that doesn't use doc/template, but it wasn't a total 
+success.  Basically, the child frame is created but not made visible.  Undoubtedly, I've done 
+something dumb, but I just haven't had the time to look at it.  I'll make the source code available to 
+anyone who wants it, if anyone thinks this is useful.
+
+> Also, which GetActiveView function were you refering to in your post? The
+> only one I know
+> about is the CFrameWnd::GetActiveView. It's implementation looks like this
+> in MFC 4.1
+
+I had made the comment that I though the original poster was getting into trouble because he wasn't 
+using a doc template and that CFrameWnd::GetActiveView() would ASSERT and blow up the way he was 
+going.  I'm not sure where I was coming from with that one.  
+
+The bottom line on Doc/View is that yes, it is possible to write an MFC app without Doc/View.  On the 
+other hand, sometimes the hassle in circumventing it isn't worth the effort.  I've actually managed to 
+get some mileage out of doc/view in some non-tradiditional document situations, such as treating a 
+portion of the registry as a document and then displaying the contents in a view.
+-- 
+Gordon Weakliem
+gweakl@metronet.com
+<A HREF="http://www.metronet.com/~gweakl">http://www.metronet.com/~gweakl</A>
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,271 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CFileDialog problem
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Martin Lacasse -- <A HREF="mailto:lacassem@berclain.com">lacassem@berclain.com</A>
+Sunday, April 21, 1996
+</B>
+Hello,
+        I'm using VC++ 2.1 on Windows NT. What I'd like to do is to display
+a custom CFileDialog. When the user clicks on a file name, I'd like to
+display some information (FROM THE SELECTED FILE) at the bottom of the
+dialog.  To do this, I must have the complete path and filename to "fopen"
+it. The problem is, when I'm overriding the
+CFileDialog::OnLBSelChangedNotify member, I can't call the
+CFileDialog::GetFileName member. The CFileDialog::m_ofn attribute
+(OPENFILENAME structure) has not been updated with the newest selected file
+information. Can you help me ???
+
+Thanks in advance.
+
+
+----------------------------------------------------------------------
+Martin Lacasse, analyst-prgm.     Berclain Group, Inc.
+e-mail: lacassem@berclain.com     Development Group
+Tel: (418) 656-0055 ext 1522      979, de Bourgogne, suite 220
+Fax: (418) 656-6317               Sainte-Foy (QC) Canada, G1W 2L4
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Kanir Pandya -- <A HREF="mailto:kpandya@harbinger.net">kpandya@harbinger.net</A>
+Wednesday, April 24, 1996
+</B>
+[Mini-digest: 2 responses]
+
+What you need to do here is as follows:
+//First get the current index in the file list box.
+int index = m_fileList.GetCurSel();
+if ( index != LB_ERR ) {
+CString filename;
+CString dirname;
+
+//get the filename.                                   
+m_fileList.GetText(index, filename);
+
+//now get the dir name
+//Get current selected item in the list box and concatenate all
+// the items till current item to form the full path.
+CListBox *pLB = (CListBox*)GetDlgItem(IDC_DIRLIST);
+int ind = pLB->GetCurSel();
+CString str;
+pLB->GetText(0, strPath);
+for( int i=1; i <= ind; i++) {
+	pLB->GetText(i, str);
+	strPath += str + "\\";
+}
+CString m_Fullname;
+// At last you get the filename.
+m_Fullname = strPath + filename;
+ 
+I hope this helps.
+
+-----From: "rick cameron" <rick_cameron@msn.com>
+
+Salut, Martin!
+
+Windows 95 (and, presumably, NT 4.0) supports a nice way of doing this: look 
+up CDM_GETFILEPATH. However, it looks to me like, under NT 3.x, you'll have to 
+get the text of various controls in the dialog and build the pathname 
+yourself. One shortcut: it may be true that the dialog sets the current 
+directory, so perhaps all you need to do is to get the text of the 'File Name' 
+edit control.
+
+As you may know, you can retrieve the text as follows:
+
+CString filename;
+
+GetDlgItem (edt1)->GetWindowText (filename);
+
+- rick
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+yogesh -- <A HREF="mailto:yogesh@cytel.com">yogesh@cytel.com</A>
+Tuesday, March 11, 1997
+</B>
+>>
+>> What I am really looking for is this. The user enters some data in the 
+>> CMyFileDialog edit controls and hits OK. As soon as the user hits OK, I 
+>> want to validate the path and file name which he has selected. If the 
+>> wrong file and path name are selected, I want to pop up an appropriate 
+>> message box and give the user another chance to enter the file name and 
+>> select the path. 
+
+
+I use DoDataExchange function to do validation of dialog items. The following
+code may solve your problem.
+
+///////////////////////////////////////////////////////////////////
+void CMySaveAsDlg::DoDataExchange(CDataExchange* pDX)
+{
+        CFileDialog::DoDataExchange(pDX);
+
+	//{{AFX_DATA_MAP(CMySaveAsDlg)
+	DDX_Text(pDX, IDC_FILENAME, m_filename);
+	//}}AFX_DATA_MAP
+
+	if(pDX->m_bSaveAndValidate)    // pDX->m_bSaveAndValidate becomes TRUE
+	  DoDataValidation(pDX);       // when user clicks OK
+}
+
+///////////////////////////////////////////////////////////////////
+void CMySaveAsDlg::DoDataValidation(CDataExchange* pDX)
+{
+        pDX->PrepareCtrl(IDC_FILENAME); // make filename item as current
+	if(m_filename.IsEmpty())
+	{
+	    AfxMessageBox(IDS_FNAMEREQ);
+	    pDX->Fail();                // cursor will be back on filename 
+	}
+}
+
+
+//////////////////////////////////////////////////////////////////////
+void CMySaveAsDlg::OnOK() 
+{
+	CFileDialog::OnOK();
+}
+
+
+
+
+
+--------------------------------------------------
+ Yogesh Gajjar ? yogesh@cytel.com : www.cytel.com
+                              
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+John Bundgaard -- <A HREF="mailto:piano_boxer@post1.com">piano_boxer@post1.com</A>
+Sunday, March 16, 1997
+</B>
+[Mini-digest: 2 responses]
+
+A simpler method:
+
+void CMySaveAsDlg::OnOK()
+{
+	UpdateData(FALSE)	// This will get the data from the edit control.
+	if(m_filename.IsEmpty())
+	{
+		AfxMessageBox(IDS_FNAMEREQ);
+		return;
+ 	}
+	EndDialog(ID_OK);
+}
+
+----------
+> From: yogesh <yogesh@cytel.com>
+> To: m_dalal@ECE.concordia.CA
+> Cc: mfc-l@netcom.com
+> Subject: Re: CFileDialog Problem
+> Date: 11. marts 1997 22:18
+> 
+> >>
+> >> What I am really looking for is this. The user enters some data in the
+
+> >> CMyFileDialog edit controls and hits OK. As soon as the user hits OK,
+I 
+> >> want to validate the path and file name which he has selected. If the 
+> >> wrong file and path name are selected, I want to pop up an appropriate
+
+> >> message box and give the user another chance to enter the file name
+and 
+> >> select the path. 
+> 
+> 
+> I use DoDataExchange function to do validation of dialog items. The
+following
+> code may solve your problem.
+> 
+> ///////////////////////////////////////////////////////////////////
+> void CMySaveAsDlg::DoDataExchange(CDataExchange* pDX)
+> {
+>         CFileDialog::DoDataExchange(pDX);
+> 
+> 	//{{AFX_DATA_MAP(CMySaveAsDlg)
+> 	DDX_Text(pDX, IDC_FILENAME, m_filename);
+> 	//}}AFX_DATA_MAP
+> 
+> 	if(pDX->m_bSaveAndValidate)    // pDX->m_bSaveAndValidate becomes TRUE
+> 	  DoDataValidation(pDX);       // when user clicks OK
+> }
+> 
+> ///////////////////////////////////////////////////////////////////
+> void CMySaveAsDlg::DoDataValidation(CDataExchange* pDX)
+> {
+>         pDX->PrepareCtrl(IDC_FILENAME); // make filename item as current
+> 	if(m_filename.IsEmpty())
+> 	{
+> 	    AfxMessageBox(IDS_FNAMEREQ);
+> 	    pDX->Fail();                // cursor will be back on filename 
+> 	}
+> }
+> 
+> 
+> //////////////////////////////////////////////////////////////////////
+> void CMySaveAsDlg::OnOK() 
+> {
+> 	CFileDialog::OnOK();
+> }
+
+-----From: Hieu Nguyen <nguyen_hieu@geocities.com>
+
+Overwrite virtual method OnFileNameOK() in your CFileDialog's derived
+class.
+Hope it help
+-Hieu
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+    <A HREF="http://www.digiday.com/mfcpro/joinmfcl.htm">Become an MFC-L member</A>
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

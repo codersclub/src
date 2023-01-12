@@ -1,0 +1,207 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Internet class problems
+</B></FONT>
+<BR>
+<PRE>
+<B>
+John Fricker -- <A HREF="mailto:jfricker@vertexgroup.com">jfricker@vertexgroup.com</A>
+Thursday, November 07, 1996
+</B>
+Environment: VC4.2b, NT4.0
+=20
+ I am having trouble using authentication with the MFC internet classes. Ev=
+erything
+ works fine without authentication so I know I understand the basics.
+=20
+ I send my username/password with the CInternetSession object
+=20
+ pServer =3D session.GetHttpConnection(m_strServer, nPort, m_strUsername,
+ m_strPassword);
+=20
+ to the server (IIS2.0). On the server I am using Network Monitor to sniff =
+the http
+ packets and it appears that things happen like this:
+=20
+ First the wininet.dll sends a GET w/o authentication information causing t=
+he server
+ to respond with the type of authenication it prefers.=20
+=20
+ Second, the wininet.dll sends another GET w/ authentication.
+=20
+ Third, the server sends another failure. (Even though I can verify the use=
+r/pass as
+ correct when I use Netscape).
+=20
+ Subsequent attempts (same instance of the program) to GET docs out of the =
+realm
+ do not send authentication info across to the server at all. That is no re=
+sponse to
+ the server's Access Denied message. If WinINET is caching authentication d=
+ata: it
+ *should not* ever.=20
+=20
+ So does wininet.dll implement a broken encryption scheme for the user/pass=
+? Can
+ I force it to use Basic instead of NTLM encryption? (The docs sez it only =
+uses
+ Basic but the packets clearly contain NTLM encrypted data).
+=20
+ Perhaps most importantly: can I use a mix of calls direct to wininet.dll w=
+hile I am
+ using the MFC wininet wrapper classes?
+=20
+ (an aside InternetErrorDlg doesn't work in the TEAR example.)
+=20
+ Any tips from anyone who has done authentication through wininet would be
+ greatly appreciated!
+=20
+ Thanks folks!
+=20
+ --j
+ -----------------------------------
+ | John Fricker (jfricker@vertexgroup.com)
+ | -random notes-
+ | My PGP public key is available by sending mail with subject "send pgp ke=
+y".
+ | www.Program.com is a good programmer web site.
+ -----------------------------------
+>>End of forwarded message<<
+
+--j
+-----------------------------------
+| John Fricker (jfricker@vertexgroup.com)
+| -random notes-
+| My PGP public key is available by sending mail with subject "send pgp key=
+".
+| www.Program.com is a good programmer web site.
+-----------------------------------
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Jim McCabe -- <A HREF="mailto:jmccabe@mail.portup.com">jmccabe@mail.portup.com</A>
+Saturday, November 09, 1996
+</B>
+John Fricker <jfricker@vertexgroup.com> wrote:
+
+>Environment: VC4.2b, NT4.0
+> So does wininet.dll implement a broken encryption scheme for the user/pass? Can
+> I force it to use Basic instead of NTLM encryption? (The docs sez it only uses
+> Basic but the packets clearly contain NTLM encrypted data).
+
+I use the MFC Internet classes with authentication, but I had to call
+InternetErrorDlg before it started working.  Here's what I do:
+
+a) Send the request, CHttpFile::SendRequest()
+
+b) Look at the status code to see whether the page was sent:
+
+      DWORD   dwStatus = 0;
+      pHttpFile->QueryInfoStatusCode(dwStatus);
+
+
+c) If the request failed due to authentication reasons, call InternetErrorDlg
+   and resend the request:
+
+      if (dwStatus == HTTP_STATUS_DENIED)
+      {
+          // Flush any boilerplate response
+          while (pHttpFile->ReadString(sText));
+
+          // Generate response headers
+          dwVal = ::InternetErrorDlg(::GetDesktopWindow(),
+                                     (HINTERNET) *pHttpFile,
+                                     ERROR_INTERNET_INCORRECT_PASSWORD,
+                                     (FLAGS_ERROR_UI_FLAGS_CHANGE_OPTIONS |
+                                     FLAGS_ERROR_UI_FLAGS_GENERATE_DATA |
+                                     FLAGS_ERROR_UI_FLAGS_NO_UI), 0);
+
+          // Send another request with the new headers?
+          if (dwVal == ERROR_INTERNET_FORCE_RETRY)
+          {
+              pHttpFile->SendRequest(0, 0, pszPost, cchPost);
+              pHttpFile->QueryInfoStatusCode(dwStatus);
+          }
+      }
+
+      // Finally process the file
+      if (dwStatus == HTTP_STATUS_OK)
+      {
+          // Make your ReadString calls here, etc...
+      }
+
+
+My program spawns a few threads, and they each go out and try to grab a page
+off the web.  They all share the same CInternetSession object, but create all
+the subsequent MFC Internet objects independently.  I found that, in my
+program, it was necessary to prevent the threads from making simultaneous
+calls to InternetErrorDlg -- the first call would work, but subsequent calls
+in other threads would fail (InternetErrorDlg would return 0) if the first
+call to InternetErrorDlg had not returned yet.  So I wrapped my call to
+InternetErrorDlg with a critical section and it works fine now.
+
+> Perhaps most importantly: can I use a mix of calls direct to wininet.dll while I am
+> using the MFC wininet wrapper classes?
+
+You HAVE to do this if you want to use InternetErrorDlg.  The MFC 4.2b
+implementation of CHttpFile::ErrorDlg won't do anything if your WININET.DLL
+doesn't contain two InternetErrorDlg exports (InternetErrorDlgW and
+InternetErrorDlgA).  Unfortunately, I've never seen a WININET.DLL with these
+exports -- even the 10/15/96 WININET.DLL released with MSIE just has the one
+InternetErrorDlg function.
+
+If someone can tell me where I can get my hands on this mythical WININET.DLL,
+I'd be very appreciative.
+
+Also, theoretically, you should be able to avoid all this hassle by
+generating your own authentication headers and adding them to your initial
+request.  The HTTP specs will tell you how to do that.
+
+Good luck,
+
+Jim
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

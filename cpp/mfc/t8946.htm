@@ -1,0 +1,470 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Transaction support thru' ODBC for Access for Win95
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Abhijit Dey -- <A HREF="mailto:sunsys@giascl01.vsnl.net.in">sunsys@giascl01.vsnl.net.in</A>
+Saturday, January 11, 1997
+</B>
+Environment: MSVC 4.0, NT 3.51 and Win95
+
+{ Using both; Problem appears on both; Solution on any one will do }
+
+Hi,
+
+I'm currently trying to implement transaction support through ODBC with MS
+Access for Win95. I have 2 recordsets, both of them should succeed in
+updating.
+
+The problem is that CDatabase::CanTransact() and CRecordSet::CanTransact()
+both reports FALSE.
+
+I have checked the code for all other possible problems. I can
+successfully SELECT, test IsOpen(), etc.
+
+I have also tried with a sample database in MS SQL Server 6.5. In this
+case also, CanTransact() says FALSE!!
+
+Is this a bug? Shall I just go ahead and ignore the results of
+CanTransact?
+
+Any suggestion would be helpful.
+
+Thanks,
+
+- Abhijit
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Ian Pepper -- <A HREF="mailto:Ian@flexicom.ie">Ian@flexicom.ie</A>
+Monday, January 13, 1997
+</B>
+[Mini-digest: 3 responses]
+
+This is covered in KB article Q128208
+
+For completeness here it is:
+
+One major requirement of the MFC transaction model is that the driver
+support cursor preservation across transaction commits and rollbacks.
+This
+requirement prohibits transaction support when using most ODBC drivers.
+None of the drivers shipped by Microsoft to date meet this requirement.
+ 
+There is a way, however, to use transactions with some ODBC drivers that
+provide a lesser degree of transaction support than what is required by
+the
+MFC model. The steps involved in getting this support are:
+ 
+1. Query the driver for capabilities.
+ 
+2. Manually set the m_bTransactions member variable.
+ 
+3. Close or Delete the cursor after finishing the transaction.
+ 
+The following sections discuss these three steps in detail.
+ 
+Step 1 - Query the Driver for Capabilities
+------------------------------------------
+ 
+An application must check two items to determine if it is able to use
+transactions as described in this article. They are transaction support
+and
+cursor behavior. There are ODBC API calls that must be used to do this
+checking. To check for transaction support, an application must call
+SQLGetInfo() with the SQL_TXN_CAPABLE flag. If SQLGetInfo() returns
+SQL_TC_NONE, transactions are not supported in any way by the driver and
+the application will not be able to use transactions with that driver.
+For
+more information about this, please see the documentation for
+SQLGetInfo()
+in the ODBC version 2.0 Programmer's Reference.
+ 
+After determining that the driver will support transactions, the
+application must determine the cursor behavior on commit and rollback.
+These capabilities can be determined by calling the SQLGetInfo()
+function
+and specifying SQL_CURSOR_COMMIT_BEHAVIOR and
+SQL_CURSOR_ROLLBACK_BEHAVIOR,
+respectively. These functions are called by MFC itself when checking
+driver
+functionality in the CDatabase::Open() function. In MFC version 3.0 and
+later, the results of these function calls are stored in the CDatabase
+member variables m_nCursorCommitBehavior and m_nCursorRollbackBehavior.
+In
+earlier versions of MFC, these variables do not exist, but the
+application
+can make the SQLGetInfo() calls itself to determine the cursor behavior.
+ 
+The cursor commit and cursor rollback behavior will determine how to
+treat
+your CRecordset after the transaction completes. The following shows the
+possible return values and what they mean:
+ 
+Return Value      Meaning
+--------------------------------------------------------
+SQL_ERROR         Transactions not supported.
+ 
+SQL_CB_DELETE     CRecordset::Close() must be called
+                  following commit or rollback.
+ 
+SQL_CB_CLOSE      CRecordset::Requery() must be called
+                  following commit or rollback.
+ 
+SQL_CB_PRESERVE   No special actions need to be taken.
+                  (m_bTransactions will be TRUE for a
+                  driver that returns this value.)
+ 
+The cursor behavior will determine what you need to do in step 3.
+ 
+Step 2 - Manually Set the m_bTransactions Member Variable
+---------------------------------------------------------
+ 
+The m_bTransactions member variable of CDatabase is protected. Because
+of
+this, you must derive a class from CDatabase to be able to change its
+value. This is one way to do it:
+ 
+   class CMyDatabase : public CDatabase {
+ 
+   public:
+      void SetTransactions() { m_bTransactions = TRUE; }
+   };
+ 
+Now, just call SetTransactions() on your CMyDatabase object to change
+the
+m_bTransactions member to TRUE and enable transactions on your database
+after making sure that transactions are supported.
+ 
+Step 3 - Close or Delete the Cursor After Finishing the Transaction
+--------------------------------------------------------------------
+ 
+Based on the cursor behavior determined in step 1, you must either
+Close()
+the recordset if the cursor behavior is SQL_CB_DELETE, or Requery() the
+recordset if the cursor behavior is SQL_CB_CLOSE -- after the
+transaction
+is done.
+ 
+An Additional Consideration When using the Microsoft Access 2.0 ODBC
+Driver
+-------------------------------------------------------------------------
+--
+ 
+When using the Microsoft Access version 2.0 or 3.0 ODBC driver, which
+uses
+the Microsoft Access Jet database engine, you must also account for the
+Jet
+database engine's requirement that you cannot begin a transaction on any
+database that has an open cursor. In the MFC CRecordset class, an open
+cursor means a pending result set.
+ 
+Here are a couple of ways to handle this situation:
+ 
+ - Be sure that the recordset is closed when starting a transaction,
+open
+   the recordset after calling the database's BeginTrans() member
+function,
+   and close the recordset immediately after ending the transaction. If
+you
+   are doing multiple transactions, the multiple opening and closing of
+the
+   recordset can negatively affect the application's performance.
+ 
+   -or-
+ 
+ - Use the ODBC API function SQLFreeStmt() to explicitly close the
+cursor
+   after ending a transaction and then call Requery() after starting the
+   next transaction. When calling SQLFreeStmt(), specify the recordset's
+   HSTMT as the first parameter and SQL_CLOSE as the second parameter.
+   This second technique is faster than closing and opening the
+recordset
+   at the start of every transaction. The following code fragment
+   demonstrates this technique when doing two transactions:
+ 
+   CMyDatabase   db;
+   db.Open("MY_DATASOURCE");
+   CMyRecordset  rs(&db);
+ 
+   db.BeginTrans();                       // start transaction 1
+   rs.Open();                             // open the recordset
+ 
+   // manipulate data
+ 
+   db.CommitTrans();                      // or Rollback()
+ 
+   ::SQLFreeStmt(rs.m_hstmt,SQL_CLOSE);   // close the cursor
+   db.BeginTrans();                       // start transaction 2
+   rs.Requery();                          // now get the result set
+ 
+   // manipulate data
+ 
+   db.CommitTrans();                      // end transaction 2
+ 
+   rs.Close();
+   db.Close();
+ 
+
+Hope this helps,
+
+Ian
+ian@flexicom.ie
+
+
+>
+-----From: "James P. Kelleghan" <jpk01@tag.acnet.net>
+
+Hi Abhijit,
+
+No, its not a bug. Access does not support transactions. (I'm not entierly
+sure about MS SQLServer). As a matter of fact, most PC based DB Engiens
+don't support transactions. A CDatabase object that's connected to a
+Database that does not support transactions will return FALSE and ignore
+all calls to transaction based methods. 
+
+This does not mean you should not incorporate them in your code. You never
+know when you app will be used with a DB Engiene that does support
+transactions, just take the proper precautions. Personaly I use SQLWindows
+by Gupta (has a new name now) for testing. Its ODBC level 3 compliant,
+supports transactions and the single user version is free. I then re test
+over MS Acces to check the  "transaction not supported" code.
+
+Hope this helps,
+
+James
+
+----------
+> From: Abhijit Dey <sunsys@giascl01.vsnl.net.in>
+> To: mfc-l@netcom.com
+> Subject: Transaction support thru' ODBC for Access for Win95
+> Date: Saturday, January 11, 1997 6:49 AM
+> 
+> Environment: MSVC 4.0, NT 3.51 and Win95
+> 
+> { Using both; Problem appears on both; Solution on any one will do }
+> 
+> Hi,
+> 
+> I'm currently trying to implement transaction support through ODBC with
+MS
+> Access for Win95. I have 2 recordsets, both of them should succeed in
+> updating.
+> 
+> The problem is that CDatabase::CanTransact() and
+CRecordSet::CanTransact()
+> both reports FALSE.
+> 
+> I have checked the code for all other possible problems. I can
+> successfully SELECT, test IsOpen(), etc.
+> 
+> I have also tried with a sample database in MS SQL Server 6.5. In this
+> case also, CanTransact() says FALSE!!
+> 
+> Is this a bug? Shall I just go ahead and ignore the results of
+> CanTransact?
+> 
+> Any suggestion would be helpful.
+> 
+> Thanks,
+> 
+> - Abhijit
+-----From: "Abhijit Dey" <sunsys@giascl01.vsnl.net.in>
+
+Hi James,
+
+Thanks for yr. reply. However, I have figured out this stuff over the last
+weekend. The problem is not with Access or SQL Server (Both of them
+support transaction to the hilt. So much so, you can even have DDL
+statements like DROP INDEX etc. right inside your transaction block.)
+
+The problem is that the MFC transaction model, which is
+recordset-centered, requires that the cursor be preserved on commit and on
+rollback. And to top it all, here is the actual quote from the VC++ online
+documentation :
+
+"Currently there are few ODBC drivers that support currency preservation.
+None of the drivers shipped with any version of MSVC have supported
+currency preservation."
+
+How do I expect that MS would ship drivers which do not work upto the
+spec. set by themselves?
+
+However, the fix is really simple (TN047: Relaxing Database Transaction
+Requirements). In summary, since the databases and the same MS drivers
+_is_ transaction capable, simply use ::SQLGetInfo(.....) to check that
+your driver and database does support transactions. If yes, set
+m_bTransactions of your CDatabase class to TRUE. Then everything else
+works like a dream.
+
+If U want the full code, just mail me.
+
+- Abhijit
+
+PS : One of my friend claims that Access supports transactions right from
+version 1. And thanks to Microsoft's versioning system, we are at version
+7 now :-)
+
+----------
+> From: James P. Kelleghan <jpk01@tag.acnet.net>
+> To: mfc-l@netcom.com
+> Cc: sunsys@giascl01.vsnl.net.in
+> Subject: Re: Transaction support thru' ODBC for Access for Win95
+> Date: Monday, January 13, 1997 10:24 PM
+> 
+> Hi Abhijit,
+> 
+> No, its not a bug. Access does not support transactions. (I'm not
+entierly
+> sure about MS SQLServer). As a matter of fact, most PC based DB Engiens
+> don't support transactions. A CDatabase object that's connected to a
+> Database that does not support transactions will return FALSE and ignore
+> all calls to transaction based methods. 
+> 
+> This does not mean you should not incorporate them in your code. You
+never
+> know when you app will be used with a DB Engiene that does support
+> transactions, just take the proper precautions. Personaly I use
+SQLWindows
+> by Gupta (has a new name now) for testing. Its ODBC level 3 compliant,
+> supports transactions and the single user version is free. I then re
+test
+> over MS Acces to check the  "transaction not supported" code.
+> 
+> Hope this helps,
+> 
+> James
+> 
+> ----------
+> > From: Abhijit Dey <sunsys@giascl01.vsnl.net.in>
+> > To: mfc-l@netcom.com
+> > Subject: Transaction support thru' ODBC for Access for Win95
+> > Date: Saturday, January 11, 1997 6:49 AM
+> > 
+> > Environment: MSVC 4.0, NT 3.51 and Win95
+> > 
+> > { Using both; Problem appears on both; Solution on any one will do }
+> > 
+> > Hi,
+> > 
+> > I'm currently trying to implement transaction support through ODBC
+with
+> MS
+> > Access for Win95. I have 2 recordsets, both of them should succeed in
+> > updating.
+> > 
+> > The problem is that CDatabase::CanTransact() and
+> CRecordSet::CanTransact()
+> > both reports FALSE.
+> > 
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Tuesday, January 14, 1997
+</B>
+[Mini-digest: 2 responses]
+
+At 18:19 1/11/97 +0530, Abhijit Dey wrote:
+>Environment: MSVC 4.0, NT 3.51 and Win95
+
+>{ Using both; Problem appears on both; Solution on any one will do }
+
+>The problem is that CDatabase::CanTransact() and CRecordSet::CanTransact()
+>both reports FALSE.
+
+That's because the ODBC driver, for the connection that you've made to
+it, is reporting that the connection can't support transactions.  Or, the
+driver didn't even support the SQLGetInfo() call which MFC used to test
+for transactions support.
+
+Maybe you've opened the database connection in such a mode that
+transactions aren't allowed.  Maybe you don't have write prermissions
+to the database.  Maybe you have a really old driver.
+
+>Is this a bug?
+
+No, I don't think it is.
+
+>Shall I just go ahead and ignore the results of CanTransact?
+
+Who knows? You didn't explain how you were using those results. Maybe you
+could, maybe you shouldn't.
+
+
+-----From: Mike Blaszczak <mikeblas@nwlink.com>
+
+
+>"Currently there are few ODBC drivers that support currency preservation.
+>None of the drivers shipped with any version of MSVC have supported
+>currency preservation."
+
+>How do I expect that MS would ship drivers which do not work upto the
+>spec. set by themselves?
+
+Cursor state preservation isn't a specification set by Microsoft.
+
+Access doesn't implement it because most people are more interested in
+performance than in cursor state preservation.  Since cursor state
+preservation is very expensive in the domain of performance, its
+implementation is eschewed in Acess.
+
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>      <-- trip report central!
+95 Honda VFR-750F / 88 Yamaha FZ-700 (damaged) / 94 Mazda RX-7
+Serial #00050!    /      AMA - HRC - VFROC     / Wang Dang Wankel
+         I am bored of this talk. It is time now for the dancing!
+These words are my own - I do not speak on behalf of Microsoft.
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

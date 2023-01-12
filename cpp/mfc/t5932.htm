@@ -1,0 +1,177 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Deadlock on listbox
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Bok Nan Lo -- <A HREF="mailto:lo@ia-us.com">lo@ia-us.com</A>
+Monday, July 22, 1996
+</B>
+Environment: VC++ 4.2 / Win 95/NT
+
+It seemed that attempting to access a listbox in a CView with 2 different 
+threads causes a deadlock situation.
+
+Here's the scenario:
+1. Both threads access the same function in the view class with a simple 
+listbox.AddString()
+
+2. Somewhere in my CDocument object I decided to logoff and thus signal 
+these two threads to terminate. Meanwhile, I have WaitForSingleObject (well 
+I also tried WaitForMultipleObject with similar results) with INFINITE set 
+for timeout value.
+
+3. I expected both threads to terminate since my main thread is already 
+sleeping. Unfortunately this is not the case, the main thread slept 
+forever, thread 0 exited, thread 1 hung forever. If I change the timeout 
+value for WaitForSingleObject to a specified time, I successfully logoff, 
+*then*, thread 1 terminated.
+
+All my threads performed as behaved if I do not use the listbox.AddString() 
+command.
+
+I've attempted to put a Semaphore around the listbox's AddString() call 
+with the same problem.
+
+Anyone with any clue why this strange behaviour?!
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@msn.com">mikeblas@msn.com</A>
+Thursday, July 25, 1996
+</B>
+[Mini-digest: 3 responses]
+
+I answered this exact question from you on CompuServe's MSMFC forum about two 
+days ago.
+
+The problem is that you've given your program a bad design. The deadlock 
+occurrs because your primary thread isn't pumping messages for the list box -- 
+it's blocking on the subordinate threads.  The subordinate thread will never 
+terminate, though, because they've called SendMessage() to the list box.  
+Since SendMessage() is synchronous, it doesn't return until the message is 
+processed.  But the message is never processed because the message pump isn't 
+running because the thread which will receive the message is blocking.  The 
+deadlock is because the thread receiving the message can't release until the 
+sending thread can release, but the sending thread won't release until the 
+receiving thread releases.
+
+You need to design deadlocks out of your software.
+
+.B ekiM
+http://www.nwlink.com/~mikeblas
+
+----------
+From: 	owner-mfc-l@netcom.com on behalf of Bok Nan Lo
+Sent: 	Monday, July 22, 1996 10:41 AM
+To: 	'mfc-l@netcom.netcom.com'
+Subject: 	Deadlock on listbox
+
+Environment: VC++ 4.2 / Win 95/NT
+
+It seemed that attempting to access a listbox in a CView with 2 different 
+threads causes a deadlock situation.
+
+Here's the scenario:
+1. Both threads access the same function in the view class with a simple 
+listbox.AddString()
+
+2. Somewhere in my CDocument object I decided to logoff and thus signal 
+these two threads to terminate. Meanwhile, I have WaitForSingleObject (well 
+I also tried WaitForMultipleObject with similar results) with INFINITE set 
+for timeout value.
+
+3. I expected both threads to terminate since my main thread is already 
+sleeping. Unfortunately this is not the case, the main thread slept 
+forever, thread 0 exited, thread 1 hung forever. If I change the timeout 
+value for WaitForSingleObject to a specified time, I successfully logoff, 
+*then*, thread 1 terminated.
+
+All my threads performed as behaved if I do not use the listbox.AddString() 
+command.
+
+I've attempted to put a Semaphore around the listbox's AddString() call 
+with the same problem.
+
+Anyone with any clue why this strange behaviour?!
+
+
+-----From: Tim Hagemann <100063.323@CompuServe.COM>
+
+Bok,
+
+Tried you to share a CListCtrl-Object in different threads? If you did, this
+might be the problem. MFC stores the hWnd - CWnd map in the
+AFX_MODULE_THREAD_STATE class, which is local to thread and module. So it is
+generally not a good idea to share CWnd derived objects in different threads. I
+tried this sometimes on my own, the result was always an assertion in the MFC
+code.
+Just try to add the string via the normal Win32 API, so call 
+
+::SendMessage(listbox.m_hWnd,0,YourString);
+
+Hope this helps !
+
+
+Tim Hagemann
+ifa informationssysteme fuer Augenaerzte
+-----From: Gordon Weakliem <gweakl@metronet.com>
+
+Probably, CListBOx::AddString() devolves into ::SendMessage( hwndlist,
+LB_ADDSTRING...)  SendMessage also causes a context switch _if_ the thread
+sending the message is not the thread that owns the destination message
+queue. So, I'm guessing that one thread creates the list box and owns it's
+message queue, and when this thread decides to terminate, and does
+WaitForSingleObject, one of your threads is trying to do an AddString.
+AddString is waiting for the context switch, and your target thread is
+waiting for the other thread to die.  That's one situation where the
+deadlock you describe could occur.
+Gordon Weakliem
+gweakl@metronet.com
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

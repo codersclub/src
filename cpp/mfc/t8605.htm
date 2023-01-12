@@ -1,0 +1,311 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CScrollView and GetUpdateRgn()
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Paul Mitsui -- <A HREF="mailto:PMITSUI@dataflight.com">PMITSUI@dataflight.com</A>
+Friday, December 20, 1996
+</B>
+Environment: VC++ 4.1, Windows95
+
+After painting text to the screen I want to update only the portions 
+of the screen which need updating.  I create a region with 
+CreateRectRgn() and call GetRgnData() which then returns NULLREGION:
+
+
+   RECT rect;
+   CRgn rgn;
+
+   GetClientRect(&rect);
+   rgn.CreateRectRgn(rect.left, rect.top, rect.right, rect.bottom);
+   nStatus = GetUpdateRgn(&rgn);
+   if ((nStatus == NULLREGION) || (nStatus == ERROR))
+      // Perform some true routine
+   else
+      // Perform some false routine <-- Never gets evaluated
+
+
+The else statement above never gets evaluated because nStatus always 
+returns NULLREGION (no region to update).  Am I doing something 
+wrong?  Is there any other way to get the region or rects which need 
+updating?  I've tried placing the above code in OnDraw() and 
+OnPaint()...neither way works.
+
+Any help would be much appreciated.  Thanks in advance.
+
+-Paul
+-----------------------------------------------------------
+Paul J. Mitsui
+Product Development and Support
+<pmitsui@dataflight.com>
+
+Dataflight Software
+2337 Roscomare Road, Suite 11
+Los Angeles, CA 90077
+(310) 471-3414
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dmitry Davidovich -- <A HREF="mailto:dmitry@enigma.co.il">dmitry@enigma.co.il</A>
+Sunday, December 22, 1996
+</B>
+At 12:17 20/12/96 +0000, you wrote:
+>Environment: VC++ 4.1, Windows95
+>
+>After painting text to the screen I want to update only the portions 
+>of the screen which need updating.  I create a region with 
+>CreateRectRgn() and call GetRgnData() which then returns NULLREGION:
+>
+>
+>   RECT rect;
+>   CRgn rgn;
+>
+>   GetClientRect(&rect);
+>   rgn.CreateRectRgn(rect.left, rect.top, rect.right, rect.bottom);
+>   nStatus = GetUpdateRgn(&rgn);
+>   if ((nStatus == NULLREGION) || (nStatus == ERROR))
+>      // Perform some true routine
+>   else
+>      // Perform some false routine <-- Never gets evaluated
+>
+>
+>The else statement above never gets evaluated because nStatus always 
+>returns NULLREGION (no region to update).  Am I doing something 
+>wrong?  Is there any other way to get the region or rects which need 
+>updating?  I've tried placing the above code in OnDraw() and 
+>OnPaint()...neither way works.
+>
+>Any help would be much appreciated.  Thanks in advance.
+>
+
+>From VC++ 4.1 Help:
+---
+The BeginPaint member function automatically validates the update region,
+so any call to GetUpdateRgn made immediately after a call to BeginPaint
+retrieves an empty update region.
+---
+
+Use next code in OnDraw of your view:
+
+if(pDC->IsKindOf( RUNTIME_CLASS( CPaintDC ) ) )
+{
+	CRect rUpdate(((CPaintDC*)pDC)->m_ps.rcPaint);
+	if(rUpdate.IsRectNull())
+		GetClientRect(&rUpdate);
+
+where rUpdate is update rect in device coordinates
+
+
+
+-----------------------------------------
+Dmitry Davidovich
+CS Tel Aviv University
+dmitry@enigma.co.il
+ddmitry@math.tau.ac.il
+-----------------------------------------
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Jim Lawson Williams -- <A HREF="mailto:jimlw@mail.ccur.com.au">jimlw@mail.ccur.com.au</A>
+Monday, December 23, 1996
+</B>
+[Mini-digest: 2 responses]
+
+At 12:17 PM 20/12/96 +0000, you wrote:
+>Environment: VC++ 4.1, Windows95
+>
+>After painting text to the screen I want to update only the portions 
+>of the screen which need updating.  I create a region with 
+>CreateRectRgn() and call GetRgnData() which then returns NULLREGION:
+>
+>
+>   RECT rect;
+>   CRgn rgn;
+>
+>   GetClientRect(&rect);
+>   rgn.CreateRectRgn(rect.left, rect.top, rect.right, rect.bottom);
+>   nStatus = GetUpdateRgn(&rgn);
+>   if ((nStatus == NULLREGION) || (nStatus == ERROR))
+>      // Perform some true routine
+>   else
+>      // Perform some false routine <-- Never gets evaluated
+>
+>
+>The else statement above never gets evaluated because nStatus always 
+>returns NULLREGION (no region to update).  Am I doing something 
+>wrong?  Is there any other way to get the region or rects which need 
+>updating?  I've tried placing the above code in OnDraw() and 
+>OnPaint()...neither way works.
+>
+>Any help would be much appreciated.  Thanks in advance.
+>
+>-Paul
+>-----------------------------------------------------------
+>Paul J. Mitsui
+>Product Development and Support
+><pmitsui@dataflight.com>
+>
+>Dataflight Software
+>2337 Roscomare Road, Suite 11
+>Los Angeles, CA 90077
+>(310) 471-3414
+>
+G'day!
+
+I use pDC->GetClipBox(&rectShtClip).  According to my reading of the various bits and pieces below, your results are what is to be expected.
+
+Regards,
+
+Jim LW
+                   ***********************
+
+>From "Books Online":
+
+The BeginPaint member function automatically validates the update region, so any call to GetUpdateRgn made immediately after a call to BeginPaint retrieves an empty update region.
+
+>From 4.2b Msdev\mfc\src\viewcore.cpp(181):
+
+void CView::OnPaint()
+{
+	// standard paint routine
+	CPaintDC dc(this);
+	OnPrepareDC(&dc);
+	OnDraw(&dc);
+}
+
+and Msdev\mfc\src\WINGDI.CPP(951):
+
+CPaintDC::CPaintDC(CWnd* pWnd)
+{
+	ASSERT_VALID(pWnd);
+	ASSERT(::IsWindow(pWnd->m_hWnd));
+
+	if (!Attach(::BeginPaint(m_hWnd = pWnd->m_hWnd, &m_ps)))
+		AfxThrowResourceException();
+}
+
+
+>From the BBC's "Barchester Chronicles":
+
+    "I know that ultimately we are not supposed to understand.
+    But I also know that we must try."
+
+       -- the Reverend Septimus Harding, clog-dancer, C++ programmer
+-----From: stas <stas@goldnet.net.il>
+
+
+------ =_NextPart_000_01BBF0C2.A761D970
+Content-Type: text/plain; charset="us-ascii"
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dulepov Dmitry -- <A HREF="mailto:dima@ssm6000.samsung.ru">dima@ssm6000.samsung.ru</A>
+Wednesday, January 08, 1997
+</B>
+        [Mailer: "Groupware E-Mail". Version 1.02.051]
+
+
+This is correct. Windows documentation states that BeginPaint clears update region. Use CDC::GetClipBox() instead.
+
+
+Dmitry A. Dulepov
+Samsung Electronics Co., Ltd.
+Russian Research Center
+Phone: +7 (095) 213-9207
+Fax: +7 (095) 213-9196
+E-mail: dima@src.samsung.ru
+====================================
+
+-----------------------------
+>        [From: Paul Mitsui
+>        [Address: PMITSUI@dataflight.com
+>        [To: Dmitry A. Dulepov
+>        [Date: Mon Jan 06 18:23:41 1997
+>Environment: VC++ 4.1, Windows95
+>
+>After painting text to the screen I want to update only the portions 
+>of the screen which need updating.  I create a region with 
+>CreateRectRgn() and call GetRgnData() which then returns NULLREGION:
+>
+>
+>   RECT rect;
+>   CRgn rgn;
+>
+>   GetClientRect(&rect);
+>   rgn.CreateRectRgn(rect.left, rect.top, rect.right, rect.bottom);
+>   nStatus = GetUpdateRgn(&rgn);
+>   if ((nStatus == NULLREGION) || (nStatus == ERROR))
+>      // Perform some true routine
+>   else
+>      // Perform some false routine <-- Never gets evaluated
+>
+>
+>The else statement above never gets evaluated because nStatus always 
+>returns NULLREGION (no region to update).  Am I doing something 
+>wrong?  Is there any other way to get the region or rects which need 
+>updating?  I've tried placing the above code in OnDraw() and 
+>OnPaint()...neither way works.
+>
+>Any help would be much appreciated.  Thanks in advance.
+>
+>-Paul
+>-----------------------------------------------------------
+>Paul J. Mitsui
+>Product Development and Support
+><pmitsui@dataflight.com>
+>
+>Dataflight Software
+>2337 Roscomare Road, Suite 11
+>Los Angeles, CA 90077
+>(310) 471-3414
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,250 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+DAO - Getting Autonumber value after AddNew/Update
+</B></FONT>
+<BR>
+<PRE>
+<B>
+David Ohlssen -- <A HREF="mailto:DAVIDO@COMMERCE.CTECH.AC.ZA">DAVIDO@COMMERCE.CTECH.AC.ZA</A>
+Tuesday, September 17, 1996
+</B>
+Environment: NT 4.0  VC++ 4.0
+===============================
+I vaguely remember a similar query, but it does not come up when I
+search the folders.
+
+My problem is that when I add a new record to a dynaset view of a table,
+I need to retrieve the value allocated by an autonumber/counter field.  The
+CDaoRecordSet m_ variable just contains the last read value, even after
+the update.   I need the value to use as a unique key in the itemdata of a
+listbox, so that selecting will allow use of the exact record.   I have
+tried setting a spare field to a high number like 2 000 000 000 and then
+calling FindFirst to look for it and then changing it back to something
+normal once I have retrieved the autonumber field.   Messy/slow.  I suspect
+that MovePrev/FindPrev followed by movenext might work, but it seems very
+dicey if the new record is not at the logical end of the recordset due to
+query sorting.   There must be a clean way to get the autonumber.
+Oh, I also tried doing an Edit on the record immediately after Update - it
+still leaves the auto field as it was last time I read anything.
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+George Grant -- <A HREF="mailto:doubleg@ix.netcom.com">doubleg@ix.netcom.com</A>
+Thursday, September 19, 1996
+</B>
+[Mini-digest: 6 responses]
+
+I've worked with this a lot in the past, and it can get pretty tricky to =
+do. You didn't mention if you were working with local (.MDB) files or =
+tables that are attached from an ODBC data source, so I guess you're =
+just using local tables. I made a call to Microsoft support a long time =
+ago when I realized that problem and their response was "Yep, that's a =
+problem allright!"
+
+There are a couple of workarounds. One is the one you've mentioned, but =
+that one runs into trouble when you're using attached (SQL Server only? =
+it's the only one I've tried) tables, because the ENTIRE RECORD you just =
+added will be marked as #DELETED in the dynaset. So you have to close =
+the recordset and then reopen at the new record you just added, based on =
+an unique key like you said.
+
+Another (neater, I guess) solution is to write a class (mine is called =
+CIdentity) that just uses a separate table called "tblIdentity" that has =
+one record in it (you could soup it up to use multiple records, I =
+guess.) The CIdentity::GetNew() routine just adds one to the value =
+that's in the record. If your ::Update() call on that record succeeds =
+[after you've added 1 to it], then that means you've got that ID; anyone =
+else would have collided with the page lock.
+
+With that class, instead of using "counter" fields you would just use a =
+"long" field and set the ID yourself. That way you know the ID without =
+any messing around at all.
+
+Works for me, but other people may criticize it... But what the heck, =
+you only live once. Besides, if you're using this class all the time, =
+then the Identity table on your DB server will be in the cache anyway so =
+it shouldn't take too long to access.
+
+I can post the class and header file if you'd like... It's pretty much =
+self-contained.
+
+-george
+
+
+-----From: Koronthaly David <dkoronth@blava-s.bratisla.ingr.com>
+
+I can remember something similar suggested by Microsoft, but I haven't
+tested it now.
+
+You have to retrieve bookmark associated with new record, and then set
+the current record using this bookmark (move in recordset). After this
+move (very quick, because it is the same record) everything should work,
+and you should have your Autonumber field set.
+
+Regards,
+David Koronthaly
+
+-----From: Stuart Downing <stuartd@izzy.net>
+
+You want to do this...
+CDaoRecordset Set;
+Set.AddNew();
+... //prepare record here
+Set.Update()
+Set.SetBookmark(GetLastModifiedBookmark());             //Move to added record
+
+Now the set is positioned on record you just added.  We used to just call MoveLast, but 
+the documentation states pretty clearly that this isn't safe.  The above is the 
+recommended way.
+If you are accessing an external data source, you'll need to confirm that bookmarks are supported
+before attempting this.  Look at the help for GetLastModifiedBookmark.
+We derived our own recordset class from CDaoRecordset to automatically do this after Update for
+a pending Add.  (We know we have bookmark support).  9 times out of 10 this is what we want anyway.
+------------------------
+Stuart Downing
+Creative Solutions, Inc.
+stuartd@izzy.net
+
+-----From: Norman <doubleM@cris.com>
+
+Have you tried Getting a Bookmark immediately after the Update command and then
+Setting the Bookmark on the next line. It works for me.
+
+Norman
+
+-----From: "GoroKhM1" <gorokhm1@SMTP.ATG-NET.COM>
+
+That is a clean way which is working fine in my program.
+
+Definition in a h-file:
+
+  const LPCTSTR LPSZ_SG_SGID = "sg_sgid";
+
+The counter field is created in a table with the attributes:
+
+  CDaoFieldInfo fInf;
+  fInf.m_strName = LPSZ_SG_SGID;
+  fInf.m_nType = dbLong;
+  fInf.m_lSize = 4;
+  fInf.m_lAttributes = dbFixedField | dbAutoIncrField;
+
+Code to add a new record:
+
+  long lRecID;
+  try
+  {
+     // Now position is "previously current record"
+     m_pSet->AddNew();   // throw !!
+     // Now position is "new record"
+     m_pSet->SetFieldValue( ... ); // throw !!
+     ...
+     m_pSet->SetFieldValue( ... ); // throw !!
+     COleVariant ovRecID = m_pSet->GetFieldValue(LPSZ_SG_SGID); // throw!!
+     lRecID = FuncVarToLong(ovRecID); // THAT IS **_ID_** FOR NEW RECORD
+     m_pFastSet->Update();  // throw !!
+     // Now position is "previously current record"
+  }
+  catch ( .. )
+  {
+    ...
+  }
+
+// Convertor from DAOSDK\SAMPLES\EMPLOYEE\DAOEMP.H:
+inline long FuncVarToLong(COleVariant& v)
+{
+  return (v.vt == VT_I4) ? (long)v.iVal : 0L;
+} // FuncVarToLong()
+
+Mark
+
+<MarkG@usa.net>
+
+-----From: Rohit Namjoshi <namjoshi@slb.com>
+
+	If Foo is an instance of a CDaoRecordSet derived object, then
+
+		Foo.SetBookmark(Foo.GetLastModifiedBookmark());
+
+will give you access the record added by the last Foo.Update().
+
+Cheers... Rohit
+--
+Rohit Namjoshi                      namjoshi@austin.asc.slb.com
+Schlumberger Austin Product Center         Vox: +1 512 331 3353
+Austin, TX 78726,  USA                     Fax: +1 512 331 3320
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Andrew Lazarus -- <A HREF="mailto:DrLaz@advisorsw.com">DrLaz@advisorsw.com</A>
+Monday, September 23, 1996
+</B>
+[Mini-digest: 2 responses]
+
+> Environment: NT 4.0  VC++ 4.0
+> ===============================
+
+> My problem is that when I add a new record to a dynaset view of a table,
+> I need to retrieve the value allocated by an autonumber/counter 
+field. 
+
+Did you use 
+recordset.SetBookmark(recordset.GetLastModifiedBookmark());
+to make sure you were on the new record?
+andrew lazarus
+senior software engineer
+DrLaz@advisorsw.com
+-----From: ivan_johannessen@invision.iip.com
+
+
+     Save a bookmark before you add, and then restore it.
+     ivan
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

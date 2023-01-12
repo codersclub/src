@@ -1,0 +1,191 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Paste to DialogBar
+</B></FONT>
+<BR>
+<PRE>
+<B>
+<A HREF="mailto:Tony_Rentschler@ap.org">Tony_Rentschler@ap.org</A>
+Friday, September 20, 1996
+</B>
+Environment: VC++ 4.2, Win95
+
+Hi All,
+
+I've got a combo box in a dialog bar (inserted by the Component
+Gallery) attached to my MainFrame window. I can set the focus to the
+box's edit window easily, but I can't paste text into it. If a document
+(based on RichEditDoc) is open, the text is inserted into the doc. How
+can I get the combo box edit window to accept pasted text when it has
+the focus?
+
+Thanks,
+Tony Rentschler
+The Associated Press
+New York
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mark Conway -- <A HREF="mailto:mrc@mfltd.co.uk">mrc@mfltd.co.uk</A>
+Monday, September 23, 1996
+</B>
+[Mini-digest: 3 responses]
+
+The problem is that the cut,copy, paste keys are being translated by
+your app's accelerator table, and the standard windows controls don't
+understand ID_EDIT_CUT, etc.
+
+The easiest way round this I've found is to override
+PreTranslateMessage() in your control bar, to ensure these keys get thru
+to the relevant control. I define a function which I then call from each
+CDialogBar's pretranslate message...as it's sometimes useful in other
+places. Code is below.
+
+Mark.
+
+
+BOOL CMyDialogBar::PreTranslateMessage(MSG* pMsg) 
+{
+	switch(pMsg->message)
+	{
+		case WM_KEYDOWN:
+			if (PreTranslateClipboardKeys(pMsg))
+				return TRUE;
+    			break;
+		.. any other messages you might need to intercept....
+	}
+    return CDialogBar::PreTranslateMessage(pMsg);
+}
+
+
+BOOL PreTranslateClipboardKeys(MSG * pMsg)
+// If the message is a clipboard key (or one that a control is likely to
+want),
+// then	avoid want to avoid translate accelerator tables.
+{
+    if (pMsg->message == WM_KEYDOWN)
+    {
+		int nVirtKey = pMsg->wParam;
+		// intercept Ctrl+X, Ctrl +C, Ctrl+V, Shift+Ins, Ctrl+Ins, Shift+Del
+		switch(nVirtKey)
+		{
+			case 'X':
+			case 'C':
+			case 'V':
+				if (IsControlKeyDown())
+					goto _TranslateDispatch;
+				break;
+
+			case VK_INSERT:
+				if (IsControlKeyDown() || IsShiftKeyDown())
+					goto _TranslateDispatch;
+				break;
+
+			case VK_DELETE:
+				if (IsShiftKeyDown())
+					goto _TranslateDispatch;
+				break;
+		}
+	}
+	return FALSE;
+
+_TranslateDispatch:
+	::TranslateMessage(pMsg);
+	::DispatchMessage(pMsg);
+	return(TRUE);
+}
+
+inline BOOL IsShiftKeyDown()
+    { return (GetKeyState(VK_SHIFT) & 0x8000); }; // Returns TRUE if the
+Shift key is held down ie top bit set
+
+inline BOOL IsControlKeyDown()
+    { return (GetKeyState(VK_CONTROL) & 0x8000); }; // Returns TRUE if
+the Control key is held down ie top bit set
+
+
+
+
+
+
+>----------
+>From: 	Tony_Rentschler@ap.org[SMTP:Tony_Rentschler@ap.org]
+>Sent: 	20 September 1996 21:15
+>To: 	mfc-l@netcom.com
+>Subject: 	Paste to DialogBar
+>
+>Environment: VC++ 4.2, Win95
+>
+>Hi All,
+>
+>I've got a combo box in a dialog bar (inserted by the Component
+>Gallery) attached to my MainFrame window. I can set the focus to the
+>box's edit window easily, but I can't paste text into it. If a document
+>(based on RichEditDoc) is open, the text is inserted into the doc. How
+>can I get the combo box edit window to accept pasted text when it has
+>the focus?
+>
+>Thanks,
+>Tony Rentschler
+>The Associated Press
+>New York
+>
+-----From: Leonard Norrgard <vinsci@citec.fi>
+
+See MSJ July 95, C/C++ Q&A for how to construct a dialog bar (or
+toolbar) with cut/copy/paste functionality.
+
+-- vinsci
+
+-----From: bliu@campbellsoft.com
+
+     MSJ 1995, July issue  C/C++ column has a solution for this.
+     Also there is an article on same issue talking about MFC message and 
+     command routing. Excellent!!! Both from Paul DiLascia. 
+
+     Bill   
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

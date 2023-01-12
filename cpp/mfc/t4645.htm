@@ -1,0 +1,212 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+AfxDaoTerm, and stuff
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Ted -- <A HREF="mailto:tward@geographix.com">tward@geographix.com</A>
+Tuesday, April 09, 1996
+</B>
+
+Sorry if this has been discussed already, but I haven't received the list   
+in awhile.
+
+I am using NT 3.51, VC 4.1.
+
+I am trying to open a DAO database in an OCX.  My code does nothing but   
+open, and close the database.  When the app that calls the OCX tries to   
+exit, the following happens:
+
+Appcore.cpp
+
+int CWinApp::ExitInstance()
+{
+ if (!afxContextIsDLL)
+  SaveStdProfileSettings();
+
+ // Cleanup DAO if necessary
+ if (m_lpfnDaoTerm != NULL)
+ {
+  // If a DLL, YOU must call AfxDaoTerm prior to ExitInstance
+  ASSERT(!afxContextIsDLL);
+
+  (*m_lpfnDaoTerm)();  <- *******IMPORTANT PART*******
+ }
+
+ return m_msgCur.wParam; // returns the value from PostQuitMessage
+}
+
+The function pointer calls into the following code:
+
+Daocore.cpp
+
+void AFXAPI AfxDaoTerm()
+{
+ _AFX_DAO_STATE* pDaoState = AfxGetDaoState();
+
+ // Close any CDaoWorkspaces left around
+ void* pvKey;
+ void* pvObject;
+ POSITION pos = pDaoState->m_mapWorkspaces.GetStartPosition();
+ while (pos != NULL)
+ {
+  pDaoState->m_mapWorkspaces.GetNextAssoc(pos, pvKey, pvObject);
+  ((CDaoWorkspace*)pvObject)->Close();
+ }
+ pDaoState->m_mapWorkspaces.RemoveAll();
+
+ // Clean up engine object if necessary
+ if (pDaoState->m_pDAODBEngine != NULL)
+ {
+  pDaoState->m_pDAODBEngine->Release();  <- *******CRASHES HERE******
+  pDaoState->m_pDAODBEngine = NULL;
+ }
+
+ // Shutdown OLE component objects if necessary
+ if (pDaoState->m_bOleInitialized)
+ {
+  ::CoUninitialize();
+  pDaoState->m_bOleInitialized = FALSE;
+ }
+
+ // If hooked up to CWinApp, make sure to unhook
+ CWinApp* pApp = AfxGetApp();
+ if (pApp != NULL)
+  pApp->m_lpfnDaoTerm = NULL;
+}
+
+And the code crashes (access error 00005), I can't even trace into the   
+Release() code, the crash happens immediately, but pointer is (obviously)   
+not NULL.
+
+The comment in AppCore says that you must call AfxDaoTerm() before   
+ExitInstance.  I have tried calling AfxDaoTerm() from different places in   
+my code (such as the ExitInstance routine, before calling the default   
+handler), and sometimes it has no effect at all, and sometimes I get an   
+assertion failure.  But no matter what, it gets called again when the   
+application exits.
+
+What is going on???  Anybody??? Thanks for any help.
+
+Please CC any replies to me.
+
+
+Ted Ward
+
+tward@geographix.com
+Denver, Colorado  
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+MikeMike -- <A HREF="mailto:MikeMike@athens.emi.net">MikeMike@athens.emi.net</A>
+Friday, April 12, 1996
+</B>
+[Mini-digest: 3 responses]
+
+Ted
+
+Check out Q143084
+"Fix:Problems with Using the MFC DAO Classes in a .DLL or .OCX"
+
+You can find it at www.microsoft.com/kb under VC or in MSDN
+
+Mike Massa
+MIKEMIKE@MSN.COM
+MIKEMIKE@EMI.NET
+407-626-2330
+
+-----From: Ola Gunnars <ola.gunnars@sto.fdata.se>
+
+Im using the Dao in an MFC app (EXE) and there is something wrong in =
+this functionality. When runing 3.51 Im calling AfxDaoTerm() and =
+everything works fine but whenb runing under NT 4.0 the program crashes =
+so I needed to check version before calling this object . My code calls =
+ODBC and DAO and I have an query in DAO that calls an ODBC stored proc . =
+When I close all databases one ODBC database (CDatabase)  object is =
+impossible to close something hangs in SQLDisconnect .
+/Ola
+
+-----From: Dan Kirby <dkirby@accessone.com>
+
+Hi, you must call AfxDaoTerm() after all of your DAO objects are destroyed 
+but before ExitInstance(). In other words you can't wait until the 
+ DLL_PROCCESS_DETACH case to terminate DAO.
+
+This means that you cannot have Global DAO objects and you can't do 
+something like:
+
+void  SomeMethod()
+{
+	CDaoDatabase db;
+	db.Open();
+     .
+     .
+     .
+            db.Close();
+	AfxDaoTerm();
+}
+ because AfxDaoTerm is called before the destruction of the DAO object.
+
+If you have:
+
+void  SomeMethod()
+{
+	CDaoDatabase * pDb= new DaoDatabase;
+	db.Open();
+     .
+     .
+     .
+            db.Close();
+	delete pDb;
+	AfxDaoTerm();
+}
+
+This is fine.
+
+--dan
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,278 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+PostMessage(WM_HELP...
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Marc -- <A HREF="mailto:msd@cadcentre.co.uk">msd@cadcentre.co.uk</A>
+Friday, November 29, 1996
+</B>
+
+Environment: VC++ 4.2-flat, NT 4.0 SP 1
+
+Hi I'm trying to post a WM_HELP message that worked at: VC++ 4.0, NT 3.51 SP 4
+
+I used to be able to use the following line:
+
+    cwnd->PostMessage(WM_HELP)   // 2nd & 3rd params default to zero
+
+But since my change in environment this now returns zero (error).
+Immediately calling GetLastError() gives an error value of 87 which means
+"Invalid Parameter". I gather the 3rd parameter should be a pointer to a
+HELPINFO structure, so I then tried the following:
+
+
+   HELPINFO  helpInfo;
+   helpInfo.cbSize       = (UINT)sizeof(HELPINFO);
+   helpInfo.iContextType = HELPINFO_WINDOW;
+   helpInfo.iCtrlId      = cwnd->GetDlgCtrlID();
+   helpInfo.hItemHandle  = (HANDLE)(cwnd->GetSafeHwnd());
+   helpInfo.dwContextId  = (DWORD)0;
+   helpInfo.MousePos     = point;  // of event in screen coords
+
+   int status = cwnd->PostMessage(WM_HELP, (WPARAM)0, (LPARAM)&helpInfo);
+   if (!status)
+       DWORD err = GetLastError();
+
+But the status returned is still zero and GetLast Error still returns 87!
+
+I've scoured the MSDN and am now stuck.
+
+Can anyone help please?
+
+Has there been an official change in this area from NT3.51 to NT4 or
+from VC++4.0 to 4.2?
+
+If the type of message passed to CWnd::PostMessage determines the values of
+the the 2nd and 3rd parameters, how would I find published info on what
+these values should be?
+
+Thanks,
+Marc.
+
+-- 
+ -----------------------------------------------------------------
+ CADCENTRE Ltd.           Telephone   +44(0)1223 556655 Ext.732
+ High Cross               Fax         +44(0)1223 556666
+ Madingley Road           Email       m.delamere@cadcentre.co.uk
+ Cambridge
+ CB3 0HB   UK             Home Page   <A HREF="http://www.cadcentre.co.uk">http://www.cadcentre.co.uk</A>
+ -----------------------------------------------------------------
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Brad Wilson/Crucial Software -- <A HREF="mailto:crucial@pobox.com">crucial@pobox.com</A>
+Sunday, December 01, 1996
+</B>
+>     cwnd->PostMessage(WM_HELP)   // 2nd & 3rd params default to zero
+> 
+> But since my change in environment this now returns zero (error).
+> Immediately calling GetLastError() gives an error value of 87 which means
+> "Invalid Parameter". I gather the 3rd parameter should be a pointer to a
+> HELPINFO structure, so I then tried the following:
+
+PostMessage doesn't do "parameter validation" on this level.  What's more
+likely is that your cwnd doesn't exist, so the HWND that's getting passed
+to ::PostMessage is 0, which is what it's choking on.
+
+--
+Brad Wilson                       Custom software development & solutions
+crucial@pobox.com               Internet and intranet consulting services
+The Brads' Consulting          Windows NT/Windows 95 software development
+<A HREF="http://www.thebrads.com">http://www.thebrads.com</A>    Web site planning, development and maintenance
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Tuesday, December 03, 1996
+</B>
+At 07:57 12/1/96 -0500, Brad Wilson wrote:
+
+>PostMessage doesn't do "parameter validation" on this level.  What's more
+>likely is that your cwnd doesn't exist, so the HWND that's getting passed
+>to ::PostMessage is 0, which is what it's choking on.
+
+This is very unlikely.  If CWnd::PostMessage() is called against a CWnd
+object that has a NULL or invalid m_hWnd member, it will ASSERT().
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+I'm afraid I've become some sort of speed freak.
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Marc -- <A HREF="mailto:msd@cadcentre.co.uk">msd@cadcentre.co.uk</A>
+Thursday, December 05, 1996
+</B>
+
+Environment: VC++ 4.2-flat, NT 4.0 SP 1
+
+On Dec 3, 12:15am, Mike Blaszczak wrote:
+> Subject: Re: PostMessage(WM_HELP...
+> At 07:57 12/1/96 -0500, Brad Wilson wrote:
+>
+> >PostMessage doesn't do "parameter validation" on this level.  What's more
+> >likely is that your cwnd doesn't exist, so the HWND that's getting passed
+> >to ::PostMessage is 0, which is what it's choking on.
+>
+> This is very unlikely.  If CWnd::PostMessage() is called against a CWnd
+> object that has a NULL or invalid m_hWnd member, it will ASSERT().
+>
+> .B ekiM
+> <A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+> I'm afraid I've become some sort of speed freak.
+> These words are my own. I do not speak on behalf of Microsoft.
+>-- End of excerpt from Mike Blaszczak
+
+
+Thanks for the replys Brad and Mike.
+
+[ My problem is cwnd->PostMessage(WM_HELP) has stopped working whilst    ]
+[ moving from : VC++ 4.0, NT 3.51 SP 4   to   VC++ 4.2-flat, NT 4.0 SP 1 ]
+[ it now returns 0, GetLastError returns 87 ("Invalid Parameter")        ]
+
+As Brad pointed out parameter validation doesn't take place at this point
+so the fact that I'm now passing a great HELPINFO structure as the 3rd
+parameter is irrelevant.
+
+Also my cwnd is now a permanent pointer containing a permanent hWnd, but
+as Mike pointed out, if there was a problem here there would have been
+an ASSERT.
+
+Some additional info that may help someone explain what's going wrong, is that
+this is all happening in an Extension DLL, also I've since noted that this will
+work if I use SendMessage rather than PostMessage.
+
+
+PS Generally, how do I workout what should be the values of the
+   LPARAM and WPARAM parameters for PostMessage/SendMessage?
+
+Thanks,
+Marc.
+
+
+-- 
+ -----------------------------------------------------------------
+ CADCENTRE Ltd.           Telephone   +44(0)1223 556655 Ext.732
+ High Cross               Fax         +44(0)1223 556666
+ Madingley Road           Email       m.delamere@cadcentre.co.uk
+ Cambridge
+ CB3 0HB   UK             Home Page   <A HREF="http://www.cadcentre.co.uk">http://www.cadcentre.co.uk</A>
+ -----------------------------------------------------------------
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Saturday, December 07, 1996
+</B>
+At 12:34 12/5/96 +0000, Marc wrote:
+
+>Environment: VC++ 4.2-flat, NT 4.0 SP 1
+
+Please upgrade to 4.2B by installing the patch.
+
+>[ My problem is cwnd->PostMessage(WM_HELP) has stopped working whilst    ]
+>[ moving from : VC++ 4.0, NT 3.51 SP 4   to   VC++ 4.2-flat, NT 4.0 SP 1 ]
+>[ it now returns 0, GetLastError returns 87 ("Invalid Parameter")        ]
+
+>As Brad pointed out parameter validation doesn't take place at this point
+>so the fact that I'm now passing a great HELPINFO structure as the 3rd
+>parameter is irrelevant.
+
+Actually, you're passing a pointer to a HELPINFO structure, not a HELPINFO
+structure.
+
+>Some additional info that may help someone explain what's going wrong,
+>is that this is all happening in an Extension DLL, also I've since noted
+>that this will work if I use SendMessage rather than PostMessage.
+
+Since once of your message parameters is a pointer, you _must_ use
+SendMessage(). There are few exceptions to this rule, but it's a very strong
+rule: if you see code that passes a pointer (other than NULL) using a call to
+PostMessage(), whoever wrote the code should be able to offer a good
+explanation about why it's being done and why it's safe.  
+
+If you think about the difference between posting and sending messages, the
+resason for this should be obvious: a sent message is processed before the
+SendMessage() function returns, while PostMessage() just makes an entry in
+a queue and the message may be processed at some later time. PostMessage()
+returns right away.
+
+What if you had coded:
+
+        HELPINFO* pInfo = new HELPINFO;
+        // initialize pInfo;
+        pWnd->PostMessage(WM_HELP, 0, pInfo);
+        delete pInfo;
+
+? PostMessage() would return right away, putting the pointer you pass as a
+parameter in the queue with the rest of the message information. Right after
+it returns (eg, probably before the handling function for the message is
+actually called) you delete the memory and it is gone.
+
+>PS Generally, how do I workout what should be the values of the
+>   LPARAM and WPARAM parameters for PostMessage/SendMessage?
+
+Read the SDK documentation.  If you look up WM_HELP, it tells you what
+WPARAM and LPARAM should be. It doesn't say anything about WPARAM, so
+you should pass zero.  It says you should pass your pointer in LPARAM.
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+I'm afraid I've become some sort of speed freak.
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

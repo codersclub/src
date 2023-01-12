@@ -1,0 +1,161 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Return value from PropertySheet::DoModal() non-wizard mode
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Bryan McKay -- <A HREF="mailto:Bryan_McKay@msn.com">Bryan_McKay@msn.com</A>
+Wednesday, November 13, 1996
+</B>
+Environment:  VC++ 4.0, NT 4.0
+
+
+Return values are normally:
+	0 (Close [X} box selected), IDOK and IDCANCEL
+
+Problem:  If you are using data validation in DataExchange, and the validation 
+
+fails (ie. calls pDX->Fail() ), then you select the close [X} button, the 
+value returned by PropertySheet::DoModal() is IDOK, even though the property 
+page still contains invalid data.
+
+The problem seems to revolve around CWnd::m_nModalResult in that this value is 
+
+set by the dialog procedure before the DataExchange function is called, and if 
+
+the pDX->Fail() function is called, the dialog box is resumed, without first 
+clearing CWnd::m_nModalResult.  After selecting the close [X} button, whatever 
+
+the current value of CWnd::m_nModalResult is is returned by 
+PropertySheet::DoModal()
+
+A workaround I have come up with to avoid modifing the MFC source code is to 
+create two member functions for the PropertySheet, namly 
+"SaveAndClearModalResult()" and "RestoreModalResult()", which save and restore 
+
+the value of CWnd::m_nModalResult into a private variable, then within the 
+DataExchange function
+
+... DatExchange(...)
+{
+	m_pPointerToPropSheet->SaveAndClearModalResult();
+
+	... DDX & DDV stuff goes here ...
+
+	m_pPointerToPropSheet->RestoreModalResult();
+}
+
+thus, if the "pDX->Fail()" function is called (causing an exception), the 
+CWnd::m_nModalResult will remain at 0, until DDV passes, and the OK or CANCEL 
+button is selected.
+
+Although I havn't tested this for regular dialog boxes yet, I am assuming it 
+applies to them as well.
+
+
+A second anomaly with property sheets seems to be when you call the 
+SetWizardButtons function, when you arn't in wizard mode -- it has no effect 
+(as it shouldn't), except for changing the default button to Cancel instead of 
+
+ok (which I don't like, but I suppose it could be considered a feature for 
+certain circumstances)
+
+I discovered this "feature" when I used the same class/page for both tabbed 
+dialog and wizard mode (wizard for adding a new "person", tabbed dialog for 
+editing)
+
+
+
+Just thought everyone would like to know,
+
+Bryan.
+
+
+P.S.  While I'm on the topic of CPropertyPage, does anyone know a quick and 
+dirty way of setting the focus to the tab itself instead of the first control 
+on the tab?
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Robert G. -- <A HREF="mailto:COBBRG@dmdceds.med.osd.mil">COBBRG@dmdceds.med.osd.mil</A>
+Friday, November 15, 1996
+</B>
+
+You can obtain the tab control by using the resource ID which is declared   
+in afxres.h as AFX_IDC_TAB_CONTROL.
+
+example from within a CPropertyPage derived class:
+CWnd *tab = GetParent()->GetDlgItem(AFX_IDC_TAB_CONTROL);
+ASSERT(tab);
+tab->SetFocus();
+
+I have occasion to put the tab control at the top of the Z-order using   
+SetWindowPos; however, I have experienced a "side effect" that causes a   
+list control to disappear if it was previously the first control on the   
+page with the WS_TABSTOP style.  Anybody had experience with this   
+phenomenon?
+
+Good Luck,
+ -Rob
+
+ ----------
+From:  Bryan McKay
+Sent:   1996 Nov 13 03:43
+To:  mfc-l@netcom.com
+Subject:  RE: Return value from PropertySheet::DoModal() non-wizard mode
+
+Environment:  VC++ 4.0, NT 4.0
+
+<snip>
+
+P.S.  While I'm on the topic of CPropertyPage, does anyone know a quick   
+and
+dirty way of setting the focus to the tab itself instead of the first   
+control
+on the tab?
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

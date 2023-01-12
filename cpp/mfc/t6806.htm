@@ -1,0 +1,179 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Passing functions via OLE Automation
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Nayab Khan -- <A HREF="mailto:nkh069@iadfw.net">nkh069@iadfw.net</A>
+Monday, September 16, 1996
+</B>
+Environment: VC++4.1/MFC/OLE, Win95 
+
+I have created an MFC based application that supports OLE Automation. I
+know how to Map properties but how can I pass a CALLBACK function. Seems
+like a function is not the supported type. Here is my declaration of the
+function that I want to pass:
+
+BOOL CALLBACK EXPORT ProductType( BSTR data, short Index)
+
+the argument it comes to is:
+BOOL (CALLBACK EXPORT ProductType *)( BSTR data, short Index)
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Andreas Riel -- <A HREF="mailto:riel@fstgds08.tu-graz.ac.at">riel@fstgds08.tu-graz.ac.at</A>
+Thursday, September 19, 1996
+</B>
+[Mini-digest: 5 responses]
+
+Nayab,
+
+an OLE Automation callback mechanism is to be realized using Connection
+Points. Passing function pointers is not the correct way for an automation
+server to reply to its clients.
+
+Using the Connection Point mechanism, OLE Automation servers may expose an
+"outgoing interface", over which they can fire events to all connected
+clients. Originally, this mechanism worked for inproc-servers only, but
+with NT 4.0 Connection Point interfaces (IConnectionPoint,
+IConnectionPointContainer, IEnumconnections and IEnumConnnectionPoints)
+are supported for out-of-process objects also. In the MS KB (article
+Q149231) there is a DLL CXPRX.DLL providing marshalling code for NT 3.51.
+I'm afraid, I don't known what the situation is like for Win95.
+
+For additional information on Connectable Objects consult chapter 4 of Kraig
+Brockschmidt's "Inside OLE2". Also, in the MS KB there is a nice sample for
+the implementation of Connection Points in MFC apps; it's in article
+Q152087, archive CONNPTS.EXE.
+
+Hope this helps, good luck!
+
+	andy
+
+
+> Environment: VC++4.1/MFC/OLE, Win95 
+> 
+> I have created an MFC based application that supports OLE Automation. I
+> know how to Map properties but how can I pass a CALLBACK function. Seems
+> like a function is not the supported type. Here is my declaration of the
+> function that I want to pass:
+> 
+> BOOL CALLBACK EXPORT ProductType( BSTR data, short Index)
+> 
+> the argument it comes to is:
+> BOOL (CALLBACK EXPORT ProductType *)( BSTR data, short Index)
+> 
+
+
+-----From: levandep@dgabby.mfldclin.edu (Paul Levande)
+
+We recently wrote an automation server that also needed to support being 
+passed a callback address.  After a little unsuccessful experimenting, we 
+finally realized that since our automation server was running out-of process, 
+it wasn't reasonable to expect that we'd even be able to invoke a callback 
+defined in the client.
+
+The solution we came up with was to have the client "register" an HWND with 
+the server (we used a property of type long and type-cast it in the server) 
+and then have the server post a WM_USER+nnn message to the window identified 
+by that HWND instead of trying to invoke a callback.  The WM_USER+nnn 
+message handler for the window then carried out the tasks that would normally 
+have been done in the callback.  In our particular case, we opted not to pass 
+or return any information in the WPARAM and LPARAM of the message, but 
+instead just shared data between the server and client via properties in the 
+server.  In a client where there isn't a window that is an obvious choice for 
+"registering" with the server, a small, invisible window that exists only to 
+handle the WM_USER+nnn message can be created for this purpose.  This scheme 
+has proven to work quite well for our particular needs and was actually very 
+simple to implement.
+
+Hope this may give you some helpful ideas,
+	-- Paul Levande --                                                  
+-----From: Roger Onslow/Newcastle/Computer Systems Australia/AU
+
+>I know how to Map properties but how can I pass a CALLBACK function.
+I believe you pass an IDispatch (ie other OLE automation object) interface
+
+-----From: raz <raz@jump-jet.demon.co.uk>
+
+Its not clear to me exactly what you want to do, but I'll assume that =
+you want the controller to pass the server a callback function so that =
+the server can execute it sometime later on (something like an =
+asynchronous event).
+
+If this is what you want to do then I think you're out of luck.  You =
+must remember that there is probably a process boundary between the =
+controller and the server.  Passing the address of a function across the =
+process boundary would be meaningless, since the address would only be =
+valid in the context of the controller, not the server.
+
+If you want to do this sort of thing, I think that you have to implement =
+an event sink on your controller and a connection point on the server.  =
+The server can then cause an event to take place on the client.  As part =
+of the event handler functionality, the client can fetch the required =
+parameters from the server and execute the callback function in its =
+correct context.
+
+Dave Razzetti
+raz@jump-jet.demon.co.uk
+
+
+
+-----From: mjmo@lubrizol.com
+
+     I think what you're talking about is an OLE control.  Controls support 
+     properties and methods like Automation, and additionally support 
+     events.  An event is really just the controlling program telling the 
+     server what function to call when something happens, much like a 
+     callback function.
+     
+     Mike Morel
+     Mushroom Software
+     <A HREF="http://www.mushroomsoft.com/mushroom">http://www.mushroomsoft.com/mushroom</A>
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

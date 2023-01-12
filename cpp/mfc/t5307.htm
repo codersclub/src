@@ -1,0 +1,175 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Page fault on exit
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Filippo Carlini -- <A HREF="mailto:carlinif@ic8u81.settimo.italtel.it">carlinif@ic8u81.settimo.italtel.it</A>
+Monday, May 27, 1996
+</B>
+
+Env.: Win95, Visual C++ 4.1, linking with MFC DLL.
+
+I have a CDocument derived class that perform a database connection 
+in OnOpenDocument and then construct a CRecordset derived object passing 
+the database object address as argument.
+The DeleteContents of my CDocument, closes the CRecordset, deletes 
+and then do the same for CDatabase.
+When I close the app with an opened document, sometimes the program 
+crashes reporting a page fault.
+I tryed to debug the app putting a message box in the destructor of 
+my CWinApp and the program reports the access violation with the 
+message box opened on the window, pressing the Debug button, I can 
+see only the disassembly of the memory that causes the page fault and 
+looking at the call stack can't tell me any more.
+
+Any idea ?
+
+The code:
+
+void CLabDoc::DeleteContents()
+{
+ if (m_pPrjCompSet) {
+  if (m_pPrjCompSet->IsOpen())
+   m_pPrjCompSet->Close();
+
+  delete m_pPrjCompSet;
+ }
+
+ if (m_cdbCurDataBase.IsOpen())
+  m_cdbCurDataBase.Close();
+}
+
+BOOL CLabDoc::OnOpenDocument(LPCTSTR lpszPathName) 
+{
+ if (!CDocument::OnOpenDocument(lpszPathName))
+  return FALSE;
+
+ CString conn("ODBC;DSN=Data Source;UID=admin;PWD=;DBQ=");
+
+ conn += "c:\\temp\\test.mdb";
+
+ try {
+  if (m_cdbCurDataBase.Open(NULL,FALSE,FALSE,conn)) {
+   m_pPrjCompSet = new CCompSet(&m_cdbCurDataBase);
+   m_pPrjCompSet->Open();
+  }
+ } catch (CDBException *e) {
+  AfxMessageBox(e->m_strError,MB_ICONEXCLAMATION);
+  e->Delete();
+ }
+
+ return TRUE;
+}
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Ward -- <A HREF="mailto:mikew@hilgraeve.com">mikew@hilgraeve.com</A>
+Friday, May 31, 1996
+</B>
+[Mini-digest: 3 responses]
+
+Yeah, I had the same problem when trying to report memory leaks.  
+Turns our you can't call the MFC functions at this point but the old 
+Win32 standbys, ::MessageBox() and such work just fine.
+
+-- Mike
+
+-----From: Jay Nabedian <jnabedian@qgraph.com>
+
+I had the same problem. This is a bug with the ODBC classes. Microsoft has a
+fix for it at their web site.  According to the readme that came with the fix:
+
+  An error can occur when mapping a CString to a SQL_LONGVARCHAR,
+  SQL_VARCHAR, or other SQL data type field if a driver returns a large
+  precision value from SQLDescribeCol() for the column.
+
+  A bug in the MFC ODBC Database classes results in MFC trying to allocate a
+  large chunk of memory to store data that might have this large precision.
+
+  In some cases, such as using a memo field with the FoxPro Desktop ODBC
+  driver, a memory allocation of 1 gigabyte may be attempted. Or, as is the
+  case with the Visual FoxPro driver, the MFC Database Classes will try to
+  allocate a negative number of bytes because the return value of the driver
+  is 2 gigabytes and then MFC adds 1, which causes the signed variable to wrap
+  into a negative value. In this case, an assertion occurs in
+  GetBufferSetLength() on line 447 of Strcore.cpp:
+
+    ASSERT(nNewLength >= 0);
+
+  Mapping a Cstring to a SQL Server text field produces the same result.
+
+  The problem occurs only when mapping CString variables to variable-
+  length fields using the RFX_Text() function.
+
+The patch cleared up all of my problems, so I would highly suggest getting it.
+
+============================================================================
+========
+Jay Nabedian
+Quad/Graphics Data Collection
+jnabedian@qgraph.com
+============================================================================
+========
+
+-----From: Vincent Mascart <100425.1337@CompuServe.COM>
+
+If you placed breakpoint in OnOpenDocument() & in DeleteContents(), you should
+have noticed that the framework first call OnOpenDocument() where you create
+your CRecordset pointer, then call DeleteContents() where you destroy you
+CRecordset pointer. So your CRecordset will never be available.
+
+Since you don't reset your pointer to NULL when deleting m_pPrjCompSet, it still
+point to invalid memory address for other code in your CDocument derived class.
+
+You should place your cleanup code either in OnCloseDocument() or in the
+document Destructor.
+
+Vincent Mascart
+100425.1337@compuserve.com
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

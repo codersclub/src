@@ -1,0 +1,427 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CListCtrl in CListView and screen font question
+</B></FONT>
+<BR>
+<PRE>
+<B>
+David Harvey -- <A HREF="mailto:dharvey@aros.net">dharvey@aros.net</A>
+Friday, January 17, 1997
+</B>
+Environment: VC4.2b NT 4.0 Win 95
+
+I am using the CListView in report mode in an MDI
+doc/view application.  I needed to access the font
+used to display the CListCtrl's item and subitems  
+in OnBeginPrinting() in my view class directly
+derived from CListView.  I finally got the 
+font information needed but it seems to me there 
+must be an easier way.  
+
+First I tried:
+	CDC *pCtrlDC = GetListCtrl().GetDC();
+	TEXTMETRIC tmCtrl;
+	pCtrlDC->GetTextMetrics(&tmCtrl);
+
+This returns the font used to display window title 
+of the child window hosting the list view!  
+
+Then I tried:
+	HFONT hFont = (HFONT) GetListCtrl().SendMessage(WM_GETFONT);
+	CFont * pCtrlFont;
+	pCtrlFont->FromHandle(hFont);
+	LOGFONT lf;
+	pCtrlFont->GetLogFont(&lf);
+	
+This caused an assertion at the GetLogFont() call 
+CGdiObject::m_hObject == NULL.  
+
+After several other permutations of the above methods
+this finally worked:
+
+	HFONT hCtrlFont = (HFONT) GetListCtrl().SendMessage(WM_GETFONT);
+	LOGFONT lf;
+	BOOL bReturn = ::GetObject(hCtrlFont, sizeof(LOGFONT), &lf);
+
+Anyone care to elaborate?
+Thanks, 
+
+David Harvey, Developer, Wasatch Interactive Learning, Inc. 
+dharvey@aros.net,  Business Account
+harvey@aros.net,  Private Account
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Syed -- <A HREF="mailto:sxs296@psu.edu">sxs296@psu.edu</A>
+Monday, January 20, 1997
+</B>
+[Mini-digest: 3 responses]
+
+>
+>Then I tried:
+>	HFONT hFont = (HFONT) GetListCtrl().SendMessage(WM_GETFONT);
+>	CFont * pCtrlFont;
+>	pCtrlFont->FromHandle(hFont);
+>	LOGFONT lf;
+>	pCtrlFont->GetLogFont(&lf);
+>	
+>This caused an assertion at the GetLogFont() call 
+>CGdiObject::m_hObject == NULL.  
+>
+>After several other permutations of the above methods
+>this finally worked:
+>
+>	HFONT hCtrlFont = (HFONT) GetListCtrl().SendMessage(WM_GETFONT);
+>	LOGFONT lf;
+>	BOOL bReturn = ::GetObject(hCtrlFont, sizeof(LOGFONT), &lf);
+>
+>Anyone care to elaborate?
+
+Actually the correct way using FromHandle is like this:-
+pCtrlFont = CFont::FromHandle(hFont);
+then do whatever you want. If you browse through the online documentation,
+the member function FromHandle is declared as static from which you can
+guess the correct usage.
+Or, you can think of the error this way - pCtrlFont itself is not
+initialized yet, so it's incorrect to use it right away (pCtrlFont->FromHandle).
+And one more thing, the variable pCtrlFont is safe to be used for a short
+period - probably within the function. Therefore, it should be declared as a
+local variable rather than member function of a class (eg your derived
+CFileView).
+
+-----From: Amir Shoval <amirs@ncc.co.il>
+
+I have an owner drawn CListView and I use the following code in my
+MeasureItem method:
+
+    LOGFONT lf;
+    CFont* pFont =3D GetFont ();
+    pFont->GetLogFont (&lf);
+    lpmis->itemHeight =3D abs ((int) lf.lfHeight) + 6;
+
+and it works OK. I can't see a reason it won't be good for what you
+need.
+
+	Amir
+
+--------------------------------------
+Amir Shoval          N.C.C.=20
+amirs@ncc.co.il
+--------------------------------------
+
+>----------
+>From: 	David Harvey[SMTP:dharvey@aros.net]
+>Sent: 	=E9=E5=ED =F9=E9=F9=E9 17 =E9=F0=E5=E0=F8 1997 20:12
+>To: 	MFC List
+>Subject: 	CListCtrl in CListView and screen font question
+>
+>Environment: VC4.2b NT 4.0 Win 95
+>
+>I am using the CListView in report mode in an MDI
+>doc/view application.  I needed to access the font
+>used to display the CListCtrl's item and subitems =20
+>in OnBeginPrinting() in my view class directly
+>derived from CListView.  I finally got the=20
+>font information needed but it seems to me there=20
+>must be an easier way. =20
+>
+>First I tried:
+>	CDC *pCtrlDC =3D GetListCtrl().GetDC();
+>	TEXTMETRIC tmCtrl;
+>	pCtrlDC->GetTextMetrics(&tmCtrl);
+>
+>This returns the font used to display window title=20
+>of the child window hosting the list view! =20
+>
+>Then I tried:
+>	HFONT hFont =3D (HFONT) GetListCtrl().SendMessage(WM_GETFONT);
+>	CFont * pCtrlFont;
+>	pCtrlFont->FromHandle(hFont);
+>	LOGFONT lf;
+>	pCtrlFont->GetLogFont(&lf);
+>=09
+>This caused an assertion at the GetLogFont() call=20
+>CGdiObject::m_hObject =3D=3D NULL. =20
+>
+>After several other permutations of the above methods
+>this finally worked:
+>
+>	HFONT hCtrlFont =3D (HFONT) GetListCtrl().SendMessage(WM_GETFONT);
+>	LOGFONT lf;
+>	BOOL bReturn =3D ::GetObject(hCtrlFont, sizeof(LOGFONT), &lf);
+>
+>Anyone care to elaborate?
+>Thanks,=20
+>
+>David Harvey, Developer, Wasatch Interactive Learning, Inc.=20
+>dharvey@aros.net,  Business Account
+>harvey@aros.net,  Private Account
+>
+-----From: David Little <dlittle@equinoxcorp.com>
+
+
+	HFONT hFont =3D (HFONT) GetListCtrl().SendMessage(WM_GETFONT);
+	CFont * pCtrlFont;
+	pCtrlFont->FromHandle(hFont);
+	LOGFONT lf;
+	pCtrlFont->GetLogFont(&lf);
+
+>> Why didn't you try pCtrlFont =3D CFont::FromHandle(hFont); ?  I dont =
+think that pCtrlFont->FromHandle() will do anything except ASSERT...I am =
+actually surprised that it didn't fail in FromHandle, since it is an =
+uninitialized pointer.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dulepov Dmitry -- <A HREF="mailto:dima@ssm6000.samsung.ru">dima@ssm6000.samsung.ru</A>
+Wednesday, January 22, 1997
+</B>
+[Mini-digest: 2 responses]
+
+        [Mailer: "Groupware E-Mail". Version 1.03.000]
+
+>From:     David Harvey[SMTP:dharvey@aros.net]
+>Subject:     CListCtrl in CListView and screen font question
+>
+>I am using the CListView in report mode in an MDI
+>doc/view application.  I needed to access the font
+>used to display the CListCtrl's item and subitems =20
+>in OnBeginPrinting() in my view class directly
+>derived from CListView.  I finally got the=20
+>font information needed but it seems to me there=20
+>must be an easier way. =20
+>
+>First I tried:
+>    CDC *pCtrlDC =3D GetListCtrl().GetDC();
+>    TEXTMETRIC tmCtrl;
+>    pCtrlDC->GetTextMetrics(&tmCtrl);
+>
+>This returns the font used to display window title=20
+>of the child window hosting the list view! =20
+>
+>Then I tried:
+>    HFONT hFont =3D (HFONT) GetListCtrl().SendMessage(WM_GETFONT);
+>    CFont * pCtrlFont;
+>    pCtrlFont->FromHandle(hFont);
+>    LOGFONT lf;
+>    pCtrlFont->GetLogFont(&lf);
+>
+>This caused an assertion at the GetLogFont() call=20
+>CGdiObject::m_hObject =3D=3D NULL. =20
+>
+>After several other permutations of the above methods
+>this finally worked:
+>
+>    HFONT hCtrlFont =3D (HFONT) GetListCtrl().SendMessage(WM_GETFONT);
+>    LOGFONT lf;
+>    BOOL bReturn =3D ::GetObject(hCtrlFont, sizeof(LOGFONT), &lf);
+>
+>Anyone care to elaborate?
+
+I just received mini-digest (I have no original message).
+
+1. If CWnd::GetFont() returns NULL, it is very likely that you have NULL hFont returned from SendMessage(WM_GETFONT). CFont::FromHandle will also return NULL.
+
+2. This code is incorrect:
+>    HFONT hFont =3D (HFONT) GetListCtrl().SendMessage(WM_GETFONT);
+>    CFont * pCtrlFont;
+>    pCtrlFont->FromHandle(hFont);
+>    LOGFONT lf;
+>    pCtrlFont->GetLogFont(&lf);
+
+FromHandle() returns a pointer to CFont but not attaches 'hFont' to your 'pCtrlFont'. Use
+    pCtrlFont = CFont::FromHandle(hFont);
+and check result for NULL pointer. If it is NULL - you have no font.
+
+
+Dmitry A. Dulepov
+Samsung Electronics Co., Ltd.
+Russian Research Center
+Phone: +7 (095) 213-9207
+Fax: +7 (095) 213-9196
+E-mail: dima@src.samsung.ru
+====================================
+
+-----From: mfc-l@netcom.com
+
+>From mfc-l Mon Jan 20 12:23:57 +0800 1997 remote from netcom.com
+Received: from netcom.com by tc4d1.cmc.stph.net; Wed, 22 Jan 1997 20:33 EST
+Received: by majordomo.netcom.com (8.7.5/8.7.3/(NETCOM MLS v1.01)) id IAA07185; Tue, 21 Jan 1997 08:41:50 -0800 (PST)
+Message-Id: <1.5.4.32.19970120042357.00676008@email.psu.edu>
+X-Sender: sxs296@email.psu.edu
+X-Mailer: Windows Eudora Light Version 1.5.4 (32)
+Mime-Version: 1.0
+Date: Mon, 20 Jan 1997 12:23:57 +0800
+To: mfc-l@netcom.com
+From: Syed <sxs296@psu.edu>
+Subject: Re: CListCtrl in CListView and screen font question
+Sender: owner-mfc-l@majordomo.netcom.com
+Errors-To: owner-mfc-l@majordomo.netcom.com
+Precedence: bulk
+Reply-To: mfc-l@netcom.com
+Content-Type: text/plain; charset="us-ascii"
+Content-Length: 3598
+
+[Mini-digest: 3 responses]
+
+>
+>Then I tried:
+>	HFONT hFont = (HFONT) GetListCtrl().SendMessage(WM_GETFONT);
+>	CFont * pCtrlFont;
+>	pCtrlFont->FromHandle(hFont);
+>	LOGFONT lf;
+>	pCtrlFont->GetLogFont(&lf);
+>	
+>This caused an assertion at the GetLogFont() call 
+>CGdiObject::m_hObject == NULL.  
+>
+>After several other permutations of the above methods
+>this finally worked:
+>
+>	HFONT hCtrlFont = (HFONT) GetListCtrl().SendMessage(WM_GETFONT);
+>	LOGFONT lf;
+>	BOOL bReturn = ::GetObject(hCtrlFont, sizeof(LOGFONT), &lf);
+>
+>Anyone care to elaborate?
+
+Actually the correct way using FromHandle is like this:-
+pCtrlFont = CFont::FromHandle(hFont);
+then do whatever you want. If you browse through the online documentation,
+the member function FromHandle is declared as static from which you can
+guess the correct usage.
+Or, you can think of the error this way - pCtrlFont itself is not
+initialized yet, so it's incorrect to use it right away (pCtrlFont->FromHandle).
+And one more thing, the variable pCtrlFont is safe to be used for a short
+period - probably within the function. Therefore, it should be declared as a
+local variable rather than member function of a class (eg your derived
+CFileView).
+
+-----From: Amir Shoval <amirs@ncc.co.il>
+
+I have an owner drawn CListView and I use the following code in my
+MeasureItem method:
+
+    LOGFONT lf;
+    CFont* pFont =3D GetFont ();
+    pFont->GetLogFont (&lf);
+    lpmis->itemHeight =3D abs ((int) lf.lfHeight) + 6;
+
+and it works OK. I can't see a reason it won't be good for what you
+need.
+
+	Amir
+
+--------------------------------------
+Amir Shoval          N.C.C.=20
+amirs@ncc.co.il
+--------------------------------------
+
+>----------
+>From: 	David Harvey[SMTP:dharvey@aros.net]
+>Sent: 	=E9=E5=ED =F9=E9=F9=E9 17 =E9=F0=E5=E0=F8 1997 20:12
+>To: 	MFC List
+>Subject: 	CListCtrl in CListView and screen font question
+>
+>Environment: VC4.2b NT 4.0 Win 95
+>
+>I am using the CListView in report mode in an MDI
+>doc/view application.  I needed to access the font
+>used to display the CListCtrl's item and subitems =20
+>in OnBeginPrinting() in my view class directly
+>derived from CListView.  I finally got the=20
+>font information needed but it seems to me there=20
+>must be an easier way. =20
+>
+>First I tried:
+>	CDC *pCtrlDC =3D GetListCtrl().GetDC();
+>	TEXTMETRIC tmCtrl;
+>	pCtrlDC->GetTextMetrics(&tmCtrl);
+>
+>This returns the font used to display window title=20
+>of the child window hosting the list view! =20
+>
+>Then I tried:
+>	HFONT hFont =3D (HFONT) GetListCtrl().SendMessage(WM_GETFONT);
+>	CFont * pCtrlFont;
+>	pCtrlFont->FromHandle(hFont);
+>	LOGFONT lf;
+>	pCtrlFont->GetLogFont(&lf);
+>=09
+>This caused an assertion at the GetLogFont() call=20
+>CGdiObject::m_hObject =3D=3D NULL. =20
+>
+>After several other permutations of the above methods
+>this finally worked:
+>
+>	HFONT hCtrlFont =3D (HFONT) GetListCtrl().SendMessage(WM_GETFONT);
+>	LOGFONT lf;
+>	BOOL bReturn =3D ::GetObject(hCtrlFont, sizeof(LOGFONT), &lf);
+>
+>Anyone care to elaborate?
+>Thanks,=20
+>
+>David Harvey, Developer, Wasatch Interactive Learning, Inc.=20
+>dharvey@aros.net,  Business Account
+>harvey@aros.net,  Private Account
+>
+-----From: David Little <dlittle@equinoxcorp.com>
+
+
+	HFONT hFont =3D (HFONT) GetListCtrl().SendMessage(WM_GETFONT);
+	CFont * pCtrlFont;
+	pCtrlFont->FromHandle(hFont);
+	LOGFONT lf;
+	pCtrlFont->GetLogFont(&lf);
+
+>> Why didn't you try pCtrlFont =3D CFont::FromHandle(hFont); ?  I dont =
+think that pCtrlFont->FromHandle() will do anything except ASSERT...I am =
+actually surprised that it didn't fail in FromHandle, since it is an =
+uninitialized pointer.
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

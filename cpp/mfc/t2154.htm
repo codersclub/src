@@ -1,0 +1,324 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+MDI and too many MultiDocTemplates
+</B></FONT>
+<BR>
+<PRE>
+<B>
+<A HREF="mailto:rquist@BIX.com">rquist@BIX.com</A>
+Thursday, October 26, 1995
+</B>
+
+I'm working on a system designed to collect various information from users
+through a series of screens. This is being implemented as an MDI
+application using views derived from CFormView under VC 1.5x/MFC 2.5x. 
+
+Our initial approach was to create a CMultiDocTemplate to correspond to
+each view/screen during the program's initialization...but this is quickly
+eating
+up resources (somewhere between 4 and 6% of USER for each template
+created). I've modified the approach slightly to create the document
+templates for a number of the views right before we need to display the
+screen and destroy it almost immediately after the user dismisses the
+screen which reduces the overall strain. 
+
+Is there a better approach? I've seen an approach outlined in a FAQ that
+involves creating a VIEW when needed and manipulating the template
+structure to "swap" the new view in and the old one out, but this is
+presented in terms of an SDI application...has anyone done something
+similar with an MDI app? 
+
+
+Thanks in advance for any help, tips, etc.
+
+Rich
+(rquist@bix.com)
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Elliott Kleinrock -- <A HREF="mailto:ELLIOTT@flexi.com">ELLIOTT@flexi.com</A>
+Friday, October 27, 1995
+</B>
+
+Exactly what we found.
+The biggest problem is the duplication of the menu items,
+if you have one menu instead of one per screen you can do the following:
+Don't register the templates in the InitInstance.
+Set the template pointers to NULL in the constructor.
+Then to create the view use the following macro:
+#define DO_MENU(ptr, view)    (view *)CreateView(&ptr, RUNTIME_CLASS(view))
+
+Where CreateView is:
+CView * FWinApp::CreateView(CMultiDocTemplate ** ptr,
+                    CRuntimeClass * ViewClass, CRuntimeClass * FrameClass)
+{
+     FHourglass fhg(m_pMainWnd);
+
+     CheckResources();
+     if (ptr == NULL || *ptr == NULL)
+     {
+          *ptr = new CMultiDocTemplate(IDR_FLX7BAR, 
+RUNTIME_CLASS(FDocument),
+                         FrameClass, ViewClass);
+          AddDocTemplate(*ptr);
+     }
+
+     (*ptr)->AssertValid();
+     CFrameWnd* pFrame = (*ptr)->CreateNewFrame(pDocument, NULL);
+     if (pFrame == NULL)
+     {
+          TRACE0("Warning: failed to create new frame\n");
+          return NULL;
+     }
+
+     ASSERT(pFrame->IsKindOf(RUNTIME_CLASS(DBEditFrame)));
+     (*ptr)->InitialUpdateFrame(pFrame, pDocument);
+     return pFrame->GetActiveView();
+}
+
+This is mainly copied from MFC.
+Note: I only use one document to which all views are connected. If you need 
+multiple documents,
+     your mileage may vary.
+
+     - Elliott
+ ----------
+From: owner-mfc-l
+To: mfc-l
+Subject: MDI and too many MultiDocTemplates
+Date: Thursday, October 26, 1995 6:35PM
+
+
+I'm working on a system designed to collect various information from users
+through a series of screens. This is being implemented as an MDI
+application using views derived from CFormView under VC 1.5x/MFC 2.5x.
+
+Our initial approach was to create a CMultiDocTemplate to correspond to
+each view/screen during the program's initialization...but this is quickly
+eating
+up resources (somewhere between 4 and 6% of USER for each template
+created). I've modified the approach slightly to create the document
+templates for a number of the views right before we need to display the
+screen and destroy it almost immediately after the user dismisses the
+screen which reduces the overall strain.
+
+Is there a better approach? I've seen an approach outlined in a FAQ that
+involves creating a VIEW when needed and manipulating the template
+structure to "swap" the new view in and the old one out, but this is
+presented in terms of an SDI application...has anyone done something
+similar with an MDI app?
+
+
+Thanks in advance for any help, tips, etc.
+
+Rich
+(rquist@bix.com)
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Terry Peterson -- <A HREF="mailto:petersot@motsat.sat.mot.com">petersot@motsat.sat.mot.com</A>
+Friday, October 27, 1995
+</B>
+
+> From owner-mfc-l@netcom.com Fri Oct 27 00:12:32 1995
+> Subject: MDI and too many MultiDocTemplates
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Terry Peterson -- <A HREF="mailto:petersot@motsat.sat.mot.com">petersot@motsat.sat.mot.com</A>
+Wednesday, November 01, 1995
+</B>
+Scot Wingo (of MFC FAQ fame) set up an ftp site for people on this mailing list to use
+about 3 months ago.  The address of the site is:
+
+landru.unx.com/pub/mfc_faq/mfc_samples
+
+I have uploaded my view switching sample and it is called switch.zip.
+
+I didn't really need to worry about disabling menus since I use the same 
+menu for all of the views in the sample.
+
+_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+_/                              _/
+_/ Terry Peterson               _/
+_/ petersot@motsat.sat.mot.com  _/
+_/                              _/
+_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+
+
+> From foster@asbestos.media.philips.com Wed Nov  1 08:54:33 1995
+> Subject: Re: MDI and too many MultiDocTemplates 
+> X-Mailer: Chameleon V0.05, TCP/IP for Windows, NetManage Inc.
+> Mime-Version: 1.0
+> Content-Type> : > TEXT/PLAIN> ; > charset=US-ASCII> 
+> 
+> Hello, you mentioned an ftp site at Netcom, but I'm not
+> a member and did not find it ?  Could you direct me to
+> your sample, or reply with it's attachment.  
+> 
+> I'm currently working on an SDI implementation with 5 views,
+> 2 of which are chock-full of bitmap thumbnails and I'm very
+> interested in preserving the user's resources.  
+> 
+> I also saw something on the MFC list about disabling the extra
+> views Menu bars, have you had any luck with this as well?
+> Thanx much
+> 
+> On Fri, 27 Oct 1995 13:04:09 -0700  Terry Peterson wrote:
+> >> This is being implemented as an MDI
+> >> application using views derived from CFormView under VC 1.5x/MFC 2.5x. 
+> >> 
+> >> Our initial approach was to create a CMultiDocTemplate to correspond to
+> >> each view/screen during the program's initialization...but this is quickly
+> >> eating
+> >> up resources (somewhere between 4 and 6% of USER for each template
+> >> created). I've modified the approach slightly to create the document
+> >> templates for a number of the views right before we need to display the
+> >> screen and destroy it almost immediately after the user dismisses the
+> >> screen which reduces the overall strain. 
+> >> Rich
+> >> (rquist@bix.com)
+> >
+> >I have a sample MDI app that does the very thing that you want to do.
+> >It is called "SWITCH".  This app has one doc template and it dynamically 
+> >creates and destroys the views as they are needed. I don't have it with
+> >me at the moment but I will post it in the ftp area for this site sometime
+> >this weekend.  The file will be called switch.zip.
+> >
+> 
+> ---------------------------------------------
+>  Todd Foster <foster@media.philips.com>
+>  11/01/95 - 10:20:30
+> ---------------------------------------------
+> 
+> 
+> 
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Harry Hahne -- <A HREF="mailto:hahne@epas.utoronto.ca">hahne@epas.utoronto.ca</A>
+Monday, April 01, 1996
+</B>
+
+> I have uploaded my view switching sample and it is called
+> switch.zip.
+
+[Moderator's note:  I'm assuming you guys are talking about
+the MFC FAQ FTP site, since I don't see this on the MFC-L
+FTP site, which is at ftp://advn.com/pub/mfc.]
+ 
+I have been playing with the Switch program sample on the MFC FTP 
+site.  I noticed an important bug/limitation of this approach: 
+If you open more than one window on the same document, then try to switch 
+views, sometimes a window other than the one with the focus gets changed.  
+The changing of views is also inconsistent.  Basically it appears that 
+the approach shown in the sample only will work if you want a single 
+view on a single document at a time.  Does anyone know 
+what to do to have several windows open at the same time with different views 
+of the same document and with changable views as in the switch 
+sample?
+
+Harry Hahne
+hahne@epas.utoronto.ca
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+John Simmons -- <A HREF="mailto:jms@connectnet.com">jms@connectnet.com</A>
+Wednesday, April 03, 1996
+</B>
+At 04:54 PM 4/1/96 +0000, you wrote:
+>I have been playing with the Switch program sample on the MFC FTP 
+>site.  I noticed an important bug/limitation of this approach: 
+>If you open more than one window on the same document, then try to switch 
+>views, sometimes a window other than the one with the focus gets changed.  
+>The changing of views is also inconsistent.  Basically it appears that 
+>the approach shown in the sample only will work if you want a single 
+>view on a single document at a time.  Does anyone know 
+>what to do to have several windows open at the same time with different views 
+>of the same document and with changable views as in the switch 
+>sample?
+
+I've written several MDI apps that have multiple child windows (MFC views),
+each containing multiple views (for lack of a better term).  We have a base
+view class which handles the drawing of all of the child views' contents,
+and view classes derived from the base class which handles each windows
+unique needs.  It's not pretty, but it was the only way we could do it.
+View access is controlled thru a button bar in each child window (as many as
+30 views per window in the largest app).
+
+/=========================================================\
+| John Simmons (Redneck Techno-Biker)                     |
+|    jms@connectnet.com                                   |
+| Home Page                                               |
+|    www2.connectnet.com/users/jms/                       |
+|---------------------------------------------------------|
+| ViewPlan, Inc. home page (my employer)                  |
+|    www.viewplan.com/index.html                          |
+|---------------------------------------------------------|
+| IGN #12 American Eagle Motorsports Zerex Ford	          |
+|    Teammates - Steve Stevens (#13 Hooters Ford and      |
+|                               1995 IGN Points Champ)    |
+|                Pat Campbell (#14 Dr. Pepper Ford)       |
+| American Eagle Motorsports Team Page                    | 
+|    www2.connectnet.com/users/jms/ignteam                |
+|---------------------------------------------------------|
+| Competitor - Longest Signature File On The Net          |
+\=========================================================/
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

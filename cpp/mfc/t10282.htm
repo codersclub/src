@@ -1,0 +1,158 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+MFC OLE bug: CoFreeUnusedLibraries & CFileDialog
+</B></FONT>
+<BR>
+<PRE>
+<B>
+<A HREF="mailto:mzinner@berlin.snafu.de">mzinner@berlin.snafu.de</A>
+Tuesday, March 25, 1997
+</B>
+
+Environment:  Win 95, NT 4.0, VC++ 4.2b
+
+(using ControlWizard and MFC OLE control container support)
+
+I'm writing an MFC OLE control container and came across a bug
+which is reproducible with just a few lines of code. It shows up only 
+on W95, not on NT. It happens if CoFreeUnusedLibraries() is 
+called while a CFileDialog is open.
+
+Here are the steps to get the problem:
+(1) using ControlWizard, create a dummy control NULLCTRL which does
+nothing. 
+(2) using AppWizard, create a SDI application; check 'support
+for OLE controls' and 'OLE automation', default settings otherwise
+(3) insert a menu command 'createDeleteControl'
+(4) insert this menu handler code which will create and destroy a
+NULLCTRL:
+
+CMyView::OnCreateDeleteControl()
+{
+    CLSID clsID = // insert your NULLCTRL's clsid here
+     {0xd607c82b, 0xa508, 0x11d0, 0x86, 0xab, 0x44, 0x45, 0x53, 0x54, 0, 0};
+
+    CWnd *wnd = new CWnd;
+
+    if(!wnd->CreateControl(clsID, NULL, WS_VISIBLE, CRect(...), this, 1, NULL)) {
+        AfxMessageBox("error creating control");
+        // ... handle error
+    }
+    wnd->DestroyWindow();
+    delete wnd;
+
+    // this will fix it - see note below
+    // CoFreeUnusedLibraries();
+}
+
+(5) start; invoke 'createDeleteControl'; then, invoke 'File/Open' and
+keep the dialog open for more than 1 minute, changing directories from time to time.
+
+After less than 60 seconds, the CFileDialog will freeze and the application
+hangs.
+
+If I have TRACE output on, I can see a line 
+'NULLCTRL: Info: AfxDllCanUnloadNow returns S_OK'
+just when the dialog freezes. Obviously, CoFreeUnusedLibraries is
+called at this moment.
+
+I can fix this problem by calling CoFreeUnusedLibraries explicitely
+after deleting the control (and, therefore, before invoking
+CFileDialog).
+
+This thing might not show up too often because CoFreeUnusedLibraries()
+will be called on Idle time every 60 seconds (see
+AfxOleTermOrFreeLib(), called by CThread::OnIdle())
+
+What is going on? CoFreeUnusedLibraries() seems to free some dll that
+the (still visible) CFileDialog needs.
+
+Thanks for any comments,
+
+-manfred
+
+p.s.: on NT, the line 
+'NULLCTRL: Info: AfxDllCanUnloadNow returns S_OK'
+always shows up after I close CFileDialog.
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Thursday, March 27, 1997
+</B>
+At 16:25 3/25/97 +0000, mzinner@berlin.snafu.de wrote:
+>
+>Environment:  Win 95, NT 4.0, VC++ 4.2b
+>(using ControlWizard and MFC OLE control container support)
+>
+>I'm writing an MFC OLE control container and came across a bug
+>which is reproducible with just a few lines of code. It shows up only 
+>on W95, not on NT. It happens if CoFreeUnusedLibraries() is 
+>called while a CFileDialog is open.
+>
+>Here are the steps to get the problem:
+>(1) using ControlWizard, create a dummy control NULLCTRL which does
+>nothing. 
+>(2) using AppWizard, create a SDI application; check 'support
+>for OLE controls' and 'OLE automation', default settings otherwise
+>(3) insert a menu command 'createDeleteControl'
+>(4) insert this menu handler code which will create and destroy a
+>NULLCTRL:
+
+Well, that's an interesting one.
+
+'Course, nothing you've posted indicates that it's really an MFC bug--it
+looks to me, in fact, that it is actually far more likely to be a bug
+in Windows.
+
+I'll take it into work and poke around with it.
+
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+These words are my own. I do not speak on behalf of Microsoft.
+       One is too many and a million is not enough.
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+    <A HREF="http://www.digiday.com/mfcpro/joinmfcl.htm">Become an MFC-L member</A>
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

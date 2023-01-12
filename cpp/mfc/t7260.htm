@@ -1,0 +1,163 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Problems with Internet classes in MSVC 4.2
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Ram Kishore -- <A HREF="mailto:Ram_Kishore.IDEA@idea.com">Ram_Kishore.IDEA@idea.com</A>
+Wednesday, October 16, 1996
+</B>
+Environment: Windows NT 4.0, MSVC 4.2 ( with patch 4.2a and 4.2b )
+
+Hi all,
+ I'm using the Internet classes that are provided with VC++ 4.2.
+
+code snippet follows:
+==============================================================
+ CInternetSession* pInternetSess = NULL;
+ CHttpConnection* pHttpConn = NULL;
+ CHttpFile* pHttpFile = NULL;
+ pInternetSess = (CInternetSession*) new CInternetSession;
+ pHttpConn =  pInternetSess->GetHttpConnection(strServerName, nPort);
+
+  while (1)
+{
+ // change the parameters - lszInput, lszHeader
+ // also delete pHttpFile object if it already exists
+
+ pHttpFile = pHttpConn->OpenRequest(CHttpConnection::HTTP_VERB_POST,
+  strObject,(LPCTSTR)m_szURL, 1,NULL, NULL,dwHttpRequestFlags);
+ Success = pHttpFile->SendRequest ( lszHeader,  lszHeader.GetLength(), 
+                     lszInput.GetBuffer (0), lszInput.GetLength());
+            
+ pHttpFile->QueryInfoStatusCode(dwRetStatus);
+ if (dwRetStatus != HTTP_STATUS_OK)
+ {
+  // failure , stop the program 
+  break;
+ }
+ 
+}
+==============================================================
+Now this code works fine - for some time - 30 min to 1 hour.
+After that the program hangs or ASSERTs in QueryInfoStatusCode(...)
+Then I went inside this function and got the code out of it and put a check in 
+my program
+i.e put
+ if (AfxGetInternetHandleType (pHttpFile->m_hFile) == AFX_INET_SERVICE_UNK)
+ {
+  // problemmmmmm.....
+ }
+code  before Query status info code.
+Whenever we have the statue AFX_INET_SERVICE_UNK ( Unknown Service possibly 
+?????? ),
+it will ASSERT. But we don't know when and how it happens ?
+Any light on this is highly Appreciated .
+Also, any thing else that could be the problem with these classes ??
+Thanks in Advance
+Ram Kishore
+rkishore@idea.com
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Friday, October 18, 1996
+</B>
+At 17:46 10/16/96 EDT, Ram Kishore <Ram_Kishore.IDEA@idea.com> wrote:
+>Environment: Windows NT 4.0, MSVC 4.2 ( with patch 4.2a and 4.2b )
+
+>Hi all,
+> I'm using the Internet classes that are provided with VC++ 4.2.
+
+>code snippet follows:
+>==============================================================
+> CInternetSession* pInternetSess = NULL;
+> CHttpConnection* pHttpConn = NULL;
+> CHttpFile* pHttpFile = NULL;
+> pInternetSess = (CInternetSession*) new CInternetSession;
+> pHttpConn =  pInternetSess->GetHttpConnection(strServerName, nPort);
+>
+>  while (1)
+>{
+> // change the parameters - lszInput, lszHeader
+> // also delete pHttpFile object if it already exists
+>
+> pHttpFile = pHttpConn->OpenRequest(CHttpConnection::HTTP_VERB_POST,
+>  strObject,(LPCTSTR)m_szURL, 1,NULL, NULL,dwHttpRequestFlags);
+> Success = pHttpFile->SendRequest ( lszHeader,  lszHeader.GetLength(), 
+>                     lszInput.GetBuffer (0), lszInput.GetLength());
+>            
+> pHttpFile->QueryInfoStatusCode(dwRetStatus);
+> if (dwRetStatus != HTTP_STATUS_OK)
+> {
+>  // failure , stop the program 
+>  break;
+> }
+>}
+
+>==============================================================
+>Now this code works fine - for some time - 30 min to 1 hour.
+>After that the program hangs or ASSERTs in QueryInfoStatusCode(...)
+
+Undoubtedly, this is because you never close any of the files that you open.
+You need to code both:
+
+        pHttpFile->Close();
+        delete pHttpFile;
+
+in each iteration of your loop. Note that you need to do that whether
+dwRetStuats is HTTP_STATUS_OK or not.  Your program ends up getting
+sick because you leak files and memory all over the place in a loop
+that never ends.
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+Don't look at my hands: look at my _shoulders_!
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

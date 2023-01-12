@@ -1,0 +1,227 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Changing CPropertyPage size at run-time
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Kevin Thomas -- <A HREF="mailto:kevin@cgltd.demon.co.uk">kevin@cgltd.demon.co.uk</A>
+Monday, February 19, 1996
+</B>
+Hi all,
+
+I've been working on this one for two days now but to no avail.
+
+First the specs:
+VC++ 4.0 , MFC 4.0
+
+Now the problem:
+
+I'm trying to write a form launching application that displays forms that
+are defined by a script file. Each form is of variable size and displayed
+within a Property Sheet. So what I need to do is set the size of the
+property page before I call CPropertySheet::Create so that the sheet is
+the right size to show all the controls on the forms.
+
+Initially I sub-classed the CPropertyPage class using Class Wizzard which
+automatically used a dialog template I had defined using the dialog editor.
+I then created and diplayed the controls for the page within 
+CMyPage::OnInitDialog. This worked fine but the size of my pages was set 
+by the values specified in the .rc file at compile time.
+
+I then tried various methods of changing the pages size using MoveWindow(),
+etc. (well I had to try it) but this didn't work because (I presume) the
+property sheet takes it's size from the dialog templates associated with
+the pages.
+
+Next, I tried to use the PSP_DLGINDIRECT flag. First I tried use LoadResource
+to get at the existing dialog template and set the CMyPage::m_psp.pResource
+variable to it. Unfortunately I could not change any of the pointed to by
+this resource once I called LockResource to access it. Is there any way I can
+get at a resource at run time?
+Next I tried to build my own dialog template at run time, but I cannot get
+this to work. I create and filled in a DLGTEMPLATE structure and set the
+pResource member of m_psp to it but it doesn't work. The VC++ 4.0
+documentation states that you need at least one DLGITEMTEMPLATE structure
+after this (I assume I need to GlobalAlloc space for the structures before
+hand and place them sequentially in memory) but it also says that these are
+followed by three variable sized arrays, but, I can't find any information
+on these arrays. Using this method the CPropertySheet is not created 
+(athough no error message is given).
+
+How do I set up a dialog template properly at run time? 
+Is it possible to set up an empty dialog template with no DLGITEMTEMPLATEs
+and arrays?
+Or is there any better way of changing the page size?
+
+thanks in advance,
+
+Kevin Thomas - Control Group Ltd.
+kevin@cgltd.demon.co.uk
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+LeRoy Baxter -- <A HREF="mailto:lbaxter@cinfo.com">lbaxter@cinfo.com</A>
+Tuesday, February 20, 1996
+</B>
+[Mini-digest: 3 responses]
+
+You need to do one of three things:
+  1) write your own CPropertySheet class - there is code in the class
+      to step through all the pages and calculate the size - you would
+      need to override this
+  2) make your pages a fixed size (based on a maximum size
+  3) don't use CPropertySheet - use CTabCtl and CDialogs to simulate
+       your Property Sheet forms
+
+-----From: "David W. Gillett" <DGILLETT@expertedge.com>
+
+  My current understanding of this is that CPropertySheet is, like 
+MessageBox, a dialog derivative that achieves ease-of-use at the 
+expense of versatility and flexibility.  So my hunch is that to get 
+the flexibility you want, you'll need to abandon CPropertySheet's 
+canned functionality, and instead create your own CDialog derivative 
+with a CTabCtrl and a few CButtons.
+
+  You should then be able to resize the CDialog derivative and the 
+CTabCtrl at run-time, based on the CPropertySheet objects you will 
+use.  I strongly suggest, though, that you do any such resizing in 
+OnInitDialog, and not attempt to re-size as each CPropertyPage is 
+selected....
+
+Dave
+
+-----From: Peter Olesen <peter.olesen@mailbox.swipnet.se>
+
+I don't know so much about property sheets but I have done some dialog
+template mangling in memory and maybe this kan help:
+
+The "Windows API Quick Reference" help files for VC2.2 (and hopefully VC4.0)
+have information on both the DLGITEMTEMPLATE and DLGTEMPLATE structs and the
+variable arrays following them.
+
+In short:
+A dialog with no menu and standard class the DLGTEMPLATE struct is followed
+by two 16bit words set to 0 (zero) and then a zero terminated UNICODE string
+with the title, if the dialog does not have a title its just another 16bit
+word of zero.
+
+Then follow the DLGITEMTEMPLATE's, one for each control. If the dialog does
+not have any controls there should be no DLGITEMTEMPLATE structs.
+
+//------------------------------------------------------------//
+// Peter Olesen                                               //
+// (peter.olesen@mailbox.swipnet.se)                          //
+//                                                            //
+// "Support the Blue Ribbon Campaign for free speech online." //
+//------------------------------------------------------------//
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Iain Fyfe -- <A HREF="mailto:Iain_Fyfe@scet.org.uk">Iain_Fyfe@scet.org.uk</A>
+Wednesday, February 21, 1996
+</B>
+[Mini-digest: 2 responses]
+
+Try this bit of code I used to increase the size of my property sheet in
+OnInitDialogue
+
+	CRect ctParentRectWnd;	
+	// dimensions of property sheet window bounding rectangle 
+	this->GetWindowRect(ctParentRectWnd);
+	this->SetWindowPos(NULL, 0, 0,
+		ctParentRectWnd.Width() + kCtrlWidth,
+		ctParentRectWnd.Height(), 
+		SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+	// Increase the size of the window to accommodate the
+	// new controls
+
+
+
+
+--
+
+     _/_/_/  _/_/_/  _/_/_/  _/_/_/  | Tel: (0141) 337 5000  
+    _/      _/      _/        _/     | Fax: (0141) 337 5050  
+   _/_/_/  _/      _/_/      _/      | Net: scet@scet.org.uk 
+      _/  _/      _/        _/       | AppleLink: SCET.DEV   
+ _/_/_/  _/_/_/  _/_/_/    _/        |                       
+......learning through technology   |
+-----From: "jeffg" <jeffg@iqpuucp.aa.iqsc.com>
+
+
+     One way of having CPropertySheet display the correct size you want is 
+     to set all of your child dialogs to the same dimension (CPropertySheet 
+     uses the first child window as a template on it's size, or at least it 
+     did before 4.00).
+     
+     Another alternative is to do it this way. Derive a class from 
+     CPropertySheet and add the following:
+     
+     int CIQPropertySheet::OnCreate(LPCREATESTRUCT lpCreateStruct)
+     {                             
+        m_bStacked = FALSE;  // we default to single line slider tabs
+     
+        if( CPropertySheet::OnCreate(lpCreateStruct) == -1 )
+                return -1;
+        
+        // TODO: Add your specialized creation code here
+        CRect rectWnd;
+        GetWindowRect( rectWnd );
+        SetWindowPos( NULL, 0, 0, rectWnd.Width(), rectWnd.Height()+20,
+                SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE );
+     
+        CenterWindow();
+
+        return 0;
+     }
+
+     Set the Width and Height in the SetWindowPos command to your own values to 
+achieve what you want.
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

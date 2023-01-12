@@ -1,0 +1,201 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+ODBC ASSERT question...
+</B></FONT>
+<BR>
+<PRE>
+<B>
+David Little -- <A HREF="mailto:dlittle@equinoxcorp.com">dlittle@equinoxcorp.com</A>
+Friday, January 24, 1997
+</B>
+Environment: VC4.2b/Win95
+
+I have an application using ODBC and the Access7.0 drivers, and I have
+been getting an ASSERTion in DBRFX.CPP line 271:
+
+			if (pInfo->m_pvBindAddress != pvBind)
+			{
+				TRACE1("Error: field address (column %u) has changed!\n",
+					nField);
+				ASSERT(FALSE);
+			}
+
+It happens if I try an Edit(), then something like this: deptTable->m_Total_Today.Format("%.4f", newTotal);
+and will go away if I change it to this:
+	CString t;
+            t.Format("%.4f", newTotal);
+            deptTable->m_Total_Today = t;
+
+Does anybody know why this might happen, and the impact on the database?  
+
+Thanks!
+
+David
+
+
+            //deptTable->m_Total_Today = t;
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Vincent Mascart -- <A HREF="mailto:100425.1337@compuserve.com">100425.1337@compuserve.com</A>
+Sunday, January 26, 1997
+</B>
+[Mini-digest: 2 responses]
+
+>From: 	David Little
+>Sent: 	dimanche 26 janvier 1997 19:10
+>To: 	"'MFC Question'"
+>Subject: 	ODBC ASSERT question...
+>
+>Environment: VC4.2b/Win95
+>
+>I have an application using ODBC and the Access7.0 drivers, and I have
+>been getting an ASSERTion in DBRFX.CPP line 271:
+>
+>			if (pInfo->m_pvBindAddress != pvBind)
+>			{
+>				TRACE1("Error: field address (column %u) has
+changed!\n",
+>					nField);
+>				ASSERT(FALSE);
+>			}
+>
+>It happens if I try an Edit(), then something like this:
+deptTable->m_Total_Today.Format("%.4f", >newTotal);
+>and will go away if I change it to this:
+>	CString t;
+>            t.Format("%.4f", newTotal);
+>            deptTable->m_Total_Today = t;
+>
+>Does anybody know why this might happen, and the impact on the database?  
+>
+>Thanks!
+
+Hi David,
+
+This is because buffer bound to field in database must not move. When you make a
+Format() with a CString, MFC allocate a new buffer large enough to contain the
+expected result of the operation. This will cause the string buffer to move if
+the estimated result buffer length is greater than the field length.
+
+That why you don't assert with the deptTable->m_Total_Today = t; version. The
+size of the preallocated buffer for deptTable->m_Total_Today is large enough to
+contain the content of your t CString.
+
+HTH
+
+Vincent Mascart
+100425.1337@compuserve.com
+
+-----From: Mike Blaszczak <mikeblas@nwlink.com>
+
+At 12:26 1/24/97 -0600, David Little wrote:
+>Environment: VC4.2b/Win95
+
+>I have an application using ODBC and the Access7.0 drivers, and I have
+>been getting an ASSERTion in DBRFX.CPP line 271:
+>
+>if (pInfo->m_pvBindAddress != pvBind)
+>{
+>	TRACE1("Error: field address (column %u) has changed!\n",
+>		nField);
+>	ASSERT(FALSE);
+>}
+
+The message means exactly what it says: you've changed the address of one of
+the items you previously bound to a database column.
+
+Binding output buffers to a database column means that you've told you want
+data from a given column to show up at a given address.  When you access the
+database, you first declare your intent to execute a SQL Statement.  You
+provide that statement to the database API, and it parses it.  If it
+successfully parses, the database API knows how many (if any) columns the
+query will return.
+
+You then start telling the database API that, each time you retrieve a row
+from the result set of the query, you want a given column's data to appear
+at a particular place in memory.  When you move to the first record, the
+database API copies information for each column that you've bound to the
+address that you said you've bound it to.  When you move to the next record,
+the API tries to use the same addresses.
+
+When you use ODBC (or SQL Server's DB-Library, or Gupta's SQLAPI, or 
+Oracle's Pro*C API), you can't change the address you've bound to after
+you've bound it.  If you need to change the address, you need to reexecute
+the query.
+
+Since MFC notices that you changed the address, it stops you in your tracks
+and issues a TRACE that explains what happened.
+
+>It happens if I try an Edit(), then something like this:
+>	deptTable->m_Total_Today.Format("%.4f", newTotal);
+
+Presumably, m_Total_Today is a CString.  When you use Format() directly
+on the CString, the string data ends up being destroyed and reallocated
+and that effectively moves the address of the buffer.
+
+>and will go away if I change it to this:
+>	CString t;
+>            t.Format("%.4f", newTotal);
+>            deptTable->m_Total_Today = t;
+
+CString includes optimizations that prevent the buffer from (usually)
+moving in this case.
+
+>Does anybody know why this might happen, and the impact on the database?  
+
+There's no impact on the database: you've raised an error, the transaction
+is rolled back, and that's that.  The reason that most database APIs
+don't allow switching around bound addresses is for performance.
+
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+Why does the "new" Corvette look like a 1993 RX-7?
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

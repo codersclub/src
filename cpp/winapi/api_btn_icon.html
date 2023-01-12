@@ -1,0 +1,76 @@
+<!--#include virtual="/ssi/top.html"-->
+<center><h1>Иконка на кнопке</h1></center>
+<dir>Забавная штука, получается, очень симпатично выглядит кнопка с рисунком, но стоит добавить манифест к файлу, как сразу эти кнопки отображаются обычными.
+Для этой цели я написал функцию, которая загоняет в кнопку иконку:<br>
+<table border="0" bgcolor="gray" cellspacing="0" cellpadding="0">
+<tr><td align="left"><img width="1" height="1"></td><td></td><td></td></tr>
+<tr><td></td><td width="100%" bgcolor="#E0E0E0"><div style="margin-left: 3">
+<pre><font face="Courier New" color="black"><font color="blue">#pragma pack(push, 8)</font>
+BOOL Button_SetIcon(HWND hwndButton, HINSTANCE hModule, LPSTR szIcon, INT cx = 32, INT cy = 32, UINT fuLoad = LR_DEFAULTCOLOR)
+{
+    BOOL ret = FALSE;
+
+    HICON hIconBlend;
+    HICON hIcon = (HICON)LoadImage(hModule, szIcon, IMAGE_ICON, cx, cy, fuLoad);
+
+    <font color="blue">struct</font>
+    {
+        HIMAGELIST  himl;       <font color="green">// Index: Normal, hot, pushed, disabled, focused.</font>
+        RECT        margin;     <font color="green">// Margin around icon.</font>
+        UINT        uAlign;
+    } bi;
+    memset(&bi, 0, <font color="blue">sizeof</font>(bi));
+    bi.himl = ImageList_Create(cx,cy,ILC_COLOR16|ILC_MASK,4,0);
+    bi.uAlign = 4;
+
+    ImageList_AddIcon(bi.himl,hIcon);   <font color="green">// Normal</font>
+    ImageList_AddIcon(bi.himl,hIcon);   <font color="green">// hot</font>
+    ImageList_AddIcon(bi.himl,hIcon);   <font color="green">// pushed</font>
+
+    <font color="green">// disabled</font>
+    hIconBlend = ImageList_GetIcon(bi.himl,0,ILD_BLEND50|ILD_TRANSPARENT);
+    ImageList_AddIcon(bi.himl,hIconBlend);
+    DestroyIcon(hIconBlend);
+
+    hIconBlend = ImageList_GetIcon(bi.himl,3,ILD_BLEND50|ILD_TRANSPARENT);
+    ImageList_Remove(bi.himl,3);
+    ImageList_AddIcon(bi.himl,hIconBlend);
+    DestroyIcon(hIconBlend);
+
+    ImageList_AddIcon(bi.himl,hIcon);       <font color="green">// focused</font>
+
+    <font color="blue">if</font>(!(ret = SendMessage(hwndButton,(0x1600<font color="green">/*BCM_FIRST*/</font> + 0x0002)<font color="green">/*BCM_SETIMAGELIST*/</font>,0,(LPARAM)&bi)))
+    {
+        ImageList_Destroy(bi.himl);
+        ret = SendMessage(hwndButton,BM_SETIMAGE,IMAGE_ICON,(LPARAM)hIcon);
+    }
+    <font color="blue">else</font>
+    {
+        DestroyIcon(hIcon);
+        SetWindowText(hwndButton,"");
+    }
+    <font color="blue">return</font> ret;
+}
+<font color="blue">#pragma pack(pop)</font></font></pre></div></td><td></td></tr>
+<tr><td></td><td></td><td align="right"><img width="1" height="1"></td></tr></table><br>
+Параметры я сделал как у функции <b>LoadImage</b> для удобства использования, т.е. если захотите загрузить иконку не из ресурсов, а из файла, просто ставите флажок. Кроме этого добавил код, который делает "дважды" бледной иконку для неактивной кнопки.Зачастую используется не та операционка, на которой мы создавали и лицезрели наше творение. По этой причине я добавил код, который в случае неудачи, загоняет иконку стандартным способом, что позволяет программе жить и под Вин9х.<br>
+<br>
+Как использовать этот код? Очень просто - добавьте в .срр-файл этот код, где используется этот наворот. Или как я - в отдельный файл с кучей аналогичных функций, описать в файле-хедере и использовать.в апях:<br>
+<table border="0" bgcolor="gray" cellspacing="0" cellpadding="0">
+<tr><td align="left"><img width="1" height="1"></td><td></td><td></td></tr>
+<tr><td></td><td width="100%" bgcolor="#E0E0E0"><div style="margin-left: 3">
+<pre><font face="Courier New" color="black">Button_SetIcon(GetDlgItem(hdlg, IDC_BUTTON), GetModuleHandle(NULL), "MYICON");
+<font color="green">// или в МФС:</font>
+Button_SetIcon(GetDlgItem(IDC_BUTTON)->m_hWnd,AfxGetResourceHandle(), MAKEINTRESOURCE(IDR_MAINFRAME) ,16,16);</font></pre></div></td><td></td></tr>
+<tr><td></td><td></td><td align="right"><img width="1" height="1"></td></tr></table><br>
+
+<table border="0" bgcolor="green" cellspacing="0" cellpadding="0">
+<tr><td align="left"><img width="1" height="1"></td><td></td><td></td></tr>
+<tr><td></td><td width="100%" bgcolor="#EEF9EC"><div style="margin-left: 3"><font face="Verdana" color="green"><b>Примечание:</b></font></div></td><td></td></tr>
+<tr><td></td><td width="100%" bgcolor="#EEF9EC"><div style="margin-left: 3"><font face="Verdana" color="green">Необходимо в начале программы вызывать InitCommonControls(), т.к. подключение манифеста, без этого вызова, приводит к абнормальному созданию окон - говоря простым языком, окно может не отобразиться на экране.</font></div></td><td></td></tr>
+<tr><td></td><td></td><td align="right"><img width="1" height="1"></td></tr>
+</table>
+
+<br>Приятной разработки программ с удобным интерфейсом.<br>
+С уважением <a href="mailto:vovan_angren@hotmail.com">BOBKA.</a><br></dir>
+<!--#include virtual="/ssi/bottom.html"-->

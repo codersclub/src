@@ -1,0 +1,666 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+One instance of an application only- How to post the creatio
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Ari Villaca -- <A HREF="mailto:villaca@correionet.com.br">villaca@correionet.com.br</A>
+Sunday, January 12, 1997
+</B>
+Environment: MSVC 4.0/Win95
+
+I have an application which is supposed to have only one instance running.
+I know how to activate the 1st instance of the application when a 2nd one
+is started by the user.
+
+But the solution I have just do it, ie, activates the 1st instance. If th=
+e
+user has used Explorer to click on a saved application document name in
+order to open that document, the document won't be opened.
+
+How can I post the 2nd instance creation message arguments ( maybe the
+CWinApp::m_lpCmdLine ) to the 1st instance already running?=20
+
+The code for limiting the application to one instance is:
+
+Bool CMyApp::InitInstance() {
+....
+....
+....
+	SetRegistryKey( "MyCompanyName" );
+	csClassName =3D GetProfileString( "Initialization", "ClassName", "None" =
+);
+
+	//determines if another window with our class name exists
+	HWND hWnd;
+	hWnd =3D ::FindWindow( ( LPCSTR ) csClassName, NULL );
+	if ( hWnd )
+	{
+		AfxMessageBox( "The application is already running..." );
+
+		SetForegroundWindow( hWnd );
+		CWnd* PrevWindow =3D CWnd::FromHandle( hWnd );
+		PrevWindow->SetForegroundWindow();
+
+		//does it have a popup?
+		CWnd* ChildWnd =3D PrevWindow->GetLastActivePopup();
+
+		//bring the main window to the top
+		PrevWindow->BringWindowToTop();
+
+		//if iconic, restore the main window
+		if ( PrevWindow->IsIconic() )
+			PrevWindow->ShowWindow( SW_RESTORE );
+
+		//if there are popups, bring them along too
+		if ( PrevWindow !=3D ChildWnd )
+			ChildWnd->BringWindowToTop();
+
+		//here seems to be the place to post the 2nd instance creation argument=
+s
+(maybe m_lpCmdLine )
+		//to the 1st instance, so they are processed
+		//for now, send a File/New message
+		PrevWindow->PostMessage( WM_COMMAND, ID_FILE_NEW );
+=09
+
+		//
+		return FALSE;
+	}
+
+....
+....
+....
+}
+
+Any pointer to related documentation or solution is greatelly appreciated=
+.=20
+
+Regards,
+
+Ari
+
+-------------------------------------------------------------------------=
+---
+---
+ Ari de Moura Villa=E7a
+ 					e-Mail:	villaca@correionet.com.br
+
+ Av. Moraes Sales, 987 Apto.113		fone:	+55 19 232-2440
+ 13010-001 - Campinas, SP		fax:	+55 19 232-2440
+ Brasil
+-------------------------------------------------------------------------=
+---
+---
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mats Månhav -- <A HREF="mailto:manhav@connectum.skurup.se">manhav@connectum.skurup.se</A>
+Tuesday, January 14, 1997
+</B>
+-- [ From: Mats Manhav * EMC.Ver #2.5.02 ] --
+
+The way you use for determining if this is the second instance, will not
+work in all cases.
+Since NT and 95 are multitasking systems it may very well happen that both
+instances are
+started in such a way that neither of them have created the mainframe when
+you do the FindWindow().
+
+Instead you should do like this:
+Use a mutex to make sure that you are not running more than one instance.
+Create the mutex in the beginning of InitInstance(). If the mutex already
+exists
+when you creat it, there is already another instance running. You than do
+findwindow
+to get the window handle. Note that it may not be present at first, so you
+may need to test 
+several times. 
+
+Delete the mutex in the CMainFrame class, when the window is closing down.
+This way there is less chance that the mutex exists and that the first
+instance is 
+about to end.
+
+To be able to send the string of the file name over you need to create some
+shared memory
+since NT and 95 have protected memory. You can achive this using
+FileMappings.
+(Or maybe using the CSharedFile I am not sure, please update me someone who
+knows how to do
+ït using CSharedFile).
+
+CApp::InitInstance()
+{
+   // create the mutex
+   m_Mutex = new CMutex(FALSE, "OneInstanceOnly");
+   // check if you are first.
+   BOOL First = (GetLastError() != ERROR_ALREADY_EXISTS); 
+   
+   // if First just startup as usual.
+   if (!First)
+   {
+      // wait for the other instance to startup
+      hWnd Wnd;
+      while (NULL == (Wnd = FindWindow())
+      {
+         Sleep(SOMETIME);
+         // don't try forever
+         if (GiveUpWaiting)
+            DoSomethingToHandleTimout(); // maybe assume you are the only
+instance
+
+      } 
+      
+      ActivateFirstInstance();
+      // sending the file given to you on the commandline I would do using a
+special message
+      // note that the string is not sharable between processes since the
+memory is
+      // protected. You need to find some way to send the string over.
+      // Try CreateFileMapping() which can be used to create a memory shared
+file.
+      // look in the Win32 reference at the article "Using Shared Memory in
+a Dynamic-Link Library"
+      // create a named the file mapping in memory and send the
+      
+      CopyTheFileNameIntoAFileMappingView();
+      SendMessage(wm_OpenFile, lpCmdLine);
+      CloseTheFileMapping();
+      ExitNicely();
+   }
+}
+
+Good Luck!
+Mats
+
+
+Mats
+-------- REPLY, Original message follows --------
+
+> Date: Sunday, 12-Jan-97 11:25 PM
+> 
+> From: Ari Villaca              \ Internet:    (villaca@correionet.com.br)
+> To:   MFCList                  \ Internet:    (mfc-l@netcom.com)
+> 
+> Subject: One instance of an application only- How to post the creation
+message
+> from the 
+> 
+> Environment: MSVC 4.0/Win95
+> 
+> I have an application which is supposed to have only one instance running.
+> I know how to activate the 1st instance of the application when a 2nd one
+> is started by the user.
+> 
+> But the solution I have just do it, ie, activates the 1st instance. If the
+> user has used Explorer to click on a saved application document name in
+> order to open that document, the document won't be opened.
+> 
+> How can I post the 2nd instance creation message arguments ( maybe the
+> CWinApp::m_lpCmdLine ) to the 1st instance already running? 
+> 
+> The code for limiting the application to one instance is:
+> 
+> Bool CMyApp::InitInstance() {
+> ....
+> ....
+> ....
+>         SetRegistryKey( "MyCompanyName" );
+>         csClassName = GetProfileString( "Initialization", "ClassName",
+"None"
+> );
+> 
+>         //determines if another window with our class name exists
+>         HWND hWnd;
+>         hWnd = ::FindWindow( ( LPCSTR ) csClassName, NULL );
+>         if ( hWnd )
+>         {
+>                 AfxMessageBox( "The application is already running..." );
+> 
+>                 SetForegroundWindow( hWnd );
+>                 CWnd* PrevWindow = CWnd::FromHandle( hWnd );
+>                 PrevWindow->SetForegroundWindow();
+> 
+>                 //does it have a popup?
+>                 CWnd* ChildWnd = PrevWindow->GetLastActivePopup();
+> 
+>                 //bring the main window to the top
+>                 PrevWindow->BringWindowToTop();
+> 
+>                 //if iconic, restore the main window
+>                 if ( PrevWindow->IsIconic() )
+>                         PrevWindow->ShowWindow( SW_RESTORE );
+> 
+>                 //if there are popups, bring them along too
+>                 if ( PrevWindow != ChildWnd )
+>                         ChildWnd->BringWindowToTop();
+> 
+>                 //here seems to be the place to post the 2nd instance
+creation
+> arguments
+> (maybe m_lpCmdLine )
+>                 //to the 1st instance, so they are processed
+>                 //for now, send a File/New message
+>                 PrevWindow->PostMessage( WM_COMMAND, ID_FILE_NEW );
+>         
+> 
+>                 //
+>                 return FALSE;
+>         }
+> 
+> ....
+> ....
+> ....
+> }
+> 
+> Any pointer to related documentation or solution is greatelly appreciated.
+
+> 
+> Regards,
+> 
+> Ari
+> 
+> --------------------------------------------------------------------------
+--
+> ---
+>  Ari de Moura Villaça
+>                                         e-Mail: villaca@correionet.com.br
+> 
+>  Av. Moraes Sales, 987 Apto.113         fone:   +55 19 232-2440
+>  13010-001 - Campinas, SP               fax:    +55 19 232-2440
+>  Brasil
+> --------------------------------------------------------------------------
+--
+> ---
+> 
+
+-------- REPLY, End of original message --------
+
+
+--
+==========================================================================
+Mats Månhav (Mats Manhav for 7-bit people)
+email:manhav@connectum.skurup.se   WWW: <A HREF="http://connectum.skurup.se/~manhav">http://connectum.skurup.se/~manhav</A>
+FAX:  (int) 46 (0) 414 243 05      Phone: (int) 46 (0) 414 243 05         
+==========================================================================
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+=?iso-8859-1?Q?Marko_K=F6nig?= -- <A HREF="mailto:koenig@Spiess.com">koenig@Spiess.com</A>
+Thursday, January 16, 1997
+</B>
+[Mini-digest: 3 responses]
+
+Hi
+Environment: VC++ 4.2, Win NT 4.2
+
+I had some problems to determine the HWND of the mainwindow from the =
+first instance using the windowclass. Here is an example which is using =
+a memory mapped file instead of FindWindow().
+
+CMyApp::InitInstance()
+{
+	m_hFileMapping =3D CreateFileMapping((HANDLE)-1, NULL, PAGE_READWRITE, =
+0, sizeof(DWORD), "StringToIdentTheMapFile");
+	ASSERT(m_hFileMapping);=20
+	BOOL bFirst =3D (GetLastError() !=3D ERROR_ALREADY_EXISTS);=20
+	if (!bFirst)
+	{
+		AfxMessageBox("There is one previsious instance!");
+		HANDLE hFileMap =3D OpenFileMapping(FILE_MAP_READ, FALSE, =
+FILEMAPIDENTIFIER);
+		ASSERT(hFileMap);
+		LPDWORD pDword =3D (LPDWORD)MapViewOfFile(
+			hFileMap, FILE_MAP_READ, 0, 0, 0);
+		ASSERT(pDword);
+		HWND hWnd =3D (HWND) *pDword;
+		ASSERT(IsWindow(hWnd));
+		::SetForegroundWindow(hWnd);
+		UnmapViewOfFile(pDword);
+		CloseHandle(hFileMap);
+		return FALSE;
+	}
+
+... do some other initialisation ... (create the mainwindow e.t.c.) ...
+
+	LPDWORD pDword =3D (LPDWORD)MapViewOfFile(m_hFileMapping,
+	FILE_MAP_WRITE, 0, 0, 0);
+	if(pDword)
+	{
+		*pDword =3D (DWORD)m_pMainWnd->m_hWnd;
+		VERIFY(UnmapViewOfFile(pDword));
+	}
+	return TRUE;
+}
+
+
+
+
+
+
+Marko Koenig
+Spiess COMPUTERSYSTEMS, Munich, Germany
+koenig@spiess.com
+<A HREF="http://www.spiess.com">http://www.spiess.com</A>
+
+
+----------
+From: 	Mats Manhav[SMTP:manhav@connectum.skurup.se]
+Sent: 	Mittwoch, 15. Januar 1997 05:46
+To: 	Ari Villaca; MFCList
+Subject: 	Re: One instance of an application only- How to post the =
+creation message from t
+
+-- [ From: Mats Manhav * EMC.Ver #2.5.02 ] --
+
+The way you use for determining if this is the second instance, will not
+work in all cases.
+Since NT and 95 are multitasking systems it may very well happen that =
+both
+instances are
+started in such a way that neither of them have created the mainframe =
+when
+you do the FindWindow().
+
+Instead you should do like this:
+Use a mutex to make sure that you are not running more than one =
+instance.
+Create the mutex in the beginning of InitInstance(). If the mutex =
+already
+exists
+when you creat it, there is already another instance running. You than =
+do
+findwindow
+to get the window handle. Note that it may not be present at first, so =
+you
+may need to test=20
+several times.=20
+
+Delete the mutex in the CMainFrame class, when the window is closing =
+down.
+This way there is less chance that the mutex exists and that the first
+instance is=20
+about to end.
+
+To be able to send the string of the file name over you need to create =
+some
+shared memory
+since NT and 95 have protected memory. You can achive this using
+FileMappings.
+(Or maybe using the CSharedFile I am not sure, please update me someone =
+who
+knows how to do
+=EFt using CSharedFile).
+
+CApp::InitInstance()
+{
+   // create the mutex
+   m_Mutex =3D new CMutex(FALSE, "OneInstanceOnly");
+   // check if you are first.
+   BOOL First =3D (GetLastError() !=3D ERROR_ALREADY_EXISTS);=20
+  =20
+   // if First just startup as usual.
+   if (!First)
+   {
+      // wait for the other instance to startup
+      hWnd Wnd;
+      while (NULL =3D=3D (Wnd =3D FindWindow())
+      {
+         Sleep(SOMETIME);
+         // don't try forever
+         if (GiveUpWaiting)
+            DoSomethingToHandleTimout(); // maybe assume you are the =
+only
+instance
+
+      }=20
+     =20
+      ActivateFirstInstance();
+      // sending the file given to you on the commandline I would do =
+using a
+special message
+      // note that the string is not sharable between processes since =
+the
+memory is
+      // protected. You need to find some way to send the string over.
+      // Try CreateFileMapping() which can be used to create a memory =
+shared
+file.
+      // look in the Win32 reference at the article "Using Shared Memory =
+in
+a Dynamic-Link Library"
+      // create a named the file mapping in memory and send the
+     =20
+      CopyTheFileNameIntoAFileMappingView();
+      SendMessage(wm_OpenFile, lpCmdLine);
+      CloseTheFileMapping();
+      ExitNicely();
+   }
+}
+
+Good Luck!
+Mats
+
+
+Mats
+-------- REPLY, Original message follows --------
+
+> Date: Sunday, 12-Jan-97 11:25 PM
+>=20
+> From: Ari Villaca              \ Internet:    =
+(villaca@correionet.com.br)
+> To:   MFCList                  \ Internet:    (mfc-l@netcom.com)
+>=20
+> Subject: One instance of an application only- How to post the creation
+message
+> from the=20
+>=20
+> Environment: MSVC 4.0/Win95
+>=20
+> I have an application which is supposed to have only one instance =
+running.
+> I know how to activate the 1st instance of the application when a 2nd =
+one
+> is started by the user.
+>=20
+> But the solution I have just do it, ie, activates the 1st instance. If =
+the
+> user has used Explorer to click on a saved application document name =
+in
+> order to open that document, the document won't be opened.
+>=20
+> How can I post the 2nd instance creation message arguments ( maybe the
+> CWinApp::m_lpCmdLine ) to the 1st instance already running?=20
+>=20
+> The code for limiting the application to one instance is:
+>=20
+> Bool CMyApp::InitInstance() {
+> ....
+> ....
+> ....
+>         SetRegistryKey( "MyCompanyName" );
+>         csClassName =3D GetProfileString( "Initialization", =
+"ClassName",
+"None"
+> );
+>=20
+>         //determines if another window with our class name exists
+>         HWND hWnd;
+>         hWnd =3D ::FindWindow( ( LPCSTR ) csClassName, NULL );
+>         if ( hWnd )
+>         {
+>                 AfxMessageBox( "The application is already running..." =
+);
+>=20
+>                 SetForegroundWindow( hWnd );
+>                 CWnd* PrevWindow =3D CWnd::FromHandle( hWnd );
+>                 PrevWindow->SetForegroundWindow();
+>=20
+>                 //does it have a popup?
+>                 CWnd* ChildWnd =3D PrevWindow->GetLastActivePopup();
+>=20
+>                 //bring the main window to the top
+>                 PrevWindow->BringWindowToTop();
+>=20
+>                 //if iconic, restore the main window
+>                 if ( PrevWindow->IsIconic() )
+>                         PrevWindow->ShowWindow( SW_RESTORE );
+>=20
+>                 //if there are popups, bring them along too
+>                 if ( PrevWindow !=3D ChildWnd )
+>                         ChildWnd->BringWindowToTop();
+>=20
+>                 //here seems to be the place to post the 2nd instance
+creation
+> arguments
+> (maybe m_lpCmdLine )
+>                 //to the 1st instance, so they are processed
+>                 //for now, send a File/New message
+>                 PrevWindow->PostMessage( WM_COMMAND, ID_FILE_NEW );
+>        =20
+>=20
+>                 //
+>                 return FALSE;
+>         }
+>=20
+> ....
+> ....
+> ....
+> }
+>=20
+> Any pointer to related documentation or solution is greatelly =
+appreciated.
+
+>=20
+> Regards,
+>=20
+> Ari
+>=20
+> =
+-------------------------------------------------------------------------=
+-
+--
+> ---
+>  Ari de Moura Villa=E7a
+>                                         e-Mail: =
+villaca@correionet.com.br
+>=20
+>  Av. Moraes Sales, 987 Apto.113         fone:   +55 19 232-2440
+>  13010-001 - Campinas, SP               fax:    +55 19 232-2440
+>  Brasil
+> =
+-------------------------------------------------------------------------=
+-
+--
+> ---
+>=20
+
+-------- REPLY, End of original message --------
+
+
+--
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D
+Mats M=E5nhav (Mats Manhav for 7-bit people)
+email:manhav@connectum.skurup.se   WWW: =
+<A HREF="http://connectum.skurup.se/~manhav">http://connectum.skurup.se/~manhav</A>
+FAX:  (int) 46 (0) 414 243 05      Phone: (int) 46 (0) 414 243 05        =
+=20
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D
+
+
+
+
+-----From: Peter.Walker@ubs.com
+
+Item Subject: cc:Mail Text
+     >CopyTheFileNameIntoAFileMappingView();
+     >SendMessage(wm_OpenFile, lpCmdLine);
+     >CloseTheFileMapping();
+     
+     Shared memory seems a bit elegant, why not use WM_COPYDATA to transfer 
+     to string and capture this in the targets Main Window?
+     
+     Peter Walker
+     peter.walker@ubs.com
+-----From: Jim Lawson Williams <jimlw@mail.ccur.com.au>
+
+At 10:12 AM 15/01/97 -0800, Gforce <gforce@liquidaudio.com> wrote:
+>    I have a similar problem, I have an app that should only have one
+>instance running at any time,
+>I send the command line to the first instance with no problems, Problem
+>arises if the
+>user double clicks on a file associated with my app and a second
+>instance tries to launch, sends
+>command line info (path and filename) to the first instances, the first
+>instances acts on the
+>command line but gets a sharing volation error attempting to open the
+>file...
+>
+>    Any ideas ?, thanks in advance.
+>
+G'day!
+I can't see why try/catch won't allow you, on trapping the exception, to scan the documents in play and report "you already have this open" or "something else has this one".
+
+Regards,
+Jim LW
+
+>From the BBC's "Barchester Chronicles":
+
+    "I know that ultimately we are not supposed to understand.
+    But I also know that we must try."
+
+       -- the Reverend Septimus Harding, crypt-analyst, clog-dancer, C++ programmer
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Âåðíóòüñÿ â êîðåíü Àðõèâà</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

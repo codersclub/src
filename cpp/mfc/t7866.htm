@@ -1,0 +1,247 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Q:  Multithreaded MDI application...
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Duane Sallee -- <A HREF="mailto:Duane@teubner.com">Duane@teubner.com</A>
+Wednesday, November 20, 1996
+</B>
+     Environment: MFC/VC++ 4.0, WinNT 4.0
+     
+     I am currently writing a MDI client application that connects to 
+     multiple servers (via named pipe or socket), receives and displays 
+     messages concerning jobs that are being processed by the server.  For 
+     every server that is connected to, the messages for that server are 
+     displayed in an CListView-derived MDI window.
+     
+     Because of the fact that the information is coming to my app via named 
+     pipe or socket, and the fact that there can be several connections 
+     running concurrently, I need to make each MDI operate on it's own 
+     thread, but I am having trouble with GUI threads.
+     
+     My question is this:  I have looked at the MTMDI sample on the VC CD, 
+     and understand what is going on, but my situation is slightly 
+     different.  In the sample, all the CChildFrame (MDI children) are 
+     created as invisible windows which then create a new thread.  This 
+     thread in turn creates a CWnd that is a child of the invisible 
+     CChildFrame window.  The OnPaint command for the CWnd is handled for 
+     all painting.  However, in my case, I want to use a CListView in the 
+     MDI child itself (not creating a child to the MDI child window).  Is 
+     it possible to set the m_pMainWnd member of my CWinThread-derived 
+     class to the MDI child window itself.  This would allow me to use most 
+     of the standard MDI functionality.
+     
+     Here's a summary representation of what I would like to do:
+     
+     in CChildFrame (MDI Child)
+        -> CMDIChildWnd::Create(...)            //base class creation
+        -> CMyThread pThread = new CMyThread    //allocate and
+        -> pThread->CreateThread(m_hwnd)        //  create a new thread
+     
+     in CMyThread::InitInstance
+        -> m_pMainWnd = m_pParentWnd            //set the mainwnd to
+                                                // be the MDI child
+     
+     
+     If there are other samples that pertain to MDI and GUI threads, please 
+     let me know.  Any suggestions, help is appreciated.
+     
+     
+     duane sallee
+     teubner & associates, inc.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Sunday, December 01, 1996
+</B>
+At 10:37 11/20/96 CST, you wrote:
+>     Environment: MFC/VC++ 4.0, WinNT 4.0
+
+>     Because of the fact that the information is coming to my app via named 
+>     pipe or socket, and the fact that there can be several connections 
+>     running concurrently, I need to make each MDI operate on it's own 
+>     thread, but I am having trouble with GUI threads.
+
+The description of your problem doesn't make the requirement that you
+say is a "need". In fact, the approach you're suggesting is inefficient
+and questionable.
+     
+>     My question is this:  I have looked at the MTMDI sample on the VC CD, 
+>     and understand what is going on, but my situation is slightly 
+>     different.  In the sample, all the CChildFrame (MDI children) are 
+>     created as invisible windows which then create a new thread.  This 
+>     thread in turn creates a CWnd that is a child of the invisible 
+>     CChildFrame window. 
+
+Uh, okay.  But if a window is hidden, its children are hidden, too.
+
+>     The OnPaint command for the CWnd is handled for 
+>     all painting. 
+
+Which CWnd are you talking about?  The child window?  It won't get any
+OnPaint() calls, since it is hidden.
+
+Your analysis of the MTMDI application is off.  A quick run of Spy++ against
+the running sample will show you that it creates no hidden windows.
+
+>     However, in my case, I want to use a CListView in the 
+>     MDI child itself (not creating a child to the MDI child window). 
+
+If the CListView is "in" the MDI Child frame, it is best for the CListView to
+be a child.  That's for two reasons:
+
+  1) A CListView is a CView derivative, and therefore needs to live in
+     some CFrameWnd-derived window--like a CMDIChildFrame.
+
+  2) If you don't keep a parent-child relationship, you'll need to write
+     a lot of code to manage the parent-child relationship of the windows.
+     If the list control window isn't a child of the frame, for example,
+     you'll need to move the list control window every time the user moves
+     the frame window, or resizes the frame window, or maximizes the frame
+     window, or minimizes the frame window.  You'll spend a lot of time
+     worrying about focus problems.  Since the popup control window can't
+     have focus when the MDI child frame window has focus, the user will 
+     be confused because they'll not perceive the control as a separate
+     window and won't understand why the caption of the window they have
+     active doesn't show that it is active.
+
+I guess point 2) is moot: if you want the MDI child frame to be hidden, the
+list view will be hidden, too, and the window will never be shown--so the
+user can't possibly minimize it or maximize it or resize it.
+
+>     Is 
+>     it possible to set the m_pMainWnd member of my CWinThread-derived 
+>     class to the MDI child window itself. 
+
+No.  This will result in more ASSERT messages than you could click "Ignore"
+upon in one lifetime.  Threads can only own windows they create.  If you create
+a window in one thread and then make it the main window of another thread,
+you're going to die in a firey crash.  What benefit do you think this hack
+would possibly bring you?
+
+>     This would allow me to use most 
+>     of the standard MDI functionality.
+
+How?  What MDI functionality wouldn't be available to you without
+that change?
+     
+>     Here's a summary representation of what I would like to do:
+     
+>     in CChildFrame (MDI Child)
+>        -> CMDIChildWnd::Create(...)            //base class creation
+>        -> CMyThread pThread = new CMyThread    //allocate and
+>        -> pThread->CreateThread(m_hwnd)        //  create a new thread
+     
+>     in CMyThread::InitInstance
+>        -> m_pMainWnd = m_pParentWnd            //set the mainwnd to
+>                                                // be the MDI child
+
+Why?  It's very hard for me to understand why you would want this.
+     
+>     If there are other samples that pertain to MDI and GUI threads, please 
+>     let me know.  Any suggestions, help is appreciated.
+
+I'm afraid that MTMDI is a very poor sample.  It is so widely misunderstood that
+I think it might be best if would remove it from the product.
+
+You've spent most of the note talking about what you want your window hierarchy
+to be like, and that description confuses me greatly--I can't see any benefit
+from it.  Maybe the problem is that your understanding of the MTMDI sample's
+hierarchy was flawed because you'd never tried cruising through the windows that
+the sample creates with a tool like Spy++.
+
+What you need to focus on when designing with threads is the threads and their
+interaction with the rest of the world. A thread owns a window; a window can
+not be created without an owning thread. You can't change the thread that owns
+a window once it has been created.  I'm not sure what effect you're trying to
+gain by fooling around with the m_pMainWnd of a thread the way you're proposing.
+
+If your application needs to do communications stuff, I would strongly suggest
+that you:
+
+   1) use the primary thread of your application for all of your UI, including
+      the MDI parent frame and all of the MDI children frames _and_ their
+content
+      views.
+
+   2) spawn a thread with each connection you make.  the spawned thread
+might not
+      have a UI, unless it would be convenient to have those threads pop up
+      windows that aren't direct participants in the MDI framework.
+
+   3) when a communications thread notices something interesting happening, it
+      can communicate that fact back to the user interface thread so the update
+      can be relayed to the user.
+
+This is probably the cleanest way to go, though I certainly can't put much
+weight
+behind my own suggestion because you've given esesentially _no_ description of
+exactly what you want the _threads_ in your application to be doing.
+
+(3), above, requires a great deal of attention.  If you're doing communication
+character by character (or, maybe even datagram by datagram) you'll need to find
+a reasonable way for the thread to batch up changes to the state of the
+connection
+before giving them back to the user interface thread.  The UI thread should be
+asked to repaint for every fistful of characters, or maybe even only ever line
+of characters.  You might want to give serious consideration to letting your
+UI thread poll the communications threads rather than letting the communications
+threads fire notifications back to your UI thread--that might make an
+automatically
+scaling application more reasonable than pciking some arbitrary high water
+mark to 
+react to.
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+I'm afraid I've become some sort of speed freak.
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

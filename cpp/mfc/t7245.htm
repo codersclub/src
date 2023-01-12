@@ -1,0 +1,253 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Tooltips for CStatusBar Panes
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Roger Longren -- <A HREF="mailto:rlongren@execpc.com">rlongren@execpc.com</A>
+Wednesday, October 16, 1996
+</B>
+Environment : VC++ 4.0, Win 95
+
+I am trying to utilize tooltips for a single pane in my CStatusBar.  Using
+my method I can get the tooltip to display, but it always displays below
+the center of the entire status bar.  The desired position is near the pane
+for which the tooltip applies.
+
+Here's what I've got:
+
+In my MDI app CMainFrame I've added the following to my message map:
+	ON_NOTIFY_EX_RANGE(TTN_NEEDTEXT, 0, 0xFFFF, OnToolTipNotify).
+
+In my CMainFrame::OnCreate() I've got this:
+	EnableToolTips(TRUE);
+
+I've got a CMainFrame::OnToolTipNotify that looks like this:
+BOOL CMainFrame::OnToolTipNotify( UINT, NMHDR * pNMHDR, LRESULT *) {
+	TOOLTIPTEXT *pTTT = (TOOLTIPTEXT *)pNMHDR;
+    	UINT nID =pNMHDR->idFrom;
+    	if (pTTT->uFlags & TTF_IDISHWND){
+        	UINT nID2 = ::GetDlgCtrlID((HWND)nID);
+        	if(nID2){
+		HWND hwnd = (HWND)m_wndStatusBar.GetSafeHwnd();
+		// Is the tooltip notification for the statusbar?
+		if(hwnd == (HWND) nID){
+			// Get the cursor position
+			POINT point;
+			GetCursorPos(&point);
+			// Determine whether cursor is in the time pane
+			CRect rect;
+		
+m_wndStatusBar.GetItemRect(m_wndStatusBar.CommandToIndex(ID_INDICATOR_TIME),
+&rect);
+			ClientToScreen(&rect);
+			if(rect.left <= point.x && rect.right >= point.x){
+				strcpy(pTTT->szText, "Hello - I am in the time pane");
+				pTTT->hinst = NULL;
+				return TRUE;
+			}
+		}
+        	}
+    }
+    return FALSE;
+}
+
+If anyone has done this successfully before I'd appreciate any tips.
+
+Thanks in advance,
+Roger
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mark Conway -- <A HREF="mailto:mrc@mfltd.co.uk">mrc@mfltd.co.uk</A>
+Thursday, October 17, 1996
+</B>
+[Mini-digest: 2 responses]
+
+I added tooltips to a status bar by deriving from CStatusBar, and
+overriding OnToolHitTest() to return the tooltip string ID's for
+individual panes. You don't really want to override the MFC CFrameWnd
+TTN_NEEDTEXT notification, because it involves copying quite a lot of
+code. 
+
+
+Mark.
+
+
+>----------
+>From: 	Roger Longren[SMTP:rlongren@execpc.com]
+>Sent: 	16 October 1996 14:33
+>To: 	mfc-l@netcom.com
+>Subject: 	Tooltips for CStatusBar Panes
+>
+>Environment : VC++ 4.0, Win 95
+>
+>I am trying to utilize tooltips for a single pane in my CStatusBar.  Using
+>my method I can get the tooltip to display, but it always displays below
+>the center of the entire status bar.  The desired position is near the pane
+>for which the tooltip applies.
+>
+>Here's what I've got:
+>
+>In my MDI app CMainFrame I've added the following to my message map:
+>	ON_NOTIFY_EX_RANGE(TTN_NEEDTEXT, 0, 0xFFFF, OnToolTipNotify).
+>
+>In my CMainFrame::OnCreate() I've got this:
+>	EnableToolTips(TRUE);
+>
+>I've got a CMainFrame::OnToolTipNotify that looks like this:
+>BOOL CMainFrame::OnToolTipNotify( UINT, NMHDR * pNMHDR, LRESULT *) {
+>	TOOLTIPTEXT *pTTT = (TOOLTIPTEXT *)pNMHDR;
+>    	UINT nID =pNMHDR->idFrom;
+>    	if (pTTT->uFlags & TTF_IDISHWND){
+>        	UINT nID2 = ::GetDlgCtrlID((HWND)nID);
+>        	if(nID2){
+>		HWND hwnd = (HWND)m_wndStatusBar.GetSafeHwnd();
+>		// Is the tooltip notification for the statusbar?
+>		if(hwnd == (HWND) nID){
+>			// Get the cursor position
+>			POINT point;
+>			GetCursorPos(&point);
+>			// Determine whether cursor is in the time pane
+>			CRect rect;
+>		
+>m_wndStatusBar.GetItemRect(m_wndStatusBar.CommandToIndex(ID_INDICATOR_TIME),
+>&rect);
+>			ClientToScreen(&rect);
+>			if(rect.left <= point.x && rect.right >= point.x){
+>				strcpy(pTTT->szText, "Hello - I am in the time pane");
+>				pTTT->hinst = NULL;
+>				return TRUE;
+>			}
+>		}
+>        	}
+>    }
+>    return FALSE;
+>}
+>
+>If anyone has done this successfully before I'd appreciate any tips.
+>
+>Thanks in advance,
+>Roger
+>
+>
+>
+>
+-----From: drt@ebt.com (Randy Taylor)
+
+Environment : VC++ 4.0, Win 95
+
+This occurs when you have the tooltip style
+#define TTF_CENTERTIP           0x02
+in effect for your tooltip.
+If it's on, turn it off in your CMainFrame::OnToolTipNotify function like this:
+
+	_AFX_THREAD_STATE* pThreadState = AfxGetThreadState();
+	CToolTipCtrl* pToolTip = pThreadState->m_pToolTip;
+        pToolTip->ModifyStyle(TTF_CENTERTIP,0);
+
+Below is more information for you:
+Your wrote:
+
+>Here's what I've got:
+>
+>In my MDI app CMainFrame I've added the following to my message map:
+>	ON_NOTIFY_EX_RANGE(TTN_NEEDTEXT, 0, 0xFFFF, OnToolTipNotify).
+>
+>In my CMainFrame::OnCreate() I've got this:
+>	EnableToolTips(TRUE);
+>
+>I've got a CMainFrame::OnToolTipNotify that looks like this:
+>BOOL CMainFrame::OnToolTipNotify( UINT, NMHDR * pNMHDR, LRESULT *) {
+>	TOOLTIPTEXT *pTTT = (TOOLTIPTEXT *)pNMHDR;
+>    	UINT nID =pNMHDR->idFrom;
+>    	if (pTTT->uFlags & TTF_IDISHWND){
+>        	UINT nID2 = ::GetDlgCtrlID((HWND)nID);
+>        	if(nID2){
+>		HWND hwnd = (HWND)m_wndStatusBar.GetSafeHwnd();
+>		// Is the tooltip notification for the statusbar?
+>		if(hwnd == (HWND) nID){
+>			// Get the cursor position
+>			POINT point;
+>			GetCursorPos(&point);
+>			// Determine whether cursor is in the time pane
+>			CRect rect;
+>		
+>m_wndStatusBar.GetItemRect(m_wndStatusBar.CommandToIndex(ID_INDICATOR_TIME),
+>&rect);
+
+Is the value returned by your call to CommandToIndex what you expect?
+You may wish to check it.
+
+>			ClientToScreen(&rect);
+>			if(rect.left <= point.x && rect.right >= point.x){
+
+Use the CRect::PtInRect function here. It's better.
+
+>				strcpy(pTTT->szText, "Hello - I am in the time pane");
+>				pTTT->hinst = NULL;
+>				return TRUE;
+>			}
+>		}
+>        	}
+>    }
+>    return FALSE;
+>}
+>
+>If anyone has done this successfully before I'd appreciate any tips.
+>
+>Thanks in advance,
+>Roger
+>
+>
+>
+>
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

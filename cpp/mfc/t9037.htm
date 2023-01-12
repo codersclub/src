@@ -1,0 +1,196 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+MFC collection class CTypedPtrList problem
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Rigeto Zhao -- <A HREF="mailto:rigeto.zhao@gauging.eurotherm.com">rigeto.zhao@gauging.eurotherm.com</A>
+Thursday, January 16, 1997
+</B>
+Environment: MSVC++ 4.2b, WinNT4.0
+
+I am building an application (SDI) that stores the configuration info from a
+dialog box for 4 scanners. i am using CTypedPtrList to store the info about
+each scanner.
+My CScanner class is defined in AppConfigDoc.h file as follow:
+
+//////////////////////////////////////////////////////////////
+// CScanner class
+class CScanner : public CObject
+{
+protected:
+	char*	m_strName;    //scanner name
+	BOOL	CHECK;        //TRUE: scanner is selected
+	CString m_strLineNum;
+public:
+	CScanner(char* szName):m_strName(szName){}
+	CScanner(const CScanner& s):m_strName(s.m_strName){}
+	const CScanner& operator =(const CScanner& s){
+		m_strName=s.m_strName;
+	return *this;
+	}
+
+	BOOL operator ==(const CScanner& s) const
+	{
+		if (m_strName==s.m_strName)
+			return TRUE;
+		else 
+			return FALSE;
+	}
+
+	BOOL operator !=(const CScanner& s) const
+	{
+		return !(*this==s);
+	}
+
+protected:	
+	CScanner();
+	DECLARE_SERIAL(CScanner)
+public:
+	virtual void Serialize(CArchive& ar);
+};
+
+////////////////////////////////////////////////////
+//AppConfigDoc class
+class CAppConfigDoc : public CDocument
+{
+friend class MyDlg;              //my dialog used for input
+..........................
+protected: // create from serialization only
+	
+	char* m_strName;	//@@@ current scanner
+
+//@@@ Attributes
+public:
+	CTypedPtrList <CObList, CScanner*> m_scannerList;
+......................................
+}
+
+//////////////////////////////////////////////////////////////////
+//In MyDlg.cpp
+void MyDlg::OnEumNext() // event handler for the "Next" Button onthe dialog
+{
+	.......................
+	//@@@ store data in a new CScanner object
+	CAppConfigDoc* m_pDoc=GetDoc();
+	if(m_bScan1==TRUE){//var associated w/ dialog check box
+		m_pDoc->m_strName="Scan1";
+		m_pCurScan=m_pDoc->NewScanner(); //see implementation below
+        }
+.......
+}
+
+
+The implementation for NewScanner() is as follow (a member function of
+CAppConfigDoc)
+//////////////////////////////////////////////////////////////
+// 
+CScanner* CAppConfigDoc::NewScanner()
+{
+	CScanner* pScannerItem = new CScanner(m_strName);
+	m_scannerList.AddTail(pScannerItem); // <-------------Error here 
+	SetModifiedFlag();  // Mark the document as having been modified,
+       			    // for purposes of confirming File Close.
+	return pScannerItem;
+
+}
+
+============================================================================
+The program compiles fine but I get an Unhandled exception error right at
+the statement
+        m_scannerList.AddTail(pScannerItem);
+in CAppConfigDoc::NewScanner() function. (see <-------------Error here )
+
+Any idea what is going on?
+Thanks in advance for your help.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:SCS.007@mch.scn.de">SCS.007@mch.scn.de</A>
+Saturday, January 18, 1997
+</B>
+
+I have tried it in MSVC++ 4.0 and NT 4.0 and it works perfectly.
+
+But the documentation says that the function ConstructElements(...) is called.
+
+// Extract from the help files
+
+You should override these functions if their default action is not suitable 
+for your collection class. The default implementation of ConstructElements 
+sets to 0 the memory that is allocated for new elements of the collection; no 
+constructors are called. The default implementation of DestructElements does 
+nothing.
+In general, overriding ConstructElements is necessary whenever the collection 
+stores objects that require a call to a constructor (or other initializing 
+function), or when the objects have members requiring such calls. Overriding 
+DestructElements is necessary when an object requires special action, such as 
+the freeing of memory allocated from the heap, when the object is destroyed.
+For example, you might override ConstructElements for an array of CPerson 
+objects as follows:
+  
+CPerson : public CObject { . . . };
+CArray< CPerson, CPerson& > personArray;
+
+void ConstructElements( CPerson* pNewPersons, int nCount )
+{
+    for ( int i = 0; i < nCount; i++, pNewPersons++ )
+    {
+        // call CPerson default constructor directly
+        new( pNewPersons )CPerson;
+    }
+}
+
+// End of extract.
+
+I haven't overridden this function and yet it works fine for me.... Try 
+stepping thru the AddTail() function and find out where exactly the 
+assertion_failure is coming.
+
+Chandru.
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

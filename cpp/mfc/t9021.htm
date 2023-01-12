@@ -1,0 +1,336 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+OnIdle problem
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Philip Beck -- <A HREF="mailto:splinta@cix.compulink.co.uk">splinta@cix.compulink.co.uk</A>
+Thursday, January 16, 1997
+</B>
+        Environment: VC++ 4.0, Windows 95
+        
+I'm converting a 16 bit mfc app to 32 using visC++ 4.0
+
+If you have version 4.0, try creating an app wizard generated dialog (not 
+doc/view) app with mfc statically linked. Using class wizard add an 
+onIdle() handler to you app class, and put a break point in the default 
+body of the idle handler. 
+
+Shouldn't this break point catch as soon as the app has started ? It 
+doesn't on my setup, but if I create a doc/view app it does ???
+
+Is this a bug in version 4.0 or is there a new way of setting up the 
+onIdle handler :-  ?   The dialog properties has a 'no idle message' 
+switch that looks bugged to me.
+
+Phil.
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Ken Nicolson -- <A HREF="mailto:kenn@owl.co.uk">kenn@owl.co.uk</A>
+Friday, January 17, 1997
+</B>
+[Mini-digest: 4 responses]
+
+On Thu, 16 Jan 97 00:06 GMT0, you wrote:
+
+>        Environment: VC++ 4.0, Windows 95
+>       =20
+>I'm converting a 16 bit mfc app to 32 using visC++ 4.0
+>
+>If you have version 4.0, try creating an app wizard generated dialog =
+(not=20
+>doc/view) app with mfc statically linked. Using class wizard add an=20
+>onIdle() handler to you app class, and put a break point in the default=20
+>body of the idle handler.=20
+>
+>Shouldn't this break point catch as soon as the app has started ? It=20
+>doesn't on my setup, but if I create a doc/view app it does ???
+>
+>Is this a bug in version 4.0 or is there a new way of setting up the=20
+>onIdle handler :-  ?   The dialog properties has a 'no idle message'=20
+>switch that looks bugged to me.
+
+Looking at the source code for v4.2b, WinCore.cpp, Line 3419 in "int
+CWnd::RunModalLoop(DWORD dwFlags)", I see:
+
+// call OnIdle while in bIdle state
+if (!(dwFlags & MLF_NOIDLEMSG) && hWndParent !=3D NULL && lIdleCount =3D=3D=
+ 0)
+{
+   // send WM_ENTERIDLE to the parent
+   ::SendMessage(hWndParent, WM_ENTERIDLE, MSGF_DIALOGBOX, =
+(LPARAM)m_hWnd);
+ }
+
+The dialog window has a parent of NULL, so the idle message is never =
+sent.
+You could create a hidden parent window and capture the OnIdle stuff =
+there.
+
+>Phil.
+
+Ken
+-----From: "Kenneth A. Argo" <argo@rias.COM>
+
+Actually it won't break on a dialog based app.  This is because a dialog =
+app never runs the main message pump so there is never any idle time.  =
+OnIdle() is called when MFC has nothing else to do after trying to =
+retrieve a message from the pump and finding nothing there!
+
+Ken
+
+
+
+----------
+From:  Philip Beck[SMTP:splinta@cix.compulink.co.uk]
+Sent:  Wednesday, January 15, 1997 7:06 PM
+To:  mfc-l@netcom.com
+Cc:  splinta@cix.compulink.co.uk
+Subject:  OnIdle problem
+
+        Environment: VC++ 4.0, Windows 95
+       =20
+I'm converting a 16 bit mfc app to 32 using visC++ 4.0
+
+If you have version 4.0, try creating an app wizard generated dialog =
+(not=20
+doc/view) app with mfc statically linked. Using class wizard add an=20
+onIdle() handler to you app class, and put a break point in the default=20
+body of the idle handler.=20
+
+Shouldn't this break point catch as soon as the app has started ? It=20
+doesn't on my setup, but if I create a doc/view app it does ???
+
+Is this a bug in version 4.0 or is there a new way of setting up the=20
+onIdle handler :-  ?   The dialog properties has a 'no idle message'=20
+switch that looks bugged to me.
+
+Phil.
+
+
+
+
+-----From: Tim Lesher <timl@epix.net>
+
+Look at you application's InitInstance.
+
+When you create a modal dialog-based application using AppWizard, the =
+dialog is created modally in InitInstance, and when it returns, =
+InitInstance returns a value telling the app to just go away.  Thus, the =
+app's main message loop is never called, and the Idle mesages, which are =
+handled in the main message loop, are never processed.
+
+What I did in a similar situation (I was using a CPropertySheet, but the =
+same logic should apply) was to create the dialog dynamically using the =
+new operator, and save the pointer to the dialog in the app's m_pMainWnd =
+variable.  Then create the dialog _modelessly_, instead of modally, =
+return a good value from InitInstance, and make sure you delete the =
+dialog object in your ExitInstance.  It took some tweaking, but this =
+eventually worked for me, and I could use the Idle handling in my =
+dialog.
+
+Good luck!
+
+Tim Lesher
+timl@epix.net
+
+----------
+From: 	Philip Beck[SMTP:splinta@cix.compulink.co.uk]
+Sent: 	Wednesday, January 15, 1997 7:06 PM
+To: 	mfc-l@netcom.com
+Cc: 	splinta@cix.compulink.co.uk
+Subject: 	OnIdle problem
+
+        Environment: VC++ 4.0, Windows 95
+       =20
+I'm converting a 16 bit mfc app to 32 using visC++ 4.0
+
+If you have version 4.0, try creating an app wizard generated dialog =
+(not=20
+doc/view) app with mfc statically linked. Using class wizard add an=20
+onIdle() handler to you app class, and put a break point in the default=20
+body of the idle handler.=20
+
+Shouldn't this break point catch as soon as the app has started ? It=20
+doesn't on my setup, but if I create a doc/view app it does ???
+
+Is this a bug in version 4.0 or is there a new way of setting up the=20
+onIdle handler :-  ?   The dialog properties has a 'no idle message'=20
+switch that looks bugged to me.
+
+Phil.
+
+
+
+
+-----From: Dong Chen <d_chen@ix.netcom.com>
+
+At 12:06 AM 1/16/97 GMT0, you wrote:
+>        Environment: VC++ 4.0, Windows 95
+>        
+>I'm converting a 16 bit mfc app to 32 using visC++ 4.0
+>
+>If you have version 4.0, try creating an app wizard generated dialog (not 
+>doc/view) app with mfc statically linked. Using class wizard add an 
+>onIdle() handler to you app class, and put a break point in the default 
+>body of the idle handler. 
+>
+>Shouldn't this break point catch as soon as the app has started ? It 
+>doesn't on my setup, but if I create a doc/view app it does ???
+>
+>Is this a bug in version 4.0 or is there a new way of setting up the 
+>onIdle handler :-  ?   The dialog properties has a 'no idle message' 
+>switch that looks bugged to me.
+>
+>Phil.
+>
+>
+
+This has been clearly expressed by Paul DiLascia in his C/C++ Q&A column in
+last year June MSJ. Let me know if you can't find a copy of it.
+--
+
+
+Dong
+d_chen@ix.netcom.com
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Joao Marcos Melo Mendes -- <A HREF="mailto:jmmm@megamedia.pt">jmmm@megamedia.pt</A>
+Sunday, January 19, 1997
+</B>
+[Mini-digest: 2 responses]
+
+Hello, 
+
+On Thu, 16 Jan 1997, Philip Beck wrote:
+
+>         Environment: VC++ 4.0, Windows 95
+
+> If you have version 4.0, try creating an app wizard generated dialog (not 
+> doc/view) app with mfc statically linked. Using class wizard add an 
+> onIdle() handler to you app class, and put a break point in the default 
+> body of the idle handler. 
+
+Dialog-based applications don't go through the normal windows message 
+loop. If yo utake a look at your App's InitInstance, you'll see that it 
+calls a DoModal on the dialog box object, then returns FALSE.
+
+Try using OnEnterIdle on your CDialog-based object, it should pretty much 
+do the trick.
+
+I hope this helps.:)
+
+                                        Joao Mendes
+                                        MegaMedia, S.A.
+
+"We're fools to make war on our brothers in arms." - Mark Knopfler
+
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+Version: 2.6.2
+
+mQBNAzKu3TgAAAECAL8+YSEFZ0XrlBMu9t2xDq3rhpWZoscP83VrX5MevAm3UOd6
+fOtDKsJxsWugnVMexo50NfBjeWOHz5nA1b9hYx0ABRG0H0pvYW8gTWVuZGVzIDxq
+bW1tQG1lZ2FtZWRpYS5wdD4=
+=sspP
+-----END PGP PUBLIC KEY BLOCK-----
+
+-----From: pjn@indigo.ie (pjn)
+
+On Thu, 16 Jan 97 00:06 GMT0, you wrote:
+
+>        Environment: VC++ 4.0, Windows 95
+>       =20
+>I'm converting a 16 bit mfc app to 32 using visC++ 4.0
+>
+>If you have version 4.0, try creating an app wizard generated dialog =
+(not=20
+>doc/view) app with mfc statically linked. Using class wizard add an=20
+>onIdle() handler to you app class, and put a break point in the default=20
+>body of the idle handler.=20
+>
+>Shouldn't this break point catch as soon as the app has started ? It=20
+>doesn't on my setup, but if I create a doc/view app it does ???
+>
+>Is this a bug in version 4.0 or is there a new way of setting up the=20
+>onIdle handler :-  ?   The dialog properties has a 'no idle message'=20
+>switch that looks bugged to me.
+>
+>Phil.
+>
+>
+>
+
+Modal Dialogs have a different idle time model. Handle WM_KICKIDLE in
+your dialog class.
+                             '''	  =20
+                             @ @
++=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+ooO-(_)-Ooo=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D+
+|                                           PJ Naughter              |
+|                                                                    |
+| Software Developer                   Email: pjn@indigo.ie          |
+| Softech Telecom                      Tel:   +353-1-2958384         |
+|                                      Fax:   +353-1-2956290         |
+| Author of DTime - A Collection       URL:   <A HREF="http://indigo.ie/~pjn">http://indigo.ie/~pjn</A>  |
+| of Date & Time classes for MFC       Mail:  Cahore,                |
+|            And                              Ballygarret,           |
+| Notpad, the best Notepad clone              Gorey                  |
+| for Windows 95 and NT 4                     Co. Wexford            |
+|                                             Ireland                |
+|                                                                    |
++=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

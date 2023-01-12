@@ -1,0 +1,331 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Name mangling problem for CTreeCtrl::GetItem() in 4.2
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Nicholas Van Wyen -- <A HREF="mailto:VANWYENN@gunet.georgetown.edu">VANWYENN@gunet.georgetown.edu</A>
+Thursday, August 29, 1996
+</B>
+Environment: VC4.2, WinNT4.0 (release)
+
+In MFC 4.0 the BOOL CTreeCtrl::GetItem(TV_ITEM *pItem) const; 
+function mangles to
+?GetItem@CTreeCtrl@@QBEHPAU_TV_ITEMA@@@Z, but in 4.2
+the same function is mangled as
+?GetItem@CTreeCtrl@@QBEHPAUtagTVITEMA@@@Z in the LIB
+file. Using the mangling rules setup by Microsoft the first one is correct
+for the source code that is supplied with 4.2 subscription. Now short of
+recompiling MFC or tagging the structure TV_ITEM does anyone have
+any ideas ? Is there a fix for this in the 4.2a patches ? Is there a 4.2b
+patch that I am not aware of ? Is there an option in the IDE to avoid this
+? Is there a seventh Brady Kid ?
+
+Any help would be greatly appreciated.
+
+Note: This same linking problem will be encountered with
+CHeaderCtrl:GetItem, CListCtrl::GetItem and CTabCtr::GetItem....
+
+I can be e-mailed directly at vanwyenn@gunet.georgetown.edu or (202)
+784 1569, but be aware that any response that I get (either internally or
+externally) will be posted back to the MFC-l list server.
+
+[Moderator's note: I would rather that people just send their answers
+to the list and let it get summarized that way.  It's OK to also
+send the answer to Nicholas.]
+
+Example:
+/* Source */
+void CTestDlg::OnTestButton() 
+{
+	TV_ITEM itemstate;
+
+	itemstate.mask = TVIF_STATE;
+	itemstate.stateMask = TVIS_SELECTED | TVIS_FOCUSED;
+	if (!m_TreeCtrl.GetItem(&itemstate)) { // <<<<< error here
+		TRACE("GetItem function failed !\n");
+		ASSERT(FALSE);
+	}
+}
+
+/* Linker error messages */
+CTestDlg.obj : error LNK2001: unresolved external symbol "public: int
+__thiscall CTreeCtrl::GetItem(struct _TV_ITEMA *)const
+"(?GetItem@CTreeCtrl@@QBEHPAU_TV_ITEMA@@@Z)
+
+Debug/ TestDlg.exe : fatal error LNK1120: 1 unresolved externals
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mast-CBT -- <A HREF="mailto:mast@ibenet.it">mast@ibenet.it</A>
+Tuesday, September 03, 1996
+</B>
+[Mini-digest: 3 responses]
+
+At 05.08 29/08/96 -0500, you wrote:
+>Environment: VC4.2, WinNT4.0 (release)
+>
+>In MFC 4.0 the BOOL CTreeCtrl::GetItem(TV_ITEM *pItem) const; 
+>function mangles to
+>?GetItem@CTreeCtrl@@QBEHPAU_TV_ITEMA@@@Z, but in 4.2
+>the same function is mangled as
+>?GetItem@CTreeCtrl@@QBEHPAUtagTVITEMA@@@Z in the LIB
+>file. Using the mangling rules setup by Microsoft the first one is correct
+>for the source code that is supplied with 4.2 subscription. Now short of
+>recompiling MFC or tagging the structure TV_ITEM does anyone have
+>any ideas ? Is there a fix for this in the 4.2a patches ? Is there a 4.2b
+>patch that I am not aware of ? Is there an option in the IDE to avoid this
+>? Is there a seventh Brady Kid ?
+>
+>Any help would be greatly appreciated.
+>
+>Note: This same linking problem will be encountered with
+>CHeaderCtrl:GetItem, CListCtrl::GetItem and CTabCtr::GetItem....
+>
+>I can be e-mailed directly at vanwyenn@gunet.georgetown.edu or (202)
+>784 1569, but be aware that any response that I get (either internally or
+>externally) will be posted back to the MFC-l list server.
+>
+>[Moderator's note: I would rather that people just send their answers
+>to the list and let it get summarized that way.  It's OK to also
+>send the answer to Nicholas.]
+>
+>Example:
+>/* Source */
+>void CTestDlg::OnTestButton() 
+>{
+>	TV_ITEM itemstate;
+>
+>	itemstate.mask = TVIF_STATE;
+>	itemstate.stateMask = TVIS_SELECTED | TVIS_FOCUSED;
+>	if (!m_TreeCtrl.GetItem(&itemstate)) { // <<<<< error here
+>		TRACE("GetItem function failed !\n");
+>		ASSERT(FALSE);
+>	}
+>}
+>
+>/* Linker error messages */
+>CTestDlg.obj : error LNK2001: unresolved external symbol "public: int
+>__thiscall CTreeCtrl::GetItem(struct _TV_ITEMA *)const
+>"(?GetItem@CTreeCtrl@@QBEHPAU_TV_ITEMA@@@Z)
+>
+>Debug/ TestDlg.exe : fatal error LNK1120: 1 unresolved externals
+>
+>
+
+Hi,
+
+Your code is not correct because I use it without problems.
+Here's the code right :
+
+void CDLGIstruttore::OnSelchangingTreIstruttori(NMHDR* pNMHDR, LRESULT*
+pResult) 
+{
+        ....
+	// Return HTREEITEM information about selected item
+	HTREEITEM IstrSelezionato = m_TreIstruttori.GetSelectedItem();	
+
+	TV_ITEM TreeCtrlIstr;
+
+	TreeCtrlIstr.mask = TVIF_HANDLE | TVIF_PARAM;
+	TreeCtrlIstr.hItem = IstrSelezionato;
+	
+        // Return information about selected item
+	m_TreIstruttori.GetItem(&TreeCtrlIstr);
+        ...
+	
+	*pResult = 0;
+}
+
+You need variable with HTREEITEM structure (IstrSelezionato).
+This variable has used subsequently to read the information of the selected
+item.
+I think that the errors of signalled linker could show that your variable
+(m_TreeCtrl) has been declared like (extern) and you then have forgotten to
+define it in the external module.
+
+Bye
+
+Mast-CBT
+
+-----From: "GoroKhM1" <gorokhm1@SMTP.ATG-NET.COM>
+
+     Here is your code:
+     
+     >void CTestDlg::OnTestButton() 
+     >{
+     >  TV_ITEM itemstate;
+     >  itemstate.mask = TVIF_STATE;
+     >  itemstate.stateMask = TVIS_SELECTED | TVIS_FOCUSED;
+     >  if (!m_TreeCtrl.GetItem(&itemstate)) { // <<<<< error here
+     >    TRACE("GetItem function failed !\n"); ASSERT(FALSE);
+     >  }
+     >}
+     
+     I think the problem is not in GetItem() itself but in m_TreeCtrl.
+     
+     Here are snippets from my program which are working fine in VC 4.2
+     
+     void CMyTreeView::SetItemState(HTREEITEM hItem)
+     {
+       ASSERT(hItem);
+       . . .
+       int iImage;
+       iImage = IMAGE_DATA_DELETED;
+       CTreeCtrl& ctlTree = GetTreeCtrl();
+       TV_ITEM tvi;
+       tvi.hItem = hItem;
+       tvi.mask = TVIF_STATE;
+       tvi.stateMask = TVIS_STATEIMAGEMASK;
+       if (ctlTree.GetItem(&tvi))
+       {
+         tvi.state = INDEXTOSTATEIMAGEMASK(iImage);
+         ctlTree.SetItem(&tvi);
+       }
+     }
+     
+     void CMyTreeView::SomeOperation(...)
+     {
+       CTreeCtrl& ctlTree = GetTreeCtrl();
+       . . .
+       HTREEITEM hItem = (hParent == TVI_ROOT) ? 
+                  ctlTree.GetRootItem() :
+                  ctlTree.GetChildItem(hParent);
+       . . .
+       TV_ITEM tvi;
+       tvi.hItem = hItem;
+       tvi.mask = TVIF_STATE;
+       if (!ctlTree.GetItem(&tvi))
+         return;
+       if (tvi.state & TVIS_EXPANDED)
+         . . .
+     }
+     
+     -Mark
+     
+     MarkG@usa.net
+
+-----From: Nicholas Van Wyen <VANWYENN@gunet.georgetown.edu>
+
+The VC42a patch fixes this and can be found at
+http://www.microsoft.com/visualc/v42/v42tech/v42a/vc42a.htm
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Tuesday, September 03, 1996
+</B>
+At 05:08 AM 8/29/96 -0500, you wrote:
+>Environment: VC4.2, WinNT4.0 (release)
+
+>In MFC 4.0 the BOOL CTreeCtrl::GetItem(TV_ITEM *pItem) const; 
+>function mangles to
+>?GetItem@CTreeCtrl@@QBEHPAU_TV_ITEMA@@@Z, but in 4.2
+>the same function is mangled as
+>?GetItem@CTreeCtrl@@QBEHPAUtagTVITEMA@@@Z in the LIB
+>file.
+
+This is because the parameter types to the function have changed. You
+should examine the COMMCTRL.H file to see what's going on.  The Visual
+C++ 4.2 product shipped with a newer version of the system headers than
+the VC++ 4.0 product did.
+
+>Using the mangling rules setup by Microsoft the first one is correct
+>for the source code that is supplied with 4.2 subscription.
+
+Actually, they're both correct given the different version of COMMCTRL.H
+that ships with each version of the product. The compiler did not change
+its name manging rules [for this kind of function and data types] between 
+the 4.0 and 4.2 release.
+
+>Now short of recompiling MFC or tagging the structure TV_ITEM does
+>anyone have any ideas ?
+
+There's not a problem in MFC--you don't need to recompile anything.  It
+sounds like you have the new (from 4.2) MFC libraries and the old 
+(from 4.0) system headers.  You need to get the new system headers into your
+system and build against those, because that's what MFC 4.2 requires.
+
+Maybe, your machine already has the correct headers.  Maybe you're just pointing
+to the old headers first on your INCLUDE path.
+
+>Is there a fix for this in the 4.2a patches ? Is there a 4.2b
+>patch that I am not aware of ? Is there an option in the IDE to avoid this?
+
+I don't think there's anything to fix in MFC or in VC++.  I think that your
+machine has a configuration or setup problem.
+
+>Is there a seventh Brady Kid?
+
+No.
+
+>Note: This same linking problem will be encountered with
+>CHeaderCtrl:GetItem, CListCtrl::GetItem and CTabCtr::GetItem....
+
+This points squarely at the COMMCTRL.H header.
+
+>[Moderator's note: I would rather that people just send their answers
+>to the list and let it get summarized that way.  It's OK to also
+>send the answer to Nicholas.]
+
+I agree.
+
+>Example:
+[snip]
+>	itemstate.stateMask = TVIS_SELECTED | TVIS_FOCUSED;
+[snip]
+
+You'll find that the new, correct header doesn't include TVIS_FOCUSED. 
+
+.B ekiM
+http://www.nwlink.com/~mikeblas/
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

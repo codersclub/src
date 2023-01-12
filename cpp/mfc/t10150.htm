@@ -1,0 +1,376 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CView::UpdateData causes Debug Assertion
+</B></FONT>
+<BR>
+<PRE>
+<B>
+SOECC01.NUEBEL01 -- <A HREF="mailto:SOECC01.NUEBEL01@ssw.alcoa.com">SOECC01.NUEBEL01@ssw.alcoa.com</A>
+Monday, March 17, 1997
+</B>
+
+
+Environment: NT 4.0, VC 4.2b
+
+Hi!
+
+Scenario: I`m displaying information read from the serial port
+in an edit control of my view (SDI-application).
+
+A seperate thread, that reads the serial port calls the following
+global function, which causes a debug assertion:
+
+void UserCallBack( CString& result, CString& status )
+
+{
+
+
+    CWinApp* pApp;
+    CMyView* pView;
+
+
+
+    // determine current application
+
+
+    pApp = AfxGetApp();
+
+
+
+    // determine current view
+    CMainFrame* pFrame = (CMainFrame*)pApp->m_pMainWnd;
+
+
+    pView = (CMyView*) pFrame->GetActiveView();
+
+    pView->myVar1 = result;
+    pView->myVar2 = status;
+
+
+    pView->UpdateData(FALSE);
+
+
+}
+
+UpdateData should update two edit controls, which are associated with
+myVar1 and myVar2, but this code causes a Debug Assertion.
+
+When calling this function from a button on the view, instead of from a
+separate thread, there is no problem.
+
+Any idea, what is wrong with my code?
+
+Thanks in advance.
+
+-- Markus Nuebel
+
+============================================================================
+  Markus Nuebel                     | voice:  +49 +2921 970-354
+  ALCOA Automotive Structures GmbH  |
+  Overweg 24                        | e-Mail: SOECC01.NUEBEL01@SSW.ALCOA.COM
+  59471 Soest , Germany             | fax:    +49 +2921 970-499
+============================================================================
+
+
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dan Kirby -- <A HREF="mailto:dkirby@accessone.com">dkirby@accessone.com</A>
+Wednesday, March 19, 1997
+</B>
+[Mini-digest: 3 responses]
+
+Hi,
+You never mention what/where the assert is.  I'm guessing the problem is
+due to the fact that you have a secondary thread which is calling the
+callback.  As a result, remember that the CWnd-to-HWnd map is stored on a
+per thread basis in the module thread state.  If any functions references
+this map, you will most likely get an assert.  There may be something else
+going on but you'll need to track down the assert and provide more
+information.
+
+--dan
+
+
+----------
+> From: SOECC01.NUEBEL01 <SOECC01.NUEBEL01@ssw.alcoa.com>
+> To: mfc-l@netcom.com
+> Subject: CView::UpdateData causes Debug Assertion
+> Date: Monday, March 17, 1997 7:47 AM
+> 
+> 
+> 
+> Environment: NT 4.0, VC 4.2b
+> 
+> Hi!
+> 
+> Scenario: I`m displaying information read from the serial port
+> in an edit control of my view (SDI-application).
+> 
+> A seperate thread, that reads the serial port calls the following
+> global function, which causes a debug assertion:
+> 
+> void UserCallBack( CString& result, CString& status )
+> 
+> {
+> 
+> 
+>     CWinApp* pApp;
+>     CMyView* pView;
+> 
+> 
+> 
+>     // determine current application
+> 
+> 
+>     pApp = AfxGetApp();
+> 
+> 
+> 
+>     // determine current view
+>     CMainFrame* pFrame = (CMainFrame*)pApp->m_pMainWnd;
+> 
+> 
+>     pView = (CMyView*) pFrame->GetActiveView();
+> 
+>     pView->myVar1 = result;
+>     pView->myVar2 = status;
+> 
+> 
+>     pView->UpdateData(FALSE);
+> 
+> 
+> }
+> 
+> UpdateData should update two edit controls, which are associated with
+> myVar1 and myVar2, but this code causes a Debug Assertion.
+> 
+> When calling this function from a button on the view, instead of from a
+> separate thread, there is no problem.
+> 
+> Any idea, what is wrong with my code?
+> 
+> Thanks in advance.
+> 
+> -- Markus Nuebel
+> 
+>
+============================================================================
+
+>   Markus Nuebel                     | voice:  +49 +2921 970-354
+>   ALCOA Automotive Structures GmbH  |
+>   Overweg 24                        | e-Mail:
+SOECC01.NUEBEL01@SSW.ALCOA.COM
+>   59471 Soest , Germany             | fax:    +49 +2921 970-499
+>
+============================================================================
+
+> 
+> 
+> 
+> 
+> 
+-----From: Marcel de Vries <marcelv@infosup.nl>
+
+hi,
+
+You're telling that you call this function in onother thread. This is
+causing the problem. It is not posible to acces a CWND from onother
+thread that has not created the window. This is because there is a
+mapping in Thread local storage from a HWND do a CWND object.
+
+This is explaind in the article in the online help.
+I included it here to save your time finding it :
++++++++++++++++++++++++++++++++++++++++++++++
+
+Windows Handle Maps
+
+As a general rule, a thread can access only MFC objects that it created.
+This is because temporary and permanent Windows handle maps are kept in
+thread local storage to ensure protection from simultaneous access from
+multiple threads. For example, a worker thread cannot perform a
+calculation and then call a document's UpdateAllViews member function to
+have the windows that contain views on the new data modified. This will
+have no effect at all, because the map from HWND objects to CWND is
+local to the primary thread. This means that one thread may have a
+mapping from a Windows handle to a C++ object, but another thread may
+map that same handle to a different C++ object. Changes made in one
+thread would not be reflected in the other.
+
+There are several ways around this problem. The first is to pass
+individual handles (such as an HWND) rather than C++ objects to the
+worker thread. The worker thread then adds these objects to its
+temporary map by calling the appropriate FromHandle member function. You
+could also add the object to the thread's permanent map by calling
+Attach, but this should be done only if you are guaranteed that the
+object will exist longer than the thread.
+
+Another method is to create new user-defined messages corresponding to
+the different tasks your worker threads will be performing and post
+these messages to the application's main window using ::PostMessage.
+This method of communication is similar to two different applications
+conversing except that both threads are executing in the same address
+space. 
+
+For more information on handle maps, see Technical Note 3. For more
+information on thread local storage, see Thread Local Storage and Using
+Thread Local Storage in the Win32 Programmer's Reference.
+++++++++++++++++++++++++++++++++++++++++++++++++
+
+>----------
+>From: 	SOECC01.NUEBEL01[SMTP:SOECC01.NUEBEL01@ssw.alcoa.com]
+>Sent: 	Monday, March 17, 1997 4:47 PM
+>To: 	mfc-l@netcom.com
+>Subject: 	CView::UpdateData causes Debug Assertion
+>
+>
+>
+>Environment: NT 4.0, VC 4.2b
+>
+>Hi!
+>
+>Scenario: I`m displaying information read from the serial port
+>in an edit control of my view (SDI-application).
+>
+>A seperate thread, that reads the serial port calls the following
+>global function, which causes a debug assertion:
+>
+>void UserCallBack( CString& result, CString& status )
+>
+>{
+>
+>
+>    CWinApp* pApp;
+>    CMyView* pView;
+>
+>
+>
+>    // determine current application
+>
+>
+>    pApp = AfxGetApp();
+>
+>
+>
+>    // determine current view
+>    CMainFrame* pFrame = (CMainFrame*)pApp->m_pMainWnd;
+>
+>
+>    pView = (CMyView*) pFrame->GetActiveView();
+>
+>    pView->myVar1 = result;
+>    pView->myVar2 = status;
+>
+>
+>    pView->UpdateData(FALSE);
+>
+>
+>}
+>
+>UpdateData should update two edit controls, which are associated with
+>myVar1 and myVar2, but this code causes a Debug Assertion.
+>
+>When calling this function from a button on the view, instead of from a
+>separate thread, there is no problem.
+>
+>Any idea, what is wrong with my code?
+>
+>Thanks in advance.
+>
+>-- Markus Nuebel
+>
+>============================================================================
+>  Markus Nuebel                     | voice:  +49 +2921 970-354
+>  ALCOA Automotive Structures GmbH  |
+>  Overweg 24                        | e-Mail: SOECC01.NUEBEL01@SSW.ALCOA.COM
+>  59471 Soest , Germany             | fax:    +49 +2921 970-499
+>============================================================================
+>
+>
+>
+>
+>
+>
+-----From: Mike Blaszczak <mikeblas@nwlink.com>
+
+At 10:47 3/17/97 EST, SOECC01.NUEBEL01 wrote:
+
+>Environment: NT 4.0, VC 4.2b
+
+>UpdateData should update two edit controls, which are associated with
+>myVar1 and myVar2, but this code causes a Debug Assertion.
+
+>Any idea, what is wrong with my code?
+
+No real idea whatsoever. Since you don't bother to tell us exactly what
+assertion failed, there's no way we can know exactly what problem you're
+experiencing. The assertion message has a line number and a file name
+in it. We'd need that information at a scraping bare minimum. A stack
+trace leading to the point of the assertion would make it much easier
+to answer your question.
+
+>When calling this function from a button on the view, instead of from a
+>separate thread, there is no problem.
+
+Perhaps the problem is simply that you can't do UpdateView() on a view
+that's not owned by the calling thread.  But I can't be sure: since
+you've provided no evidence, this is just a guess.
+
+>Thanks in advance.
+
+Please make me a chocolate shake.  Thanks in advance.
+
+[Moderator's note: Poof!  You're a chocolate shake.  And, you're welcome...]
+
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+These words are my own. I do not speak on behalf of Microsoft.
+       One is too many and a million is not enough.
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+    <A HREF="http://www.digiday.com/mfcpro/joinmfcl.htm">Become an MFC-L member</A>
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

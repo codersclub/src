@@ -1,0 +1,812 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+class CDIBitmap
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Crucial Software -- <A HREF="mailto:crucial@ix.netcom.com">crucial@ix.netcom.com</A>
+Wednesday, April 03, 1996
+</B>
+I have placed the source and documentation to class CDIBitmap on advn.com.
+It's in the uploads directory as of now, to be moved whenever it is.  :-)
+
+[Moderator's note: It's moved to ftp://advn.com/pub/mfc ]
+
+Filename is "CDIBitmap.zip".  You'll need a 32-bit ZIP utility like
+WinZip for Windows 95/NT.
+
+The class is used to load and paint device-independent bitmaps from
+the resource of an executable or DLL.  It assists you in the palettes
+that are present in the bitmap.  The next major revision will include
+support for reading/writing DIB files (ie, .DIB and .BMP files).
+
+Note that if you got an early copy of the .ZIP file from me, you should
+go pick up the new one.  It has corrected documentation, which has also
+been converted to Word format for better viewing.
+
+Many thanks to Brad Pohl who helped with the palette stuff.
+
+--
+Brad Wilson, Crucial Software     crucial@ix.netcom.com    +1 (810) 620-9803
+Custom software engineering services for Microsoft Windows NT and Windows 95
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:MICHAEL@datatree.com">MICHAEL@datatree.com</A>
+Friday, April 05, 1996
+</B>
+[Mini-digest: 4 responses]
+
+>I have placed the source and documentation to class CDIBitmap on advn.com.
+>It's in the uploads directory as of now, to be moved whenever it is.  :-)
+>
+>[Moderator's note: It's moved to ftp://advn.com/pub/mfc ]
+>
+>Filename is "CDIBitmap.zip".  You'll need a 32-bit ZIP utility like
+>WinZip for Windows 95/NT.
+>
+>The class is used to load and paint device-independent bitmaps from
+>the resource of an executable or DLL.  It assists you in the palettes
+>that are present in the bitmap.  The next major revision will include
+>support for reading/writing DIB files (ie, .DIB and .BMP files).
+>
+>Note that if you got an early copy of the .ZIP file from me, you should
+>go pick up the new one.  It has corrected documentation, which has also
+>been converted to Word format for better viewing.
+>
+>Many thanks to Brad Pohl who helped with the palette stuff.
+>
+>--
+>Brad Wilson, Crucial Software     crucial@ix.netcom.com    +1 (810) 620-9803
+>Custom software engineering services for Microsoft Windows NT and Windows 95
+>
+>
+>
+
+Environment: VC++ 4.1 /  Windows 95  / 16 MB memory
+
+Thanks Brad. I look forward to the next release, even though your
+sample code that uses your CDIBitmap class seems to be
+working just fine.
+
+Perhaps together we can create a version that BitBlts from a
+memory device context. You're probably familiar with this method
+of displaying. If not, then the simple explanation is cosmetic in
+nature. Basically the entire screen gets refreshed at once. You're
+probably aware that most Windows programs use this method.
+
+As you may recall, I am displaying a 256-color resource bitmap
+in the client area of my application window.  I spent over a day
+changing the "screen device" approach to a "memory device"
+approach. No changes were made to your  CDIBitmap class.
+
+After it was all said and done I was so disappointed that after all
+that effort I could only get it to work in DEBUG mode.
+
+I've pasted in code from the two approaches below. Sample A uses
+the screen device and Sample B uses the memory.
+
+Any insight you can offer would be greatly appreciated.
+
+Since I feel it's probably a memory allocation issue, I've turned
+ optimization off and tried making several local variables global;
+all to no avail.
+
+===================================================
+SAMPLE A  - SCREEN DEVICE CONTEXT
+===================================================
+// This code works in both Debug and Release versions
+BOOL CMDIClientWnd::OnEraseBkgnd(CDC* pDC) 
+{
+    CDIBitmap bmp;
+    CRect rectBitmap;
+    CRect rectClient;
+    CPalette* pOldPal;
+
+    bmp.LoadDIBitmap((WORD)IDB_CLIENT);
+
+    if (bmp.GetPalette())
+    {
+        pOldPal = pDC->SelectPalette(bmp.GetPalette(), TRUE);
+        pDC->RealizePalette();
+    }
+	
+    rectBitmap.left = 0;
+    rectBitmap.top = 0;
+    rectBitmap.right = bmp.Width();
+    rectBitmap.bottom = bmp.Height();
+
+    GetClientRect(rectClient);
+
+    bmp.PaintDIB(pDC, &rectClient, &rectBitmap);
+
+    if (bmp.GetPalette())
+    {
+        pDC->SelectPalette(pOldPal, TRUE);
+    }
+    return TRUE;
+}
+
+===================================================
+SAMPLE B  - MEMORY DEVICE CONTEXT
+===================================================
+// This code DOES NOT work in theRelease version.
+BOOL CMDIClientWnd::OnEraseBkgnd(CDC* pDC) 
+{
+    CRect rectBitmap;
+    CRect rectClient;
+    CPalette palOld;
+    HBITMAP hBitmap;
+    CDC dcMem;
+
+    GetClientRect(rectClient);
+    hBitmap = CreateCompatibleBitmap(pDC->m_hDC, rectClient.right,
+rectClient.bottom);
+    ASSERT(dcMem.CreateCompatibleDC(pDC));
+
+    ASSERT(SelectObject(dcMem.m_hDC, hBitmap));
+    SetMapMode(dcMem.m_hDC, GetMapMode(dcMem.m_hDC));
+
+    bmp.LoadDIBitmap((WORD)IDB_CLIENT);
+
+    if (bmp.GetPalette())
+    {
+        CPalette* pPal = &palOld;
+        pPal = dcMem.SelectPalette(bmp.GetPalette(), TRUE);
+		dcMem.RealizePalette();
+    }
+	
+    rectBitmap.left = 0;
+    rectBitmap.top = 0;
+    rectBitmap.right = bmp.Width();
+    rectBitmap.bottom = bmp.Height();
+
+    bmp.PaintDIB(&dcMem, &rectClient, &rectBitmap);
+    BITMAP bm;
+    GetObject(hBitmap, sizeof(BITMAP), (LPSTR)&bm);
+
+    BOOL bRet = pDC->BitBlt(0,
+                            0,
+                            bm.bmWidth,
+                            bm.bmHeight,
+                            &dcMem,
+                            0,
+                            0,
+	                        SRCCOPY);
+
+    if (bmp.GetPalette())
+    {
+        pDC->SelectPalette(&palOld, TRUE);
+    }
+    return TRUE;
+}
+
+
+P.S.
+
+Actually I did make one minor change to your CDIBitmap
+class. I removed to ASSERT show below.
+
+// **************************************************************************
+//  CDIBitmap::LoadDIBitmap(LPCTSTR)
+//    Loads a device independent bitmap from a resource (string)
+
+BOOL CDIBitmap::LoadDIBitmap(LPCTSTR lpszResourceName)
+{
+    //  Make sure we don't have one loaded already
+
+//    ASSERT( !IsValid( ));
+    if( IsValid( ))
+        return FALSE;
+
+Moderator:
+
+I added you as a "CC:" when I sent this same e-mail to Brad
+Wilson.
+
+My apologies - my reply should have been to this message
+instead.  Especially if someone, other than Brad, can
+post a solution.
+
+Cheers.
+
+Michael L. Thal
+Data Tree Corporation
+voice: (619) 231-3300
+fax:      (619) 231-3301
+
+-----From: Brad Wilson <crucial@ix.netcom.com>
+
+michael wrote ...
+
+>> Perhaps together we can create a version that BitBlts from a
+>> memory device context.
+
+CDIBitmap :: PaintDIB() works with a memory DC.
+
+>> As you may recall, I am displaying a 256-color resource bitmap
+>> in the client area of my application window.  I spent over a day
+>> changing the "screen device" approach to a "memory device"
+>> approach. No changes were made to your  CDIBitmap class.
+
+And the code sample ...
+
+>>    if (bmp.GetPalette())
+>>    {
+>>        CPalette* pPal = &palOld;
+>>        pPal = dcMem.SelectPalette(bmp.GetPalette(), TRUE);
+>>		dcMem.RealizePalette();
+>>    }
+
+I'm not certain if what I do is the "only" right way to do it, but I
+select the palette into the device DC, then create the compatible DC
+from that.  After I'm done transferring the memory DC into the device
+DC, I select the old palette back in.  But there are other problems
+with the code, so this is a semi-moot point.  Maybe.  :-)
+
+This code made me curious:
+
+>> BOOL CMDIClientWnd::OnEraseBkgnd(CDC* pDC) 
+>> {
+>>    CPalette palOld;
+...
+>>    if (bmp.GetPalette())
+>>    {
+>>        CPalette* pPal = &palOld;
+>>        pPal = pDC -> SelectPalette(bmp.GetPalette(), TRUE);
+>>        pDC -> RealizePalette();
+>>    }
+
+I would change
+
+>>    CPalette palOld;
+
+to
+
+>>    CPalette* palOld;
+
+and change
+
+>>        CPalette* pPal = &palOld;
+>>        pPal = pDC -> SelectPalette(bmp.GetPalette(), TRUE);
+
+to
+
+>>        palOld = pDC -> SelectPalette(bmp.GetPalette(), TRUE);
+
+and change
+
+>>        pDC->SelectPalette(&palOld, TRUE);
+
+to
+
+>>        pDC->SelectPalette(palOld, TRUE);
+
+Your comment here is interesting:
+
+>> P.S.
+>>
+>> Actually I did make one minor change to your CDIBitmap
+>> class. I removed to ASSERT show below.
+...
+>> BOOL CDIBitmap::LoadDIBitmap(LPCTSTR lpszResourceName)
+...
+>>  //    ASSERT( !IsValid( ));
+
+It sounds like you're calling LoadDIBitmap multiple times with the
+same CDIBitmap object (something you're not supposed to do; hence the
+assert).  Further, I noticed that your CDIBitmap is not declared in
+the OnEraseBkgnd funciton; this makes me think you took my advice and
+placed the object as a member of the CMDIClientWnd.
+
+If you did, you should call LoadDIBitmap _once_ in the constructor of
+the object.
+
+So, move
+
+>>    bmp.LoadDIBitmap((WORD)IDB_CLIENT);
+
+to the constructor.
+
+One other thing I noticed, which is why your RELEASE builds fail:
+
+>>    ASSERT(dcMem.CreateCompatibleDC(pDC));
+
+ASSERT is only defined during DEBUG builds.  It results in no code
+during RELEASE builds.  What you really want here is:
+
+>>    VERIFY(dcMem.CreateCompatibleDC(pDC));
+
+This would be my complete function after changes:
+
+--------------------- >8  Cut here  8< ---------------------
+
+BOOL
+CMDIClientWnd :: OnEraseBkgnd
+    (
+    CDC* pDC
+    )
+
+    {
+    CRect rectBitmap;
+    CRect rectClient;
+    HBITMAP hBitmap;
+    CPalette* palOld;
+    CDC dcMem;
+
+    if( bmp.GetPalette( ))
+        {
+        palOld = pDC -> SelectPalette( bmp.GetPalette(), TRUE );
+        pDC -> RealizePalette( );
+        }
+
+    GetClientRect( rectClient );
+    hBitmap = CreateCompatibleBitmap( pDC -> m_hDC,
+                                      rectClient.right,
+                                      rectClient.bottom );
+    VERIFY( dcMem.CreateCompatibleDC( pDC ));
+    VERIFY( SelectObject( dcMem.m_hDC, hBitmap ));
+    SetMapMode( dcMem.m_hDC, GetMapMode( dcMem.m_hDC ));
+
+    rectBitmap.left = 0;
+    rectBitmap.top = 0;
+    rectBitmap.right = bmp.Width();
+    rectBitmap.bottom = bmp.Height();
+
+    bmp.PaintDIB( &dcMem, &rectClient, &rectBitmap );
+    BITMAP bm;
+    GetObject( hBitmap, sizeof( BITMAP ), (LPSTR) &bm );
+
+    BOOL bRet = pDC -> BitBlt( 0,
+                               0,
+                               bm.bmWidth,
+                               bm.bmHeight,
+                               &dcMem,
+                               0,
+                               0,
+                               SRCCOPY );
+
+    if( bmp.GetPalette( ))
+        {
+        pDC -> SelectPalette( palOld, TRUE );
+        }
+
+    return TRUE;
+    }
+
+--------------------- >8  Cut here  8< ---------------------
+
+Good luck!
+Brad
+
+--
+Brad Wilson, Crucial Software     crucial@ix.netcom.com    +1 (810) 620-9803
+Custom software engineering services for Microsoft Windows NT and Windows 95
+
+            "Some may rise by sin; and some, fall by virtue."
+
+-----From: michael <Michael@datatree.com>
+
+
+
+>>> Unfortunately, after I exit OnEraseOnEraseBkgnd
+>>> (with the DIB displayed) my app goes off into
+>>> some MFC black hole and never returns. Eventually
+>>> I get a System warning that I'm running out of system
+>>> resources - so I'm only left with Ctrl-Alt-Del.
+>
+>I have located and fixed this problem.  It only occurs under Win95, which
+>doesn't automatically free resources.  In v1.1 of the CDIBitmap class,
+>you can find this fixed.  I'll let you know when the new changes are
+>available for general consumption.
+>
+>Brad
+>
+
+Environment: VC++ 4.1 /  Windows 95  / 16 MB memory
+
+Thanks Brad. I look forward to the next release, even though your
+sample code that uses your CDIBitmap class seems to be
+working just fine.
+
+Perhaps together we can create a version that BitBlts from a
+memory device context. You're probably familiar with this method
+of displaying. If not, then the simple explanation is cosmetic in
+nature. Basically the entire screen gets refreshed at once. You're
+probably aware that most Windows programs use this method.
+
+As you may recall, I am displaying a 256-color resource bitmap
+in the client area of my application window.  I spent over a day
+changing the "screen device" approach to a "memory device"
+approach. No changes were made to your  CDIBitmap class.
+
+After it was all said and done I was so disappointed that after all
+that effort I could only get it to work in DEBUG mode.
+
+I've pasted in code from the two approaches below. Sample A uses
+the screen device and Sample B uses the memory.
+
+Any insight you can offer would be greatly appreciated.
+
+Since I feel it's probably a memory allocation issue, I've turned
+ optimization off and tried making several local variables global;
+all to no avail.
+
+===================================================
+SAMPLE A  - SCREEN DEVICE CONTEXT
+===================================================
+// This code works in both Debug and Release versions
+BOOL CMDIClientWnd::OnEraseBkgnd(CDC* pDC) 
+{
+    CDIBitmap bmp;
+    CRect rectBitmap;
+    CRect rectClient;
+    CPalette* pOldPal;
+
+    bmp.LoadDIBitmap((WORD)IDB_CLIENT);
+
+    if (bmp.GetPalette())
+    {
+        pOldPal = pDC->SelectPalette(bmp.GetPalette(), TRUE);
+        pDC->RealizePalette();
+    }
+	
+    rectBitmap.left = 0;
+    rectBitmap.top = 0;
+    rectBitmap.right = bmp.Width();
+    rectBitmap.bottom = bmp.Height();
+
+    GetClientRect(rectClient);
+
+    bmp.PaintDIB(pDC, &rectClient, &rectBitmap);
+
+    if (bmp.GetPalette())
+    {
+        pDC->SelectPalette(pOldPal, TRUE);
+    }
+    return TRUE;
+}
+
+===================================================
+SAMPLE B  - MEMORY DEVICE CONTEXT
+===================================================
+// This code DOES NOT work in theRelease version.
+BOOL CMDIClientWnd::OnEraseBkgnd(CDC* pDC) 
+{
+    CRect rectBitmap;
+    CRect rectClient;
+    CPalette palOld;
+    HBITMAP hBitmap;
+    CDC dcMem;
+
+    GetClientRect(rectClient);
+    hBitmap = CreateCompatibleBitmap(pDC->m_hDC, rectClient.right,
+rectClient.bottom);
+    ASSERT(dcMem.CreateCompatibleDC(pDC));
+
+    ASSERT(SelectObject(dcMem.m_hDC, hBitmap));
+    SetMapMode(dcMem.m_hDC, GetMapMode(dcMem.m_hDC));
+
+    bmp.LoadDIBitmap((WORD)IDB_CLIENT);
+
+    if (bmp.GetPalette())
+    {
+        CPalette* pPal = &palOld;
+        pPal = dcMem.SelectPalette(bmp.GetPalette(), TRUE);
+		dcMem.RealizePalette();
+    }
+	
+    rectBitmap.left = 0;
+    rectBitmap.top = 0;
+    rectBitmap.right = bmp.Width();
+    rectBitmap.bottom = bmp.Height();
+
+    bmp.PaintDIB(&dcMem, &rectClient, &rectBitmap);
+    BITMAP bm;
+    GetObject(hBitmap, sizeof(BITMAP), (LPSTR)&bm);
+
+    BOOL bRet = pDC->BitBlt(0,
+                            0,
+                            bm.bmWidth,
+                            bm.bmHeight,
+                            &dcMem,
+                            0,
+                            0,
+	                        SRCCOPY);
+
+    if (bmp.GetPalette())
+    {
+        pDC->SelectPalette(&palOld, TRUE);
+    }
+    return TRUE;
+}
+
+
+P.S.
+
+Actually I did make one minor change to your CDIBitmap
+class. I removed to ASSERT show below.
+
+// **************************************************************************
+//  CDIBitmap::LoadDIBitmap(LPCTSTR)
+//    Loads a device independent bitmap from a resource (string)
+
+BOOL CDIBitmap::LoadDIBitmap(LPCTSTR lpszResourceName)
+{
+    //  Make sure we don't have one loaded already
+
+//    ASSERT( !IsValid( ));
+    if( IsValid( ))
+        return FALSE;
+Michael L. Thal
+Data Tree Corporation
+voice: (619) 231-3300
+fax:      (619) 231-3301
+
+-----From: michael <Michael@datatree.com>
+
+
+
+The key was replacing all ASSERTs with VERIFYs.
+
+Kudos!
+
+
+>
+>
+>michael wrote ...
+>
+>>> Perhaps together we can create a version that BitBlts from a
+>>> memory device context.
+>
+>CDIBitmap :: PaintDIB() works with a memory DC.
+>
+>>> As you may recall, I am displaying a 256-color resource bitmap
+>>> in the client area of my application window.  I spent over a day
+>>> changing the "screen device" approach to a "memory device"
+>>> approach. No changes were made to your  CDIBitmap class.
+>
+>And the code sample ...
+>
+>>>    if (bmp.GetPalette())
+>>>    {
+>>>        CPalette* pPal = &palOld;
+>>>        pPal = dcMem.SelectPalette(bmp.GetPalette(), TRUE);
+>>>		dcMem.RealizePalette();
+>>>    }
+>
+>I'm not certain if what I do is the "only" right way to do it, but I
+>select the palette into the device DC, then create the compatible DC
+>from that.  After I'm done transferring the memory DC into the device
+>DC, I select the old palette back in.  But there are other problems
+>with the code, so this is a semi-moot point.  Maybe.  :-)
+>
+>This code made me curious:
+>
+>>> BOOL CMDIClientWnd::OnEraseBkgnd(CDC* pDC) 
+>>> {
+>>>    CPalette palOld;
+>...
+>>>    if (bmp.GetPalette())
+>>>    {
+>>>        CPalette* pPal = &palOld;
+>>>        pPal = pDC -> SelectPalette(bmp.GetPalette(), TRUE);
+>>>        pDC -> RealizePalette();
+>>>    }
+>
+>I would change
+>
+>>>    CPalette palOld;
+>
+>to
+>
+>>>    CPalette* palOld;
+>
+>and change
+>
+>>>        CPalette* pPal = &palOld;
+>>>        pPal = pDC -> SelectPalette(bmp.GetPalette(), TRUE);
+>
+>to
+>
+>>>        palOld = pDC -> SelectPalette(bmp.GetPalette(), TRUE);
+>
+>and change
+>
+>>>        pDC->SelectPalette(&palOld, TRUE);
+>
+>to
+>
+>>>        pDC->SelectPalette(palOld, TRUE);
+>
+>Your comment here is interesting:
+>
+>>> P.S.
+>>>
+>>> Actually I did make one minor change to your CDIBitmap
+>>> class. I removed to ASSERT show below.
+>...
+>>> BOOL CDIBitmap::LoadDIBitmap(LPCTSTR lpszResourceName)
+>...
+>>>  //    ASSERT( !IsValid( ));
+>
+>It sounds like you're calling LoadDIBitmap multiple times with the
+>same CDIBitmap object (something you're not supposed to do; hence the
+>assert).  Further, I noticed that your CDIBitmap is not declared in
+>the OnEraseBkgnd funciton; this makes me think you took my advice and
+>placed the object as a member of the CMDIClientWnd.
+>
+>If you did, you should call LoadDIBitmap _once_ in the constructor of
+>the object.
+>
+>So, move
+>
+>>>    bmp.LoadDIBitmap((WORD)IDB_CLIENT);
+>
+>to the constructor.
+>
+>One other thing I noticed, which is why your RELEASE builds fail:
+>
+>>>    ASSERT(dcMem.CreateCompatibleDC(pDC));
+>
+>ASSERT is only defined during DEBUG builds.  It results in no code
+>during RELEASE builds.  What you really want here is:
+>
+>>>    VERIFY(dcMem.CreateCompatibleDC(pDC));
+>
+>This would be my complete function after changes:
+>
+>--------------------- >8  Cut here  8< ---------------------
+>
+>BOOL
+>CMDIClientWnd :: OnEraseBkgnd
+>    (
+>    CDC* pDC
+>    )
+>
+>    {
+>    CRect rectBitmap;
+>    CRect rectClient;
+>    HBITMAP hBitmap;
+>    CPalette* palOld;
+>    CDC dcMem;
+>
+>    if( bmp.GetPalette( ))
+>        {
+>        palOld = pDC -> SelectPalette( bmp.GetPalette(), TRUE );
+>        pDC -> RealizePalette( );
+>        }
+>
+>    GetClientRect( rectClient );
+>    hBitmap = CreateCompatibleBitmap( pDC -> m_hDC,
+>                                      rectClient.right,
+>                                      rectClient.bottom );
+>    VERIFY( dcMem.CreateCompatibleDC( pDC ));
+>    VERIFY( SelectObject( dcMem.m_hDC, hBitmap ));
+>    SetMapMode( dcMem.m_hDC, GetMapMode( dcMem.m_hDC ));
+>
+>    rectBitmap.left = 0;
+>    rectBitmap.top = 0;
+>    rectBitmap.right = bmp.Width();
+>    rectBitmap.bottom = bmp.Height();
+>
+>    bmp.PaintDIB( &dcMem, &rectClient, &rectBitmap );
+>    BITMAP bm;
+>    GetObject( hBitmap, sizeof( BITMAP ), (LPSTR) &bm );
+>
+>    BOOL bRet = pDC -> BitBlt( 0,
+>                               0,
+>                               bm.bmWidth,
+>                               bm.bmHeight,
+>                               &dcMem,
+>                               0,
+>                               0,
+>                               SRCCOPY );
+>
+>    if( bmp.GetPalette( ))
+>        {
+>        pDC -> SelectPalette( palOld, TRUE );
+>        }
+>
+>    return TRUE;
+>    }
+>
+>--------------------- >8  Cut here  8< ---------------------
+>
+>Good luck!
+>Brad
+>
+>--
+>Brad Wilson, Crucial Software     crucial@ix.netcom.com    +1 (810) 620-9803
+>Custom software engineering services for Microsoft Windows NT and Windows 95
+>
+>            "Some may rise by sin; and some, fall by virtue."
+>
+>
+>
+Michael L. Thal
+Data Tree Corporation
+voice: (619) 231-3300
+fax:      (619) 231-3301
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+David W. Gillett -- <A HREF="mailto:DGILLETT@expertedge.com">DGILLETT@expertedge.com</A>
+Monday, April 08, 1996
+</B>
+> ===================================================
+> SAMPLE B  - MEMORY DEVICE CONTEXT
+> ===================================================
+> // This code DOES NOT work in theRelease version.
+> BOOL CMDIClientWnd::OnEraseBkgnd(CDC* pDC) 
+> {
+>     CRect rectBitmap;
+>     CRect rectClient;
+>     CPalette palOld;
+>     HBITMAP hBitmap;
+>     CDC dcMem;
+> 
+>     GetClientRect(rectClient);
+>     hBitmap = CreateCompatibleBitmap(pDC->m_hDC, rectClient.right,
+> rectClient.bottom);
+>     ASSERT(dcMem.CreateCompatibleDC(pDC));
+> 
+>     ASSERT(SelectObject(dcMem.m_hDC, hBitmap));
+
+  In release builds, the arguments to ASSERT are never evaluated.  If 
+you can't (or won't) write it so your ASSERT expressions have no 
+crucial side-effects, you should use VERIFY instead.
+
+Dave
+
+
+ 
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

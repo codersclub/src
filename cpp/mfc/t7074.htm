@@ -1,0 +1,431 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Can't override 'new' in DLL
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Graham Mark -- <A HREF="mailto:gam@lanl.gov">gam@lanl.gov</A>
+Friday, October 04, 1996
+</B>
+
+Environment: VC++ 4.2, NT 3.51
+
+I've written a DLL to handle certain kinds of files.  This is an MFC
+extension DLL; my file classes are derived from CFile.
+
+Clients of this DLL ought to be able to create file objects dynamically.
+The naive approach--relying on global 'new' and 'delete'--causes run-time
+errors.  As I understand it, the errors arise because of confusion between
+the DLL's stack and the application's stack.  The solution is supposedly to
+override 'new' and 'delete' in the DLL.
+
+I've done this.  The code compiles fine.  Unfortunately, though, global
+'new' gets called rather than the object's 'new'; and the object's 'delete'
+gets called, not global 'delete'.
+
+Here's some of the code:
+/**************************/
+/**************************/
+// file ntbfile.h
+
+#include "stdafx.h"
+// ...
+
+class AFX_EXT_CLASS CNtbFile : public CFile
+{
+// 'new' and 'delete' not overridden here
+// ...
+};
+
+class AFX_EXT_CLASS CNtbFileIn : public CNtbFile
+{
+public:
+	CNtbFileIn();
+	void *operator new( unsigned int p1, char * p2, size_t  nSize );
+	void operator delete( void *pMem );
+// ...
+};
+
+/**************************/
+// file ntbfile .cpp
+
+#include "stdafx.h"
+#include "ntbfile.h"
+//...
+
+void *CNtbFileIn::operator new( unsigned int p1, char * p2, size_t  nSize )
+{
+// ...
+    return malloc( p1 );
+}
+
+void CNtbFileIn::operator delete( void *pMem )
+{
+    CNtbFileIn *pf = static_cast< CNtbFileIn * >(pMem);
+// ...
+    free( pMem );
+}
+
+/**************************/
+The application has code like
+
+#include "ntbfile.h"
+
+// ...
+
+    CNtbFileIn *pIn = new CNtbFileIn;
+    // ...
+    delete pIn;
+
+/**************************/
+
+When the application (debug compile) is run, the invocation of 'new' goes
+directly to the following routine in file mfc\src\afxmem.cpp:
+
+void* PASCAL
+CObject::operator new(size_t nSize, LPCSTR lpszFileName, int nLine)
+{
+	return ::operator new(nSize, _CLIENT_BLOCK, lpszFileName, nLine);
+}
+
+The call to 'delete' invokes CNtbFileIn::operator delete.  From there it
+gets an assert failure in the C runtime library.
+
+This is making me nuts.  I'd appreciate your suggestions.
+
+Thanks.
+
+
+
+
+--
+Graham Mark
+Los Alamos National Laboratory
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Andrew Dalgleish -- <A HREF="mailto:andrewd@axonet.com.au">andrewd@axonet.com.au</A>
+Monday, October 07, 1996
+</B>
+Graham Mark[SMTP:gam@lanl.gov] wrote:
+>
+
+[snip]
+
+>>
+>>When the application (debug compile) is run, the invocation of 'new' goes
+>>directly to the following routine in file mfc\src\afxmem.cpp:
+>>
+>>void* PASCAL
+>>CObject::operator new(size_t nSize, LPCSTR lpszFileName, int nLine)
+>>{
+>>	return ::operator new(nSize, _CLIENT_BLOCK, lpszFileName, nLine);
+>>}
+
+My first guess is that you still have "#define new DEBUG_NEW" somewhere
+in you code.
+You have two options:
+* do without the file & line tracking by disabling the DEBUG_NEW
+* try defining the debug versions of new & delete in your object.
+
+Regards,
+Andrew Dalgleish
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Les -- <A HREF="mailto:Les.Hill@FMR.Com">Les.Hill@FMR.Com</A>
+Monday, October 07, 1996
+</B>
+[Mini-digest: 2 responses]
+
+Check the signature of your operator new.  The size_t parameter should be 
+first.
+
+Les
+leh@cybercom.net
+
+ ----------
+From: owner-mfc-l
+To: CC71629; A029823
+Subject: Can't override 'new' in DLL
+Date: Monday, October 07, 1996 2:13AM
+
+<<File Attachment: HEADERS.TXT>>
+
+
+Environment: VC++ 4.2, NT 3.51
+
+I've written a DLL to handle certain kinds of files.  This is an MFC
+extension DLL; my file classes are derived from CFile.
+
+Clients of this DLL ought to be able to create file objects dynamically.
+The naive approach--relying on global 'new' and 'delete'--causes run-time
+errors.  As I understand it, the errors arise because of confusion between
+the DLL's stack and the application's stack.  The solution is supposedly to
+override 'new' and 'delete' in the DLL.
+
+I've done this.  The code compiles fine.  Unfortunately, though, global
+'new' gets called rather than the object's 'new'; and the object's 'delete'
+gets called, not global 'delete'.
+
+Here's some of the code:
+/**************************/
+/**************************/
+// file ntbfile.h
+
+#include "stdafx.h"
+// ...
+
+class AFX_EXT_CLASS CNtbFile : public CFile
+{
+// 'new' and 'delete' not overridden here
+// ...
+};
+
+class AFX_EXT_CLASS CNtbFileIn : public CNtbFile
+{
+public:
+        CNtbFileIn();
+        void *operator new( unsigned int p1, char * p2, size_t  nSize );
+        void operator delete( void *pMem );
+// ...
+};
+
+/**************************/
+// file ntbfile .cpp
+
+#include "stdafx.h"
+#include "ntbfile.h"
+//...
+
+void *CNtbFileIn::operator new( unsigned int p1, char * p2, size_t  nSize )
+{
+// ...
+    return malloc( p1 );
+}
+
+void CNtbFileIn::operator delete( void *pMem )
+{
+    CNtbFileIn *pf = static_cast< CNtbFileIn * >(pMem);
+// ...
+    free( pMem );
+}
+
+/**************************/
+The application has code like
+
+#include "ntbfile.h"
+
+// ...
+
+    CNtbFileIn *pIn = new CNtbFileIn;
+    // ...
+    delete pIn;
+
+/**************************/
+
+When the application (debug compile) is run, the invocation of 'new' goes
+directly to the following routine in file mfc\src\afxmem.cpp:
+
+void* PASCAL
+CObject::operator new(size_t nSize, LPCSTR lpszFileName, int nLine)
+{
+        return ::operator new(nSize, _CLIENT_BLOCK, lpszFileName, nLine);
+}
+
+The call to 'delete' invokes CNtbFileIn::operator delete.  From there it
+gets an assert failure in the C runtime library.
+
+This is making me nuts.  I'd appreciate your suggestions.
+
+Thanks.
+
+
+
+
+ --
+Graham Mark
+Los Alamos National Laboratory
+
+-----From: Elliott Kleinrock <ELLIOTT@MAIL35SERVER.FLEXI.COM>
+
+
+Try:
+
+void * FlxPrintForm::operator new(size_t size)
+{
+     // size is the size of the object to be created.
+     // This override of operator new just calls the global new.
+     // The reason it is overridden is to make the call to new in the
+     // same DLL/EXE section as the call to delete (this is only needed
+     // in NT).
+
+     return ::new char[size];
+}
+
+// Deallocate memory for a FlxPrintForm and derived objects.
+void FlxPrintForm::operator delete(void * DeadObject, size_t)
+{
+     // DeadObject is the object to be deleted.
+     // size is the size of the object to be deleted.
+     // This override of operator delete just calls the global delete.
+     // The reason it is overridden is to make the call to new in the
+     // same DLL/EXE section as the call to delete (this is only needed
+     // in NT).
+
+     ::delete [] ((char *)DeadObject);
+}
+
+     Good Luck
+     - Elliott (elliott@flexi.com)
+
+ ----------
+From: owner-mfc-l
+To: mfc-l
+Subject: Can't override 'new' in DLL
+Date: Friday, October 04, 1996 10:33AM
+
+
+Environment: VC++ 4.2, NT 3.51
+
+I've written a DLL to handle certain kinds of files.  This is an MFC
+extension DLL; my file classes are derived from CFile.
+
+Clients of this DLL ought to be able to create file objects dynamically.
+The naive approach--relying on global 'new' and 'delete'--causes run-time
+errors.  As I understand it, the errors arise because of confusion between
+the DLL's stack and the application's stack.  The solution is supposedly to
+override 'new' and 'delete' in the DLL.
+
+I've done this.  The code compiles fine.  Unfortunately, though, global
+'new' gets called rather than the object's 'new'; and the object's 'delete'
+gets called, not global 'delete'.
+
+Here's some of the code:
+/**************************/
+/**************************/
+// file ntbfile.h
+
+#include "stdafx.h"
+// ...
+
+class AFX_EXT_CLASS CNtbFile : public CFile
+{
+// 'new' and 'delete' not overridden here
+// ...
+};
+
+class AFX_EXT_CLASS CNtbFileIn : public CNtbFile
+{
+public:
+        CNtbFileIn();
+        void *operator new( unsigned int p1, char * p2, size_t  nSize );
+        void operator delete( void *pMem );
+// ...
+};
+
+/**************************/
+// file ntbfile .cpp
+
+#include "stdafx.h"
+#include "ntbfile.h"
+//...
+
+void *CNtbFileIn::operator new( unsigned int p1, char * p2, size_t  nSize )
+{
+// ...
+    return malloc( p1 );
+}
+
+void CNtbFileIn::operator delete( void *pMem )
+{
+    CNtbFileIn *pf = static_cast< CNtbFileIn * >(pMem);
+// ...
+    free( pMem );
+}
+
+/**************************/
+The application has code like
+
+#include "ntbfile.h"
+
+// ...
+
+    CNtbFileIn *pIn = new CNtbFileIn;
+    // ...
+    delete pIn;
+
+/**************************/
+
+When the application (debug compile) is run, the invocation of 'new' goes
+directly to the following routine in file mfc\src\afxmem.cpp:
+
+void* PASCAL
+CObject::operator new(size_t nSize, LPCSTR lpszFileName, int nLine)
+{
+        return ::operator new(nSize, _CLIENT_BLOCK, lpszFileName, nLine);
+}
+
+The call to 'delete' invokes CNtbFileIn::operator delete.  From there it
+gets an assert failure in the C runtime library.
+
+This is making me nuts.  I'd appreciate your suggestions.
+
+Thanks.
+
+
+
+
+ --
+Graham Mark
+Los Alamos National Laboratory
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,241 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CHttpFile::ErrorDlg
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Jim McCabe -- <A HREF="mailto:jmccabe@mail.portup.com">jmccabe@mail.portup.com</A>
+Friday, October 11, 1996
+</B>
+Environment:  MSVC 4.2 with first patch, Win95, 24MB RAM, Win95 PPP
+
+I'm having trouble with the CHttpFile::ErrorDlg function.  The TEAR
+sample program uses this function when responding to an authentication
+challenge from a web server, and although undocumented, it seems to be a
+very minimal wrapper for the InternetErrorDlg function.
+
+I am able to access web pages just fine if they don't require
+authentication.  But when I get a HTTP_STATUS_DENIED status code after a
+CHttpFile::SendRequest, I would like to respond with a userid and
+password.  I've already got these stored myself, and would rather not
+even use the dialog UI presented by InternetErrorDlg.  (There is an
+option for that but it produces the same error, which I'll describe in a
+bit.)
+
+Here's my code:
+
+   if (pHttpFile->SendRequest("", 0, pszPost, cchPost))
+   {
+      DWORD  dwStatus = 0;
+      pHttpFile->QueryInfoStatusCode(dwStatus);
+
+      if (dwStatus == HTTP_STATUS_DENIED)
+      {
+          DWORD   dwVal = pHttpFile->ErrorDlg(0,
+                            ERROR_INTERNET_INCORRECT_PASSWORD,
+                            (FLAGS_ERROR_UI_FLAGS_CHANGE_OPTIONS |
+                             FLAGS_ERROR_UI_FLAGS_GENERATE_DATA
+                             /* | FLAGS_ERROR_UI_FLAGS_NO_UI*/ ));
+          if (dwVal == ERROR_INTERNET_FORCE_RETRY)
+             pHttpFile->SendRequest(0, 0, pszPost, cchPost);
+
+          pHttpFile->QueryInfoStatusCode(dwStatus);
+      }
+
+      // Now read the actual data, if successful
+      // ...
+   }
+
+The problem is that in the call to InternetErrorDlg, a
+CInternetException is thrown, with error 126 and context 126.  The error
+string is "The specified module could not be found."  I thought that
+perhaps I needed to link to some special DLL with the error dialog, but
+the TEAR example doesn't seem to do anything like this.  Now my specific
+questions:
+
+a) What usually causes this exception?
+b) If I get rid of the exception and am able to call ErrorDlg without
+   problems, how can I predefine the userid and password so the dialog
+   never appears?  (My app needs to run without user intervention, and
+   I already store the information.  In fact, I even pass the userid and
+   password to GetHttpConnection.)
+
+Thanks for any clues,
+
+Jim
+jmccabe@mail.portup.com
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Sunday, October 13, 1996
+</B>
+At 12:43 10/11/96 -0400, Jim McCabe wrote:
+>Environment:  MSVC 4.2 with first patch, Win95, 24MB RAM, Win95 PPP
+>I'm having trouble with the CHttpFile::ErrorDlg function.  
+
+What's "the first patch"? Do you mean MFC 4.2a?  If so, that's your
+problem--this was a beta and didn't correctly load the
+InternetErrorDlg() import from the golden builds of WININET.DLL.
+
+Specifically, MFC 4.2-flat and MFC 4.2a try to load a routine named
+InternetErrorDlg(), but the final release of WININET.DLL doesn't export
+such a function. Instead, it exports InternetErrorDlgA() and
+InternetErrorDlgW().
+
+(So, maybe you have a build of MFC that correctly tries to load the
+function with the right name, but it can't be found because your machine
+doesn't have a correct version of WININET.DLL properly installed.)
+
+If you're really using MFC 4.2b, you should provide a stack trace showing
+where the exception was thrown... it means there's some other problem,
+as MFC 4.2b fixes the import-name problem.
+
+>a) What usually causes this exception?
+
+The number comes directly from the GetLastError() API, and the error text
+comes directly from the system via FormatMessage() API.  MFC will throw
+a CInternetException with this error code if it can't load a routine
+it needs from a system DLL.
+
+>b) If I get rid of the exception and am able to call ErrorDlg without
+>   problems, how can I predefine the userid and password so the dialog
+>   never appears? 
+
+You need to set them in the header for your request. Information on
+doing this are in the HTTP specification, which you can get from
+<A HREF="http://www.w3.org.">http://www.w3.org.</A>
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+Don't look at my hands: look at my _shoulders_!
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Jim McCabe -- <A HREF="mailto:jmccabe@mail.portup.com">jmccabe@mail.portup.com</A>
+Monday, October 14, 1996
+</B>
+MikeB helped me with my question regarding InternetErrorDlg:
+
+>>Environment:  MSVC 4.2 with first patch, Win95, 24MB RAM, Win95 PPP
+>>I'm having trouble with the CHttpFile::ErrorDlg function.  
+>
+>Specifically, MFC 4.2-flat and MFC 4.2a try to load a routine named
+>InternetErrorDlg(), but the final release of WININET.DLL doesn't export
+>such a function. Instead, it exports InternetErrorDlgA() and
+>InternetErrorDlgW().
+
+Thanks.  I downloaded the 4.2b patch this morning but it didn't install
+a newer WININET.DLL -- mine is dated 8/21/96 and has the older
+InternetErrorDlg() export instead of the newer -W() and -A() exports.
+First I installed the patch for users who already applied 4.2a (I had).
+Then I tried again with the SDK component patch (which was included in
+the first one anyway), thinking I might have missed the new WININET.DLL
+somehow.
+
+When I installed the 4.2b patch, my msvc\include\wininet.h still only
+lists one InternetErrorDlg -- that is, it doesn't show the two versions
+you describe.  My wininet.h is dated 09/06/96, 78840 bytes.
+
+Where can one get this new WININET.DLL?  The latest MS IE 3.0r keeps the
+8/21/96 version, and the latest ActiveX SDK from the MS web site is also
+dated August.
+
+(Not that it matters, but... when I run my program using the new MFC,
+the new MFC detects the lack of InternetErrorDlgA() and bails out
+cleanly.  This is a nice way to handle it.  But now I need to find the
+new WININET.DLL.)
+
+>>b) If I get rid of the exception and am able to call ErrorDlg without
+>>   problems, how can I predefine the userid and password so the dialog
+>>   never appears? 
+>
+>You need to set them in the header for your request. Information on
+>doing this are in the HTTP specification, which you can get from
+><A HREF="http://www.w3.org.">http://www.w3.org.</A>
+
+Actually, after I posted my original message, I changed my code to call
+the non-MFC ::InternetErrorDlg and it automatically used the userid and
+password that were originally passed to GetHttpConnection().  If I then
+resend the request, there is a pause while the network activity begins
+and then I get a successful status code (200):
+
+   if (pHttpFile->SendRequest("", 0, pszPost, cchPost))
+   {
+      DWORD  dwStatus = 0;
+      pHttpFile->QueryInfoStatusCode(dwStatus);
+
+      if (dwStatus == HTTP_STATUS_DENIED)
+      {
+          DWORD   dwVal = ::InternetErrorDlg(0,
+                                ERROR_INTERNET_INCORRECT_PASSWORD,
+                                (FLAGS_ERROR_UI_FLAGS_CHANGE_OPTIONS |
+                                 FLAGS_ERROR_UI_FLAGS_GENERATE_DATA |
+                                 FLAGS_ERROR_UI_FLAGS_NO_UI));
+          if (dwVal == ERROR_INTERNET_FORCE_RETRY)
+             pHttpFile->SendRequest(0, 0, pszPost, cchPost);
+
+          pHttpFile->QueryInfoStatusCode(dwStatus);
+      }
+
+      // Read the file here
+      //...
+   }
+
+
+But when I read the text from the CHttpFile, I get the following message
+instead of the expected HTML file:  "Message from VB/VFP interface:
+fails to read form data from Web server!"  I couldn't find the string
+"VB/VFP" in any of the files (*.*) in my Windows or MSVC directories, so
+I'm assuming it's not an MFC problem but rather something I need to work
+out with the server on the other end.  I just wanted to mention it just
+in case anyone recognizes this kind of message.
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

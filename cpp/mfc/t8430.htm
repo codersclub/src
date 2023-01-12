@@ -1,0 +1,233 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CListCtrl and new COMCTL32.DLL
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Bryan Schilling -- <A HREF="mailto:bchili@execpc.com">bchili@execpc.com</A>
+Wednesday, December 11, 1996
+</B>
+Environment:  Windows 95, VC++ 4.1
+
+We have noticed some different selection behavior using the CListCtrl on machines which 
+have the new version of COMCTL32.DLL (released with IE3.0).
+
+We are using the CListCtrl with the SHOWSELALWAYS style.  When the control loses focus, 
+we expect the background color of the item selected to remain.  With the new control, 
+the color changes when the control loses focus.
+
+	Version 4.0.0.950 (which comes with Windows 95)
+		-- whether the control has focus or not, the selected
+                   item has the color defined as "Selected Items" in
+                   the Windows 95 display properties.
+
+	Version 4.70.1378.1 (first seen with Internet Explorer 3.0)
+		-- when the control has focus, the selected item has
+                   the color defined as "Selected Items" in the
+                   Windows 95 display properties.
+                -- when the control doesn't have focus, the selected
+                   item has the color defined as "3D Objects" in the
+                   Windows 95 display properties.
+
+Is there a way in MFC to stop this behavior experienced with the new DLL or manually 
+handle the painting of the background color for the selected item?
+
+I have noticed several technical support posts that mention various problems this new 
+DLL has with commericial products, so my problem may not be anything that can be fixed, 
+but I was hoping someone might know of a workaround that can support both versions of 
+the DLL.
+
+Also, are there any other behaviors that are different with the new DLL?  Is there a 
+list somewhere that does more than just generally speak of new features - focuses also 
+on how existing apps will be altered?
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+GoroKhM1 -- <A HREF="mailto:gorokhm1@SMTP.ATG-NET.COM">gorokhm1@SMTP.ATG-NET.COM</A>
+Friday, December 13, 1996
+</B>
+[Mini-digest: 2 responses]
+
+     
+I have the same problem. My solution is ugly, but it's working.
+I created new MListCtrl derived from CListCtrl. It's owner drawn.
+The colors are:
+
+void MListCtrl::DrawItem(LPDRAWITEMSTRUCT lpDIS)
+{
+  ...
+
+  // Get item state
+  int iState = GetItemState(lpDIS->itemID, 0xFFFF);
+  BOOL bSelected = (iState & LVIS_SELECTED);
+  BOOL bFocused = (iState & LVIS_FOCUSED);
+
+  if (bSelected || bFocused)  <----- that is the trick
+  {
+    pDC->SetTextColor(::GetSysColor(COLOR_HIGHLIGHTTEXT));
+    pDC->SetBkColor(::GetSysColor(COLOR_HIGHLIGHT));
+  }
+  ...
+}
+
+Unfortunately, the color is minor problem. The big problem, that if
+clicked in CListCtrl window, but outside the items, _no_ items are
+selected. I have to implement a method to return selection to the 
+item with the focus:
+
+int MListCtrl::GetSelItem()
+{
+  // Don't call this method from OnSelChanged() !! <-- ugly restriction
+  // It will cause recursive calls !!
+  int iCount = GetItemCount();
+  if (iCount == 0)
+    return -1;
+
+  int iFocus = 0;
+  for (int i = 0;  i < iCount;  i++)
+  {
+    if (GetItemState(i, LVIS_SELECTED))
+    {
+      if (!GetItemState(i, LVIS_FOCUSED))
+        SetItemState(i, LVIS_FOCUSED, LVIS_FOCUSED);
+      return i;
+    }
+    if (GetItemState(i, LVIS_FOCUSED))
+      iFocus = i;
+  }
+  SetSelItem(iFocus);
+  return iFocus;
+} // MListCtrl::GetSelItem()
+
+
+MarkG@usa.net
+
+______________________________ Reply Separator _________________________________
+Subject: CListCtrl and new COMCTL32.DLL
+Author:  mfc-l@netcom.com at INTERNET
+Date:    12/13/96 3:49 PM
+
+
+Environment:  Windows 95, VC++ 4.1
+     
+We have noticed some different selection behavior using the CListCtrl on 
+machines which 
+have the new version of COMCTL32.DLL (released with IE3.0).
+     
+We are using the CListCtrl with the SHOWSELALWAYS style.  When the control loses
+focus, 
+we expect the background color of the item selected to remain.  With the new 
+control, 
+the color changes when the control loses focus.
+     
+ Version 4.0.0.950 (which comes with Windows 95)
+  -- whether the control has focus or not, the selected
+                   item has the color defined as "Selected Items" in 
+                   the Windows 95 display properties.
+     
+ Version 4.70.1378.1 (first seen with Internet Explorer 3.0)
+  -- when the control has focus, the selected item has
+                   the color defined as "Selected Items" in the 
+                   Windows 95 display properties.
+                -- when the control doesn't have focus, the selected
+                   item has the color defined as "3D Objects" in the 
+                   Windows 95 display properties.
+     
+Is there a way in MFC to stop this behavior experienced with the new DLL or 
+manually 
+handle the painting of the background color for the selected item?
+     
+I have noticed several technical support posts that mention various problems 
+this new 
+DLL has with commericial products, so my problem may not be anything that can be
+fixed, 
+but I was hoping someone might know of a workaround that can support both 
+versions of 
+the DLL.
+     
+Also, are there any other behaviors that are different with the new DLL?  Is 
+there a 
+list somewhere that does more than just generally speak of new features - 
+focuses also 
+on how existing apps will be altered?
+
+-----From: Mike Blaszczak <mikeblas@nwlink.com>
+
+At 08:57 12/11/96 -0600, Bryan Schilling wrote:
+>Environment:  Windows 95, VC++ 4.1
+
+>We have noticed some different selection behavior using the CListCtrl on
+machines which 
+>have the new version of COMCTL32.DLL (released with IE3.0).
+
+>Is there a way in MFC to stop this behavior experienced with the new DLL 
+
+No.
+
+>or manually handle the painting of the background color for the selected item?
+
+Sure.  Make it owner draw.
+
+>I have noticed several technical support posts that mention various
+problems this new 
+>DLL has with commericial products, so my problem may not be anything that
+can be fixed, 
+>but I was hoping someone might know of a workaround that can support both
+versions of 
+>the DLL.
+
+This isn't a bug.  It's "by-design" behaviour.
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>      <-- trip report central!
+95 Honda VFR-750F / 88 Yamaha FZ-700 (damaged) / 94 Mazda RX-7
+Serial #00050!    /      AMA - HRC - VFROC     / Wang Dang Wankel
+         I am bored of this talk. It is time now for the dancing!
+These words are my own - I do not speak on behalf of Microsoft.
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,404 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Again Re & Q : How can I size client precisely ?
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Taehoon Kee -- <A HREF="mailto:keeth@chollian.dacom.co.kr">keeth@chollian.dacom.co.kr</A>
+Thursday, September 26, 1996
+</B>
+Environment : VC++ 4.0, Windows 95
+
+In question "How can I size client precisely ?", I wrote :
+
+>Environment : VC++ 4.0, Windows 95
+>
+>To size a view at wanted size,
+>In my view class's OnInitialUpdate,
+>
+> rect.left   = 100;
+> rect.top    = 100;
+> rect.right  = 200;
+> rect.bottom = 200;
+>
+> AdjustWindowRect( &rect, AfxGetMainWnd()->GetStyle(), TRUE);
+> AfxGetMainWnd()->MoveWindow( rect, TRUE);
+>
+>And then,
+>In OnDraw,
+> I call GetClientRect,
+>
+>The result I wanted was ( 0, 0, 100, 100),
+>BUT the result was -> ( 0, 0,  96,  96) !
+>I guess difference 4 is border's thickness,
+> but I started this app by turning off "Thick Frame".
+>
+>What is wrong ?
+>
+>To size a view at wanted size,
+>I try CalcWindowRect and AdjustWindowRect.
+>But Both were wrong.
+>
+>And in case of adopting ToolBar and/or StatusBar,
+> problems get worse.
+>
+>How can I do it ?
+>
+>Thanks in advance.
+>Taehoon
+
+========================================================================
+AND there were three replys.
+ I thank them for replys.
+
+* Re 1. by Roy G. Browning <ctf@sccsi.com>
+>You sized your rectangle in "logical pixels" and what you got back was in
+>"device pixels". Check out the "LPtoDP()" and "DPtoLP()" functions.
+
+To be honest, I cannot figure out what this means.
+IMHO, all CalWindowRect, AdjustWindowRect, GetClientRect runs on
+MM_TEXT.
+
+* Re 2. by Grigoriev Alexander <grigoriev@pcmail6.nb.rockwell.com>
+>In some source file I have seen the following code:
+>
+> // The windows API AdjustWindowRect (and thus Cwnd::CalcWindowRect) gets its
+> // sums wrong when you have a WS_OVERLAPPED style. The following line gets
+> // around this.
+> AdjustWindowRect( &rectClient, WS_CAPTION|WS_THICKFRAME, TRUE );
+>
+>Note about WS_OVERLAPPED. Your window has such a style.
+
+This helped me. But there are deeper problems, I think.
+
+*Re 3. by ganeshs@nationwide.com
+>Put the CalcWindowRect call in your frame window's OnCreate,
+>then call MoveWindow, and things should be fine.
+>What's happening is, since the View does not have a "frame",
+>CalcWindowRect returns the rect unchanged.
+>So, effectively, you're using the same initial values to size
+>the Frame, not taking the Frame's "frame" into account.
+>
+>For correct View sizing with ToolBars/StatusBars, use RepositionBars
+>with the reposQuery option (again) in your Frame window's OnCreate,
+>passing the View's desired size. Then call MoveWindow with the Rect
+>returned, and RepositionBars again.
+>Check out <A HREF="ftp://ftp.microsoft.com/softlib/mslfiles/DLGCBR32.EXE.">ftp://ftp.microsoft.com/softlib/mslfiles/DLGCBR32.EXE.</A>
+>This program explains the procedure for a Dialog,
+>but the same principle applies.
+
+This reply has 2 part.
+
+Part one is about location of calling CalcWindowRect,
+ but, IMHO, this did not help me.
+Whether I call the func at View or at MainFrame,
+ no differences are made.
+
+Part Two is about adopting ToolBar and/or StatusBar,
+ I will thank him for that comment, though, I did not test yet.
+
+========================================================================
+None of three above gives me a cool answer.
+So, I explored through MFC's source codes.
+
+And then I found some strange looking codes.
+In viewcore.cpp, CalcWindowRect,
+
+    if (nAdjustType != 0)
+    {
+        // allow for special client-edge style
+        ::AdjustWindowRectEx(lpClientRect, 0, FALSE, GetExStyle()); //
+(*)
+
+        // default behavior for in-place editing handles scrollbars
+        DWORD dwStyle = GetStyle();
+        if (dwStyle & WS_VSCROLL)
+        {
+            ... below, omit.
+
+In the above code line which I mark with (*),
+ CalcWindowRect calls AdjustWindowRectEx.
+
+BUT, the parameters are somewhat curious.
+2nd param dwStyle is set to zero,
+ this style must be MainFrame's window style !
+and 3rd param is set to be FALSE,
+ this parameter should designate whether this MainFrame has menu or not.
+
+And after some tests,
+I concluded that this problem was resulted from that lines.
+
+So, instead of building whole MFC DLL variants,
+I solved this by inserting followings into view's OnInitialUpdate,
+
+    DWORD style = AfxGetMainWnd()->GetStyle();
+        // style = GetStyle(); -> wrong
+    DWORD exstyle = GetExStyle();
+        // exstyle = AfxGetMainWnd()->GetExStyle(); -> wrong
+
+    AdjustWindowRectEx( &rectDC, style, TRUE, exstyle);
+
+    AfxGetMainWnd()->MoveWindow( &rectDC, TRUE);
+
+    //GetClientRect( &rectDC);  // for test right or wrong...
+
+*********************************************************************
+If you are using VC++ 4.2,
+LET ME KNOW about 4.2's viewcore.cpp - CalcWindowRect.
+Some changes ?
+*********************************************************************
+
+But, when adopting toolbar and status bar,
+ it still needs to be studied...
+
+Thanks all.
+Taehoon
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Shanku Niyogi -- <A HREF="mailto:shanku@accent.net">shanku@accent.net</A>
+Saturday, September 28, 1996
+</B>
+> From: Taehoon Kee <keeth@chollian.dacom.co.kr>
+> To: mfc-l@netcom.com
+> Subject: Again Re & Q : How can I size client precisely ?
+> Date: Wednesday, September 25, 1996 7:44 PM
+>
+> ...
+> Part one is about location of calling CalcWindowRect,
+>  but, IMHO, this did not help me.
+> Whether I call the func at View or at MainFrame,
+>  no differences are made.
+> 
+
+If you do put the code in OnCreate, and you are having all
+sorts of problems with CalcWindowRect, why not just call
+GetWindowRect and GetClientRect, and add the difference?
+
+	CRect rectClient, rectWindow;
+
+	GetClientRect (&rectClient);
+	GetWindowRect (&rectWindow);
+	rect.left   = 100;
+	rect.top    = 100;
+	rect.right  = 200 + rectWindow.Width () - rectClient.Width ();
+	rect.bottom = 200 + rectWindow.Height () - rectClient.Height ();
+
+It would save a lot of time murking around with CalcWindowRect,
+IMHO.
+
+Regards,
+
+Shanku.
+
+
+=======================================================================
+Shanku S. Niyogi                                                      
+shanku@accent.net
+Etobicoke, Ontario, Canada
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+John Simmons -- <A HREF="mailto:jms@connectnet.com">jms@connectnet.com</A>
+Monday, September 30, 1996
+</B>
+[Mini-digest: 2 responses]
+
+At 01:52 PM 9/28/96 -0400, you wrote:
+>> From: Taehoon Kee <keeth@chollian.dacom.co.kr>
+>> To: mfc-l@netcom.com
+>> Subject: Again Re & Q : How can I size client precisely ?
+>> Date: Wednesday, September 25, 1996 7:44 PM
+>>
+>> ...
+>> Part one is about location of calling CalcWindowRect,
+>>  but, IMHO, this did not help me.
+>> Whether I call the func at View or at MainFrame,
+>>  no differences are made.
+>> 
+>
+>If you do put the code in OnCreate, and you are having all
+>sorts of problems with CalcWindowRect, why not just call
+>GetWindowRect and GetClientRect, and add the difference?
+>
+>	CRect rectClient, rectWindow;
+>
+>	GetClientRect (&rectClient);
+>	GetWindowRect (&rectWindow);
+>	rect.left   = 100;
+>	rect.top    = 100;
+>	rect.right  = 200 + rectWindow.Width () - rectClient.Width ();
+>	rect.bottom = 200 + rectWindow.Height () - rectClient.Height ();
+>
+>It would save a lot of time murking around with CalcWindowRect,
+>IMHO.
+>
+
+The only way I was able to resize an MDI client window was in my derive
+child frame class.  One note of caution - there's a bug in MFC which does
+not show the minimize or close system buttons normally associated with a
+window if you maximize it within the OnCreate() method.  The fastest fix I
+found for this was to set a public flag that indicated whether or not the
+window should come up maximized, and create a function in the child frame
+class which acted on it when called from the OnInitialUpdate() method in the
+view class using the frame.  I've included code from my frame class and the
+view class to illustrate.  It should be fairly simple to make adjustments to
+fit your situation.
+
+Here's the code for the child frame :
+
+//---------------------------------------------------------------------/  
+int CMyMdiFrame::CMDIvp()
+{
+  initially_maximized = FALSE;
+}
+
+//---------------------------------------------------------------------/  
+int CMyMdiFrame::OnCreate(LPCREATESTRUCT lpCreateStruct)
+{
+  if (CMDIChildWnd::OnCreate(lpCreateStruct) == -1)
+    return -1;
+  
+  //resize this window
+  // get the size of the entire window
+  RECT rc;
+  GetWindowRect(&rc);
+  //set the top/left corner
+  // NextWindowPos is a variable I created to track window positions as
+  // new ones are created.
+  rc.left = NextWindowPos.left;
+  rc.top  = NextWindowPos.top;
+  // set the bottom right corner
+  rc.right  = rc.left + 650;
+  rc.bottom = rc.top + 490;
+
+  int cx = GetSystemMetrics(SM_CXSCREEN);
+  if (cx <= 640)
+    initially_maximized = TRUE;
+  else
+  {
+    WINDOWPLACEMENT wnd;
+    wnd.length = sizeof(WINDOWPLACEMENT);
+    if (AfxGetMainWnd()->GetWindowPlacement(&wnd))
+    {
+      int xsize = wnd.rcNormalPosition.right  - wnd.rcNormalPosition.left;
+      int ysize = wnd.rcNormalPosition.bottom - wnd.rcNormalPosition.top;
+      if (xsize <= 680 || ysize <= 520)
+        initially_maximized = TRUE;
+      else
+        MoveWindow(&rc);
+    }
+    else
+      MoveWindow(&rc);
+  }
+  RecalcLayout(); 
+  return 0;
+}
+
+//-----------------------------------------------------------------------/  
+void CMyMdiFrame::SetScenarioID(int id)
+{
+  ScenarioID = id;
+}
+
+//-----------------------------------------------------------------------/  
+void CMyMdiFrame::MaximizeIfNeeded()
+{
+  if (initially_maximized)
+  {
+    ShowWindow(SW_SHOWMAXIMIZED);
+  }
+  initially_maximized = FALSE;
+}
+
+Here's the affected method in the view class :
+
+//----------------------------------------------------------------/
+void CMyView::OnInitialUpdate()
+{
+  CView::OnInitialUpdate();
+  CMDIvp* pFrame = (CMDIvp *)GetParentFrame();	
+  pFrame->MaximizeIfNeeded();
+}
+
+
+/=========================================================\
+| John Simmons (Redneck Techno-Biker)                     |
+|    jms@connectnet.com                                   |
+| Home Page                                               |
+|    www2.connectnet.com/users/jms/                       |
+|---------------------------------------------------------|
+| ViewPlan, Inc. home page (my employer)                  |
+|    www.viewplan.com/index.html                          |
+|---------------------------------------------------------|
+| IGN #12 American Eagle Motorsports Zerex Ford	          |
+|    Teammates - Steve Stevens (#13 Hooters Ford and      |
+|                               1995 IGN Points Champ)    |
+|                Pat Campbell (#14 Dr. Pepper Ford)       |
+| American Eagle Motorsports Team Page                    | 
+|    www2.connectnet.com/users/jms/ignteam                |
+| Hawaii Multi-Player Nickname:  AEMwest                  |
+|---------------------------------------------------------|
+| Competitor - Longest Signature File On The Net          |
+\=========================================================/
+
+-----From: Chris Saunders <saunders@wchat.on.ca>
+
+ I did not see your original posting so I am trying to guess what you are
+after from the subject heading.  If you know precisly the size that you
+want for your client rectangle then you can calculate the size of the
+entire window using the function AdjustWindowRect or AdjustWindowRectEx. 
+You would call one of these in your OnCreate handler and then use the
+returned RECT to size your window.
+
+Regards
+Chris Saunders
+saunders@wchat.on.ca
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

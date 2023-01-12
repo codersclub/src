@@ -1,0 +1,219 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+ON_UPDATE_COMMAND_UI for dynamically created controls on a t
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Jeff S. Shanholtz -- <A HREF="mailto:jshanholtz@worldnet.att.net">jshanholtz@worldnet.att.net</A>
+Wednesday, January 15, 1997
+</B>
+Environment: MSVC 1.52c, Win 95
+
+I have derived from CToolBar in order to add two combo boxes to my toolbar.
+I chose not to use CDialogBar because it's not quite as simple to add
+buttons.
+
+My new toolbar class works fine, but normally if you don't attach an
+ON_UPDATE_COMMAND_UI handler to a control ID, it is disabled. However, in
+this case the combo boxes are enabled. Furthermore, I have found for this
+case that each of my views *must* have a handler (some for enabling and
+some for disabling). If I only have handlers for the views which require
+them to be disabled, then once one of those views becomes active the combo
+boxes stay disabled from then on regardless of which view becomes active.
+
+I know the easiest solution is to just put a handler in each of my view
+classes (enabling in some, disabling in others), but this is not consistent
+with how MFC normally works. I'd rather add code which will cause the combo
+boxes to be automatically disabled if there isn't a handler to enable them.
+That way the code will be more maintenance-friendly. So the question is,
+how does MFC usually disable controls without handlers, and why doesn't it
+happen in this case?
+
+Here's how I'm creating the combo boxes:
+----------------------------------------------------------------
+BOOL CStyleBar::PostCreate(void)
+{
+.....
+// ADD CONTROLS
+.....
+    if(!m_cboxDataSet.Create(CBS_DROPDOWNLIST |
+        WS_VISIBLE, rect, this, IDC_TOOLBAR_DATA_SET))
+    {
+        TRACE("Failed to create combo box\n");
+        return FALSE;
+    }
+.....
+    if(!m_cboxWave.Create(CBS_DROPDOWNLIST |
+        WS_VISIBLE, rect, this, IDC_TOOLBAR_WAVE))
+    {
+        TRACE("Failed to create combo box\n");
+        return FALSE;
+    }
+.....
+    return TRUE;
+}
+----------------------------------------------------------------
+Any ideas? Thanks!
+
+Jeff Shanholtz
+Design Engineer
+----------------------------------
+Enertech Consultants
+www.etc-inc.com
+jshanholtz@msn.com
+----------------------------------
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mark Conway -- <A HREF="mailto:mrc@mfltd.co.uk">mrc@mfltd.co.uk</A>
+Thursday, January 16, 1997
+</B>
+>Environment: MSVC 1.52c, Win 95
+
+Jeff, I encountered this a long time ago. The reason this happens is
+that CControlBar's use the CWnd::UpdateDialogControls() routine to
+update their controls. About halfway down this routine (see wincore.cpp,
+line 3340, VC42b) there's some code and a comment, which causes
+non-button items to be enabled, even if there isn't a command-handler.
+Only certain styles of buttons are disabled if there is no handler.
+
+This is reasonable: If you consider the case of a typical entry
+field/combo box on a dialog bar, then you probably always want users to
+be able to type into it, as it's unlikely to have a command handler
+anyway. It would be far more confusing to auto-disable it - Many more
+people would scream "I put an entry field on a dialog bar, how the
+piggin' heck do I get it enabled, so I can type in it ?", than "Holy
+Cow, it's enabled, but I haven't written any code to enable it yet" . 
+
+MFC doesn't stop you having the behaviour you want, but you have to
+write code to do it. The easiest way is to have an update handler in
+your mainframe or CWinApp to always disable the object, and then
+handlers in those views that respond to it to enable it. This way the
+normal MFC command routing does the job.
+
+Hope this helps
+Mark
+
+
+
+
+
+'ve got an entry field, you want to allow users to be able to type into
+it, even if though there isn't a command-handler for it 
+
+You can probab
+
+   If you put an updatehandler in your mainframe window (or CWinApp),
+which always disables the controls, and then add handlers in the 
+
+  The approach I used to get round this was to put an update handler in
+the CWinApp which disabled the object, and Looking at this code suggests
+than you should be able 
+
+>----------
+>From: 	Jeff S. Shanholtz[SMTP:jshanholtz@worldnet.att.net]
+>Sent: 	15 January 1997 20:14
+>To: 	MFC Discussion List
+>Subject: 	ON_UPDATE_COMMAND_UI for dynamically created controls on a toolbar
+>
+>Environment: MSVC 1.52c, Win 95
+>
+>I have derived from CToolBar in order to add two combo boxes to my toolbar.
+>I chose not to use CDialogBar because it's not quite as simple to add
+>buttons.
+>
+>My new toolbar class works fine, but normally if you don't attach an
+>ON_UPDATE_COMMAND_UI handler to a control ID, it is disabled. However, in
+>this case the combo boxes are enabled. Furthermore, I have found for this
+>case that each of my views *must* have a handler (some for enabling and
+>some for disabling). If I only have handlers for the views which require
+>them to be disabled, then once one of those views becomes active the combo
+>boxes stay disabled from then on regardless of which view becomes active.
+>
+>I know the easiest solution is to just put a handler in each of my view
+>classes (enabling in some, disabling in others), but this is not consistent
+>with how MFC normally works. I'd rather add code which will cause the combo
+>boxes to be automatically disabled if there isn't a handler to enable them.
+>That way the code will be more maintenance-friendly. So the question is,
+>how does MFC usually disable controls without handlers, and why doesn't it
+>happen in this case?
+>
+>Here's how I'm creating the combo boxes:
+>----------------------------------------------------------------
+>BOOL CStyleBar::PostCreate(void)
+>{
+>.....
+>// ADD CONTROLS
+>.....
+>    if(!m_cboxDataSet.Create(CBS_DROPDOWNLIST |
+>        WS_VISIBLE, rect, this, IDC_TOOLBAR_DATA_SET))
+>    {
+>        TRACE("Failed to create combo box\n");
+>        return FALSE;
+>    }
+>.....
+>    if(!m_cboxWave.Create(CBS_DROPDOWNLIST |
+>        WS_VISIBLE, rect, this, IDC_TOOLBAR_WAVE))
+>    {
+>        TRACE("Failed to create combo box\n");
+>        return FALSE;
+>    }
+>.....
+>    return TRUE;
+>}
+>----------------------------------------------------------------
+>Any ideas? Thanks!
+>
+>Jeff Shanholtz
+>Design Engineer
+>----------------------------------
+>Enertech Consultants
+>www.etc-inc.com
+>jshanholtz@msn.com
+>----------------------------------
+>
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

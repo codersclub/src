@@ -1,0 +1,324 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Can the Interface part in an OLE class be overriden?
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Scott Andrew -- <A HREF="mailto:sandrew@west.net">sandrew@west.net</A>
+Tuesday, October 22, 1996
+</B>
+Environment:  VC 4.2b, Win95, NT 4.0     
+
+I have a class defined like so:
+
+class CFTPSitesShellView : public CCmdTarget
+{
+	DECLARE_DYNCREATE(CFTPSitesShellView)
+	DECLARE_INTERFACE_MAP()
+
+
+	CFTPSitesShellView();           // protected constructor used by dynamic
+creation
+
+// Attributes
+public:
+   CFTPSitesShellView(IShellFolder* pShellFolder);
+
+// Operations
+public:
+
+// Overrides
+	// ClassWizard generated virtual function overrides
+	//{{AFX_VIRTUAL(CFTPSitesShellView)
+	public:
+	virtual void OnFinalRelease();
+	//}}AFX_VIRTUAL
+
+// Implementation
+protected:
+
+	virtual ~CFTPSitesShellView();
+
+/*********************** IShellView interfaces ****************/
+BEGIN_INTERFACE_PART(ShellView, IShellView)
+        // *** IOleWindow methods ***
+        STDMETHODIMP GetWindow(HWND * lphwnd);
+        STDMETHODIMP ContextSensitiveHelp(BOOL fEnterMode);
+
+        // *** IShellView methods ***
+        STDMETHODIMP TranslateAccelerator(LPMSG lpmsg);
+    #ifdef _FIX_ENABLEMODELESS_CONFLICT
+        STDMETHODIMP EnableModelessSV(BOOL fEnable);
+    #else
+        STDMETHODIMP EnableModeless(BOOL fEnable);
+    #endif
+        STDMETHODIMP UIActivate(UINT uState);
+        STDMETHODIMP Refresh();
+
+        STDMETHODIMP CreateViewWindow(IShellView  *lpPrevView,
+                                      LPCFOLDERSETTINGS lpfs, 
+                                      IShellBrowser  * psb,
+                                      RECT * prcView, 
+                                      HWND  *phWnd);
+
+        STDMETHODIMP DestroyViewWindow();
+        
+        STDMETHODIMP GetCurrentInfo(LPFOLDERSETTINGS lpfs);
+        STDMETHODIMP AddPropertySheetPages(DWORD dwReserved,
+                                        LPFNADDPROPSHEETPAGE lpfn,
+                                        LPARAM lparam);
+
+        STDMETHODIMP SaveViewState();
+        STDMETHODIMP SelectItem(LPCITEMIDLIST pidlItem, UINT uFlags);
+        
+        STDMETHODIMP GetItemObject(UINT uItem, 
+                                   REFIID riid,
+                                   LPVOID *ppv);
+       
+END_INTERFACE_PART(ShellView)
+
+
+	// Generated message map functions
+	//{{AFX_MSG(CFTPSitesShellView)
+		// NOTE - the ClassWizard will add and remove member functions here.
+	//}}AFX_MSG
+
+	DECLARE_MESSAGE_MAP()
+
+  	IShellFolder* m_pShellFolder;                       // ShellFolder pointer
+	ICommDlgBrowser* m_pCDB;                   // ICommdlgBrowser
+
+	CShellViewWnd* m_pViewWnd   
+	                                           //  listview in the right pane
+	FOLDERSETTINGS m_FolderSettings;
+	IShellBrowser* m_pShellBrowser;
+
+   HWND m_hParentWnd;
+
+   UINT m_uState;
+};
+
+The question I have. Is if I derive from my class. Can I override my
+functions in the the IShellView interface part? If so how do I call back to
+the default implementation? How do I declare the functions? 
+
+Scott Andrew
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Benny -- <A HREF="mailto:blee@filenet.com">blee@filenet.com</A>
+Wednesday, October 23, 1996
+</B>
+[Mini-digest: 2 responses]
+
+
+Nope, that is not possible.
+
+One possible solution is:
+
+class CFTPSitesShellView : public CCmdTarget {
+ protected:
+ virtual STDMETHODIMP GetWindow(HWND * lphwnd);
+ {
+  // base class implementation
+ }
+
+BEGIN_INTERFACE_PART(ShellView, IShellView)
+        // *** IOleWindow methods ***
+        STDMETHODIMP GetWindow(HWND * lphwnd)
+   {
+  METHOD_PROLOGUE(...)
+  return pThis->GetWindow(lphwnd);
+   }
+
+      END_INTERFACE_PART(ShellView)
+};
+
+
+In your derived class, you have
+class Derived : public CFTPSitesShellView {
+ virtual STDMETHODIMP GetWindow(HWND * lphwnd);
+ {
+  // call base class
+  CFTPSitesShellView::GetWindow(lphwnd);
+
+  // .. do your extra stuff here
+ }
+
+};
+
+
+This is the cleanest solution I have found so far.
+
+Benny
+
+ ----------
+From:  Scott Andrew[SMTP:sandrew@west.net]
+Sent:  Tuesday, October 22, 1996 10:14 AM
+To:  mfc-l@netcom.com
+Subject:  Can the Interface part in an OLE class be overriden?
+
+Environment:  VC 4.2b, Win95, NT 4.0
+
+I have a class defined like so:
+
+class CFTPSitesShellView : public CCmdTarget
+{
+ DECLARE_DYNCREATE(CFTPSitesShellView)
+ DECLARE_INTERFACE_MAP()
+
+
+ CFTPSitesShellView();           // protected constructor used by dynamic
+creation
+
+// Attributes
+public:
+   CFTPSitesShellView(IShellFolder* pShellFolder);
+
+// Operations
+public:
+
+// Overrides
+ // ClassWizard generated virtual function overrides
+ //{{AFX_VIRTUAL(CFTPSitesShellView)
+ public:
+ virtual void OnFinalRelease();
+ //}}AFX_VIRTUAL
+
+// Implementation
+protected:
+
+ virtual ~CFTPSitesShellView();
+
+/*********************** IShellView interfaces ****************/
+BEGIN_INTERFACE_PART(ShellView, IShellView)
+        // *** IOleWindow methods ***
+        STDMETHODIMP GetWindow(HWND * lphwnd);
+        STDMETHODIMP ContextSensitiveHelp(BOOL fEnterMode);
+
+        // *** IShellView methods ***
+        STDMETHODIMP TranslateAccelerator(LPMSG lpmsg);
+    #ifdef _FIX_ENABLEMODELESS_CONFLICT
+        STDMETHODIMP EnableModelessSV(BOOL fEnable);
+    #else
+        STDMETHODIMP EnableModeless(BOOL fEnable);
+    #endif
+        STDMETHODIMP UIActivate(UINT uState);
+        STDMETHODIMP Refresh();
+
+        STDMETHODIMP CreateViewWindow(IShellView  *lpPrevView,
+                                      LPCFOLDERSETTINGS lpfs,
+                                      IShellBrowser  * psb,
+                                      RECT * prcView,
+                                      HWND  *phWnd);
+
+        STDMETHODIMP DestroyViewWindow();
+          
+
+        STDMETHODIMP GetCurrentInfo(LPFOLDERSETTINGS lpfs);
+        STDMETHODIMP AddPropertySheetPages(DWORD dwReserved,
+                                        LPFNADDPROPSHEETPAGE lpfn,
+                                        LPARAM lparam);
+
+        STDMETHODIMP SaveViewState();
+        STDMETHODIMP SelectItem(LPCITEMIDLIST pidlItem, UINT uFlags);
+          
+
+        STDMETHODIMP GetItemObject(UINT uItem,
+                                   REFIID riid,
+                                   LPVOID *ppv);
+         
+
+END_INTERFACE_PART(ShellView)
+
+
+ // Generated message map functions
+ //{{AFX_MSG(CFTPSitesShellView)
+  // NOTE - the ClassWizard will add and remove member functions here.
+ //}}AFX_MSG
+
+ DECLARE_MESSAGE_MAP()
+
+   IShellFolder* m_pShellFolder;                       // ShellFolder   
+pointer
+ ICommDlgBrowser* m_pCDB;                   // ICommdlgBrowser
+
+ CShellViewWnd* m_pViewWnd
+                                            //  listview in the right   
+pane
+ FOLDERSETTINGS m_FolderSettings;
+ IShellBrowser* m_pShellBrowser;
+
+   HWND m_hParentWnd;
+
+   UINT m_uState;
+};
+
+The question I have. Is if I derive from my class. Can I override my
+functions in the the IShellView interface part? If so how do I call back   
+to
+the default implementation? How do I declare the functions?
+
+Scott Andrew
+
+-----From: Ian Pepper <Ian@flexicom.ie>
+
+As the functions you want available in the base class are not declared
+virtual you will not be able to call them in a derived class.  Try
+adding the virtual  keyword before each prototype and see if that works
+as is.  Then you may be in with a chance of trying to deriev another
+class.
+
+Hope this is a starting point.
+
+Ian
+
+Ian Pepper, Flexicom Ltd.
+ian@flexicom.ie
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

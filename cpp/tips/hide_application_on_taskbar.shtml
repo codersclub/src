@@ -1,0 +1,106 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как сделать, чтобы некотоpое пpиложение не
+    показывалось в Task Bar, System Tray и в списке по Ctrl+Alt+Del?</h3>
+    <pre>/* Alexey Chubar &amp; Paul Ishenin*/
+#pragma hdrstop
+#include &lt;condefs.h&gt;
+#include &lt;windows.h&gt;
+#include &lt;tlhelp32.h&gt;
+#include &lt;string.h&gt;
+#include &lt;stdlib.h&gt;
+USELIB(&quot;KERNEL32.lib&quot;);
+#pragma argsused
+extern &quot;C&quot; __stdcall DWORD RegisterServiceProcess(DWORD dwProcessID, DWORD
+dwType);
+char * ExtractFilePath(const char *Name)
+{
+ int i = strlen(Name), l = strlen(Name);
+ char *res=&quot;\0&quot;;
+ while ((i &gt; 0)&amp;&amp;(Name[i] != '\\')) i--;
+ if (i)
+ {
+   res = (char *)malloc(l - i);
+   strcpy(res, Name + i + 1);
+   res[l-i-1] = '\0';
+ }
+ return res;
+}
+void HideApp(DWORD dwProcessID)
+{
+ HWND MyHandle = GetTopWindow(0);
+ DWORD WindowProcess;
+ while (MyHandle != NULL)
+ {
+   if ((GetWindowThreadProcessId(MyHandle, &amp;WindowProcess) != 0) &amp;&amp;
+(WindowProcess == dwProcessID))
+   {
+    ShowWindow(MyHandle, SW_HIDE);
+   }
+   MyHandle = GetNextWindow(MyHandle, GW_HWNDNEXT);
+ }
+ RegisterServiceProcess(dwProcessID, 1);
+}
+DWORD __fastcall FindID(const char *FName)
+{
+ HANDLE h;
+ PROCESSENTRY32 p;
+ h=CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS,0);
+ p.dwSize=sizeof(p);
+ if(!Process32First(h,&amp;p))
+  return -1;
+ if(strcmp(strlwr((char *)FName), strlwr(ExtractFilePath(p.szExeFile)))==0)
+ {
+    CloseHandle(h);
+    return p.th32ProcessID;
+  }
+ while(Process32Next(h,&amp;p))
+  if(strcmp(strlwr((char *)FName), strlwr(ExtractFilePath(p.szExeFile)))==0)
+  {
+    CloseHandle(h);
+    return p.th32ProcessID;
+   }
+  CloseHandle(h);
+  return -1;
+}
+int main(int argc, char* argv[])
+{
+  if (argc &gt; 1)
+  {
+   DWORD ProgID=FindID(argv[1]);
+   if(ProgID != (DWORD)-1)
+    HideApp(ProgID);
+   }
+   return 0;
+}
+</pre>
+    <p>или</p>
+    <pre>
+  _asm{
+   mov eax,1
+   push eax
+   dec eax
+   push eax
+   call dword ptr[pRegisterServiceProcess]
+  }
+</pre>
+    <p>А теперь более подробно. Невидимость по Alt-Tab:</p>
+    <pre>
+ var  WnHnd   : Integer;
+ WnHnd := GetWindowLong(Application.Handle, GWL_EXSTYLE);
+ WnHnd := WnHnd or WS_EX_TOOLWINDOW; {Типа Tools-окно}
+ SetWindowLong(Application.Handle, GWL_EXSTYLE, WnHnd);
+</pre>
+    <p>Невидимость в Панели Задач:</p>
+    <pre>
+ ShowWindow[Async](Application.Handle,SW_HIDE)</pre>
+    <p><br>
+    </td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

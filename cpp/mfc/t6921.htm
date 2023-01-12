@@ -1,0 +1,215 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Multiple Documents Without Multiple Documents
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Erik Funkenbusch -- <A HREF="mailto:chucks@isd.net">chucks@isd.net</A>
+Tuesday, September 24, 1996
+</B>
+Environment: VC4.2a, Win95
+
+I've been asked to come up with a unique solution.  I thought i'd toss a
+question out to the list and see if anyone had any ideas on how to solve
+this.
+
+The problem:
+
+The app is an SDI application that has multiple views (using splitter to
+have different view classes attached to the same view) and a single
+document.  This has been implemented and is working fine.
+
+There are 3 panes, a single lower pane, and 2 side by side upper panes. 
+The upper panes can have different views swapped in and out of them based
+on the work being done, the lower pane can also be swapped with several
+views (different views than those available for the upper panes).
+
+Now the problem is that one view is a RichEditView derived class.  I've
+derived my document from CRichEditDoc and removed all the ole client
+overrides (since the view is text only.  a RichEditView was used because of
+the streaming capabilities as well as margin and printing support).  
+
+The reason this is a problem is that it's possible to have 2 RichEditView's
+(with different documents) open in the upper panes at the same time.  Since
+this is an SDI application, the document only supports one file.   I know
+that this is what MDI is intended for, but 99% of the application demands
+SDI, and i'd hate to have to do all the extra handling necessary to make
+this application work as an MDI app.
+
+So, if anyone has any ideas, feel free to shoot them my way.  I'm taking a
+crack at it first thing next week, but it would be nice to hear from
+someone that's already done this (or knows how to do this) so I don't have
+to re-invent the Pizza... ;)
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dave Kolb -- <A HREF="mailto:sasdxk@unx.sas.com">sasdxk@unx.sas.com</A>
+Thursday, September 26, 1996
+</B>
+Actually changing to MDI would not help either with this problem which =
+is that there is a rich edit control in the view and IT owns the data =
+that was streamed into the document/view. I have an MDI app that I would =
+LOVE to have a 2nd/split CRichEditView of the same doc and to coordinate =
+changes made in one view to the other. This just can't be done so I have =
+to just not allow multiple views of the same document. Someone tell me =
+I'm wrong please and there is a way to do this.
+
+Dave Kolb
+PC Research and Development
+SAS Institute Inc.
+919-677-8000 x6827
+
+
+----------
+From: 	Erik Funkenbusch[SMTP:chucks@isd.net]
+Sent: 	Tuesday, September 24, 1996 8:55 PM
+To: 	mfc-l
+Subject: 	Multiple Documents Without Multiple Documents
+
+Environment: VC4.2a, Win95
+
+I've been asked to come up with a unique solution.  I thought i'd toss a
+question out to the list and see if anyone had any ideas on how to solve
+this.
+
+The problem:
+
+The app is an SDI application that has multiple views (using splitter to
+have different view classes attached to the same view) and a single
+document.  This has been implemented and is working fine.
+
+There are 3 panes, a single lower pane, and 2 side by side upper panes.=20
+The upper panes can have different views swapped in and out of them =
+based
+on the work being done, the lower pane can also be swapped with several
+views (different views than those available for the upper panes).
+
+Now the problem is that one view is a RichEditView derived class.  I've
+derived my document from CRichEditDoc and removed all the ole client
+overrides (since the view is text only.  a RichEditView was used because =
+of
+the streaming capabilities as well as margin and printing support). =20
+
+The reason this is a problem is that it's possible to have 2 =
+RichEditView's
+(with different documents) open in the upper panes at the same time.  =
+Since
+this is an SDI application, the document only supports one file.   I =
+know
+that this is what MDI is intended for, but 99% of the application =
+demands
+SDI, and i'd hate to have to do all the extra handling necessary to make
+this application work as an MDI app.
+
+So, if anyone has any ideas, feel free to shoot them my way.  I'm taking =
+a
+crack at it first thing next week, but it would be nice to hear from
+someone that's already done this (or knows how to do this) so I don't =
+have
+to re-invent the Pizza... ;)
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+T.K.Wessing -- <A HREF="mailto:tkw@xs4all.nl">tkw@xs4all.nl</A>
+Tuesday, November 19, 1996
+</B>
+Hi,
+The trick is in the document,
+You can (and I did) actually change the document of one of the panes to an
+other one
+try some thing like this:
+
+void CMySplitter::DestroyDefaultView()
+{
+	CDocument*		pOldDoc ;
+	BOOL			bTmpAutoDelete ;
+
+	pOldDoc = GetPane(DEFCOL, DEFROW)->GetDocument();
+
+	bTmpAutoDelete = pOldDoc->m_bAutoDelete ;
+	pOldDoc->m_bAutoDelete = FALSE ;		// set flag so that document will not 
+							// be deleted when view is destroyed
+	GetPane(DEFCOL, DEFROW)->DestroyWindow();		// Delete existing view ...
+	pOldDoc->m_bAutoDelete = bTmpAutoDelete ;
+}
+
+BOOL CMySplitter::SetRTFView (SIZE size)
+{
+	CCreateContext	context;
+	BOOL			bOK ;
+	CView*			pNewView ;
+
+	// Create new view                      
+	context.m_pNewViewClass		= RUNTIME_CLASS(CRtfView);
+	context.m_pCurrentDoc		= GetRtfViewTemplate()->CreateNewDocument();
+	context.m_pNewDocTemplate		= GetRtfViewTemplate() ;
+	context.m_pLastView			= NULL;
+	context.m_pCurrentFrame		= (CFrameWnd*) this;
+
+	bOK = CreateView(DEFCOL, DEFROW, RUNTIME_CLASS(CRtfView), size, &context);
+	if (!bOK)
+	{
+		return  FALSE ;
+	}
+
+	pNewView = VIEWPANE();
+	pNewView->SendMessage(WM_INITIALUPDATE, 0, 0) ;	// WM_INITIALUPDATE is
+define in afxpriv.h
+	RecalcLayout(); 
+	pNewView->UpdateWindow() ;
+
+	return TRUE;
+}
+
+CMyApp::InitInstance()
+{
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,190 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Help: How to make a DLL's window show modal in a MFC app?
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Mao Zhihong -- <A HREF="mailto:maozhihong@hotmail.com">maozhihong@hotmail.com</A>
+Friday, December 06, 1996
+</B>
+Environment: VC++ 1.52, VC++ 4.0 with patch, Win3.1, Win 95
+
+Dear MFC-Acers,
+  I need help! In my current project, we mixed MFC's codes with Delphi's, 
+that is, we make some DLLs by Delphi, and then call them from MFC app. 
+When I try to make a window(dialog) from DLL show modal, it doesn't work 
+ok: the DLL's windows can not always stay on top, if I click on my app's 
+main window, it will overlap the dll's dialog, but this time the main 
+window is inactive. In Win 95, the DLL's window and my mainframe both 
+appear in the task bar. 
+  my code is like this : 
+  
+  ...
+  extern "C" void ShowDllDialog();
+  ...
+  void CMyView::OnShowDialog()
+  {
+    ::ShowDllDialog();
+    //...
+  }
+  ...
+  
+  I tried to set DLL's dialog's parent to my main window, but this time, 
+both two windows refuse any input!
+  I peeked the windows information by SPY++, and found it nothing differ 
+from a MFC's dialog box.
+  Can any body help me?
+
+				best reguards
+					Robert Mao
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mao Zhihong -- <A HREF="mailto:maozhihong@hotmail.com">maozhihong@hotmail.com</A>
+Friday, December 06, 1996
+</B>
+Mao Zhihong wrote:
+> 
+> Environment: VC++ 1.52, VC++ 4.0 with patch, Win3.1, Win 95
+> 
+> Dear MFC-Acers,
+>   I need help! In my current project, we mixed MFC's codes with Delphi's,
+> that is, we make some DLLs by Delphi, and then call them from MFC app.
+> When I try to make a window(dialog) from DLL show modal, it doesn't work
+> ok: the DLL's windows can not always stay on top, if I click on my app's
+> main window, it will overlap the dll's dialog, but this time the main
+> window is inactive. In Win 95, the DLL's window and my mainframe both
+> appear in the task bar.
+>   my code is like this :
+> 
+>   ...
+>   extern "C" void ShowDllDialog();
+>   ...
+>   void CMyView::OnShowDialog()
+>   {
+>     ::ShowDllDialog();
+>     //...
+>   }
+>   ...
+> 
+>   I tried to set DLL's dialog's parent to my main window, but this time,
+> both two windows refuse any input!
+>   I peeked the windows information by SPY++, and found it nothing differ
+> from a MFC's dialog box.
+>   Can any body help me?
+> 
+>                                 best reguards
+>                                         Robert Mao
+
+Dear friends, 
+  I get the answer myself, maybe it is not the best, but it do 
+effective!
+  firstly, we should know:
+  1. if you want to make a Dialog in DLL show modal, you MUST pass a 
+parent
+  for it, or it can not show modal as you want! (there is a tech notes 
+in 
+  MSDN talk about this)
+  2. When a window show modal, its parent automatically set to toplevel
+  window, though you just passed a parent window handle for it!
+  
+  But sometimes, maybe you can not pass a handle for the DLL, how could 
+u 
+  do this smoothly? (that's just my problem, I still don't know how to 
+  set a HWND as a TForm's parent. :( )
+  ok, the following is my way, it is dirty but really work!
+
+  /* file : mainfrm.h */
+  ...
+  BEGIN_MESSAGE_MAP(CMainFrame, CMDIFrameWnd)
+    	//{{AFX_MSG_MAP(CMainFrame)
+	ON_WM_WINDOWPOSCHANGING()
+	//}}AFX_MSG_MAP
+  END_MESSAGE_MAP()
+  ...
+void CMainFrame::EnableZorder(BOOL b)
+{
+  m_bZorderCanChg = b;
+}
+
+void CMainFrame::OnWindowPosChanging(WINDOWPOS FAR* lpwndpos)
+{
+	CFrameWnd::OnWindowPosChanging(lpwndpos);
+	
+	if (!m_bZorderCanChg) {
+	  lpwndpos->flags |= SWP_NOZORDER; 
+	}
+}
+  ...
+
+  /* file : where you call up the DLL's dialog */
+  ...
+  extern "C" void ShowDllDialog();
+   ...
+   void CMyView::OnShowDialog()
+   { 
+     CMainFrame *pMain = (CMainFrame*)AfxGetMainWnd();
+     pMain->EnableZorder(FALSE);
+     ::ShowDllDialog();  // rem: here will pop a modal dialog
+     pMain->EnableZorder(TRUE);
+     //...
+   }
+   ...
+  
+  Hope this will be helpful for u!
+
+			Best Reguards
+				Mao Zhihong  
+-- 
+ -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+      Mao Zhihong ( Robert Mao )  DreamyRainbow Software Studio
+
+      Voc/Fax : 86-25-5408086
+      E-Mail  : maozhihong@hotmail.com  mao@seu.edu.cn
+      URL     : <A HREF="http://seic3.seu.edu.cn/~mao">http://seic3.seu.edu.cn/~mao</A>
+ -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

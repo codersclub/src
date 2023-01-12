@@ -1,0 +1,227 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Wizard
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Eric Lamontagne -- <A HREF="mailto:ericl@dra.com">ericl@dra.com</A>
+Monday, April 29, 1996
+</B>
+
+VC++ 4.1/ NT 4.0 build 1234
+
+I'm using a CPropertySheet to create a wizard (SetWizardMode()).  I would   
+like to have the <Back, Next> and Finish  buttons availlable at all the   
+time.  My problem is that when I use the functions SetWizardsButtons with   
+PSWIZB_NEXT | PSWIZB_BACK | PSWIZB_FINISH, the Next button is not   
+visible.  How can I make them all visible at the same time?
+
+Thank you.
+
+Eric Lamontagne
+ericl@dra.com  
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+LeRoy Baxter -- <A HREF="mailto:lbaxter@cinfo.com">lbaxter@cinfo.com</A>
+Monday, April 29, 1996
+</B>
+[Mini-digest: 2 responses]
+
+you can't - unless you re-write the Wizard/CPropertySheet.  You can get _either_
+the next button or the finish (without looking at the code, I would suspect that
+Next and Finish are the same button with different labels)
+
+-----From: "David W. Gillett" <DGILLETT@expertedge.com>
+
+  The "Finish" button is basically the "Next" button with a changed 
+caption. 
+
+  I can see two other ways to get the sort of effect that you want.  
+One approach is to coopt one of the other standard buttons (Cancel, 
+Help), setting its text to "Finish" and intercepting it in a derived 
+class.
+  The other approach, also requiring a derived class, is to overload 
+OnCreate() or OnInitDialog to move the "Back" and "Next" buttons, and 
+insert your own "Finish" button.  Again this is handled in the 
+derived class, but this doesn't interfere with any of the other 
+buttons.
+
+  A third approach might be to rethink your user interface to more 
+closely approximate the existing "Wizard" framework.  [Having 
+"Finish" available from every page is not necessarily "bad" -- 
+although apparently it won't work under Win32s -- but it *is* 
+different from every other wizard your users will meet.]
+
+Dave
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Barbara Laird -- <A HREF="mailto:Barbara_Laird@qm.claris.com">Barbara_Laird@qm.claris.com</A>
+Tuesday, April 30, 1996
+</B>
+[Mini-digest: 6 responses]
+
+                      RE>Wizard                                    4/30/96
+
+I ran into this same problem.  What's happening is that the next and back
+buttons are in the exact same location.  So, I changed my OnInitDialog to
+enable, move, and show the buttons so that they are all visible (ID_WIZNEXT,
+ID_WIZBACK, ID_WIZFINISH, and IDCANCEL).  
+-----From: beriksen@cda.com
+
+     The person that said that "The finish button is basically the next 
+     button with a changed caption" is _absoleutely_ wrong.  All three 
+     buttons are there.  (You can find this out by stepping through the 
+     children of the CPropertyPage-derived object.)
+
+-----From: beriksen@cda.com
+
+     It seems that CPropertySheet only allows 2 of the buttons at a time.  
+     Really they're all there, but one of the three is always underneath 
+     the other two.  The way I solved this was to move the buttons on 
+     ::OnInitDialog of the first CPropertyPage-derived object that is added 
+     to the CPropertySheet-derived object using the following code:
+     
+     BOOL CMyPropertyPage::OnInitDialog(void) {
+        CPropertyPage::OnInitDialog();
+        //... other initialization ...
+     
+        ((CPropertySheet*)GetParent())->
+           SetWizardButtons(PSWIZB_NEXT|PSWIZB_FINISH);
+     
+        CWnd *buttonBack = GetParent()->GetDlgItem(ID_WIZBACK);
+        CWnd *buttonNext = GetParent()->GetDlgItem(ID_WIZNEXT);
+     
+        //move around the back and next buttons
+        CRect rectBackButton;
+        buttonBack->GetWindowRect(&rectBackButton);
+        ScreenToClient(&rectBackButton);
+        buttonBack->
+           SetWindowPos(NULL,
+                        rectBackButton.left-rectBackButton.Width(),
+                        rectBackButton.top,
+                        0,
+                        0,
+                        SWP_NOACTIVATE||SWP_NOSIZE||
+                           SWP_NOZORDER||SWP_SHOWWINDOW);
+        buttonNext->
+           SetWindowPos(buttonBack,
+                        rectBackButton.left,
+                        rectBackButton.top,
+                        rectBackButton.Width(),
+                        rectBackButton.Height(),
+                        SWP_NOACTIVATE||SWP_SHOWWINDOW);
+        buttonNext->EnableWindow(TRUE);
+        buttonNext->ShowWindow(SW_SHOW);
+     
+        return(TRUE);
+     }
+     
+The catch with this hack is that you can never call SetWizardButtons again, or 
+else you'll lose what you've done.  You must manually enable/disable/hide/show 
+the buttons with the standard CWnd member functions.
+
+Brian Eriksen
+CDA/Wiesenberger
+beriksen@cda.com
+
+-----From: Jeff_Stong@bio-rad.com
+
+     <<[Having "Finish" available from every page is not necessarily "bad" 
+     -- although apparently it won't work under Win32s -- but it *is* 
+     different from every other wizard your users will meet.] >>
+     
+     Except of course for AppWizard, which uses the very model suggested by 
+     the original poster.
+
+-----From: "David W. Gillett" <DGILLETT@expertedge.com>
+     
+  The "Finish" button is basically the "Next" button with a changed 
+caption. 
+     
+  I can see two other ways to get the sort of effect that you want.  
+One approach is to coopt one of the other standard buttons (Cancel, 
+Help), setting its text to "Finish" and intercepting it in a derived 
+class.
+  The other approach, also requiring a derived class, is to overload 
+OnCreate() or OnInitDialog to move the "Back" and "Next" buttons, and 
+insert your own "Finish" button.  Again this is handled in the 
+derived class, but this doesn't interfere with any of the other 
+buttons.
+     
+  A third approach might be to rethink your user interface to more 
+closely approximate the existing "Wizard" framework.  [Having 
+"Finish" available from every page is not necessarily "bad" -- 
+although apparently it won't work under Win32s -- but it *is* 
+different from every other wizard your users will meet.]
+     
+Dave
+     
+     
+
+-----From: Brad Wilson/Crucial Software <crucial@ix.netcom.com>
+
+>>  A third approach might be to rethink your user interface to more 
+>> closely approximate the existing "Wizard" framework.  [Having 
+>> "Finish" available from every page is not necessarily "bad" -- 
+>> although apparently it won't work under Win32s -- but it *is* 
+>> different from every other wizard your users will meet.]
+
+There are extremely valid reasons for wanting Finish and Next,
+as the Visual C++ team would tell you.  Instead of paging
+through many pages of things you would leave as default,
+simply click Finish to expedite the process.
+
+Why wouldn't it work under Win32s?
+Brad
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

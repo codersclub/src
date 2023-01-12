@@ -1,0 +1,517 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Problems with OnChar for CEdit
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Yoong Hor Meng -- <A HREF="mailto:eng30391@leonis.nus.sg">eng30391@leonis.nus.sg</A>
+Monday, December 09, 1996
+</B>
+	Environment: Windows 3.11, VC++ 1.52
+
+	I am using an edit control which is subclassed with CParseEdit
+which is derived CEdit class. It is able to filter out any character
+depending on the style.  (CParseEdit is in the file
+	mcvc\mfc\samples\ctrltest\paredit.cpp)
+
+	Now, the problem is that CParseEdit's number style
+(PES_NUMBER) does not accept decimal point.  So I modified it as follow
+
+
+// paredit.cpp: C++ derived edit control for numbers/letters etc
+#include "paredit.h"
+
+CParsedEdit::CParsedEdit()
+{
+	m_wParseStyle = 0;
+	m_bDecimalFlag = 0; // No decimal point set yet.
+}
+
+void CParsedEdit::OnChar(UINT nChar, UINT nRepCnt, UINT nFlags)
+{
+	WORD type;
+	if (nChar < 0x20)
+		type = PES_ALL; // always allow control chars
+	else if (nChar == '.')	// I added decimal point.
+	{
+	 	if(!m_bDecimalFlag)
+		{
+			type = PES_NUMBERS;
+			m_bDecimalFlag = 1;
+		}
+		else
+			type = PES_OTHERCHARS;
+	}
+	else if (nChar >= '0' && nChar <= '9')
+		type = PES_NUMBERS;
+	else if (nChar >= 'A' && nChar <= 'Z') // hard coded to english
+		type = PES_LETTERS;
+	else if (nChar >= 'a' && nChar <= 'z')
+		type = PES_LETTERS;
+	else
+		type = PES_OTHERCHARS;
+
+	if (m_wParseStyle & type)
+	{
+		CEdit::OnChar(nChar, nRepCnt, nFlags);  // permitted
+	}
+	else
+	{
+		// illegal character - inform parent
+		OnBadInput();
+	}
+}
+
+	So it can accept decimal point and once it is entered, the class
+does not accept it anymore.  However if the user use backspace or delete
+keys to delete the decimal point, then it cannot accept the decimal again.
+So, I try to get the string that has been typed so far for a particular
+edit control and scan for decimal point whenever the user press backspace 
+and delete.  I read documentation for CEdit, it has a member function
+GetLine which only return the string if the edit control is multiline.
+So I cannot use this method.
+
+	I have an idea in mind, I create a CString varaible inside
+CParseEdit.  It will store the character that has been typed before tab
+and enter keys.  I can then process them.  Is there a better way?
+
+	Another problem is that, whenever the user used ctrl-V (paste)
+command and if the clipboard has valid string, it will be pasted to the
+edit control regardless the style that I have set for the control.  How
+can I intercept it before it is actually displaced.  (Perhaps I disble the
+paste capability for the edit control).
+	
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Rob Manderson -- <A HREF="mailto:robmanderson@unn.unisys.com">robmanderson@unn.unisys.com</A>
+Thursday, December 12, 1996
+</B>
+[Mini-digest: 6 responses]
+
+
+
+
+
+To get the contents of a single line edit control use GetWindowText.  Ie,
+
+void CSomeClass::SomeFunc)
+{
+     CString contents;
+     CParseEdit editControl;
+
+     //   Do things
+     editControl.GetWindowText(contents);
+}
+
+Rob
+
+
+
+To:       mfc-l @ netcom.com
+cc:        (bcc: Rob Manderson/APG/AU/Unisys)
+From:     eng30391 @ leonis.nus.sg
+Date:     09/12/96 14:36:07 ZE8
+Subject:  Problems with OnChar for CEdit
+
+
+
+
+ Environment: Windows 3.11, VC++ 1.52
+
+ I am using an edit control which is subclassed with CParseEdit
+which is derived CEdit class. It is able to filter out any character depending
+on the style.  (CParseEdit is in the file
+ mcvc\mfc\samples\ctrltest\paredit.cpp)
+
+ Now, the problem is that CParseEdit's number style
+(PES_NUMBER) does not accept decimal point.  So I modified it as follow
+
+
+// paredit.cpp: C++ derived edit control for numbers/letters etc
+#include "paredit.h"
+
+CParsedEdit::CParsedEdit()
+{
+ m_wParseStyle = 0;
+ m_bDecimalFlag = 0; // No decimal point set yet.
+}
+
+void CParsedEdit::OnChar(UINT nChar, UINT nRepCnt, UINT nFlags)
+{
+ WORD type;
+ if (nChar < 0x20)
+  type = PES_ALL; // always allow control chars
+ else if (nChar == '.')  // I added decimal point.
+ {
+   if(!m_bDecimalFlag)
+  {
+   type = PES_NUMBERS;
+   m_bDecimalFlag = 1;
+  }
+  else
+   type = PES_OTHERCHARS;
+ }
+ else if (nChar >= '0' && nChar <= '9')
+  type = PES_NUMBERS;
+ else if (nChar >= 'A' && nChar <= 'Z') // hard coded to english
+  type = PES_LETTERS;
+ else if (nChar >= 'a' && nChar <= 'z')
+  type = PES_LETTERS;
+ else
+  type = PES_OTHERCHARS;
+
+ if (m_wParseStyle & type)
+ {
+  CEdit::OnChar(nChar, nRepCnt, nFlags);  // permitted
+ }
+ else
+ {
+  // illegal character - inform parent
+  OnBadInput();
+ }
+}
+
+ So it can accept decimal point and once it is entered, the class
+does not accept it anymore.  However if the user use backspace or delete keys to
+delete the decimal point, then it cannot accept the decimal again. So, I try to
+get the string that has been typed so far for a particular edit control and scan
+for decimal point whenever the user press backspace and delete.  I read
+documentation for CEdit, it has a member function GetLine which only return the
+string if the edit control is multiline.
+So I cannot use this method.
+
+ I have an idea in mind, I create a CString varaible inside
+CParseEdit.  It will store the character that has been typed before tab
+and enter keys.  I can then process them.  Is there a better way?
+
+ Another problem is that, whenever the user used ctrl-V (paste)
+command and if the clipboard has valid string, it will be pasted to the
+edit control regardless the style that I have set for the control.  How
+can I intercept it before it is actually displaced.  (Perhaps I disble the paste
+capability for the edit control).
+
+
+
+
+
+-----From: =?iso-8859-1?Q?Klaus_G=FCtter?= <KG@it-gmbh.de>
+
+1. To get the current text of an edit control, use CWnd::GetWindowText.
+
+2. To check before pasting, you can intercept the WM_PASTE message. At
+least on my system (NT 4.0) this message is also generated when the user
+presses Ctrl+V or Shift-Ins. I'm not quite sure whether is is generated
+on Win 3.11, too (can be easiliy verified using SPY). If not, you will
+have to handle these events in WM_KEYDOWN.
+
+3. You should really not hard-code the dot '.' as decimal separator.
+Depending on the country settings, this character may vary (e.g. comma
+',' in most european countries). You can get the decimal separator from
+the [Int] section in WIN.INI.
+
+- Klaus
+
+>----------
+>Von: 	Anonymous[SMTP:eng30391@leonis.nus.sg]
+>Gesendet: 	Montag, 9. Dezember 1996 07:36
+>An: 	mfc-l@netcom.com
+>Betreff: 	Problems with OnChar for CEdit 
+>
+>	Environment: Windows 3.11, VC++ 1.52
+>
+>	I am using an edit control which is subclassed with CParseEdit
+>which is derived CEdit class. It is able to filter out any character
+>depending on the style.  (CParseEdit is in the file
+>	mcvc\mfc\samples\ctrltest\paredit.cpp)
+>
+>	Now, the problem is that CParseEdit's number style
+>(PES_NUMBER) does not accept decimal point.  So I modified it as follow
+>
+>
+>// paredit.cpp: C++ derived edit control for numbers/letters etc
+>#include "paredit.h"
+>
+>CParsedEdit::CParsedEdit()
+>{
+>	m_wParseStyle = 0;
+>	m_bDecimalFlag = 0; // No decimal point set yet.
+>}
+>
+>void CParsedEdit::OnChar(UINT nChar, UINT nRepCnt, UINT nFlags)
+>{
+>	WORD type;
+>	if (nChar < 0x20)
+>		type = PES_ALL; // always allow control chars
+>	else if (nChar == '.')	// I added decimal point.
+>	{
+>	 	if(!m_bDecimalFlag)
+>		{
+>			type = PES_NUMBERS;
+>			m_bDecimalFlag = 1;
+>		}
+>		else
+>			type = PES_OTHERCHARS;
+>	}
+>	else if (nChar >= '0' && nChar <= '9')
+>		type = PES_NUMBERS;
+>	else if (nChar >= 'A' && nChar <= 'Z') // hard coded to english
+>		type = PES_LETTERS;
+>	else if (nChar >= 'a' && nChar <= 'z')
+>		type = PES_LETTERS;
+>	else
+>		type = PES_OTHERCHARS;
+>
+>	if (m_wParseStyle & type)
+>	{
+>		CEdit::OnChar(nChar, nRepCnt, nFlags);  // permitted
+>	}
+>	else
+>	{
+>		// illegal character - inform parent
+>		OnBadInput();
+>	}
+>}
+>
+>	So it can accept decimal point and once it is entered, the class
+>does not accept it anymore.  However if the user use backspace or delete
+>keys to delete the decimal point, then it cannot accept the decimal again.
+>So, I try to get the string that has been typed so far for a particular
+>edit control and scan for decimal point whenever the user press backspace 
+>and delete.  I read documentation for CEdit, it has a member function
+>GetLine which only return the string if the edit control is multiline.
+>So I cannot use this method.
+>
+>	I have an idea in mind, I create a CString varaible inside
+>CParseEdit.  It will store the character that has been typed before tab
+>and enter keys.  I can then process them.  Is there a better way?
+>
+>	Another problem is that, whenever the user used ctrl-V (paste)
+>command and if the clipboard has valid string, it will be pasted to the
+>edit control regardless the style that I have set for the control.  How
+>can I intercept it before it is actually displaced.  (Perhaps I disble the
+>paste capability for the edit control).
+>	
+>
+>
+-----From: "Doug Brubacher" <Doug_Brubacher@compuware.com>
+
+     Anonymous,
+     
+     CEdit is a CWnd derived class, therefore simply use 
+     CWnd::GetWindowText to get the current contents of the Edit control.
+     
+     Regards,
+     
+     Doug Brubacher
+     DouglasB@msn.com
+
+-----From: joew@statsoft.com (Joe Willcoxson)
+
+
+>and delete.  I read documentation for CEdit, it has a member function
+>GetLine which only return the string if the edit control is multiline.
+>So I cannot use this method.
+
+Ever heard of GetWindowText() ?
+--
+Gloria in excelsius Deo
+Joe Willcoxson (joew@statsoft.com), Senior Software Engineer
+Visit us: <A HREF="http://www.statsoft.com,">http://www.statsoft.com,</A> Visit me: http://users.aol.com/chinajoe
+#define STD_DISCLAIMER "I speak only for myself"
+__cplusplus spoken here;
+
+
+-----From: "Greg Tighe" <gdt@eng.aisinc.com>
+
+Gentle (Anonymous) Reader:
+
+
+> 	Environment: Windows 3.11, VC++ 1.52
+> 
+> So, I try to get the string that has been typed so far for a particular
+> edit control and scan for decimal point whenever the user press backspace 
+> and delete.  I read documentation for CEdit, it has a member function
+> GetLine which only return the string if the edit control is multiline.
+> So I cannot use this method.
+> 
+
+Since edit controls are windows, you can call the GetWindowText() 
+method to get the current edit control string.  (Note that in your 
+OnChar() method the returned string will *not* include the char you 
+are currently handling unless you call the base class OnChar() method 
+first.)
+
+	-Greg Tighe
+	Applied Intelligent Systems, Inc.
+	Ann Arbor, MI
+	gdt@aisinc.com
+-----From: "Dmitry A. Dulepov" <dima@samsung.msk.su>
+
+        [Mailer: "Groupware E-Mail". Version 1.02.048]
+
+
+
+1. Backspace is a '\b' key (VK_BACK)
+2. Paste can be made through WM_PASTE message, otherwise in OnChar =
+look for 'v' (or 'V') for nChar and for "GetKeyState(VK_CONTROL) < =
+0" to trap Control key (how about Shift+Ins ? -- too many ways to p=
+aste...).
+3. Do not forget about VK_DELETE.
+
+In both these cases use GetWindowText() for edit control and search=
+ for the '.'. Use CString form of GetWindowText(), and CString::Fin=
+d() to find the '.'.
+
+
+Dmitry A. Dulepov
+Samsung Electronics Co., Ltd.
+Russian Research Center
+Phone: +7 (095) 213-9207
+Fax: +7 (095) 213-9196
+E-mail: dima@src.samsung.ru
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D
+
+-----------------------------
+>        [From: Anonymous
+>        [Address: eng30391@leonis.nus.sg
+>        [To: Dmitry A. Dulepov
+>        [Date: Sat Dec 14 08:00:34 1996
+>    Environment: Windows 3.11, VC++ 1.52
+>
+>    I am using an edit control which is subclassed with CParseEdit=
+
+>which is derived CEdit class. It is able to filter out any charact=
+er
+>depending on the style.  (CParseEdit is in the file
+>    mcvc\mfc\samples\ctrltest\paredit.cpp)
+>
+>    Now, the problem is that CParseEdit's number style
+>(PES_NUMBER) does not accept decimal point.  So I modified it as f=
+ollow
+>
+>
+>// paredit.cpp: C++ derived edit control for numbers/letters etc
+>#include "paredit.h"
+>
+>CParsedEdit::CParsedEdit()
+>{
+>    m_wParseStyle =3D 0;
+>    m_bDecimalFlag =3D 0; // No decimal point set yet.
+>}
+>
+>void CParsedEdit::OnChar(UINT nChar, UINT nRepCnt, UINT nFlags)
+>{
+>    WORD type;
+>    if (nChar < 0x20)
+>        type =3D PES_ALL; // always allow control chars
+>    else if (nChar =3D=3D '.')    // I added decimal point.
+>    {
+>         if(!m_bDecimalFlag)
+>        {
+>            type =3D PES_NUMBERS;
+>            m_bDecimalFlag =3D 1;
+>        }
+>        else
+>            type =3D PES_OTHERCHARS;
+>    }
+>    else if (nChar >=3D '0' && nChar <=3D '9')
+>        type =3D PES_NUMBERS;
+>    else if (nChar >=3D 'A' && nChar <=3D 'Z') // hard coded to en=
+glish
+>        type =3D PES_LETTERS;
+>    else if (nChar >=3D 'a' && nChar <=3D 'z')
+>        type =3D PES_LETTERS;
+>    else
+>        type =3D PES_OTHERCHARS;
+>
+>    if (m_wParseStyle & type)
+>    {
+>        CEdit::OnChar(nChar, nRepCnt, nFlags);  // permitted
+>    }
+>    else
+>    {
+>        // illegal character - inform parent
+>        OnBadInput();
+>    }
+>}
+>
+>    So it can accept decimal point and once it is entered, the cla=
+ss
+>does not accept it anymore.  However if the user use backspace or =
+delete
+>keys to delete the decimal point, then it cannot accept the decima=
+l again.
+>So, I try to get the string that has been typed so far for a parti=
+cular
+>edit control and scan for decimal point whenever the user press ba=
+ckspace =
+
+>and delete.  I read documentation for CEdit, it has a member funct=
+ion
+>GetLine which only return the string if the edit control is multil=
+ine.
+>So I cannot use this method.
+>
+>    I have an idea in mind, I create a CString varaible inside
+>CParseEdit.  It will store the character that has been typed befor=
+e tab
+>and enter keys.  I can then process them.  Is there a better way?
+>
+>    Another problem is that, whenever the user used ctrl-V (paste)=
+
+>command and if the clipboard has valid string, it will be pasted t=
+o the
+>edit control regardless the style that I have set for the control.=
+  How
+>can I intercept it before it is actually displaced.  (Perhaps I di=
+sble the
+>paste capability for the edit control).=
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

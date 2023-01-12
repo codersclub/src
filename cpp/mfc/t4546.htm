@@ -1,0 +1,761 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+new, delete
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Albert Szilvasy -- <A HREF="mailto:szilvasy@almos.vein.hu">szilvasy@almos.vein.hu</A>
+Wednesday, April 03, 1996
+</B>
+Hi,
+
+NT 3.51 VC 4.0
+
+I'm building a dll that uses MFC in a dll and encountered a strange 
+behaviour.
+
+I tried to use new and delete for a non-CObject derived class. The 
+new performs fine in that it does debug memory allocation. However, 
+when I  try to call delete the exe I'm writing the dll to asserts 
+saying that something wrong on the heap.
+So long, I thought. (I don't have access to the source code of the
+exe)
+BUT when I do the same thing with a CObject derived class everything 
+is FINE. The new call ends up in the same global debug new operator 
+(CObject::new calls it) and delete frees the memory without any 
+scorning on side of the exe. (I can't step into the delete in either 
+of the cases)
+Any idea what's happening? What's the difference?
+Thanks in advance,
+Cheers,
+Albert
+--
+UofV,Hungary
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:daveferg@niagara.com">daveferg@niagara.com</A>
+Friday, April 05, 1996
+</B>
+NT 3.51 VC 4.1
+
+I have a similar problem using a 3'rd party class library maintained
+in dll. However if I derive a class from this dll in my application
+the problem goes away. Clearly there is some difference in the new in 
+the app vs the dll. The problem also goes away if I am not using the 
+debug version of new. For now it isn't hard for me to work around this
+quirk but I would be interested in any further discussion on the subject.
+
+Dave
+>Hi,
+>
+>NT 3.51 VC 4.0
+>
+>I'm building a dll that uses MFC in a dll and encountered a strange 
+>behaviour.
+>
+>I tried to use new and delete for a non-CObject derived class. The 
+>new performs fine in that it does debug memory allocation. However, 
+>when I  try to call delete the exe I'm writing the dll to asserts 
+>saying that something wrong on the heap.
+>So long, I thought. (I don't have access to the source code of the
+>exe)
+>BUT when I do the same thing with a CObject derived class everything 
+>is FINE. The new call ends up in the same global debug new operator 
+>(CObject::new calls it) and delete frees the memory without any 
+>scorning on side of the exe. (I can't step into the delete in either 
+>of the cases)
+>Any idea what's happening? What's the difference?
+>Thanks in advance,
+>Cheers,
+>Albert
+>--
+>UofV,Hungary
+>
+>
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+David W. Gillett -- <A HREF="mailto:DGILLETT@expertedge.com">DGILLETT@expertedge.com</A>
+Friday, April 05, 1996
+</B>
+[Mini-digest: 2 responses]
+
+> NT 3.51 VC 4.0
+> 
+> I'm building a dll that uses MFC in a dll and encountered a strange 
+> behaviour.
+> 
+> I tried to use new and delete for a non-CObject derived class. The 
+> new performs fine in that it does debug memory allocation. However, 
+> when I  try to call delete the exe I'm writing the dll to asserts 
+> saying that something wrong on the heap.
+> So long, I thought. (I don't have access to the source code of the
+> exe)
+> BUT when I do the same thing with a CObject derived class everything 
+> is FINE. The new call ends up in the same global debug new operator 
+> (CObject::new calls it) and delete frees the memory without any 
+> scorning on side of the exe. (I can't step into the delete in either 
+> of the cases)
+> Any idea what's happening? What's the difference?
+
+  There was a thread here within the last week about this, which 
+turned upon the fact that a Win32 process can have multiple heaps -- 
+and that each module (.EXE, .DLL) gets its own defualt heap.  
+Presumably the standard new and delete work on the current module's 
+default heap.
+
+  The fact that it worked with CObject points to three possible fixes:
+
+(1) Override new and delete in your own class.  They don't need to do 
+anything fancy, but this should make sure that they both refer to 
+the heap of the module where your class is defined.  (I believe that 
+this is how CObject is avoiding the problem.)
+
+(2) Export routines to create and destroy instances of your class, so 
+that new and delete actually get called from within the same module.  
+This is less satisfactory, since it requires exceptional syntax to 
+use your class, especially if you want to support arrays of your 
+objects.
+
+(3) Derive your objects from CObject.  There's probably all sorts of 
+stuff CObject offers that you don't care about, but the overhead is 
+probably not much more than a single vtable for your class and a 
+vtable pointer in every instance, and in a multi-module application, 
+that's not likely to be noticeable.  You may discover next week that 
+you have some use, after all, for other aspects of CObject, and 
+they'll come virtually free.
+
+Dave
+
+
+ 
+-----From: Dan Kirby <dkirby@accessone.com>
+
+Hi,
+Articles Q121216 and Q122675 in the Microsoft knowledgebase may gives some 
+clues.  It appears that there needs to be more information in your message, 
+perhaps some snippets of code of where you are creating and deleting the 
+non-Cobject objects. Are the objects being allocated and deleted in the DLL 
+and if so, where?  Is this a regular DLL or extension DLL?
+
+--dan
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:djw@arbortext.com">djw@arbortext.com</A>
+Saturday, April 06, 1996
+</B>
+>  There was a thread here within the last week about this, which 
+>turned upon the fact that a Win32 process can have multiple heaps -- 
+>and that each module (.EXE, .DLL) gets its own defualt heap.  
+>Presumably the standard new and delete work on the current module's 
+>default heap.
+
+This doesn't seem right.  New and delete are using the C runtime malloc and
+free.  As of VC++ 4.0, even the extra heap debugging aids that used to be in MFC
+have been moved down into the CRT.  Unless multiple copies of the CRT are
+being loaded, by statically linking the C runtime into a dll for example, there
+shouldn't be an issue of multiple heaps.
+
+Perhaps Mike B. could give us a definitive lecture on this topic.
+
+Dave Wilson  djw@arbortext.com
+ArborText Inc.  Ann Arbor Michigan
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dean McCrory -- <A HREF="mailto:deanm@microsoft.com">deanm@microsoft.com</A>
+Sunday, April 07, 1996
+</B>
+There is no "default" heap for a "module" in Win32, but Win32 does in
+fact have the capability to deal with multiple, independent heaps (see
+HeapCreate, etc. APIs).  For each separate C-runtime that you link in,
+you will get code which uses a separate heap for that CRT.  If you
+dyanamically link to the CRT (msvcrt40.dll) then you have code which is
+sharing a heap, and so you can freely mix new/delete from separate
+modules.
+
+General rule to keep in mind: if two modules A and B are calling into
+the *same* new and delete, then everything is fine.  If they are calling
+into separate new and delete implementations, then you are probably
+doing something bad.  The only way to share new and delete
+implementations is by dynamically linking to a single DLL which
+implements them.
+
+// Dean McCrory
+// Team Jakarta
+
+>----------
+>From: 	djw@arbortext.com[SMTP:djw@arbortext.com]
+>Sent: 	Saturday, April 06, 1996 11:57 AM
+>To: 	mfc-l@netcom.com
+>Cc: 	Albert Szilvasy; djw@arbortext.com
+>Subject: 	Re: new, delete  
+>
+>>  There was a thread here within the last week about this, which 
+>>turned upon the fact that a Win32 process can have multiple heaps -- 
+>>and that each module (.EXE, .DLL) gets its own defualt heap.  
+>>Presumably the standard new and delete work on the current module's 
+>>default heap.
+>
+>This doesn't seem right.  New and delete are using the C runtime malloc
+>and
+>free.  As of VC++ 4.0, even the extra heap debugging aids that used to
+>be in MFC
+>have been moved down into the CRT.  Unless multiple copies of the CRT
+>are
+>being loaded, by statically linking the C runtime into a dll for
+>example, there
+>shouldn't be an issue of multiple heaps.
+>
+>Perhaps Mike B. could give us a definitive lecture on this topic.
+>
+>Dave Wilson  djw@arbortext.com
+>ArborText Inc.  Ann Arbor Michigan
+>
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mario Contestabile -- <A HREF="mailto:Mario_Contestabile.UOS__MTL@UOSMTL2.universal.com">Mario_Contestabile.UOS__MTL@UOSMTL2.universal.com</A>
+Monday, April 08, 1996
+</B>
+[Mini-digest: 2 responses]
+
+>>  There was a thread here within the last week about this, which 
+>>turned upon the fact that a Win32 process can have multiple heaps -- 
+>>and that each module (.EXE, .DLL) gets its own defualt heap.  
+>>Presumably the standard new and delete work on the current module's 
+>>default heap.
+
+>This doesn't seem right.  New and delete are using the C runtime malloc and
+>free.  As of VC++ 4.0, even the extra heap debugging aids that used to be in 
+MFC
+>have been moved down into the CRT.
+
+I thought that as of 4.0 new and delete used GlobalAlloc() and GlobalFree().
+
+mcontest@universal.com
+
+-----From: "Albert Szilvasy" <szilvasy@almos.vein.hu>
+
+Thanks for all of you who replied. Finally, overloading the new and 
+delete operators in non-CObject derived classes as suggested by
+David W. Gillett <DGILLETT@expertedge.com> and the KB article Q122675 
+solved the problem. Code sniplet follows:
+
+#if defined(_DEBUG) && !defined(_AFX_NO_DEBUG_CRT)
+void* PASCAL operator new(size_t nSize, LPCSTR lpszFileName, int nLine) 
+{
+ return ::operator new(nSize, _CLIENT_BLOCK, lpszFileName, nLine);
+}
+void  operator delete( void* p ) 
+{
+ _free_dbg(p, _CLIENT_BLOCK);
+}
+#endif
+
+Thanks again,
+Albert
+--
+UofV,Hungary
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:djw@arbortext.com">djw@arbortext.com</A>
+Wednesday, April 10, 1996
+</B>
+>>>  There was a thread here within the last week about this, which 
+>>>turned upon the fact that a Win32 process can have multiple heaps -- 
+>>>and that each module (.EXE, .DLL) gets its own defualt heap.  
+>>>Presumably the standard new and delete work on the current module's 
+>>>default heap.
+>
+>>This doesn't seem right.  New and delete are using the C runtime malloc and
+>>free.  As of VC++ 4.0, even the extra heap debugging aids that used to be in 
+MFC
+>>have been moved down into the CRT.
+>...
+>I thought that as of 4.0 new and delete used GlobalAlloc() and GlobalFree().
+
+If I properly understood the section on memory in the new edition of
+Kruglinsky's book (which I like a *lot*), new and delete (if not overridden,
+of course) use the CRT, which in turn uses VirtualAlloc to obtain large blocks
+of memory.  A call to new only results in a call into the operating system
+when the CRT needs to add another large block.  I recall him saying that the
+first request will be for one meg; the second for two meg; the third for four;
+and so on.  Also, he said that as of 4.0 the free list data structure has been
+moved outside of the heap, and is very compact.  Therefore traversals of the
+free list no longer result in touching large numbers of virtual pages, thus
+avoiding a great deal of slow paging (as is the case in "normal" heap
+implementations).  This should reduce the need for extra memory management
+products.
+
+You would want to use GlobalAlloc yourself when allocating space that has to
+be passed to an api entry point that requires a handle to movable memory.
+Also, if you need a large block there might be an advantage to using GlobalAlloc
+to avoid fragmenting the heap the CRT is maintaining.  Kruglinsky discusses
+when this would be appropriate.  He, in turn, suggests reading Richter's books
+for deeper information about some things, such as sharing memory and memory
+mapped files.
+
+Dave Wilson  djw@arbortext.com
+ArborText Inc.  Ann Arbor Michigan
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@msn.com">mikeblas@msn.com</A>
+Saturday, April 13, 1996
+</B>
+[Mini-digest: 3 responses]
+
+>I thought that as of 4.0 new and delete used GlobalAlloc() and GlobalFree().
+
+They do, essentially: there's not a very big difference between 
+HeapAlloc()/HeapFree() and GlobalAlloc()/GlobalFree().  It is just that the 
+Heap-routines work on a private heap while the Global()-routines work on the 
+Windows core heap.
+
+> If I properly understood the section on memory in the new edition of
+> Kruglinsky's book (which I like a *lot*),
+
+It's spelled "Kruglinski".  I'm afraid that either you're misrecalling these 
+facts or David got them wrong in the book to begin with. The CRTL memory 
+management routines are probably the most often updated part of the product: 
+they changed substantially in VC++ 4.0, and will change substantially again.  
+This is a dangerous thing to try and document.
+
+> new and delete (if not overridden,
+> of course) use the CRT, which in turn uses VirtualAlloc to obtain large 
+blocks
+> of memory. 
+
+The VC++ 4.0 and 4.1 C Runtimes don't ever call VirtualAlloc() during the 
+handling of memory allocations.  They _do_ use a VirtualAlloc() to get a block 
+of memory in the DLL builds for per-process state information, but other than 
+that, they don't use VirtualAlloc().
+
+By using "find in files" or grep through the CRT\SRC directory on your CD, you 
+(or David Kruglinski) could verify this for yourself.  (You _will_ get hits on 
+VirtualAlloc(), but they're #ifdef'ed out.)  You could also write a four-line 
+application and step into the memory allocation routines with the debugger.
+
+Instead, they directly call HeapAlloc() in response to every request for 
+memory you make via operator new() or malloc() or any of their friends.   In a 
+debug build, you'll see lots more work going on to set up arenas for the 
+actually allocated data, but everything ends up going to HeapAlloc() and not 
+VirtualAlloc().
+
+> A call to new only results in a call into the operating system
+> when the CRT needs to add another large block.  I recall him saying that the
+> first request will be for one meg; the second for two meg; the third for 
+four;
+> and so on. 
+
+This is obsolete information.  It seems to describe the pre-4.0 C Runtime 
+libraries.
+
+> Also, he said that as of 4.0 the free list data structure has been
+> moved outside of the heap, and is very compact.  Therefore traversals of the
+> free list no longer result in touching large numbers of virtual pages, thus
+> avoiding a great deal of slow paging (as is the case in "normal" heap
+> implementations). 
+
+Since 4.0 doesn't manage a list of free data by itself, this is incorrect. 
+Windows its own self is actually managing the memory, so there is no free 
+memory list managed by the CRTL.  In ver>=4.0, The free pool is something that 
+Windows manages, not the CRTL.
+
+> This should reduce the need for extra memory management
+> products.
+
+I really can't comment on that one.
+
+> You would want to use GlobalAlloc yourself when allocating space that has to
+> be passed to an api entry point that requires a handle to movable memory.
+
+In Win32, is any memory moveable?
+
+> Also, if you need a large block there might be an advantage to using 
+GlobalAlloc
+> to avoid fragmenting the heap the CRT is maintaining. 
+
+GlobalAlloc() doesn't affect the CRT heap in VC++ 4.0.
+
+It sounds like your recollection and/or the Kruglinski book really document 
+what's going on in VC++ 2.x, not VC++ 4.0 or 4.1.
+
+.B ekiM
+TCHAR szSpringtime[] = _T("Check twice and save a life: motorcycles are 
+everywhere!");
+-----From: grossman@teleport.com (Jeff Grossman)
+
+To the best of my knowledge, what Dave Wilson says here is completely
+accurate. However, there is more. If you have statically linked the CRT
+with each DLL, each "copy" of the CRT will maintain its own local memory
+pool and free list. Hence, if you allocate an object in one DLL and then
+try to free it by giving that pointer to the CRT being used in another
+DLL, that second CRT will, in effect, say "I never knew you" and generate
+the run-time error: Invalid pointer passed to RtlFreeHeap.
+
+I've run into this problem with an ODBC driver vendor, and also had the
+problem myself in a multiple-DLL project with a slip-of-the-finger in
+the release build options. Note that this problem also will occur if you
+accidently mix release and debug CRTs, even if both are in DLL form.
+
+My standard policy is always to use the multi-threaded DLL CRT (release or
+debug version) and not worry about the problem.
+
+Jeff
+
+-----From: Niels Ull Jacobsen <nuj@kruger.dk>
+
+I guess we're straying a bit off MFC here?
+Kruglinski may say so. The CRT source says otherwise :-).
+
+According to the CRT makefile provided with MSVC 4.0, except for the 68K and
+PowerMac versions of the runtime library, all versions are build using WINHEAP
+where malloc/free and new/delete maps more or less directly to the
+HeapAlloc, HeapFree etc calls of Win32.
+
+[...]
+>Dave Wilson  djw@arbortext.com
+Niels Ull Jacobsen, Krьger A/S (nuj@kruger.dk)
+Everything stated herein is THE OFFICIAL POLICY of the entire Kruger group
+and should be taken as legally binding in every respect. Pigs will grow
+wings and fly.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+eric jung -- <A HREF="mailto:ejung@dbintellect.com">ejung@dbintellect.com</A>
+Tuesday, April 16, 1996
+</B>
+
+Mike B.,
+
+Two questions:
+First, I would greatly appreciate it if you could point me to a couple of 
+sources (books or whatever) which would explain this to me in greater 
+detail...
+
+Second:
+>They do, essentially: there's not a very big difference between
+>HeapAlloc()/HeapFree() and GlobalAlloc()/GlobalFree().  It is just that the 
+
+>Heap-routines work on a private heap while the Global()-routines work on 
+the
+>Windows core heap.
+Assuming that the entire private heap is always returned to the global free 
+list when the app terminates, and assuming that allocations from the global 
+core heap are not returned to the global free list unless explicity deleted, 
+wouldn't it be better if 4.0's new and delete operators used 
+HeapAlloc()/HeapFree()?
+
+Please tell me if my assumptions are incorrect (which they probably are), or 
+if they are correct perhaps you know MS's rationale for this implementation 
+of new/delete?
+
+Thanks,
+Eric Jung
+ejung@dbintellect.com
+ ----------
+From: owner-mfc-l
+To: mfc-l
+Subject: RE: new, delete
+Date: Saturday, April 13, 1996 7:56AM
+
+[Mini-digest: 3 responses]
+
+>I thought that as of 4.0 new and delete used GlobalAlloc() and 
+GlobalFree().
+
+They do, essentially: there's not a very big difference between
+HeapAlloc()/HeapFree() and GlobalAlloc()/GlobalFree().  It is just that the
+Heap-routines work on a private heap while the Global()-routines work on the 
+
+Windows core heap.
+
+> If I properly understood the section on memory in the new edition of
+> Kruglinsky's book (which I like a *lot*),
+
+It's spelled "Kruglinski".  I'm afraid that either you're misrecalling these 
+
+facts or David got them wrong in the book to begin with. The CRTL memory
+management routines are probably the most often updated part of the product: 
+
+they changed substantially in VC++ 4.0, and will change substantially again. 
+
+This is a dangerous thing to try and document.
+
+> new and delete (if not overridden,
+> of course) use the CRT, which in turn uses VirtualAlloc to obtain large
+blocks
+> of memory.
+
+The VC++ 4.0 and 4.1 C Runtimes don't ever call VirtualAlloc() during the
+handling of memory allocations.  They _do_ use a VirtualAlloc() to get a
+block
+of memory in the DLL builds for per-process state information, but other 
+than
+that, they don't use VirtualAlloc().
+
+By using "find in files" or grep through the CRT\SRC directory on your CD,
+you
+(or David Kruglinski) could verify this for yourself.  (You _will_ get hits
+on
+VirtualAlloc(), but they're #ifdef'ed out.)  You could also write a 
+four-line
+application and step into the memory allocation routines with the debugger.
+
+Instead, they directly call HeapAlloc() in response to every request for
+memory you make via operator new() or malloc() or any of their friends.   In
+a
+debug build, you'll see lots more work going on to set up arenas for the
+actually allocated data, but everything ends up going to HeapAlloc() and not 
+
+VirtualAlloc().
+
+> A call to new only results in a call into the operating system
+> when the CRT needs to add another large block.  I recall him saying that 
+the
+> first request will be for one meg; the second for two meg; the third for
+four;
+> and so on.
+
+This is obsolete information.  It seems to describe the pre-4.0 C Runtime
+libraries.
+
+> Also, he said that as of 4.0 the free list data structure has been
+> moved outside of the heap, and is very compact.  Therefore traversals of 
+the
+> free list no longer result in touching large numbers of virtual pages, 
+thus
+> avoiding a great deal of slow paging (as is the case in "normal" heap
+> implementations).
+
+Since 4.0 doesn't manage a list of free data by itself, this is incorrect.
+Windows its own self is actually managing the memory, so there is no free
+memory list managed by the CRTL.  In ver>=4.0, The free pool is something
+that
+Windows manages, not the CRTL.
+
+> This should reduce the need for extra memory management
+> products.
+
+I really can't comment on that one.
+
+> You would want to use GlobalAlloc yourself when allocating space that has 
+to
+> be passed to an api entry point that requires a handle to movable memory.
+
+In Win32, is any memory moveable?
+
+> Also, if you need a large block there might be an advantage to using
+GlobalAlloc
+> to avoid fragmenting the heap the CRT is maintaining.
+
+GlobalAlloc() doesn't affect the CRT heap in VC++ 4.0.
+
+It sounds like your recollection and/or the Kruglinski book really document
+what's going on in VC++ 2.x, not VC++ 4.0 or 4.1.
+
+.B ekiM
+TCHAR szSpringtime[] = _T("Check twice and save a life: motorcycles are
+everywhere!");
+ -----From: grossman@teleport.com (Jeff Grossman)
+
+To the best of my knowledge, what Dave Wilson says here is completely
+accurate. However, there is more. If you have statically linked the CRT
+with each DLL, each "copy" of the CRT will maintain its own local memory
+pool and free list. Hence, if you allocate an object in one DLL and then
+try to free it by giving that pointer to the CRT being used in another
+DLL, that second CRT will, in effect, say "I never knew you" and generate
+the run-time error: Invalid pointer passed to RtlFreeHeap.
+
+I've run into this problem with an ODBC driver vendor, and also had the
+problem myself in a multiple-DLL project with a slip-of-the-finger in
+the release build options. Note that this problem also will occur if you
+accidently mix release and debug CRTs, even if both are in DLL form.
+
+My standard policy is always to use the multi-threaded DLL CRT (release or
+debug version) and not worry about the problem.
+
+Jeff
+
+ -----From: Niels Ull Jacobsen <nuj@kruger.dk>
+
+I guess we're straying a bit off MFC here?
+Kruglinski may say so. The CRT source says otherwise :-).
+
+According to the CRT makefile provided with MSVC 4.0, except for the 68K and
+PowerMac versions of the runtime library, all versions are build using 
+WINHEAP
+where malloc/free and new/delete maps more or less directly to the
+HeapAlloc, HeapFree etc calls of Win32.
+
+[...]
+>Dave Wilson  djw@arbortext.com
+Niels Ull Jacobsen, Kr?ger A/S (nuj@kruger.dk)
+Everything stated herein is THE OFFICIAL POLICY of the entire Kruger group
+and should be taken as legally binding in every respect. Pigs will grow
+wings and fly.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:djw@arbortext.com">djw@arbortext.com</A>
+Wednesday, April 17, 1996
+</B>
+>> If I properly understood the section on memory in the new edition of
+>> Kruglinsky's book (which I like a *lot*),
+>
+>It's spelled "Kruglinski".  I'm afraid that either you're misrecalling these 
+>facts or David got them wrong in the book to begin with. The CRTL memory 
+>management routines are probably the most often updated part of the product: 
+>they changed substantially in VC++ 4.0, and will change substantially again.  
+>This is a dangerous thing to try and document.
+
+With the exception of the last letter of Mr. Kruglinski's name, a review of
+pages 203-204 of the book indicate that my recollections were reasonably
+accurate.  (The full reference, for anyone who wants to check out the book,
+is "Inside Visual C++ The Standard Reference for Programming with Microsoft
+Visual C++ Version 4", by David J. Kruglinski, copyright 1996, Microsoft
+Press. $45.00 US.)  The cover says "Covers: MFC 4.0 ...".
+
+>By using "find in files" or grep through the CRT\SRC directory on your CD, you 
+>(or David Kruglinski) could verify this for yourself.  (You _will_ get hits on 
+>VirtualAlloc(), but they're #ifdef'ed out.)  You could also write a four-line 
+>application and step into the memory allocation routines with the debugger.
+
+Guilty.  I took what I read at face value, and I'm more than old enough to know
+better.  You may trust that I've now been thoroughly disabused of the notion
+that just because I'd recently read something relevant to a question on this
+mailing list, that I could make a sensible contribution.
+
+>This is obsolete information.  It seems to describe the pre-4.0 C Runtime 
+>libraries.
+
+I'm still favorably impressed by the book, so I'll be charitable and assume
+that the author overlooked a section while making revisions for the 3rd
+edition.  Another possibility would be that, given the time lag in getting a
+book printed, he was working with something different than 4.0 as it was
+finally released.
+
+>> You would want to use GlobalAlloc yourself when allocating space that has to
+>> be passed to an api entry point that requires a handle to movable memory.
+>
+>In Win32, is any memory moveable?
+
+Since Mike would presumably know the answer to that, I have to guess that was
+a rhetorical question.  But anyway, what Mr. Kruglinski says is, roughly,
+that while moveable memory is an artifact of Win16, it continues to exist to
+support GlobalReAlloc.  Also, he says many library functions use HGLOBAL
+return values and parameters.  "If you're required to supply an HGLOBAL
+parameter, to be absolutely safe you should generate it with a GlobalAlloc(
+GMEM_MOVEABLE...) call just in case the called function decides to call
+GlobalRealloc and expects the handle value to be unchanged."  Also, he says
+"...but the HGLOBAL values returned by OLE are moveable, so you have to call
+GlobalLock."
+
+I suppose it wouldn't be appropriate for Mike to review Mr. Kruglinski's book
+(even if he had the time and inclination), being an author himself.  Perhaps
+someone else better qualified than I seem to be could post a review?
+
+Dave Wilson  djw@arbortext.com
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@msn.com">mikeblas@msn.com</A>
+Saturday, April 20, 1996
+</B>
+From: 	owner-mfc-l@netcom.com on behalf of David J. Wilson
+Sent: 	Wednesday, April 17, 1996 7:10 AM
+
+>>It's spelled "Kruglinski".  I'm afraid that either you're misrecalling these
+>>facts or David got them wrong in the book to begin with.
+
+> a review of pages 203-204 of the book indicate that my recollections
+> were reasonably accurate. 
+
+So, it's unfortunately the latter case.  Like I said in my original note, the 
+memory manager in the runtime libraries has been very turbulent lately... so 
+it's possible that Mr Kruglinski just didn't update the text.  I forwarded 
+your note with my comments over to the folks at MS Press at the same time I 
+mailed my response (last week?), but they haven't responded.
+
+> I suppose it wouldn't be appropriate for Mike to review Mr. Kruglinski's 
+book
+> (even if he had the time and inclination), being an author himself. 
+
+Indeed: and I feel quite itchy going on as far as I have.  These are just 
+facts, though, and not opinion like most book reviews (especially, for 
+example, Ron Burk's) are.
+
+.B ekiM
+TCHAR sz[] = _T("I do not speak for Microsoft.");
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

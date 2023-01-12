@@ -1,0 +1,221 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Using CDC::InvertRgn
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Peter Moss -- <A HREF="mailto:pmoss@bbn.com">pmoss@bbn.com</A>
+Sunday, November 24, 1996
+</B>
+Environment: MSVC 4.2-flat, NT 4.0, Win 95
+
+I am creating a CRgn and then calling CDC::InvertRgn. I haven't played with 
+this before, but it worked the first time. My question is that I am not 
+explicitly selecting the CRgn into the DC before calling CDC::InvertRgn, nor 
+am I calling DeleteObject on it. I saw some note in the MFC doc on CRgn that 
+implies that I should call CGDIObject::DeleteObject().  Am I causing resource 
+leaks by not doing this? It makes me a little nervous cause I'm doing this in 
+a OnMouseMove() response method, so it will get called a lot.
+
+Here is my code currently:
+
+CRgn Rgn;
+..
+Rgn.CreatePolygonRgn(...);
+
+CClientDC dc(this);
+dc.InvertRgn(&Rgn);
+__________________________________________________
+
+i.e., do I need to do something like the following:
+
+CRgn Rgn;
+..
+Rgn.CreatePolygonRgn(...);
+
+CClientDC dc(this);
+dc.SelectObject(&Rgn);
+dc.InvertRgn(&Rgn);
+
+Rgn.DeleteObject();
+_________________________________
+
+If I do need to do the above, how do I "deselect" the CRgn since the 
+CGDIObject::DeleteObject() doc says that 
+"An application should not call DeleteObject on a CGdiObject object that is 
+currently selected into a device context. "
+The CDC::SelectObject() call for CRgns does not return any "previously 
+selected" region.  
+
+Any comments?
+
+Thanks,
+Pete Moss
+pmoss@bbn.com
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Jim Lawson Williams -- <A HREF="mailto:jimlw@mail.ccur.com.au">jimlw@mail.ccur.com.au</A>
+Tuesday, November 26, 1996
+</B>
+[Mini-digest: 3 responses]
+
+At 10:38 PM 24-11-96 -0500, you wrote:
+>Environment: MSVC 4.2-flat, NT 4.0, Win 95
+>
+>I am creating a CRgn and then calling CDC::InvertRgn. <snip> I saw some note in the MFC doc on CRgn that implies that I should call CGDIObject::DeleteObject().  Am I causing resource 
+leaks by not doing this?
+
+If "Debug Mode" reports no leaks, believe it.  From the little code you supply I infer that you are creating your CRgn on the stack, and it disappears at function-end.
+ 
+
+>i.e., do I need to do something like the following:
+>
+>CRgn Rgn;
+>..
+>Rgn.CreatePolygonRgn(...);
+>
+>CClientDC dc(this);
+>dc.SelectObject(&Rgn);
+>dc.InvertRgn(&Rgn);
+>
+>Rgn.DeleteObject();
+>
+
+  Try that and see what happens.....  :-}
+
+>The CDC::SelectObject() call for CRgns does not return any "previously 
+>selected" region.  
+
+No, it simply tells you what kind of CRgn you're attempting to deal with  --  you missed this part of the on-line documentation:
+
+The version of the member function that takes a region parameter performs the same task as the SelectClipRgn member function. Its return value can ........
+    ^^^^^^^^^^^^^
+
+Regards,
+Jim LW
+-----From: "L.P. Fu" <l.p._fu@dca.com>
+
+ Since you are using CDC and CRgn as stack variables.  MFC will clean up
+for you.
+ One of the thing you have remember is you can't delete an object when it
+is still selected in the DC.
+
+-----From: Mike Blaszczak <mikeblas@nwlink.com>
+
+At 22:38 11/24/96 -0500, Peter Moss wrote:
+>Environment: MSVC 4.2-flat, NT 4.0, Win 95
+
+>I am creating a CRgn and then calling CDC::InvertRgn. I haven't played with 
+>this before, but it worked the first time. My question is that I am not 
+>explicitly selecting the CRgn into the DC before calling CDC::InvertRgn, nor 
+>am I calling DeleteObject on it.
+
+The CRgn destructor will destroy the region for you.
+
+You don't need to select a region to use InvertRgn().  InvertRgn() uses the
+region you pass as a paremeter.
+
+>If I do need to do the above, how do I "deselect" the CRgn since the 
+>CGDIObject::DeleteObject() doc says that 
+>"An application should not call DeleteObject on a CGdiObject object that is 
+>currently selected into a device context. "
+
+Again, you don't.  But you do need to do it for things like brushes, which
+you do need to select into the DC to use, you might code something like
+this:
+
+void CYourView::OnDraw(CDC* pDC)
+{
+   CBrush brush(RGB(83, 83, 83));
+   CBrush* pOldBrush;
+
+   pOldBrush = pDC->SelectObject(&brush);
+
+   CRect rect(0, 0, 100, 100);
+   pDC->Rectangle(&rect);
+
+   pDC->SelectObject(pOldBrush);
+}
+
+The CBrush destrctor destroys the "brush" object for you.  You
+don't need to destroy pOldBrush--it isn't yours. You unselect
+"brush" from the  DC by selecting pOldBrush back in there again.
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+I'm afraid I've become some sort of speed freak.
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Wednesday, November 27, 1996
+</B>
+At 23:19 11/26/96 +1100, Jim Lawson Williams wrote:
+
+>>I am creating a CRgn and then calling CDC::InvertRgn. <snip> I saw
+>>some note in the MFC doc on CRgn that implies that I should call
+>>CGDIObject::DeleteObject().  Am I causing resource 
+>>leaks by not doing this?
+
+>If "Debug Mode" reports no leaks, believe it. 
+
+MFC and the C Runtimes only track memory leaks, not resource leaks.
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+I'm afraid I've become some sort of speed freak.
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

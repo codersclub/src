@@ -1,0 +1,358 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Multithreading for invisible doc and view
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Ji Song -- <A HREF="mailto:101762.3041@compuserve.com">101762.3041@compuserve.com</A>
+Tuesday, May 28, 1996
+</B>
+Window NT 3.51, VC 4.0
+
+My goal is to deal with a long batch printing job ( possible 
+2000 news stories ).  I want to use the MFC printing support.
+I created a invisible document and view to deal with the 
+printing job.  I cannot use the visible document and view
+because the user may close the visible view at any time, will therefore
+kill the printing job.  In short my question is 
+        how to create a thread which encapsulate the invisible 
+document and view for my printing job, yet leave the visible view in the 
+main thread.  The main thread is of course in CWinApp ?
+
+If you want to know more detail, please read the following:     
+
+In InitInstance I create two document template
+
+        m_pMultiTemplate = new CMultiDocTemplate(
+                IDR_MULTITYPE,
+                RUNTIME_CLASS(CMultiDoc),
+                RUNTIME_CLASS(CChildFrame), 
+                RUNTIME_CLASS(CMultiView));
+        AddDocTemplate(m_pMultiTemplate);
+
+        m_pHideTemplate = new CMultiDocTemplate(
+                IDR_HIDETYPE,
+                RUNTIME_CLASS(CMultiDoc),
+                RUNTIME_CLASS(CChildFrame),        
+                RUNTIME_CLASS(CHiddenView));
+        AddDocTemplate(m_pHideTemplate);
+
+        
+        // create main MDI Frame window
+        CMainFrame* pMainFrame = new CMainFrame;
+        if (!pMainFrame->LoadFrame(IDR_MAINFRAME))
+                return FALSE;
+        m_pMainWnd = pMainFrame;
+
+Then  as soon as the user open a new document, two documents are created:
+
+
+        CMultiApp*  pTheApp= ( CMultiApp* ) AfxGetApp();
+
+        CMultiDocTemplate*  pMulitTemplate= ( CMultiDocTemplate* )         
+                                                        
+pTheApp->m_pMultiTemplate;
+        CMultiDocTemplate*  pHideTemplate= ( CMultiDocTemplate* )
+                                pTheApp->m_pHideTemplate;
+
+        // create visible doc and view
+        CDocument*  pMultiDoc= pMulitTemplate->OpenDocumentFile( NULL );
+
+        // create hide doc and view
+        m_pHideDoc= ( CMultiDoc* ) pHideTemplate->OpenDocumentFile(  0, 
+                                                                FALSE);
+
+
+This all works fine.  But now I want to create a separate thread for the
+hidden 
+document and view.  I tired to do following:
+        
+        // create visible doc and view
+        CDocument*  pMultiDoc= pMulitTemplate->OpenDocumentFile( NULL );
+
+        AfxBeginThread( StartHideDoc, this );  // this refer to main frame
+window
+
+and 
+
+UINT StartHideDoc( LPVOID pParam )
+{
+        CMultiApp*  pTheApp= ( CMultiApp* ) AfxGetApp();
+        CMultiDocTemplate*  pHideTemplate= ( CMultiDocTemplate* )          
+                                                
+pTheApp->m_pHideTemplate;
+
+        CMainFrame* pMainFrame= ( CMainFrame* ) pParam;
+
+        pMainFrame->m_pHideDoc= 
+                ( CMultiDoc* ) pHideTemplate->OpenDocumentFile( 0, FALSE );
+
+        return 0;
+}
+
+
+I got ASSERTION error in mfc file winmdi.cpp
+ 
+BOOL CMDIChildWnd::Create(LPCTSTR lpszClassName,
+        LPCTSTR lpszWindowName, DWORD dwStyle,
+        const RECT& rect, CMDIFrameWnd* pParentWnd,
+        CCreateContext* pContext)
+{
+                if (pParentWnd == NULL)
+                {
+                        CWnd* pMainWnd = AfxGetThread()->m_pMainWnd;
+                        ASSERT(pMainWnd != NULL);
+--> ASSERTION error     ASSERT_KINDOF(CMDIFrameWnd, pMainWnd);  
+
+------------------------------------------------------------------
+Could anyone tell me how to create a thread which encapsulate the invisible
+
+document and view for my printing job ?
+
+
+Thanks in advance,
+
+Ji Song
+
+Compuserve address:     101762,3041
+Internet                        101762.3041@compuserve.com
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Marty Fried -- <A HREF="mailto:mfried@linex.com">mfried@linex.com</A>
+Friday, May 31, 1996
+</B>
+[Mini-digest: 2 responses]
+
+At 07:25 PM 5/28/96 -0400, Ji Song wrote:
+>Window NT 3.51, VC 4.0
+>
+>My goal is to deal with a long batch printing job ( possible 
+>2000 news stories ).  I want to use the MFC printing support.
+>I created a invisible document and view to deal with the 
+>printing job.  I cannot use the visible document and view
+>because the user may close the visible view at any time, will therefore
+>kill the printing job.  In short my question is 
+>        how to create a thread which encapsulate the invisible 
+>document and view for my printing job, yet leave the visible view in the 
+>main thread.  The main thread is of course in CWinApp ?
+
+Why couldn't you prompt the user to wait or cancel the print job, and
+close down when it is safe?  Or perhaps set a flag that will cause your
+app to shut down when it's finished, and close the windows (and turn off
+the lights) before it goes.  You could simply hide the main window until
+you finish.
+
+-----From: Tony Pan <tpan@wise.com>
+
+Dear Song
+
+It is very hard to pass GDI objects like Window across the threads. MFC has 
+a separate
+repository for each thread to keep track of these objects. You should create 
+your
+your invisible document template within your new thread.
+UINT StartHideDoc( LPVOID pParam )
+{
+        CMultiDocTemplate*  pHideTemplate=  new CMultiDocTemplate(
+                IDR_HIDETYPE,
+                RUNTIME_CLASS(CMultiDoc),
+                RUNTIME_CLASS(CChildFrame),
+                RUNTIME_CLASS(CHiddenView));
+
+
+        CMainFrame* pMainFrame= ( CMainFrame* ) pParam;
+
+        pMainFrame->m_pHideDoc=
+                ( CMultiDoc* ) pHideTemplate->OpenDocumentFile( 0, FALSE );
+
+        return 0;
+}
+Good Luck
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:CraigTT_at_USNELMIS@ccmail01.PE-Nelson.COM">CraigTT_at_USNELMIS@ccmail01.PE-Nelson.COM</A>
+Monday, June 03, 1996
+</B>
+     
+Your problem is in passing the main window to the thread using its pointer.  The
+maps that MFC uses to associate window handles with MFC window objects are 
+thread local.  Your secondary thread cannot find the window handle associated 
+with the main window pointer.
+
+You CAN however pass the m_hWnd into the thread and use it there.  If you want, 
+you can create a window object in the thread and attach the window handle to it 
+so you can operate on the window as an object.  Just be sure to detach the 
+handle before the thread exits.
+
+Tim Craig
+PE-Nelson
+
+______________________________ Reply Separator _________________________________
+Subject: Multithreading for invisible doc and view
+Author:  mfc-l@netcom.com at SMTPLINK-PEN
+Date:    6/1/96 2:37 AM
+
+
+Window NT 3.51, VC 4.0
+     
+My goal is to deal with a long batch printing job ( possible 
+2000 news stories ).  I want to use the MFC printing support. 
+I created a invisible document and view to deal with the 
+printing job.  I cannot use the visible document and view
+because the user may close the visible view at any time, will therefore 
+kill the printing job.  In short my question is 
+        how to create a thread which encapsulate the invisible 
+document and view for my printing job, yet leave the visible view in the 
+main thread.  The main thread is of course in CWinApp ?
+     
+If you want to know more detail, please read the following:     
+     
+In InitInstance I create two document template
+     
+        m_pMultiTemplate = new CMultiDocTemplate(
+                IDR_MULTITYPE,
+                RUNTIME_CLASS(CMultiDoc),
+                RUNTIME_CLASS(CChildFrame), 
+                RUNTIME_CLASS(CMultiView));
+        AddDocTemplate(m_pMultiTemplate);
+     
+        m_pHideTemplate = new CMultiDocTemplate(
+                IDR_HIDETYPE,
+                RUNTIME_CLASS(CMultiDoc),
+                RUNTIME_CLASS(CChildFrame),        
+                RUNTIME_CLASS(CHiddenView));
+        AddDocTemplate(m_pHideTemplate);
+     
+     
+        // create main MDI Frame window
+        CMainFrame* pMainFrame = new CMainFrame; 
+        if (!pMainFrame->LoadFrame(IDR_MAINFRAME))
+                return FALSE;
+        m_pMainWnd = pMainFrame;
+     
+Then  as soon as the user open a new document, two documents are created:
+     
+     
+        CMultiApp*  pTheApp= ( CMultiApp* ) AfxGetApp();
+     
+        CMultiDocTemplate*  pMulitTemplate= ( CMultiDocTemplate* )         
+     
+pTheApp->m_pMultiTemplate;
+        CMultiDocTemplate*  pHideTemplate= ( CMultiDocTemplate* )
+                                pTheApp->m_pHideTemplate;
+     
+        // create visible doc and view
+        CDocument*  pMultiDoc= pMulitTemplate->OpenDocumentFile( NULL );
+     
+        // create hide doc and view
+        m_pHideDoc= ( CMultiDoc* ) pHideTemplate->OpenDocumentFile(  0, 
+                                                                FALSE);
+     
+     
+This all works fine.  But now I want to create a separate thread for the 
+hidden 
+document and view.  I tired to do following:
+     
+        // create visible doc and view
+        CDocument*  pMultiDoc= pMulitTemplate->OpenDocumentFile( NULL );
+     
+        AfxBeginThread( StartHideDoc, this );  // this refer to main frame
+window
+     
+and 
+     
+UINT StartHideDoc( LPVOID pParam )
+{
+        CMultiApp*  pTheApp= ( CMultiApp* ) AfxGetApp(); 
+        CMultiDocTemplate*  pHideTemplate= ( CMultiDocTemplate* )          
+     
+pTheApp->m_pHideTemplate;
+     
+        CMainFrame* pMainFrame= ( CMainFrame* ) pParam;
+     
+        pMainFrame->m_pHideDoc= 
+                ( CMultiDoc* ) pHideTemplate->OpenDocumentFile( 0, FALSE );
+     
+        return 0;
+}
+     
+     
+I got ASSERTION error in mfc file winmdi.cpp
+     
+BOOL CMDIChildWnd::Create(LPCTSTR lpszClassName,
+        LPCTSTR lpszWindowName, DWORD dwStyle, 
+        const RECT& rect, CMDIFrameWnd* pParentWnd, 
+        CCreateContext* pContext)
+{
+                if (pParentWnd == NULL)
+                {
+                        CWnd* pMainWnd = AfxGetThread()->m_pMainWnd; 
+                        ASSERT(pMainWnd != NULL);
+--> ASSERTION error     ASSERT_KINDOF(CMDIFrameWnd, pMainWnd);  
+     
+------------------------------------------------------------------
+Could anyone tell me how to create a thread which encapsulate the invisible
+     
+document and view for my printing job ?
+     
+     
+Thanks in advance,
+     
+Ji Song
+     
+Compuserve address:     101762,3041
+Internet                        101762.3041@compuserve.com
+     
+     
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

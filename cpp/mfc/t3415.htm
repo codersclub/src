@@ -1,0 +1,215 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Out of user resources
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Maurits Rijk 7 84941 -- <A HREF="mailto:rijkm@ehv.tass.philips.com">rijkm@ehv.tass.philips.com</A>
+Friday, January 12, 1996
+</B>
+Folks,
+
+We have a small problem here and I hope someone can help us on this one: we
+are developing a MDI application using MSVC 1.5 and we are using Windows 3.1
+as a development platform. This application uses about 20 document types. 
+This means that somewhere in our code we have 20 times a 
+"new CMultiDocTemplate(...)". However these 20 statements consume all the user
+resources (which I believe is 64 k), Result: the program crashes very soon 
+because it hasn't any resources left.
+
+Is there a solution to this problem (apart from moving to Windows NT or '95)?
+
+Maurits Rijk
+Senior Software Engineer
+Philips TASS
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@interserv.com">mikeblas@interserv.com</A>
+Sunday, January 14, 1996
+</B>
+[Mini-digest: 5 responses]
+
+On Fri, 12 Jan 1996, rijkm@ehv.tass.philips.com (Maurits Rijk (7)84941) 
+wrote:
+
+>We have a small problem here and I hope someone can help us on this one: we
+>are developing a MDI application using MSVC 1.5 and we are using Windows 3.1
+>as a development platform. This application uses about 20 document types. 
+>This means that somewhere in our code we have 20 times a 
+>"new CMultiDocTemplate(...)". However these 20 statements consume all the 
+>user
+>resources (which I believe is 64 k), Result: the program crashes very soon 
+>because it hasn't any resources left.
+
+You should catch up to the thread "Out of System & User Resources" on this 
+list.  It's much the same answer as yours.
+
+Your answer is slightly different mainly because you're worried about 
+registered menu handles... the doc template loads the menu handle _always_ 
+instead of  just when necessary.  There has been other mail on this list 
+about working around that problem, so maybe you should try and see if anyone 
+else has it saved.
+
+>Is there a solution to this problem (apart from moving
+>to Windows NT or '95)?
+
+Even Nintendo is shipping 32-bit applications.
+
+.B ekiM
+--
+TCHAR szDisc[] = _T("These words are my own; I do not speak for Microsoft.");
+
+-----From: Lee Thompson <lee@usa.nai.net>
+
+I don't know if this is the "right" way to solve the problem, but I just 
+had a similar one, also using MSVC 1.52.  I found a solution by using 
+Heapwalk and looking at all the items in column OWNER that were labelled 
+USER.  One of the items that was flagged Y in the column HEAP kept 
+growing with every new doc template.  It appeared to contain a complete 
+menu for each new page.  I changed the call to new CMultiDocTemplate to 
+use the IDR_MAINFRAME resource, including that menu, for each child 
+window.  This appeared to solve my problem.  I was also getting a memory 
+leak from all of these menus not being deleted, and it solved that also. 
+ You of course need to change your icons, menus, etc. that are 
+assoicated with the resources you are using.
+
+					Lee
+-----From: rquist@BIX.com
+
+One possibility is to be more conservative in managing the memory
+usage...delay allocating the MultiDocTemplate until it's needed, and delete
+it ASAP...
+
+Rich
+(rquist@bix.com)
+
+-----From: kitk@mudshark.sunquest.com (Kit Kauffmann)
+
+Do they all require that all the objects are permament for the life of the PGM?
+If so, yes Win32 may help.
+
+If not, consider dynamically creating and destroying them as needed.
+
+
+-----From: Jim Lavin <ooptech@Onramp.NET>
+
+Basically Maurits, you're screwed under 16bit Windows without going through
+some very tough coding and modifying of MFC.  We had the same problem about
+two months back and I also posted a few messages on it.  The gist of the
+problem is that each CMultiDocTemplate can load up to 4 seperate menus at
+the time you create it.  Those Menus are:
+
+        m_hMenuShared - used by all views created in a stand-alone run, not
+used if the application has been OLE In-Place Activated or Embedded.
+
+        m_hMenuInPlace - used by any view that contains OLE Objects.
+
+        m_hMenuInPlaceServer - used by any view that is In-Place Activated
+under OLE.
+
+        m_hMenuEmbedded - used by any view that is OLE Embedded and not
+In-Place activated.
+
+Also each CMainframe derived class does a load menu on IDR_MAINFRAME which
+is only used when there is no view displayed.
+
+Along with each of these menus a set of Accelerators are also loaded.
+Microsoft says they did this to improve performance, which IMHO is a cop
+out.  They could have easily done a LoadMenu when they needed to use the
+menu.  This leads to a hugh amount of USER resource being used before the
+application gets started, we calculated about 2% per menu that is loaded,
+larger menus eat up more USER resources.
+
+We ended up deleteing all of the menus we knew we would not be using inside
+of the InitInstance() of CWinApp.  We then added functions to
+COleClientItem, COleServerItem, COleServerDoc and COleIPFrameWnd which
+loaded the menu before it is needed.  We also modified CMainFrame to remove
+the Menu attached to it.  This cut our applications resource usage from 60+%
+down to 24%.
+
+
+
+
+Jim Lavin
+OOP Technologies
+http://emporium.turnpike.net/~jlavin
+http://rampages.onramp.net/~ooptech
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Chong Zhang -- <A HREF="mailto:cz@dana.ucc.nau.edu">cz@dana.ucc.nau.edu</A>
+Tuesday, January 16, 1996
+</B>
+On Fri, 12 Jan 1996, Maurits Rijk (7)84941 wrote:
+
+> Folks,
+> 
+> We have a small problem here and I hope someone can help us on this one: we
+> are developing a MDI application using MSVC 1.5 and we are using Windows 3.1
+> as a development platform. This application uses about 20 document types. 
+> This means that somewhere in our code we have 20 times a 
+> "new CMultiDocTemplate(...)". However these 20 statements consume all the user
+> resources (which I believe is 64 k), Result: the program crashes very soon 
+> because it hasn't any resources left.
+> 
+> Is there a solution to this problem (apart from moving to Windows NT or '95)?
+> 
+> Maurits Rijk
+> Senior Software Engineer
+> Philips TASS
+> 
+
+The problem is that each CMultiDocTemplate object preloads its menu which 
+consumes 2.5% of resource each. So your 20 template objects used up 50% 
+of the system resource. The solution is you have to load the menu when 
+you need and destroy it once it is done.
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

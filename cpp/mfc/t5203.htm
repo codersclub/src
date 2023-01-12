@@ -1,0 +1,279 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+How do you create a view class from an arbitrary control
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Marty Wagner -- <A HREF="mailto:marty@concentra.com">marty@concentra.com</A>
+Thursday, May 16, 1996
+</B>
+VC++ 4.1 on NT 3.51
+
+Microsoft's new common controls are supported as 
+both control classes and as view classes.
+This is very nice, as we are using the document/view 
+architecture. We can have a view
+which inherits from CRichEditView, and we can 
+use it in our document/view paradigm.  I would like to implement
+this paradigm with any arbitrary control.  
+
+Their view class is very nicely implemented, in that it 
+encapsulates the control class as well.
+CRichEditView inherits directly from CView, 
+and enhances CView with a number of functions. In addition,
+it gives you access to the functionality in the 
+CRichEditCtrl without reimplementing or redefining
+and delegating the functionality to a member variable 
+which contains the control. Instead, it allows you
+to access the control using the GetRichEditCtrl() 
+function. This function is implemented as simply 
+casting the "this" pointer to CRichEditCtrl !!! 
+
+I would like to have this sort of architecture for 
+any control that I may buy or make myself. For example,
+we are currently using an off-the-shelf tree control 
+(from Premia).  In our present implementation, we
+use the tree control by creating a view class 
+(called CuiTreeView) which has a member variable which is the
+tree control (CuiTree). We then create a child window of the 
+view using the member variable.
+
+The problem with this implementation is that we in fact 
+have two windows: the view window, and
+the tree control window. This causes some 
+subtle scrolling bugs.    
+
+Of course, we could move to the new CTreeView class in MFC 4.0. 
+However, this problem will still be an issue for any other controls 
+we may purchase, or make ourselves.  I would like to be able to 
+treat any arbitrary control as a view class, and be able to 
+access the functionality of that window without redefining
+and delegating the existing functions to that control.  
+I admit that I have spent time trying to figure
+out how MFC does it, but it is quite beyond me to follow 
+that particular code.  
+
+Does anyone have any suggestions?
+
+
+
+-- 
+Marty Wagner
+marty@concentra.com
+
+"Does the chichen need a reason?"
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Chet Murphy -- <A HREF="mailto:cmurphy@modelworks.com">cmurphy@modelworks.com</A>
+Friday, May 17, 1996
+</B>
+[Mini-digest: 4 responses]
+
+Marty Wagner wrote:
+> 
+> VC++ 4.1 on NT 3.51
+> 
+> Microsoft's new common controls are supported as
+> both control classes and as view classes.
+> This is very nice, as we are using the document/view
+> architecture. We can have a view
+> which inherits from CRichEditView, and we can
+> use it in our document/view paradigm.  I would like to implement
+> this paradigm with any arbitrary control.
+> 
+> Their view class is very nicely implemented, in that it
+> encapsulates the control class as well.
+> CRichEditView inherits directly from CView,
+> and enhances CView with a number of functions. In addition,
+> it gives you access to the functionality in the
+> CRichEditCtrl without reimplementing or redefining
+> and delegating the functionality to a member variable
+> which contains the control. Instead, it allows you
+> to access the control using the GetRichEditCtrl()
+> function. This function is implemented as simply
+> casting the "this" pointer to CRichEditCtrl !!!
+> 
+> I would like to have this sort of architecture for
+> any control that I may buy or make myself. For example,
+> we are currently using an off-the-shelf tree control
+> (from Premia).  In our present implementation, we
+> use the tree control by creating a view class
+> (called CuiTreeView) which has a member variable which is the
+> tree control (CuiTree). We then create a child window of the
+> view using the member variable.
+> 
+> The problem with this implementation is that we in fact
+> have two windows: the view window, and
+> the tree control window. This causes some
+> subtle scrolling bugs.
+> 
+> Of course, we could move to the new CTreeView class in MFC 4.0.
+> However, this problem will still be an issue for any other controls
+> we may purchase, or make ourselves.  I would like to be able to
+> treat any arbitrary control as a view class, and be able to
+> access the functionality of that window without redefining
+> and delegating the existing functions to that control.
+> I admit that I have spent time trying to figure
+> out how MFC does it, but it is quite beyond me to follow
+> that particular code.
+> 
+> Does anyone have any suggestions?
+> 
+> --
+> Marty Wagner
+> marty@concentra.com
+> 
+> "Does the chichen need a reason?"
+
+Marty,
+
+The secret is in the CRichEditView constructor - it creates a window of 
+type "RICHEDIT" when creating a CRichEditView object.  It's defined as 
+follows:  
+
+CRichEditView::CRichEditView() : CCtrlView(_T("RICHEDIT") ...
+
+-- 
+--Chet Murphy
+ModelWorks Software
+cmurphy@modelworks.com
+http://www.modelworks.com/express
+
+-----From: "Scot Wingo" <scot_wingo@msn.com>
+
+
+Hi Marty,
+
+You made one big oversight in your analysis:
+
+C*View where * = RichEdit, Tree, etc.. are actually
+derived from CCtrlView.
+
+This ABT class does exactly what you want - it
+maps the CView architecture onto a control.
+
+For the total details check out:
+
+mfc\include\afxwin.h where it's declared and
+mfc\src\viewcore.cpp where it's implemented and
+mfc\src\viewcmn.cpp where CTreeView lives and
+mfc\src\viewrich.cpp where CRichEditView lives (be careful in here - it's 
+dangerous).
+
+I'm not sure how hard/easy it will be to map this to
+the Premia control - I think they have a MFC wrapper, but it's a
+crap shoot on how hard/easy this is going to be.  (They probably
+just wrap  a DLL so you'll have to get your hands pretty dirty before
+it's all over with..)
+
+HTH - let us know how it goes!
+
+Scot
+Stingray - http://www.unx.com/~stingray
+
+P.S.  There's more about CCtrlView in MFC Internals!
+<Addison Wesley ISBN 0-201-40721-3 in bookstores any second now!!>
+
+-----From: "Frederic Steppe" <FredericS@msn.com>
+
+Using a CFormView as the view may solve scrolling problems.
+
+Another solution is to make your CWnd-derived window be the view.  I sent an 
+example on how to do that (mainly for using multiple splitter views, but you 
+can do it with just one view and replace the splitter with any other CWnd) 
+some days ago. The subject was "Memory leak problem with Splitter window".
+
+Frederic Steppe (frederics@msn.com)
+-----From: "K.V.R.M.Rao" <kvrmrao@OPTIMASW.COM>
+
+Derive a class from CCtrlView class that comes with VC++ 4.1. Set
+the m_strClass variable to your tree class and m_dwDefaultStyle to
+window style you want. See the source code.
+
+ I hope it helps you.
+
+Rammohan
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+John Addis -- <A HREF="mailto:jaddis@erols.com">jaddis@erols.com</A>
+Sunday, May 19, 1996
+</B>
+Marty Wagner wrote:
+> 
+> VC++ 4.1 on NT 3.51
+> 
+> Their view class is very nicely implemented, in that it
+> encapsulates the control class as well.
+> CRichEditView inherits directly from CView,
+> and enhances CView with a number of functions. In addition,
+> it gives you access to the functionality in the
+> CRichEditCtrl without reimplementing or redefining
+> and delegating the functionality to a member variable
+> which contains the control. Instead, it allows you
+> to access the control using the GetRichEditCtrl()
+> function. This function is implemented as simply
+> casting the "this" pointer to CRichEditCtrl !!!
+
+You've obviously looked at the source since  you know how the 
+GetXxxCtrl() functions are implemented. Look at the Create() methods
+for these view classes. Rather than using an MFC generated name they
+use the predefined class name of the control class. So the window that
+gets created is in fact a control of the appropriate type, no matter 
+what MFC stuff happens to be along for the ride.
+
+
+-- 
+John Addis        Master of Time and Space
+jaddis@erols.com  C++, MFC, Win32, Win95, TCP/IP
+"Invalid or missing REALITY.COM Universe halted."
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

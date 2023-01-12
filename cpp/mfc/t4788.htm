@@ -1,0 +1,142 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CCmdTarget subclasses and OLE Automation
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Dan L. Pierson -- <A HREF="mailto:dan@cthulhu.control.com">dan@cthulhu.control.com</A>
+Wednesday, April 17, 1996
+</B>
+VC++/MFC 4.1 / NT 4.0b1
+
+I'm a bit confused about the interaction of CCmdTarget support for OLE =
+automation and C++ derivation.  Given a class hierarchy like the =
+following:
+
+class ParseTreeNode : CCmdTarget
+{
+   // Dispatch map, etc.  Maybe Interface map as well.
+   // EnableAutomation() called in constructor
+   virtual void SomeMethod();
+   SCODE DispDoSomeMethod();
+}
+
+SCODE ParseTreeNode::DispDoSomeMethod()
+{
+   SomeMethod();
+   return S_OK;
+}
+
+class FirstLevelNode : ParseTreeNode
+{
+   ...
+}
+
+class SecondLevelNode : FirstLevelNode
+{
+   ...
+   virtual something SomeMethod();
+}
+
+For this example, no class but ParseTreeNode explicitly implements any =
+OLE automation support.  In my real hierarchy there is one direct child =
+of ParseTreeNode that needs to implement an additional dispatch =
+interface (or additional methods but I think an additional interface may =
+be cleaner).  The actual hierarchy is about four levels deep and =
+ParseTreeNode is an abstract base class.
+
+I'd like to pass an instance of SecondLevelNode as an LPDISPATCH by
+passing the result of ParseTreeNode::GetIDispatch(), i.e. it's inherited =
+IDispatch*. =20
+
+I'd like all calls on the passed IDispatch to wind up calling virtual =
+functions in the SecondLevelNode.
+
+Is this reasonable?  Do I have to implement empty dispatch maps, etc. in =
+all descendant classes?
+
+Dan Pierson, Control Technology Corporation	<dan@control.com>
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+William Cook -- <A HREF="mailto:wcook@msn.com">wcook@msn.com</A>
+Saturday, April 20, 1996
+</B>
+>I'd like all calls on the passed IDispatch to wind up calling virtual
+>functions in the SecondLevelNode.
+>Is this reasonable?  Do I have to implement empty dispatch maps, etc. in
+>all descendant classes?
+
+This is reasonable, and it works without a great deal of hassle. There are, 
+however, a few things you should be aware of.
+
+First, you will have some problems creating an abstract base class, because of 
+the constraints of IMPLEMENT_DYNCREATE, so you will need to look at the MFC 
+FAQ to find out how to do this. 
+
+Second, the DISPIDs of your derived classes will differ from those of their 
+base classes. For example, if class CMyAbstractBaseClass has a property 
+"MyProp" with a dispid of 0x00000001, then the derived class 
+CMyFirstLevelDerivedClass will inherit a property "MyProp" with a dispid of 
+0x00010001, and a further derived class CMySecondLevelDerivedClass will 
+inherit a property "MyProp" with a dispid of 0x00020001, etc. This behavior is 
+described in Tech Note TN039, and it is very annoying when trying to provide a 
+set of COleDispatchDriver-derived classes for a C++ client. You cannot have a 
+corresponding class hierarchy there unless you do some funcky things to make 
+sure you're using the right DISPIDs for the current object or call 
+GetDispIDsOfNames each time you want to invoke a property.
+
+Third, the type library that classwizard generates will not be entirely 
+correct, in that the derived classes will not have their inherited methods in 
+the type lib. You will therefore need to edit the type lib yourself to 
+maintain the inherited methods and properties, which is just as well given 
+that the DISPIDs are all messed up anyway.
+
+Good luck,
+Bill Cook _/)_
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

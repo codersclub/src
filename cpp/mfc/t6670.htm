@@ -1,0 +1,270 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+timer disabled on drag?
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Gene Sewell -- <A HREF="mailto:genes@fast.net">genes@fast.net</A>
+Sunday, September 08, 1996
+</B>
+Hi,
+
+Environment: MSVC 4.1, NT 3.51
+
+I'm trying to use a timer to help me draw flashing focused rectangles
+illuminating the target of a drag operation.  
+
+I've installed a timer, but I'm having problems.  Using either a timer proc
+or just the wm_timer message handling, I get exactly one callback and
+then... no more.
+
+I had a hope that the problem was that DragEnter locks updates to the
+window, so I surrounded the timer code with DragLeave and then DragEnter.
+That didn't help.
+
+Anyone else have problems with timers during the drag?  Any ideas on how to
+get it to work?
+
+Here's a snip of my timer code:
+
+void CCommonListView::OnTimer(UINT nIDEvent) 
+{
+        // unlock the window and hide drag image
+	mx_pApp->m_pimageListDrag->DragLeave(mx_pApp->mx_DestList); 
+
+        // this draws a flashing focus rectangle on the current target
+	FlashDropTarget();
+
+        // call the default handler as well....
+	CListView::OnTimer(nIDEvent);
+
+        // lock updates and show drag image
+	mx_pApp->m_pimageListDrag->DragEnter(this, mx_pApp->mx_CurrentPos);  
+}
+
+Thanks!
+
+Gene
+----
+The game of life is a game of boomerangs. Our thoughts, deeds and words
+return to us sooner or later with astounding accuracy. 
+	-Florence Scovel Shinn
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+David Ohlssen -- <A HREF="mailto:DAVIDO@COMMERCE.CTECH.AC.ZA">DAVIDO@COMMERCE.CTECH.AC.ZA</A>
+Monday, September 09, 1996
+</B>
+>I've installed a timer, but I'm having problems.  Using either a timer proc
+>or just the wm_timer message handling, I get exactly one callback and
+>then... no more.
+>Thanks!
+>
+>Gene
+
+It also disables timer messages while you hold down a button
+while on the title bar, whether or not you move the mouse.
+
+Easiest way around is to try OnIdle - hopefully those
+messages get through!  You will have to read COleDateTime
+to get a "real-time" indication of how much time has
+elapsed because OnIdle is called erratically when
+the wndproc is busy.
+
+If all else fails, open a worker thread that Sleeps for a
+short time and then based on a flag stored in the app,
+sends your view a suitable message - I'm not sure what.
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Chris Scott -- <A HREF="mailto:cscott@aceltd.com">cscott@aceltd.com</A>
+Monday, September 09, 1996
+</B>
+[Mini-digest: 2 responses]
+
+<<
+I'm trying to use a timer to help me draw flashing focused rectangles
+illuminating the target of a drag operation.  
+
+I've installed a timer, but I'm having problems.  Using either a timer proc
+or just the wm_timer message handling, I get exactly one callback and
+then... no more.
+
+Anyone else have problems with timers during the drag?  Any ideas on how to
+get it to work?
+>>
+
+Yeah, don't call the base class implementation.
+Remove this line...
+
+<<
+	// call the default handler as well....
+	CListView::OnTimer(nIDEvent);
+>>
+
+- Chris Scott
+- Useless stuff that looks bad w/o a Terminal font goes here.
+
+-----From: Danny Lauwers <dlauwers@innet.be>
+
+Hello,
+
+The timer and drawing messages are kept in the threads message queue until
+there are no other messages. Maybe it is because you are dragging that the
+timer message are not coming through. You could use a UIThread that does the
+updating. Multimedia timer are out of the question because you can't do much
+inside the callback routine.
+
+Hope this helps
+Danny Lauwers
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Kelly Capelli -- <A HREF="mailto:capelli@waste.org">capelli@waste.org</A>
+Monday, September 09, 1996
+</B>
+
+Hi Gene..  Remember that timer messages get pushed to the back of the
+message queue (even behind WM_PAINT messages).  So if you're somehow
+causing a paint message, but you're not instantiating a CPaintDC class in
+your OnPaint handler, you'll get an endless queue of WM_PAINT messages and
+you'll never see your timer messages again.  This happened to me 2 weeks
+ago and may or may not be your problem.  Have you tried spy-ing to see if
+you're getting a bunch of paint message?  -Angela
+
+On Sun, 8 Sep 1996, Gene Sewell wrote:
+
+> Environment: MSVC 4.1, NT 3.51
+> 
+> I'm trying to use a timer to help me draw flashing focused rectangles
+> illuminating the target of a drag operation.  
+> 
+> I've installed a timer, but I'm having problems.  Using either a timer proc
+> or just the wm_timer message handling, I get exactly one callback and
+> then... no more.
+> 
+> Anyone else have problems with timers during the drag?  Any ideas on how to
+> get it to work?
+> 
+> Here's a snip of my timer code:
+> 
+> void CCommonListView::OnTimer(UINT nIDEvent) 
+> {
+>         // unlock the window and hide drag image
+> 	mx_pApp->m_pimageListDrag->DragLeave(mx_pApp->mx_DestList); 
+> 
+>         // this draws a flashing focus rectangle on the current target
+> 	FlashDropTarget();
+> 
+>         // call the default handler as well....
+> 	CListView::OnTimer(nIDEvent);
+> 
+>         // lock updates and show drag image
+> 	mx_pApp->m_pimageListDrag->DragEnter(this, mx_pApp->mx_CurrentPos);  
+> }
+-> 
+> Thanks!
+> 
+> Gene
+> ----
+> The game of life is a game of boomerangs. Our thoughts, deeds and words
+> return to us sooner or later with astounding accuracy. 
+> 	-Florence Scovel Shinn
+> 
+
+--
+  Kelly Capelli            capelli@waste.org
+  HOW RUDE!!
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Gene Sewell -- <A HREF="mailto:genes@fast.net">genes@fast.net</A>
+Tuesday, September 10, 1996
+</B>
+[Mini-digest: 2 responses]
+
+Hi all,
+
+Just to complete the thread....  I got a lot of suggestions, all of which
+were enlightening.  As it turned out, I changed one line of code, and fixed
+the problem.
+
+As soon as I commented out the default timer proc, everything worked just fine!
+//	CListView::OnTimer(nIDEvent);
+
+Thanks to all!
+
+Gene
+----
+     The universe is full of magical things, patiently waiting
+        for our wits to grow sharper.   -- Eden Phillpotts
+
+-----From: Kelly Capelli <capelli@waste.org>
+
+
+Hi Gene..  Remember that timer messages get pushed to the back of the
+message queue (behind WM_PAINT messages).  So if you're somehow
+causing a paint message, but you're not instantiating a CPaintDC class in
+your OnPaint handler, you'll get an endless queue of WM_PAINT messages and
+you'll never see your timer messages again.  This happened to me 2 weeks
+ago and may or may not be your problem.  Have you tried spy-ing to see if
+you're getting a bunch of paint message?  -Angela
+
+--
+  Kelly Capelli            capelli@waste.org
+  HOW RUDE!!
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

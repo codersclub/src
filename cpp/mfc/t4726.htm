@@ -1,0 +1,255 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+MFC and OCXs, installation issues
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Crucial Software -- <A HREF="mailto:crucial@ix.netcom.com">crucial@ix.netcom.com</A>
+Sunday, April 14, 1996
+</B>
+Environment: VC++ 4.1, Win95
+
+I'm planning on using a couple of the OCXs that come with VC++ 4.1
+in my application.  What installation issues do I need to consider?
+With VBXs, you only needed to copy the file(s) to the Windows system
+directory.
+
+Do I need to manually replicate the registry entries for the OCX?  Or
+do I simply need to copy the OCX to the system directory?  Or ... ?
+
+Thanks in advance for answers that I like... :-)
+Brad
+
+--
+Brad Wilson, Crucial Software     crucial@ix.netcom.com    +1 (810) 620-9803
+Custom software engineering services for Microsoft Windows NT and Windows 95
+
+  "You wear guilt . Like shackles on your feet . Like a halo in reverse
+   I can feel . The discomfort in your seat . And in your head it's worse"
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Grant Shirreffs Great Elk -- <A HREF="mailto:Grant.S@greatelk.co.nz">Grant.S@greatelk.co.nz</A>
+Wednesday, April 17, 1996
+</B>
+[Mini-digest: 5 responses]
+
+I've always just used the REGSVR32.EXE utility (or at least its   
+functionality - it's pretty easy to duplicate).  This just calls the   
+DllRegisterServer(void) function, which should then handle everything   
+from there.
+
+Grant Shirreffs
+grant.s@greatelk.co.nz
+
+-----From: "John Elsbree" <elsbree@msn.com>
+
+Brad -
+
+Refer to the article "OLE Controls: Distributing OLE Controls" in the VC++ 
+Books Online. It's mainly written for someone who wants to ship OLE controls 
+that they have written themselves, but it also applies to redistributing OLE 
+controls that are used by an app.
+
+By the way, I'd really like to bring to the attention of MFC-L readers the 
+existence of a full-text index that's built into the VC++ Books Online. It's 
+very powerful, and could probably answer a fair number of the questions that 
+get posted to the list. To access it, just choose Help/Search from the menu, 
+and click on the "Query" tab.
+
+For example, I found the answer to this question by running a query for the 
+words "install OLE control".
+
+John (not speaking for Microsoft)
+
+-----From: Steve Loughran <slo@hplb.hpl.hp.com>
+
+1. You need to install the OCXs as you would any shared DLL in win95:
+ -install it into the system[32] directory if the version checking
+  functions say you should
+ -update the registry to note your apps use of the OCX in the
+  Windows\CurrentVersion\SharedDLLs (see win95 prog guide ch. 10)
+
+2. You need to get the OCx to register itself. REGSVR32'll do this,
+and the source of this app comes with VCC so you can add it to your
+installer.
+
+3. You also need to distribute *and* self register MFC40.DLL,
+and OLEPRO32.DLL. The last is often easy to forget, but you won't get
+property sheets without it, and failing to self-reg MFC40.DLL is a
+mistake I've done before now.
+
+4. Dont distribute the .LIC file with the same name as the OCX, that's
+what's used to distinguish developers from mere end-users.
+
+Hope this helps,
+	-Steve
+-----From: Mike Moskowitz <mmoskowitz@jetsoft.com>
+
+Hi Brad,
+
+OCXs definitely require a bit of care during installation and uninstallation.
+
+First, most OCXs are "self-registering." That means that they contain an exported
+function called "DllRegisterServer" which you can invoke, with no arguments, to
+ask an OCX to register itself. The result of this process will be numerous entries
+in the CLSID section of your enduser's registry, and possibly other registry entries
+as well.
+
+How do you know if your OCX is self-registering? Well, there's supposed to be a
+string entry in the OCX's version info announcing this fact, but many don't seem
+to follow this convention. The easiest way is to run "regsvr32 <name>.ocx from
+a command line, and see what it says. You can also register the OCX by using
+this command line instead of calling DllRegisterServer yourself. If your OCX is
+not self-registering, you probably have a .reg file that came with the OCX. You
+can call an API to merge these entries with your enduser's registry.
+
+Second, put the OCX in the "proper place." If your OCX is "general purpose," than 
+ it should go in the Windows System directory. If the OCX is used by several of 
+your applications but is not truly universal, you are supposed to create a directory 
+\Program Files\Common Files\<Company or Subsystem>\. Note that the 
+"common files" directory might not be \Program Files\Common Files, there is a 
+registry entry that points to this.
+
+Third, you are supposed to do what is called "reference counting" for any shared 
+components, such as OCXs. For each time one of these files is installed, you
+increment the DWORD count for that file in HKEY_LOCAL_MACHINE\Software\Microsoft\
+Windows\CurrentVersion\SharedDLLs. Upon uninstall of your application, you
+decrement that count. If the count is then zero, you are supposed to ask the user
+if they want to delete the file or leave it there. Since it only takes a single non-
+reference-counting application to screw up this mechanism, you should very strongly
+suggest to the enduser that they *not* choose to delete these shared files. 
+Examples of non-compliant applications include Microsoft Access 7.0.
+
+Fourth, during uninstall, if the user agreed to remove your OCX, you should call the
+OCX's "DLLUnregisterServer" function. Of course, you need to do this before you delete
+the file or any of it's dependents.
+
+Yes, this is a lot of work to use an OCX properly; these are the "guidelines" that 
+Microsoft has promulgated for setups under Windows 95 (and NT 4). You need to follow 
+these guidelines if you want to apply for the Windows 95 logo (you send your program
+and setup to VeriTest, Inc., and they do test for this with an automated registry compare
+tool).
+
+Here's the code we use (from InstallWizard for MFC) to register any self-registering OCXs or
+DLLs:
+
+typedef enum 
+{
+	SELFREG_SUCCESS = 0,
+	SELFREG_LOADLIBRARY,
+	SELFREG_NOSELFREG,
+	SELFREG_SELFREGFAILED
+} SelfRegisterError;
+
+typedef HRESULT (STDAPICALLTYPE *CTLREGPROC)(void) ; //see COMPOBJ.H
+
+
+const char * const szRegisterFunctionName = "DllRegisterServer";
+const char * const szUnregisterFunctionName =	"DllUnregisterServer";
+
+#ifdef _WIN32
+#define LOADLIBRARY_FAILED(x) (x == 0)
+#else
+#define LOADLIBRARY_FAILED(x) (x <= HINSTANCE_ERROR)
+#endif
+
+
+SelfRegisterError SelfRegisterDLL (LPCSTR lpszPath, 
+   			              LPCSTR lpszFunctionName)
+{
+	BOOL	bResult = FALSE;
+	ASSERT(lpszPath != NULL);
+
+	HINSTANCE hModule = ::LoadLibrary (lpszPath);
+	if (LOADLIBRARY_FAILED(hModule)) 
+		return SELFREG_LOADLIBRARY;
+
+	CTLREGPROC DLLRegisterServer = (CTLREGPROC) ::GetProcAddress(hModule,lpszFunctionName);
+	if (DLLRegisterServer == NULL)
+	{
+		::FreeLibrary (hModule);
+		return SELFREG_NOSELFREG;
+	}
+
+	HRESULT hResult = DLLRegisterServer();
+	::FreeLibrary (hModule);
+
+	if (hResult == NOERROR)
+		return SELFREG_SUCCESS;
+	else
+		return SELFREG_SELFREGFAILED;
+}
+
+If you have any questions about registration or other install issues, just ask. We love this stuff <grin>
+
+Gratuitous plug: We make InstallWizard for MFC, a AppWizard-like tool that generates the full MFC
+source code for your install and uninstall, with proper self-registration, version checking, etc. The
+code above is from our tool.
+
+Regards, Mike.
+_______________________________________________________________________
+Mike Moskowitz, Jetstream Software, Inc. 
+voice: (206) 827-9273, (800) MFC-GURU
+Internet: mmoskowitz@jetsoft.com www.jetsoft.com/jetstrm/
+CompuServe: GO JETSTREAM -or- 74777,3362 
+Makers of InstallWizard, the MFC install and uninstall source code generator
+
+-----From: craigtt@ccmail.PE-Nelson.COM
+
+ Brad,
+ 
+ Here is one way to get your control registered.  OCXs are self registering 
+ to the extent that they are required to export the DLLRegisterServer 
+ function.  See the REGSVR example in MSDEV\SAMPLES\MFC\CONTROLS\REGSVR to 
+ see how to use this function.
+ 
+ Tim Craig
+ PE-Nelson
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

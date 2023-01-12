@@ -1,0 +1,260 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+C2674 Error W/ Derived Class Operator=
+</B></FONT>
+<BR>
+<PRE>
+<B>
+William G Dempsey -- <A HREF="mailto:DEMPSEY@dempsey.com">DEMPSEY@dempsey.com</A>
+Monday, August 26, 1996
+</B>
+Environment: VC 1.52, MFC 2.52, WfW 3.11
+
+I am getting an error message C2674: '=' : no acceptable conversions
+from 'int' to 'class ::CWDString' from code that attempts to initialize
+a variable.
+
+The variable is "RecVer" (shown below) declared as CWDString wich is a
+class derived from CString.  CWDString has a empty constructor.  I was
+expecting that the operator = implementation of the base class would be
+available in the derived class.
+
+Perhaps I am misinterpreting the error message.
+
+Any ideas?
+
+Thanks in advance,
+William
+
+   class CWDString : public CString
+   {
+   <snip>
+   };
+
+   void  CWDConfig::InitCfg()
+   {
+   	CWDString   RecVer;
+   <snip>
+   	RecVer    =  "00";    //  This is line 42
+   <snip>
+   }
+
+   clas.cpp(42) : error C2674: '=' : no acceptable conversions from 'int'
+   to 'class ::CWDString'
+
+
+------------------------------------------------------------------------------
+ William G Dempsey     William G Dempsey & Associates     Tel: (408) 248-0544
+                            840 Jefferson Street          FAX: (408) 248-0544
+ dempsey@dempsey.com       Santa Clara, CA  95050
+------------------------------------------------------------------------------
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+John Young -- <A HREF="mailto:jyoung@gol.com">jyoung@gol.com</A>
+Thursday, August 29, 1996
+</B>
+[Mini-digest: 10 responses]
+
+Hi William, 
+
+----------
+> From: William G Dempsey <DEMPSEY@dempsey.com>
+> To: mfc-l@netcom.com
+> Subject: C2674 Error W/ Derived Class Operator=
+> Date: 27 August 1996 11:34am
+> 
+> Environment: VC 1.52, MFC 2.52, WfW 3.11
+> 
+> I am getting an error message C2674: '=' : no acceptable conversions
+> from 'int' to 'class ::CWDString' from code that attempts to initialize
+> a variable.
+> 
+> The variable is "RecVer" (shown below) declared as CWDString wich is a
+> class derived from CString.  CWDString has a empty constructor.  I was
+> expecting that the operator = implementation of the base class would be
+> available in the derived class.
+> 
+> Perhaps I am misinterpreting the error message.
+> 
+> Any ideas?
+
+Yup.  Derived classes do not inherit constructors and overloaded operators.
+ You have to re-do them yourself in the derived class.  Its a pain, I know,
+but cannot be avoided.
+
+-John
+
+ 
+
+-----From: "Tomasz Pawlowski" <tomasz@ix.netcom.com>
+
+Just add one more constructor:
+
+  CWDString(const char *s):CString(s) { }
+
+This allows to construct CWDConfig object from 'const char*' (i.e. from
+"00"), and then in your statement
+    	RecVer    =  "00";    //  This is line 42
+memberwise copy will be applied (assuming that you didn't implement
+assignment operator).
+
+Tomasz
+tomasz@ix.netcom.com
+
+-----From: "S. Balachandar" <chandar@wings.xko.dec.com>
+
+Hi!,
+
+The problem in your case is, the '=' operator is not inherited!!!.
+
+Please note : The only operator that is not Inherited is the assignment                      operator!!.
+
+I think this helps you.
+
+Regards
+Bala
+
+-----------------------------------------------------------------------------------------------------------------
+S. Balachandar                                e-mail : chandar@adca01.enet.dec.com
+Software Engineer                             Phone  : 3370445 Ext : 479
+Digital Equipment (I) Ltd.,                   Fax    : 3371498
+Digital House, 45/14 Tumkur Road,   
+Yeshwanthpur II Stage,                    
+Bangalore 560 022.                          
+-----From: IAND@wcom.co.uk
+
+
+You're not misinterpreting the message.
+operator=3D is not inherited by a derived class.
+You'll need to explicitly declare operator=3D and cut and paste some code f=
+rom=20
+the MFC sources.
+
+-----From: Dean Henkel <Dean_Henkel@mixcom.com>
+
+You still need to overload the = operator for the type of 
+operation you are  performing.  The other alternative is to 
+initialize all data members of RecVer in the constructor of 
+CWDString.  My preferred way assuming you never need to 
+re-initialize.
+
+
+Dean
+-----From: Zhilin Li <zhilin@infolytica.qc.ca>
+
+According to Bjarne Stroustrup's book "The C++ Programming Language",
+operator functions are inherited except operator=().
+
+Have a nice day!
+
+Zhilin
+
+--
+
+
+ =====================================================================
+ Zhilin Li                           Infolytica Corporation        
+ Software Developper                 300 Leo Pariseau #2222          
+ Tel: (514) 849-8752 ext. 252        P.O.Box 1144, Place du Parc  
+ Fax: (514) 849-4239                 Montreal, QC, Canada, H2W 2P4    
+ e-Mail: zhilin@infolytica.qc.ca                            
+ =====================================================================
+
+-----From: David Little <dlittle@communique.net>
+
+You need to write your own "operator =".  Operators aren't inherited.
+Here is an example:
+
+class CMyString : public CString
+{
+	<snip, as you say>
+
+public:
+operator=(LPCSTR str)
+{
+  <probably>
+  char* s = GetBuffer(strlen(str));  //allocate memory from CString
+  strcpy(s,str);                     //copy string
+  ReleaseBuffer();                   //release memory
+  FreeExtra();                       
+}
+
+};
+
+You can also write operators for other data types.  I have a
+CString-derived class that accepts ints, longs, and floats as
+assignment.  I just do a Format() when I get those....
+
+Hope this helps!
+David
+
+-----From: "Lee, Benny" <blee@filenet.com>
+
+
+operator= and the copy ctor is not inherited.
+
+Benny
+-----From: Peter Turpin <peter.turpin@northnet.com>
+
+>From VC 1.52 
+C++ Language help
+
+
+The assignment operator has some additional restrictions. It can be
+overloaded only as a nonstatic member function, not as a friend
+function. It is the only operator that cannot be inherited; a derived
+class cannot use a base class's assignment operator.----------
+-----From: "(Bobby)Babak Lashkari" <bobbi@portal.ca>
+
+overloaded operator = is not inherited and neither is the copy constructor.
+you should implement a operator = for your new class and copy the code from
+CString::operator =.
+
+Babak Lashkari (604)221-8996
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

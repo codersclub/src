@@ -1,0 +1,309 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+How to show progress control in Status bar pane
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Uma Shankar -- <A HREF="mailto:Uma_Shankar@countrywide.com">Uma_Shankar@countrywide.com</A>
+Tuesday, March 26, 1996
+</B>
+hi all,
+Can some one suggest me, on how to show progress bar on the status bar.  
+I tried this way.
+Created a dialog with a progress bar control in it.  
+Added the Resource id of the dialog to the indicators array in mainfrm.cpp
+Added onupdate command UI hander for this id..
+
+Am i goofing? If so please let me know the way to do it
+thanks in advance
+shankar
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Jim Leavitt -- <A HREF="mailto:jimll@halcyon.com">jimll@halcyon.com</A>
+Saturday, March 30, 1996
+</B>
+Uma Wrote....
+----------
+Can some one suggest me, on how to show progress bar on the status bar.  
+I tried this way.
+Created a dialog with a progress bar control in it.  
+Added the Resource id of the dialog to the indicators array in mainfrm.cpp
+Added onupdate command UI hander for this id..
+I Reply....
+
+Uma:
+I've done this, my application is MDI, here's what I did:
+1.  Added to CMainFrame:
+a public CProgressCtrl pointer....
+
+public:
+	CProgressCtrl* m_pCtrlMainProgress;
+
+	BOOL bProgressCreated;	// flag  is progress ctrl created?
+	void CreateProgressCtrl();	// create the progress ctrl
+	BOOL ShowProgressCtrl(BOOL bShow);	// show it or hide it
+	BOOL SetProgress(int nPercent);			// set the progress thus far
+	BOOL StepProgressCtrl();					// step it as necessary
+
+with these implementations...
+
+BOOL CMainFrame::ShowProgressCtrl(BOOL bShow)
+{
+	if (bShow == TRUE)
+	{
+		if (bProgressCreated == FALSE)
+			CreateProgressCtrl();
+
+		m_pCtrlMainProgress->ShowWindow(SW_SHOW);
+	}
+	else
+		m_pCtrlMainProgress->ShowWindow(SW_HIDE);
+	return TRUE;
+}
+
+BOOL CMainFrame::SetProgress(int nPercent)
+{
+	if (bProgressCreated == FALSE)
+		CreateProgressCtrl();
+
+	m_pCtrlMainProgress->SetPos(nPercent);
+	return TRUE;
+}
+
+BOOL CMainFrame::StepProgressCtrl()
+{
+	if (bProgressCreated == FALSE)
+		CreateProgressCtrl();
+	m_pCtrlMainProgress->StepIt();
+	return TRUE;
+}
+
+void CMainFrame::CreateProgressCtrl()
+{
+	m_pCtrlMainProgress = new CProgressCtrl();
+	CRect rProgressRect;
+	
+	m_wndStatusBar.SetPaneText(ID_SEPARATOR,"");
+
+	m_wndStatusBar.GetItemRect(ID_SEPARATOR, &rProgressRect);
+	rProgressRect.DeflateRect(1,1);		// 1 pixel border...
+	rProgressRect.right = 200;
+	m_pCtrlMainProgress->Create(WS_CHILD, rProgressRect, &m_wndStatusBar, 4 );
+	m_pCtrlMainProgress->SetRange(0,100);
+	m_pCtrlMainProgress->SetStep(10);
+	m_pCtrlMainProgress->ShowWindow(SW_HIDE);
+	bProgressCreated = TRUE;
+}
+
+Then later, when I need it, I call the below from an importing routine...
+
+	CMainFrame* wndpMainWnd = ((CInspectorApp*) AfxGetApp())->m_pMainFrame;
+	wndpMainWnd->SetProgress(0);
+	wndpMainWnd->ShowProgressCtrl(TRUE);
+	wndpMainWnd->UpdateWindow();
+
+and step it with...
+wndpMainWnd->SetProgress(nProgress);
+where nProgress is an integer representing the progress thus far...
+
+Finally, when the app end, the CMainFrame destructor deletes it...
+CMainFrame::~CMainFrame()
+{
+	if (bProgressCreated == TRUE)
+		delete m_pCtrlMainProgress;
+}
+
+I'm not saying this is the best way to handle it, hope this helps!
+Jim Leavitt...
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Niels Ull Jacobsen -- <A HREF="mailto:nuj@kruger.dk">nuj@kruger.dk</A>
+Monday, April 01, 1996
+</B>
+At 18:16 26-03-96, you wrote:
+>hi all,
+>Can some one suggest me, on how to show progress bar on the status bar.  
+>I tried this way.
+>Created a dialog with a progress bar control in it.  
+>Added the Resource id of the dialog to the indicators array in mainfrm.cpp
+>Added onupdate command UI hander for this id..
+>
+>Am i goofing? If so please let me know the way to do it
+Basically, yes :-)
+
+I think the easiest way to do what you want is to draw the progress bar
+yourself, 
+not using the standard control.
+
+Use m_StatusBar.GetStatusBarCtrl().SetText("", 2, SBT_OWNERDRAW); // assume
+progress control is in pane 2
+
+Subclass m_StatusBar to handle WM_DRAWITEM. Draw the progress bar using two
+FillSolidRect's.
+
+ 
+
+>thanks in advance
+>shankar
+>
+>
+>
+Niels Ull Jacobsen, Krьger A/S (nuj@kruger.dk)
+Everything stated herein is THE OFFICIAL POLICY of the entire Kruger group
+and should be taken as legally binding in every respect. Pigs will grow
+wings and fly.
+
+
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Frank McGeough -- <A HREF="mailto:frankhm@synchrologic.com">frankhm@synchrologic.com</A>
+Wednesday, April 03, 1996
+</B>
+Niels Ull Jacobsen wrote:
+> 
+> At 18:16 26-03-96, you wrote:
+> >hi all,
+> >Can some one suggest me, on how to show progress bar on the status bar.
+> >I tried this way.
+> >Created a dialog with a progress bar control in it.
+> >Added the Resource id of the dialog to the indicators array in mainfrm.cpp
+> >Added onupdate command UI hander for this id..
+> >
+> >Am i goofing? If so please let me know the way to do it
+> Basically, yes :-)
+> 
+> I think the easiest way to do what you want is to draw the progress bar
+> yourself,
+> not using the standard control.
+> 
+> Use m_StatusBar.GetStatusBarCtrl().SetText("", 2, SBT_OWNERDRAW); // assume
+> progress control is in pane 2
+> 
+> Subclass m_StatusBar to handle WM_DRAWITEM. Draw the progress bar using two
+> FillSolidRect's.
+
+I don't necessarily agree that drawing yourself is the easiest. I think
+they are both relatively easy (but drawing yourself works under Win 3.1).
+
+To put the progress control in the status bar, I would use a couple of
+indicator arrays (that arrays of ids declared in mainfrm.cpp in a appwizard
+created app). For example, 
+
+UINT TheIndicators[] =
+{
+    ID_SEPARATOR,           // status line indicator
+    ID_INDICATOR_TIME	    // clock
+};
+
+UINT TheProgressIndicators[] =
+{
+    ID_SEPARATOR,           // status line indicator
+    ID_INDICATOR_PROGRESS,  // our progress bar
+    ID_INDICATOR_TIME       // clock
+};
+
+Have a pointer to a CProgressCtrl member variable in your view or 
+CMainFrame class. When you want to display the progress bar call 
+something like the following routine.
+
+BOOL CSvsyncView::CreateProgressBar()
+{
+    BOOL bSuccess = TRUE;
+    RECT rect;
+    CStatusBar* pStatusBar = 0;
+
+    if (!m_pProgress)
+        m_pProgress = new CProgressCtrl;
+
+    // get the status bar from CFrameWnd
+    pStatusBar = GetStatusBar();
+    ASSERT(pStatusBar);
+
+    if (pStatusBar)
+    {
+        pStatusBar->SetIndicators(TheProgressIndicators,
+                                  sizeof(TheProgressIndicators)/sizeof(UINT));
+        int nIndex = pStatusBar->CommandToIndex(ID_INDICATOR_PROGRESS);
+        ASSERT(nIndex >= 0);
+ 
+        // confine our progress control to the indicator area
+        pStatusBar->GetItemRect( nIndex, &rect);
+        rect.top += 1;
+        rect.bottom -= 1;
+        rect.left += 1;
+        rect.right -= 1;
+
+        m_pProgress->Create( WS_VISIBLE | WS_CHILD , 
+                             rect, 
+                             pStatusBar, 
+                             IDC_PROGRESS_CONTROL);
+        m_pProgress->SetStep(1);
+        SetPaneText("Ready");
+    }
+
+    return bSuccess;
+}
+
+When you are done showing progress simply flip the indicators back using
+the SetIndicators call and passing in 'TheIndicators'.
+__________________________________________________
+Frank McGeough      frankhm@synchrologic.com
+Synchrologic, Inc. (http://www.synchrologic.com/)
+Voice: 404.876.3209            Fax: 404.876.3809
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

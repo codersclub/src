@@ -1,0 +1,498 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Rotating a bitmap
+</B></FONT>
+<BR>
+<PRE>
+<B>
+R. Kevin Burton -- <A HREF="mailto:kburton@mail.tds.net">kburton@mail.tds.net</A>
+Friday, November 15, 1996
+</B>
+Environment: VC++ 4.1, WinNT 3.51
+
+I am having more trouble than I expected with rotating a bitmap. I can
+rotate the bitmap by integral multiples of 90 degrees with no problem
+and the other angles do rotate but I am getting what looks like a
+shearing effect that I did not expect.
+
++-----+              +-----+
+|     |               \     \
+|     |    --->        \     \
+|     |                 \     \
+|     |                  \     \
++-----+                   +-----+
+
+Here is the code:
+
+The transformation:
+
+-------------------------------------------------------
+
+        //                       |1   0   0|  
+        // |x' y' 1| = |x y 1| * |0   1   0|  
+        //                       |Dx  Dy  1| 
+
+        XFORM translateDownTransform;
+
+        translateDownTransform.eM11 = 1.0f;
+        translateDownTransform.eM12 = 0.0f;
+        translateDownTransform.eM21 = translateDownTransform.eM12;
+        translateDownTransform.eM22 = translateDownTransform.eM11;
+        translateDownTransform.eDx = -(float)pDib->GetWidth()/2;
+        translateDownTransform.eDy = -(float)pDib->GetHeight()/2;
+
+        // |x' y'| == |x y| * | cos A   sin A|  
+    //                    |-sin A   cos A|
+
+        XFORM rotationTransform;
+        rotationTransform.eM11 = (float)cos(m_fRotation);
+        rotationTransform.eM12 = (float)sin(m_fRotation);
+        rotationTransform.eM21 = rotationTransform.eM12;
+        rotationTransform.eM22 = rotationTransform.eM11;
+        rotationTransform.eDx = 0.0f;
+        rotationTransform.eDy = 0.0f;
+
+        //                       |1   0   0|  
+        // |x' y' 1| = |x y 1| * |0   1   0|  
+        //                       |Dx  Dy  1| 
+
+        XFORM translateUpTransform;
+
+        translateUpTransform.eM11 = 1.0f;
+        translateUpTransform.eM12 = 0.0f;
+        translateUpTransform.eM21 = translateUpTransform.eM12;
+        translateUpTransform.eM22 = translateUpTransform.eM11;
+        translateUpTransform.eDx = (float)pDib->GetWidth()/2;
+        translateUpTransform.eDy = (float)pDib->GetHeight()/2;
+
+        CombineTransform(&m_currentTransform, &m_originalTransform,
+&translateDownTransform);
+        CombineTransform(&m_currentTransform, &m_currentTransform,
+&rotationTransform);
+        CombineTransform(&m_currentTransform, &m_currentTransform,
+&translateUpTransform);
+
+        Invalidate();
+
+-------------------------------------------------------
+
+Now the Drawing:
+
+-------------------------------------------------------
+        CRect rcDraw;
+        CLineAcqDoc* pDoc = GetDocument();
+        CDib *pDib = pDoc->GetDIB();
+        GetClientRect(rcDraw);
+        // Get the clip box.
+        CRect rcClip;
+        pDC->GetClipBox(rcClip);
+
+        // Create a rect for the DIB.
+        CRect rcDIB;
+        rcDIB.left = rcDIB.top = 0;
+        rcDIB.right = pDib->GetWidth() - 1;
+        rcDIB.bottom = pDib->GetHeight() - 1;
+
+        // Find a rectangle that describes the intersection of the draw
+        // rect, clip rect, and DIB rect.
+        // CRect rcBlt = rcDraw & rcClip & rcDIB;
+
+        CRect rcBlt = rcClip & rcDIB;
+       // Copy the update rectangle from the off-screen DC to the
+       // window DC. Note that the DIB origin is the bottom-left corner.
+       int w, h, xs, xd, yd, ys;
+       w = rcBlt.right - rcBlt.left;
+       h = rcBlt.bottom - rcBlt.top;
+       xs = xd = rcBlt.left;
+       ys = rcBlt.top;
+       yd = rcBlt.top;
+
+       // If we have a palette, select and realize it.
+       CPalette *pPalette = pDib->GetPalette();
+       CPalette *pOldPalette = NULL;
+       pOldPalette = pDC->SelectPalette(pPalette, FALSE);
+       pDC->RealizePalette();
+
+       BYTE* pBits;
+       CDC dcMem;
+       dcMem.CreateCompatibleDC(pDC);
+       HBITMAP hbmOld = (HBITMAP)dcMem.SelectObject(pDib->GetBitmap());
+
+
+        POINT destPoint[3];
+        CBitmap hbmMask;
+        // This is the correct settings
+        destPoint[0].x = xd;
+        destPoint[0].y = yd;
+        destPoint[1].x = xd+w
+        destPoint[1].y = yd;
+        destPoint[2].x = xd;
+        destPoint[2].y = yd+h;
+        SetGraphicsMode(pDC->GetSafeHdc(), GM_ADVANCED);
+        SetWorldTransform (pDC->GetSafeHdc(), &m_currentTransform);
+        pDC->PlgBlt(destPoint,
+                    &dcMem,
+                    xs, ys,
+                    w, h,
+                    hbmMask, 0, 0);
+-------------------------------------------------------
+
+     
+-- 
+Kevin Burton
+kburton@waun.tdsnet.com
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Gajendra Prasad Yadav -- <A HREF="mailto:gajendra@aditi.com">gajendra@aditi.com</A>
+Monday, November 18, 1996
+</B>
+[Mini-digest: 4 responses]
+
+Hi You may want to refer to the PLGBLT sample. This sample uses PlgBlt()
+API to rotate or shear bitmaps. PLGBLT is a Microsoft Win32(R) Software
+Development Kit (SDK) sample and also available on MSDN.
+
+Gajendra,
+Aditi
+
+
+>----------
+>From: 	Kevin Burton[SMTP:kburton@mail.tds.net]
+>Sent: 	Saturday, November 16, 1996 12:45 AM
+>To: 	mfc-l@netcom.com
+>Cc: 	kburton@mail.tds.net
+>Subject: 	Rotating a bitmap
+>
+>Environment: VC++ 4.1, WinNT 3.51
+>
+>I am having more trouble than I expected with rotating a bitmap. I can
+>rotate the bitmap by integral multiples of 90 degrees with no problem
+>and the other angles do rotate but I am getting what looks like a
+>shearing effect that I did not expect.
+>
+>+-----+              +-----+
+>|     |               \     \
+>|     |    --->        \     \
+>|     |                 \     \
+>|     |                  \     \
+>+-----+                   +-----+
+>
+>Here is the code:
+>
+>The transformation:
+>
+>-------------------------------------------------------
+>
+>        //                       |1   0   0|  
+>        // |x' y' 1| = |x y 1| * |0   1   0|  
+>        //                       |Dx  Dy  1| 
+>
+>        XFORM translateDownTransform;
+>
+>        translateDownTransform.eM11 = 1.0f;
+>        translateDownTransform.eM12 = 0.0f;
+>        translateDownTransform.eM21 = translateDownTransform.eM12;
+>        translateDownTransform.eM22 = translateDownTransform.eM11;
+>        translateDownTransform.eDx = -(float)pDib->GetWidth()/2;
+>        translateDownTransform.eDy = -(float)pDib->GetHeight()/2;
+>
+>        // |x' y'| == |x y| * | cos A   sin A|  
+>    //                    |-sin A   cos A|
+>
+>        XFORM rotationTransform;
+>        rotationTransform.eM11 = (float)cos(m_fRotation);
+>        rotationTransform.eM12 = (float)sin(m_fRotation);
+>        rotationTransform.eM21 = rotationTransform.eM12;
+>        rotationTransform.eM22 = rotationTransform.eM11;
+>        rotationTransform.eDx = 0.0f;
+>        rotationTransform.eDy = 0.0f;
+>
+>        //                       |1   0   0|  
+>        // |x' y' 1| = |x y 1| * |0   1   0|  
+>        //                       |Dx  Dy  1| 
+>
+>        XFORM translateUpTransform;
+>
+>        translateUpTransform.eM11 = 1.0f;
+>        translateUpTransform.eM12 = 0.0f;
+>        translateUpTransform.eM21 = translateUpTransform.eM12;
+>        translateUpTransform.eM22 = translateUpTransform.eM11;
+>        translateUpTransform.eDx = (float)pDib->GetWidth()/2;
+>        translateUpTransform.eDy = (float)pDib->GetHeight()/2;
+>
+>        CombineTransform(&m_currentTransform, &m_originalTransform,
+>&translateDownTransform);
+>        CombineTransform(&m_currentTransform, &m_currentTransform,
+>&rotationTransform);
+>        CombineTransform(&m_currentTransform, &m_currentTransform,
+>&translateUpTransform);
+>
+>        Invalidate();
+>
+>-------------------------------------------------------
+>
+>Now the Drawing:
+>
+>-------------------------------------------------------
+>        CRect rcDraw;
+>        CLineAcqDoc* pDoc = GetDocument();
+>        CDib *pDib = pDoc->GetDIB();
+>        GetClientRect(rcDraw);
+>        // Get the clip box.
+>        CRect rcClip;
+>        pDC->GetClipBox(rcClip);
+>
+>        // Create a rect for the DIB.
+>        CRect rcDIB;
+>        rcDIB.left = rcDIB.top = 0;
+>        rcDIB.right = pDib->GetWidth() - 1;
+>        rcDIB.bottom = pDib->GetHeight() - 1;
+>
+>        // Find a rectangle that describes the intersection of the draw
+>        // rect, clip rect, and DIB rect.
+>        // CRect rcBlt = rcDraw & rcClip & rcDIB;
+>
+>        CRect rcBlt = rcClip & rcDIB;
+>       // Copy the update rectangle from the off-screen DC to the
+>       // window DC. Note that the DIB origin is the bottom-left corner.
+>       int w, h, xs, xd, yd, ys;
+>       w = rcBlt.right - rcBlt.left;
+>       h = rcBlt.bottom - rcBlt.top;
+>       xs = xd = rcBlt.left;
+>       ys = rcBlt.top;
+>       yd = rcBlt.top;
+>
+>       // If we have a palette, select and realize it.
+>       CPalette *pPalette = pDib->GetPalette();
+>       CPalette *pOldPalette = NULL;
+>       pOldPalette = pDC->SelectPalette(pPalette, FALSE);
+>       pDC->RealizePalette();
+>
+>       BYTE* pBits;
+>       CDC dcMem;
+>       dcMem.CreateCompatibleDC(pDC);
+>       HBITMAP hbmOld = (HBITMAP)dcMem.SelectObject(pDib->GetBitmap());
+>
+>
+>        POINT destPoint[3];
+>        CBitmap hbmMask;
+>        // This is the correct settings
+>        destPoint[0].x = xd;
+>        destPoint[0].y = yd;
+>        destPoint[1].x = xd+w
+>        destPoint[1].y = yd;
+>        destPoint[2].x = xd;
+>        destPoint[2].y = yd+h;
+>        SetGraphicsMode(pDC->GetSafeHdc(), GM_ADVANCED);
+>        SetWorldTransform (pDC->GetSafeHdc(), &m_currentTransform);
+>        pDC->PlgBlt(destPoint,
+>                    &dcMem,
+>                    xs, ys,
+>                    w, h,
+>                    hbmMask, 0, 0);
+>-------------------------------------------------------
+>
+>     
+>-- 
+>Kevin Burton
+>kburton@waun.tdsnet.com
+>
+-----From: "Alan J. Livingston" <AlanLivingston@acm.org>
+
+Shouldn't 
+        rotationTransform.eM21 = rotationTransform.eM12;
+be
+        rotationTransform.eM21 = -rotationTransform.eM12;
+Note the negative:              ^^^
+
+
+-Alan
+
+
+-----From: "KobyLev" <kobylev@ibm.net>
+
+In order to rotate an image you have to know 2 things:
+
+1. you have to recalculate the image center, that is you have to know that
+the rotation formula : 
+
+	| x' |      | cos(teta)   sin(teta) |    |x|
+	|    |  =  |                              | *  |  |
+	|y'  |      | -sin(teta)   cos(teta)|    |y|
+
+	where theta is the rotation angle.
+	in the above formula the rotation is with respect to the Image origin that
+is   
+	here:
+	(0,0)-------------------
+	      |                  |
+	      |   image      |
+	      |        *         |
+	      |    true         |
+	      |     org.        |
+	      --------------------
+	in order to get the right rotation you have to rewrite the formula in this
+manner:
+
+		| x' |      | cos(teta)      sin(teta) |    |x - w/2|
+		|    |  =  |                                 | * |           |
+		|y'  |      | -sin(teta)    cos(teta)  |    |y - h/2 |
+
+
+	where w, h are the image width, and hight respectively.
+
+2. Dont forget to calculate the new image size pre-rotating the image, that
+is the image size will be:
+	
+	| w' |      | cos(teta)      sin(teta) |    |w|
+	|    |  =  |                                 | *  |  |
+	|h'  |      | -sin(teta)    cos(teta)  |    |h|
+where w, h, w', h' are the image width, and high before and after the
+rotation, respectively.
+
++       +       ++++++      ++++++        +         +    @@@@@@@@@ @   
++    +        +  @   @+     +          +        +       +    @ Koby Lev    
+        @     
++  +          +      O   +     ++++++             +   +     @
+kobylev@ibm.net @    
++      +      +    ---    +     +          +               +     
+@@@@@@@@@@
++         +     ++++++      ++++++  ++++++++     
+      
+-----From: browkl@inel.gov (Kenneth L Brown)
+
+You're probably better off to check out a graphics oriented faq where
+you're likely to find more people working directly with graphics and
+graphics transformations.  It's been a few years since I did any serious
+graphics work and my suggestions may be a little of date so I will only
+attempt to point you in the right direction.
+
+The shearing effect appears to be an error in your translation of the
+mathematics to code.  I don't have the time to go through your code to
+find it but I would recommend a close examination of the code against a
+matrix based solution with known numbers first.  Check out your trig
+operations since your rotations are working for primary angles.  At the
+risk of insulting your intelligence, cos(0) = 1 and sin(90)=1 so when
+you deviate from an angle where either the cos or sin are supposed to be
+0 or 1, and the results of compound math operations using either of
+those operations is 0 or 1 your image will distort or not do anything at
+all.  The shear you show below tells me that probably only one equation
+is wrong. Which one depends on the direction of the shear.  It is a good
+idea to check for precision errors here since this is a common problem
+where cos, sin and division are used together.
+
+I would also recommend the book Computer Graphics, Principles and
+Practice by Foley and van Dam.  This book is considered by many to be
+the bible of computer graphics.  It runs between $60 and $75 dollars
+depending on where you get it and is available from Addison Wesley.  I
+have nearly worn out my copy.  It's well worth the price.  The book
+covers several different methods for performing geometrical
+transformations including the one your using here.
+
+Of particular interest is the chapter on Image Storage and
+Manipulation.  In this chapter is a section on Multipass
+Transformations.  An image rotation can be accomplished by performing a
+column shear followed by a row shear.  This is often faster and more
+accurate than the matrix method.  There are also many other ways to
+accomplish the same thing which you will need to research to find the
+method most appropriate to your application.
+
+I am a user of the book only and am in no way affiliated with the
+publisher or authors.  I have the second edition which is almost 7 years
+old now but I expect the latest edition is much the same.
+
+Kenneth Brown
+browkl@inel.gov
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Jim Lawson Williams -- <A HREF="mailto:jimlw@mail.ccur.com.au">jimlw@mail.ccur.com.au</A>
+Thursday, November 21, 1996
+</B>
+At 01:15 PM 15-11-96 -0600, you wrote:
+>Environment: VC++ 4.1, WinNT 3.51
+>
+>I am having more trouble than I expected with rotating a bitmap.
+    <snip>
+>        XFORM rotationTransform;
+>        rotationTransform.eM11 = (float)cos(m_fRotation);
+>        rotationTransform.eM12 = (float)sin(m_fRotation);
+>        rotationTransform.eM21 = rotationTransform.eM12;
+>        rotationTransform.eM22 = rotationTransform.eM11;
+    <snip>
+
+>From "Books Online",
+
+eM21 Specifies the following: 
+
+Operation	Meaning
+Shear	        Vertical proportionality constant
+Rotation	Negative sine of the rotation angle
+                ^^^^^^^^
+Now I've not used XFORM, but my reading indicates you're in error there and
+elsewhere with eM22.  What values do you get when you translate the vertices
+of the rectangle bounding your bitmap?
+
+
+>Now the Drawing:
+>
+>-------------------------------------------------------
+>        CRect rcDraw;
+         ^^^^^^^^^^^^^
+To what use, if any, is this put? 
+     
+...and the rest -- e.g., are you always dealing with normalized rectangles
+in a consistent "logical" or "device" coordinate space? -- I am in no
+position to comment about.
+
+Regards,
+Jim LW
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

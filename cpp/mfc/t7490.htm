@@ -1,0 +1,517 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+exception handler in OnInitDialog()
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Rick Rankin -- <A HREF="mailto:RickR@fscrater.com">RickR@fscrater.com</A>
+Wednesday, October 30, 1996
+</B>
+Environment: Win 95, VC++ 4.1
+
+Does anyone know if there is a way to catch an exception thrown in an
+overridden 
+CMyDialog::OnInitDialog() method, outside of the OnInitDialog() method?
+
+e.g.
+
+BOOL CAboutDlg::OnInitDialog() 
+{
+	CDialog::OnInitDialog();
+	
+	//I would like to catch this exception
+	//outside of this method	
+	AfxThrowResourceException();
+
+	return TRUE;  
+}
+
+
+When I attempt this I get the following illegal operation error:
+
+EX caused a stack fault in module MSVCR40D.DLL at 0137:1020837c.
+Registers:
+EAX=00000000 CS=0137 EIP=1020837c EFLGS=00010282
+EBX=00405b88 SS=013f ESP=0063eba4 EBP=00000000
+ECX=00405b40 DS=013f ESI=0063ee04 FS=44c7
+EDX=00405b88 ES=013f EDI=0063f230 GS=0000
+Bytes at CS:EIP:
+8b 45 00 50 53 51 57 e8 b8 fe ff ff 8b 4c 24 44 
+Stack dump:
+0063ee04 00000000 00405b70 1020803c 0063ee04 0063f230 0063ed38 0063ed10
+00405b40 00405b88 5f8bc718 00405b70 00000000 00000000 0063ec64 0063ee04 
+
+
+I have tried to catch this exception in: 
+	CAboutDlg::WindowProc, 
+	CAboutDlg::DefWindowProc, 
+	CEXApp::ProcessWndProcException,
+and finally in:
+
+int CEXApp::Run() 
+{
+	try
+	{
+		return CWinApp::Run();
+	}
+	catch(...)
+	{
+		AfxMessageBox( "caught in Run()" );
+	}
+}
+
+
+with no success.
+
+Any help would be appreciated.
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Rick Rankin -- <A HREF="mailto:RickR@fscrater.com">RickR@fscrater.com</A>
+Wednesday, October 30, 1996
+</B>
+Environment: Win 95, VC++ 4.1
+
+Does anyone know if there is a way to catch an exception thrown in an
+overridden 
+CMyDialog::OnInitDialog() method, outside of the OnInitDialog() method?
+
+e.g.
+
+BOOL CAboutDlg::OnInitDialog() 
+{
+	CDialog::OnInitDialog();
+	
+	//I would like to catch this exception
+	//outside of this method	
+	AfxThrowResourceException();
+
+	return TRUE;  
+}
+
+
+When I attempt this I get the following illegal operation error:
+
+EX caused a stack fault in module MSVCR40D.DLL at 0137:1020837c.
+Registers:
+EAX=00000000 CS=0137 EIP=1020837c EFLGS=00010282
+EBX=00405b88 SS=013f ESP=0063eba4 EBP=00000000
+ECX=00405b40 DS=013f ESI=0063ee04 FS=44c7
+EDX=00405b88 ES=013f EDI=0063f230 GS=0000
+Bytes at CS:EIP:
+8b 45 00 50 53 51 57 e8 b8 fe ff ff 8b 4c 24 44 
+Stack dump:
+0063ee04 00000000 00405b70 1020803c 0063ee04 0063f230 0063ed38 0063ed10
+00405b40 00405b88 5f8bc718 00405b70 00000000 00000000 0063ec64 0063ee04 
+
+
+I have tried to catch this exception in: 
+	CAboutDlg::WindowProc, 
+	CAboutDlg::DefWindowProc, 
+	CEXApp::ProcessWndProcException,
+and finally in:
+
+int CEXApp::Run() 
+{
+	try
+	{
+		return CWinApp::Run();
+	}
+	catch(...)
+	{
+		AfxMessageBox( "caught in Run()" );
+	}
+}
+
+
+with no success.
+
+Any help would be appreciated.
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Doug Brubacher -- <A HREF="mailto:Doug_Brubacher@compuware.com">Doug_Brubacher@compuware.com</A>
+Monday, November 04, 1996
+</B>
+     I did not have a good answer to this question when I originally saw it 
+     so I did not reply, but now that the question has returned I'll at 
+     least give you what I know (can suggest).
+     
+     In my experimenting I tried catching the exception in the procedure 
+     that calls DoModal for the dialog but MFC was catching it first.  I 
+     also tried catching it in PreTranslateMessage but this didn't work 
+     either.  Further investigation uncovered this nifty piece of code from 
+     MFC's dlgcore.cpp:
+     
+     //////////////////////////////////////////////////////////////////////
+     ///////
+     // AfxDlgProc - does nothing since all messages are handled via 
+     AfxWndProc
+     
+     BOOL CALLBACK AfxDlgProc(HWND hWnd, UINT message, WPARAM, LPARAM)
+     {
+        if (message == WM_INITDIALOG)
+        {
+                // special case for WM_INITDIALOG
+                CDialog* pDlg = DYNAMIC_DOWNCAST(CDialog, 
+     CWnd::FromHandlePermanent(hWnd));
+                if (pDlg != NULL)
+                        return pDlg->OnInitDialog();
+                else
+                        return 1;
+        }
+        return 0;
+     }
+     
+     I found this by setting a break point in my OnInitDialog and looking 
+     at what was available in the call stack.  This was the only 
+     non-operating system item other than my OnInitDialog that was 
+     available.  Thus you can't catch the exception the way the questioner 
+     wants.  WM_INITDIALOG is a Windows message and OnInitDialog is being 
+     called directly by AfxDlgProc bypassing any other message routing that 
+     would offer us the opportunity to insert a try/catch.  
+     
+     I would suggest that the questioner call CDialog::EndDialog(nResult) 
+     rather than AfxThrowResourceException().  You can of course return any 
+     value, not just IDCANCEL or IDOK, to differentiate this from the 
+     typical return value from DoModal().  At that point you could handle 
+     the condition appropriately or if you really want throw the Resource 
+     Exception at that point.
+     
+     Regards,
+     
+     Doug Brubacher
+     DouglasB@msn.com
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Pradeep Tapadiya -- <A HREF="mailto:pradeep@nuview.com">pradeep@nuview.com</A>
+Wednesday, November 06, 1996
+</B>
+
+Hi,
+
+I think you can override CWinThread::ProcessWndProcException to
+process CException based exceptions.  To process exceptions at a
+global level, you can override CWinApp::ProcessWndProcException
+(as CWinApp is derived from CWinThread).
+
+To proces exceptions at the level that you want, you would need
+to implement a separate message loop. The easiest way would be to
+create a CWinThread based thread and display your dialog in this
+thread.
+
+Disclaimer: I have never used ProcesssWndProcException API.
+
+Pradeep
+
+
+>     In my experimenting I tried catching the exception in the procedure 
+>     that calls DoModal for the dialog but MFC was catching it first.  I 
+>     also tried catching it in PreTranslateMessage but this didn't work 
+>     either.  Further investigation uncovered this nifty piece of code from 
+>     MFC's dlgcore.cpp:
+>     
+>     //////////////////////////////////////////////////////////////////////
+>     ///////
+>     // AfxDlgProc - does nothing since all messages are handled via 
+>     AfxWndProc
+>     
+>     BOOL CALLBACK AfxDlgProc(HWND hWnd, UINT message, WPARAM, LPARAM)
+>     {
+>        if (message == WM_INITDIALOG)
+>        {
+>                // special case for WM_INITDIALOG
+>                CDialog* pDlg = DYNAMIC_DOWNCAST(CDialog, 
+>     CWnd::FromHandlePermanent(hWnd));
+>                if (pDlg != NULL)
+>                        return pDlg->OnInitDialog();
+>                else
+>                        return 1;
+>        }
+>        return 0;
+>     }
+>     
+>     I found this by setting a break point in my OnInitDialog and looking 
+>     at what was available in the call stack.  This was the only 
+>     non-operating system item other than my OnInitDialog that was 
+>     available.  Thus you can't catch the exception the way the questioner 
+>     wants.  WM_INITDIALOG is a Windows message and OnInitDialog is being 
+>     called directly by AfxDlgProc bypassing any other message routing that 
+>     would offer us the opportunity to insert a try/catch.  
+>     
+>     I would suggest that the questioner call CDialog::EndDialog(nResult) 
+>     rather than AfxThrowResourceException().  You can of course return any 
+>     value, not just IDCANCEL or IDOK, to differentiate this from the 
+>     typical return value from DoModal().  At that point you could handle 
+>     the condition appropriately or if you really want throw the Resource 
+>     Exception at that point.
+>     
+>     Regards,
+>     
+>     Doug Brubacher
+>     DouglasB@msn.com
+>
+>
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Pradeep Tapadiya -- <A HREF="mailto:pradeep@nuview.com">pradeep@nuview.com</A>
+Thursday, November 07, 1996
+</B>
+Environment: VC++4.2b, NT 4.0
+
+Howdy netters,
+
+In the application that we are working on, we collect some
+real-time data at a specified time interval (default is one
+second) and display it in different MDI views. While
+handling user commands, some of the functions that we call
+may take several seconds to return. In a single-thread model,
+the views will not get updated during this time.
+
+The calls are meant to be blocking in the sense that we don't want
+the user to be able to do anything (except maybe minimize the app window)
+while the call is in progress. However, we don't want the view updates
+to stop.
+
+The way we handle it currently is
+
+1) popup a modal dialog box from the UI thread
+2) override OnInitDialog to spawn a worker thread
+   that in turn calls the blocking function.
+3) Activate a 1 second timer. At each WM_TIMER, we
+   check if the thread has killed itself. This also
+   gives us a chance to update our dialog box (we display
+   a stop clock in the dialog box).
+
+This works fine. We have achieved what we wanted to, i.e.,
+ 1) The views are getting updated at the specfied time interval.
+ 2) The user cannot do anything during a blocking command is
+    being processed.
+
+What I would like to do is to have two UI threads: one
+that just collects data and updates the views (and does
+nothing else), and the other that handles all other
+activities. This way, I don't need to create a thread
+each time I process a user command. If a function blocks
+for several seconds, that's fine. The view updates are
+not being stopped because of this.
+
+So I wrote a test program that spawns a UI thread (CWinThread
+derived class). Here is the InitInstance code for this
+class.
+
+BOOL CMyWinThread::InitInstance()
+{
+    CWinApp* pApp = AfxGetApp();
+    
+    for (;;) {
+        Sleep(1 * 1000);
+
+        POSITION pos = pApp->GetFirstDocTemplatePosition();
+        if (NULL == pos)
+            continue;
+
+        CDocTemplate* pTemplate = pApp->GetNextDocTemplate(pos);
+        if (NULL == pTemplate)
+            continue;
+
+        POSITION docPos = pTemplate->GetFirstDocPosition();
+        if (NULL == docPos)
+            continue;
+
+        CDocument* pDoc = pTemplate->GetNextDoc(docPos);
+        if (NULL == pDoc)
+            continue;
+
+        pDoc->UpdateAllViews(NULL, 0);
+    }
+
+    return TRUE;
+}
+
+However, the call to UpdateAllViews causes an assertion that
+I am trying to use CObject based pointer from one thread
+in another thread. Seems like this is not the correct way of
+using a UI thread.
+
+Can someone please enlighten me if it is possible to do
+what I wish to do?
+
+Thank you for your help.
+
+Pradeep
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Doug Boone -- <A HREF="mailto:dboone@fasttax.com">dboone@fasttax.com</A>
+Monday, November 11, 1996
+</B>
+To me you're doing this the hard way. I'd approach it something like this:
+  
+ 1) create thread to do something useful.
+ 2) At the beginning of each On*() command (except OnUpdate) check to see
+if that thread is still active.
+ (WaitForSingleObject() with timeout zero and look for a timed-out error.) 
+   a) if the thread is active, just beep to give the user feedback that you
+know they've pressed a key but you can't process it right now.
+  b) If the thread is not active, then process the user's request.
+ 
+I would just create the thread inside the dialog and a semaphore to go with
+it. When the user types in something that should make activity occur you
+take ownership of the semaphore and tell the thread what to do. When the
+thread completes it releases the semaphore. If the UI section can't get
+ownership of the semaphore then it just beeps.
+  
+
+----------
+> From: Pradeep Tapadiya <pradeep@nuview.com>
+> To: mfc-l@netcom.com
+> Subject: RE: exception handler in OnInitDialog()
+> Date: Thursday, November 07, 1996 6:08 PM
+> 
+> Environment: VC++4.2b, NT 4.0
+> 
+> Howdy netters,
+> 
+> In the application that we are working on, we collect some
+> real-time data at a specified time interval (default is one
+> second) and display it in different MDI views. While
+> handling user commands, some of the functions that we call
+> may take several seconds to return. In a single-thread model,
+> the views will not get updated during this time.
+> 
+> The calls are meant to be blocking in the sense that we don't want
+> the user to be able to do anything (except maybe minimize the app window)
+> while the call is in progress. However, we don't want the view updates
+> to stop.
+> 
+> The way we handle it currently is
+> 
+> 1) popup a modal dialog box from the UI thread
+> 2) override OnInitDialog to spawn a worker thread
+>    that in turn calls the blocking function.
+> 3) Activate a 1 second timer. At each WM_TIMER, we
+>    check if the thread has killed itself. This also
+>    gives us a chance to update our dialog box (we display
+>    a stop clock in the dialog box).
+> 
+> This works fine. We have achieved what we wanted to, i.e.,
+>  1) The views are getting updated at the specfied time interval.
+>  2) The user cannot do anything during a blocking command is
+>     being processed.
+> 
+> What I would like to do is to have two UI threads: one
+> that just collects data and updates the views (and does
+> nothing else), and the other that handles all other
+> activities. This way, I don't need to create a thread
+> each time I process a user command. If a function blocks
+> for several seconds, that's fine. The view updates are
+> not being stopped because of this.
+> 
+> So I wrote a test program that spawns a UI thread (CWinThread
+> derived class). Here is the InitInstance code for this
+> class.
+> 
+> BOOL CMyWinThread::InitInstance()
+> {
+>     CWinApp* pApp = AfxGetApp();
+>     
+>     for (;;) {
+>         Sleep(1 * 1000);
+> 
+>         POSITION pos = pApp->GetFirstDocTemplatePosition();
+>         if (NULL == pos)
+>             continue;
+> 
+>         CDocTemplate* pTemplate = pApp->GetNextDocTemplate(pos);
+>         if (NULL == pTemplate)
+>             continue;
+> 
+>         POSITION docPos = pTemplate->GetFirstDocPosition();
+>         if (NULL == docPos)
+>             continue;
+> 
+>         CDocument* pDoc = pTemplate->GetNextDoc(docPos);
+>         if (NULL == pDoc)
+>             continue;
+> 
+>         pDoc->UpdateAllViews(NULL, 0);
+>     }
+> 
+>     return TRUE;
+> }
+> 
+> However, the call to UpdateAllViews causes an assertion that
+> I am trying to use CObject based pointer from one thread
+> in another thread. Seems like this is not the correct way of
+> using a UI thread.
+> 
+> Can someone please enlighten me if it is possible to do
+> what I wish to do?
+> 
+> Thank you for your help.
+> 
+> Pradeep
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

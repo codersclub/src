@@ -1,0 +1,249 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+file copy code?
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Herbert W Stiel -- <A HREF="mailto:herb+@CMU.EDU">herb+@CMU.EDU</A>
+Sunday, January 14, 1996
+</B>
+Can someone show me how to implement a file copy function that uses
+CArchive and CFile in VC++ 4.0?
+
+For some reason this doesn't work for me:
+
+char pbuf[100];
+
+CArchive ar( &myFileDest, CArchive::store );
+
+"loop until eof"
+myfileSource.Read( pbuf, 100 );
+ar << pbuf;
+
+I think sending pbuf to the archive puts some extra things in at the end
+- maybe "\t" or something.
+
+Please clue me in.
+
+Thanks,
+Herb
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dan Creswell -- <A HREF="mailto:dancres@drake.bt.co.uk">dancres@drake.bt.co.uk</A>
+Wednesday, January 17, 1996
+</B>
+[Mini-digest: 3 responses, including code]
+
+> From: Herbert W Stiel <herb+@CMU.EDU>
+> 
+> Can someone show me how to implement a file copy function that uses
+> CArchive and CFile in VC++ 4.0?
+> 
+> For some reason this doesn't work for me:
+> 
+> char pbuf[100];
+> 
+^^^^^^^^^^^^^^^^^^
+I don't think this is a good idea - In VC2 you'd write things of type
+BYTE to avoid the archive routines adding type information etc.  I
+suspect that CArchive is writing the array as you requested along with
+an indication of it's type etc.
+
+> CArchive ar( &myFileDest, CArchive::store );
+> 
+> "loop until eof"
+> myfileSource.Read( pbuf, 100 );
+> ar << pbuf;
+> 
+
+If I'm right a simple solution would be a loop thus:
+
+BYTE buf;
+
+"loop until eof"
+myfileSource.Read(&buf, 1);
+ar << buf;
+
+> I think sending pbuf to the archive puts some extra things in at the end
+> - maybe "\t" or something.
+> 
+> Please clue me in.
+> 
+> Thanks,
+> Herb
+> 
+> 
+If I'm wrong no doubt someone will say so!
+
+Dan.
+
+-----From: John Simmons <jms@connectnet.com>
+Subject: Re: file copy code?
+
+At 01:10 PM 1/14/96 -0500, you wrote:
+>Can someone show me how to implement a file copy function that uses
+>CArchive and CFile in VC++ 4.0?
+
+It doesn't use CASrchive, but maybe you can get something useful out of it.  
+
+//----------------------------------------------------------------------------/
+int CopyFile(CString inFile, CString outFile)
+{
+  ASSERT(!inFile.IsEmpty() && !outFile.IsEmpty());
+
+  char VPbuffer[1001];
+  CFile FileIn;
+  CFile FileOut;
+  CFileException locException;
+  UINT locChars;
+
+  if (FileIn.Open(inFile, CFile::modeRead | 
+	                  CFile::shareDenyNone | 
+	                  CFile::typeBinary, &locException))
+  {
+    if (!FileOut.Open(outFile, CFile::modeCreate | 
+	                       CFile::modeWrite | 
+	                       CFile::typeBinary, &locException))
+    {
+      FileIn.Close();
+      return (-2);  // Could not create output file!
+    }
+    for(;;)
+    {
+      locChars = FileIn.Read( VPbuffer, 1000 );
+      if (locChars > 0) 
+        FileOut.Write( VPbuffer, locChars );
+      if (locChars < 1000) 
+        break;
+    }
+    FileIn.Close();
+    FileOut.Close();
+  }
+  else
+    return (-1);    // could not open input file!
+  return (0);       // either no input file or copy OK!
+}
+
+
+/=========================================================\
+| John Simmons (Redneck Techno-Biker)                     |
+|    jms@connectnet.com                                   |
+| Home Page                                               |
+|    www2.connectnet.com/users/jms/                       |
+|---------------------------------------------------------|
+| ViewPlan, Inc. home page (my employer)                  |
+|    www.viewplan.com/index.html                          |
+|---------------------------------------------------------|
+| IGN #3 American Eagle Motorsports Zerex Ford	          |
+|    Teammates - Steve Stevens (#13 Hooters Ford and      |
+                                1995 IGN Points Champ)    |
+| American Eagle Motorsports Team Page                    | 
+|    www2.connectnet.com/users/jms/ignteam                |
+|---------------------------------------------------------|
+| Competitor - Longest Signature File On The Net          |
+\=========================================================/
+
+-----From: David Stidolph <stidolph@magnet.com>
+
+CArchive was not designed to do file copying.  CArchive was designed to =
+assist in object persistance so it stores its own codes about objects =
+and pointers to objects in the file structure.  Your use of '<<' puts =
+information in the stream about the object about to be written (so when =
+the archive is read it can know what to create).
+
+Instead, try using CFile to open the old file and the new file and use =
+your loop.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+RDELEON.US.ORACLE.COM -- <A HREF="mailto:RDELEON@us.oracle.com">RDELEON@us.oracle.com</A>
+Thursday, January 18, 1996
+</B>
+
+--Boundary-2835260-0-0
+
+I understand that the original posting somehow required the use of CArchive. 
+However, it is much easier to perform file copy operations by using the Win 
+API LZCopy(). The declaration is in "lzexpand.h". Just make sure you add the 
+.lib file to your makefile: 
+ 
+Win16: lzexpand.lib 
+Win32: lz32.lib 
+ 
+NOTE: The source file need not be compressed for this function to work (i.e. 
+it will work with uncompressed files also). 
+
+[Moderator's note: Wouldn't it have been neat if CFile or a derived
+class had been based on the LZ routines?]
+ 
+- Ross 
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@msn.com">mikeblas@msn.com</A>
+Saturday, January 20, 1996
+</B>
+> I understand that the original posting somehow required the use of CArchive. 
+
+> However, it is much easier to perform file copy operations by using the Win 
+> API LZCopy(). The declaration is in "lzexpand.h". Just make sure you add the 
+
+> .lib file to your makefile: 
+
+Actually, for Win32 applications, it's far more appropriate to use APIs like 
+CopyFile() or SHFileOperation().
+
+.B ekiM
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

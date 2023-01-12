@@ -1,0 +1,556 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Trouble with Owner Draw Combos
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Jeff Lindholm -- <A HREF="mailto:JeffL@inter-intelli.com">JeffL@inter-intelli.com</A>
+Wednesday, October 23, 1996
+</B>
+Environment: VC++ 4.2 Windows NT 4.0			
+
+I am trying to make an OwnerDraw combo box with icons and text. I am not
+sorting the data in the combobox. My problem is that when you drop down
+the list the items are not painted until you either scroll past them or
+move the mouse over an item. The first item or the selected item is
+always displayed. 
+
+Thanks for any help;
+Jeff
+
+Here is the ComboBox code:
+
+CDrawComboBox::CDrawComboBox()
+{
+}
+
+CDrawComboBox::~CDrawComboBox()
+{
+}
+
+
+BEGIN_MESSAGE_MAP(CDrawComboBox, CComboBox)
+	//{{AFX_MSG_MAP(CDrawComboBox)
+		// NOTE - the ClassWizard will add and remove mapping macros here.
+	//}}AFX_MSG_MAP
+END_MESSAGE_MAP()
+
+////////////////////////////////////////////////////////////////////////
+/////
+// CDrawComboBox message handlers
+
+void CDrawComboBox::Initialize()
+{
+	m_Images.Create(16, 16, FALSE, 1, 1);
+	HICON icon;
+	icon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
+	m_Images.Add(icon);
+	icon = AfxGetApp()->LoadIcon(IDI_ICON1);
+	m_Images.Add(icon);
+}
+
+int CDrawComboBox::CompareItem(LPCOMPAREITEMSTRUCT lpCompareItemStruct) 
+{
+	return 0;
+}
+
+void CDrawComboBox::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct) 
+{
+	if ( lpDrawItemStruct->itemID == -1 )
+	{
+		return;
+	}
+
+	CDC dc;
+	dc.Attach(lpDrawItemStruct->hDC);
+	int nState = dc.SaveDC();
+
+	int nImage = GetItemData(lpDrawItemStruct->itemID);
+
+	//	Get the text string for this item out of the combo box
+	CString		strText;
+	GetLBText(lpDrawItemStruct->itemID, strText);
+
+	// Determine colors-selected disk shown with blue background, etc
+	if (ODS_SELECTED & lpDrawItemStruct->itemState)
+	{
+		// Select the appropriate text colors
+		dc.SetTextColor(GetSysColor(COLOR_HIGHLIGHTTEXT));
+		dc.SetBkColor(GetSysColor(COLOR_HIGHLIGHT));
+	}
+	else
+	{
+		dc.SetTextColor(GetSysColor(COLOR_WINDOWTEXT));
+		dc.SetBkColor(GetSysColor(COLOR_WINDOW));
+	}
+
+	int		nImageWidth	= 16;
+	RECT&	r			= lpDrawItemStruct->rcItem;
+
+	//	Draw the text & bounding rectangles with proper colors
+	dc.ExtTextOut(lpDrawItemStruct->rcItem.left + nImageWidth + 4,
+					lpDrawItemStruct->rcItem.top,
+    					ETO_CLIPPED | ETO_OPAQUE, 
+					&lpDrawItemStruct->rcItem, 
+					strText, lstrlen(strText), 
+					(LPINT)NULL);
+
+	//	Now draw the bitmap associated with the disk drive
+	CPoint p(lpDrawItemStruct->rcItem.left, lpDrawItemStruct->rcItem.top);
+	if (ODS_SELECTED & lpDrawItemStruct->itemState)
+	{
+		m_Images.Draw(&dc, nImage, p, ILD_SELECTED);
+	}
+	else
+	{
+		m_Images.Draw(&dc, nImage, p, ILD_TRANSPARENT);
+	}
+    
+
+	if ((ODA_FOCUS & lpDrawItemStruct->itemAction) || (ODS_FOCUS &
+lpDrawItemStruct->itemState))
+	{
+		DrawFocusRect(lpDrawItemStruct->hDC, &lpDrawItemStruct->rcItem);
+	}
+
+	dc.RestoreDC(nState);
+}
+
+void CDrawComboBox::MeasureItem(LPMEASUREITEMSTRUCT lpMeasureItemStruct)
+{
+	lpMeasureItemStruct->itemHeight = 16;
+}
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Kostya Sebov -- <A HREF="mailto:sebov@is.kiev.ua">sebov@is.kiev.ua</A>
+Friday, November 01, 1996
+</B>
+[Mini-digest: 2 responses]
+
+>   Environment: VC++ 4.2 Windows NT 4.0
+>
+>   I am trying to make an OwnerDraw combo box with icons and text. I am not
+>   sorting the data in the combobox. My problem is that when you drop down
+>   the list the items are not painted until you either scroll past them or
+>   move the mouse over an item. The first item or the selected item is
+>   always displayed.
+>
+>   Thanks for any help;
+>   Jeff
+>
+>   Here is the ComboBox code:
+>
+>   CDrawComboBox::CDrawComboBox()
+>   {
+>   }
+>
+>   CDrawComboBox::~CDrawComboBox()
+>   {
+>   }
+>
+>
+>   BEGIN_MESSAGE_MAP(CDrawComboBox, CComboBox)
+>       //{{AFX_MSG_MAP(CDrawComboBox)
+>           // NOTE - the ClassWizard will add and remove mapping macros here.
+>       //}}AFX_MSG_MAP
+>   END_MESSAGE_MAP()
+>
+>   ////////////////////////////////////////////////////////////////////////
+>   /////
+>   // CDrawComboBox message handlers
+>
+>   void CDrawComboBox::Initialize()
+>   {
+>       m_Images.Create(16, 16, FALSE, 1, 1);
+>       HICON icon;
+>       icon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
+>       m_Images.Add(icon);
+>       icon = AfxGetApp()->LoadIcon(IDI_ICON1);
+>       m_Images.Add(icon);
+>   }
+>
+>   int CDrawComboBox::CompareItem(LPCOMPAREITEMSTRUCT lpCompareItemStruct)
+>   {
+>       return 0;
+>   }
+>
+>   void CDrawComboBox::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
+>   {
+>       if ( lpDrawItemStruct->itemID == -1 )
+>       {
+>           return;
+>       }
+>
+>       CDC dc;
+>       dc.Attach(lpDrawItemStruct->hDC);
+>       int nState = dc.SaveDC();
+>
+>       int nImage = GetItemData(lpDrawItemStruct->itemID);
+>
+>       //  Get the text string for this item out of the combo box
+>       CString     strText;
+>       GetLBText(lpDrawItemStruct->itemID, strText);
+>
+>       // Determine colors-selected disk shown with blue background, etc
+>       if (ODS_SELECTED & lpDrawItemStruct->itemState)
+>       {
+>           // Select the appropriate text colors
+>           dc.SetTextColor(GetSysColor(COLOR_HIGHLIGHTTEXT));
+>           dc.SetBkColor(GetSysColor(COLOR_HIGHLIGHT));
+>       }
+>       else
+>       {
+>           dc.SetTextColor(GetSysColor(COLOR_WINDOWTEXT));
+>           dc.SetBkColor(GetSysColor(COLOR_WINDOW));
+>       }
+>
+>       int     nImageWidth = 16;
+>       RECT&   r           = lpDrawItemStruct->rcItem;
+>
+>       //  Draw the text & bounding rectangles with proper colors
+>       dc.ExtTextOut(lpDrawItemStruct->rcItem.left + nImageWidth + 4,
+>                       lpDrawItemStruct->rcItem.top,
+>                           ETO_CLIPPED | ETO_OPAQUE,
+>                       &lpDrawItemStruct->rcItem,
+>                       strText, lstrlen(strText),
+>                       (LPINT)NULL);
+>
+>       //  Now draw the bitmap associated with the disk drive
+>       CPoint p(lpDrawItemStruct->rcItem.left, lpDrawItemStruct->rcItem.top);
+>       if (ODS_SELECTED & lpDrawItemStruct->itemState)
+>       {
+>           m_Images.Draw(&dc, nImage, p, ILD_SELECTED);
+>       }
+>       else
+>       {
+>           m_Images.Draw(&dc, nImage, p, ILD_TRANSPARENT);
+>       }
+>
+>
+>       if ((ODA_FOCUS & lpDrawItemStruct->itemAction) || (ODS_FOCUS &
+>   lpDrawItemStruct->itemState))
+>       {
+>           DrawFocusRect(lpDrawItemStruct->hDC, &lpDrawItemStruct->rcItem);
+>       }
+>
+>       dc.RestoreDC(nState);
+>   }
+>
+>   void CDrawComboBox::MeasureItem(LPMEASUREITEMSTRUCT lpMeasureItemStruct)
+>   {
+>       lpMeasureItemStruct->itemHeight = 16;
+>   }
+>
+>
+I believe the bug lives in the following lines og your code:
+    CDC dc;
+    dc.Attach(lpDrawItemStruct->hDC);
+
+The thing is that that Windows reuses a single HDC for drawing all the items
+in the owner-draw combo. On the other hand, you're attaching this reusable
+HDC to a local C++ object, whose destructor calls something like DeleteDC when
+the object goes out of scope.
+
+That's why the first item gets drawn and prevents the others from being drawn
+since the HDC is no longer valid.
+
+You can solve this problem by calling cd.Detach(); just before the function
+returns. This will decouple the two entities and saves the HDC.
+
+However the better way of coding (IMO) is to use a temporarily allocated CDC:
+    CDC* pDC = CDC::FromHandle( lpDrawItemStruct->hDC);
+    ASSERT(pDC);
+
+The later one is just an MFC alias to the system object, whict I think is
+exactly what yoiu need here.
+
+HTH
+
+
+
+
+--- 
+Kostya Sebov. 
+----------------------------------------------------------------------------
+Tel: (38 044) 266-6387 | Fax: (38 044) 266-6195 | E-mail: sebov@is.kiev.ua
+-----From: John.Bell@xcellenet.com
+
+Environment: VC++ 4.1 Windows NT 4.0
+
+Jeff:
+
+I had the same problem until I replaced the line
+-dc.Attach(lpDrawItemStruct->hDC);
+in CDrawComboBox::DrawItem() with
+-CDC *pdc = CDC::FromHandle(lpDrawItemStruct->hDC);
+then it worked on Windows95 and Windows NT 4.0.
+
+John
+john.bell@xcellenet.com
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dulepov Dmitry -- <A HREF="mailto:dima@ssm6000.samsung.ru">dima@ssm6000.samsung.ru</A>
+Tuesday, November 05, 1996
+</B>
+        [Mailer: "Groupware E-Mail". Version 1.01.035]
+
+
+I remember I used CDC::Attach() with lpDIS->hDC and in 16-bit app u=
+nder Win 3.11 (debug) I got "Attempt to delete object owned by the =
+system" message on Debug Messages Logger (DbWin.Exe).
+
+In your code simply add:
+    dc.Detach();
+
+To Jeff: this explains why CDC::FromHandle() works -> their HDCs ne=
+ver deleted.
+
+Dima.
+
+-----------------------------
+>        [From: Kostya Sebov
+>        [Address: sebov@is.kiev.ua
+>        [To: Dmitry A. Dulepov
+>        [CC: mfc-l@netcom.com
+>        [Date: Mon Nov 04 08:04:31 1996
+>[Mini-digest: 2 responses]
+>
+>>   Environment: VC++ 4.2 Windows NT 4.0
+>>
+>>   I am trying to make an OwnerDraw combo box with icons and text=
+=2E I am not
+>>   sorting the data in the combobox. My problem is that when you =
+drop down
+>>   the list the items are not painted until you either scroll pas=
+t them or
+>>   move the mouse over an item. The first item or the selected it=
+em is
+>>   always displayed.
+>>
+>>   Thanks for any help;
+>>   Jeff
+>>
+>>   Here is the ComboBox code:
+>>
+>>   CDrawComboBox::CDrawComboBox()
+>>   {
+>>   }
+>>
+>>   CDrawComboBox::~CDrawComboBox()
+>>   {
+>>   }
+>>
+>>
+>>   BEGIN_MESSAGE_MAP(CDrawComboBox, CComboBox)
+>>       //{{AFX_MSG_MAP(CDrawComboBox)
+>>           // NOTE - the ClassWizard will add and remove mapping =
+macros here.
+>>       //}}AFX_MSG_MAP
+>>   END_MESSAGE_MAP()
+>>
+>>   //////////////////////////////////////////////////////////////=
+//////////
+>>   /////
+>>   // CDrawComboBox message handlers
+>>
+>>   void CDrawComboBox::Initialize()
+>>   {
+>>       m_Images.Create(16, 16, FALSE, 1, 1);
+>>       HICON icon;
+>>       icon =3D AfxGetApp()->LoadIcon(IDR_MAINFRAME);
+>>       m_Images.Add(icon);
+>>       icon =3D AfxGetApp()->LoadIcon(IDI_ICON1);
+>>       m_Images.Add(icon);
+>>   }
+>>
+>>   int CDrawComboBox::CompareItem(LPCOMPAREITEMSTRUCT lpCompareIt=
+emStruct)
+>>   {
+>>       return 0;
+>>   }
+>>
+>>   void CDrawComboBox::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct=
+)
+>>   {
+>>       if ( lpDrawItemStruct->itemID =3D=3D -1 )
+>>       {
+>>           return;
+>>       }
+>>
+>>       CDC dc;
+>>       dc.Attach(lpDrawItemStruct->hDC);
+>>       int nState =3D dc.SaveDC();
+>>
+>>       int nImage =3D GetItemData(lpDrawItemStruct->itemID);
+>>
+>>       //  Get the text string for this item out of the combo box=
+
+>>       CString     strText;
+>>       GetLBText(lpDrawItemStruct->itemID, strText);
+>>
+>>       // Determine colors-selected disk shown with blue backgrou=
+nd, etc
+>>       if (ODS_SELECTED & lpDrawItemStruct->itemState)
+>>       {
+>>           // Select the appropriate text colors
+>>           dc.SetTextColor(GetSysColor(COLOR_HIGHLIGHTTEXT));
+>>           dc.SetBkColor(GetSysColor(COLOR_HIGHLIGHT));
+>>       }
+>>       else
+>>       {
+>>           dc.SetTextColor(GetSysColor(COLOR_WINDOWTEXT));
+>>           dc.SetBkColor(GetSysColor(COLOR_WINDOW));
+>>       }
+>>
+>>       int     nImageWidth =3D 16;
+>>       RECT&   r           =3D lpDrawItemStruct->rcItem;
+>>
+>>       //  Draw the text & bounding rectangles with proper colors=
+
+>>       dc.ExtTextOut(lpDrawItemStruct->rcItem.left + nImageWidth =
++ 4,
+>>                       lpDrawItemStruct->rcItem.top,
+>>                           ETO_CLIPPED | ETO_OPAQUE,
+>>                       &lpDrawItemStruct->rcItem,
+>>                       strText, lstrlen(strText),
+>>                       (LPINT)NULL);
+>>
+>>       //  Now draw the bitmap associated with the disk drive
+>>       CPoint p(lpDrawItemStruct->rcItem.left, lpDrawItemStruct->=
+rcItem.top);
+>>       if (ODS_SELECTED & lpDrawItemStruct->itemState)
+>>       {
+>>           m_Images.Draw(&dc, nImage, p, ILD_SELECTED);
+>>       }
+>>       else
+>>       {
+>>           m_Images.Draw(&dc, nImage, p, ILD_TRANSPARENT);
+>>       }
+>>
+>>
+>>       if ((ODA_FOCUS & lpDrawItemStruct->itemAction) || (ODS_FOC=
+US &
+>>   lpDrawItemStruct->itemState))
+>>       {
+>>           DrawFocusRect(lpDrawItemStruct->hDC, &lpDrawItemStruct=
+->rcItem);
+>>       }
+>>
+>>       dc.RestoreDC(nState);
+>>   }
+>>
+>>   void CDrawComboBox::MeasureItem(LPMEASUREITEMSTRUCT lpMeasureI=
+temStruct)
+>>   {
+>>       lpMeasureItemStruct->itemHeight =3D 16;
+>>   }
+>>
+>>
+>I believe the bug lives in the following lines og your code:
+>    CDC dc;
+>    dc.Attach(lpDrawItemStruct->hDC);
+>
+>The thing is that that Windows reuses a single HDC for drawing all=
+ the items
+>in the owner-draw combo. On the other hand, you're attaching this =
+reusable
+>HDC to a local C++ object, whose destructor calls something like D=
+eleteDC when
+>the object goes out of scope.
+>
+>That's why the first item gets drawn and prevents the others from =
+being drawn
+>since the HDC is no longer valid.
+>
+>You can solve this problem by calling cd.Detach(); just before the=
+ function
+>returns. This will decouple the two entities and saves the HDC.
+>
+>However the better way of coding (IMO) is to use a temporarily all=
+ocated CDC:
+>    CDC* pDC =3D CDC::FromHandle( lpDrawItemStruct->hDC);
+>    ASSERT(pDC);
+>
+>The later one is just an MFC alias to the system object, whict I t=
+hink is
+>exactly what yoiu need here.
+>
+>HTH
+>
+>
+>
+>
+>--- =
+
+>Kostya Sebov. =
+
+>------------------------------------------------------------------=
+----------
+>Tel: (38 044) 266-6387 | Fax: (38 044) 266-6195 | E-mail: sebov@is=
+=2Ekiev.ua
+>-----From: John.Bell@xcellenet.com
+>
+>Environment: VC++ 4.1 Windows NT 4.0
+>
+>Jeff:
+>
+>I had the same problem until I replaced the line
+>-dc.Attach(lpDrawItemStruct->hDC);
+>in CDrawComboBox::DrawItem() with
+>-CDC *pdc =3D CDC::FromHandle(lpDrawItemStruct->hDC);
+>then it worked on Windows95 and Windows NT 4.0.
+>
+>John
+>john.bell@xcellenet.com=
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

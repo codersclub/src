@@ -1,0 +1,254 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+QUESTION: Setting a CRichEditCtl with a CString with RTF
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Daniel Rosengarten -- <A HREF="mailto:70451.2212@compuserve.com">70451.2212@compuserve.com</A>
+Friday, March 29, 1996
+</B>
+Can someone please explain (an example would be nice) how to set
+a Rich Text Control from a CString that contains a complete Rich Text encoded
+file (all the RTF codes).  It's VB4 counterpart is
+RichTextBox1.textRTF=strMyRTFString.  
+I am using MSVC 4.1 under windows 95. 
+I have tried SetWindowText-it just shows all the text including the RTF codes.
+I don't want to select each format change- that would take too long.  I think
+the answer lies somewhere with CRichEditCtl::StreamIn, but I can't figure out
+how to create the editstream and callback function.
+
+
+Any help would be appreciated.
+Daniel Rosengarten
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Chet Murphy -- <A HREF="mailto:cmurphy@modelworks.com">cmurphy@modelworks.com</A>
+Sunday, March 31, 1996
+</B>
+[Mini-digest: 2 responses]
+
+Daniel Rosengarten wrote:
+> 
+> Can someone please explain (an example would be nice) how to set
+> a Rich Text Control from a CString that contains a complete Rich Text encoded
+> file (all the RTF codes).  It's VB4 counterpart is
+> RichTextBox1.textRTF=strMyRTFString.
+> I am using MSVC 4.1 under windows 95.
+> I have tried SetWindowText-it just shows all the text including the RTF codes.
+> I don't want to select each format change- that would take too long.  I think
+> the answer lies somewhere with CRichEditCtl::StreamIn, but I can't figure out
+> how to create the editstream and callback function.
+> 
+> Any help would be appreciated.
+> Daniel Rosengarten
+
+Daniel,
+
+You need to use StreamIn.  Here is the code that I use to stream in RTF text.  SetBuffer is 
+the main routine and SetBufferCallback is the callback used by ctrl.StreamIn
+
+struct ExchangeBuffer {
+	LPTSTR buffer;
+	long currentOffset;
+	long length;
+};
+
+DWORD CALLBACK SetBufferCallback(DWORD dwCookie, 
+    LPBYTE pbBuff, LONG cb, LONG FAR *pcb)
+{
+	ExchangeBuffer* exchange = (ExchangeBuffer*)dwCookie;
+	if (exchange->currentOffset + cb < exchange->length)
+	{
+		*pcb = cb;
+		memcpy(pbBuff,&exchange->buffer[exchange->currentOffset],cb);
+		exchange->currentOffset += cb;
+	}
+	else
+	{
+		*pcb = exchange->length - exchange->currentOffset;
+		memcpy(pbBuff,&exchange->buffer[exchange->currentOffset],*pcb);
+		exchange->currentOffset = exchange->length; 
+	}
+
+	return NULL; // Return null to continue
+} 
+
+void SetBuffer(CRichEditCtrl& ctrl, LPTSTR buffer, BOOL rtf, BOOL selection)
+{
+	EDITSTREAM es;
+
+	long length = strlen(buffer);
+
+	ExchangeBuffer exchangeBuffer;
+	exchangeBuffer.buffer = buffer;
+	exchangeBuffer.currentOffset = 0;
+	exchangeBuffer.length = length;
+
+	es.dwCookie = (DWORD)&exchangeBuffer; 
+	es.dwError = NULL; 
+	es.pfnCallback = SetBufferCallback; 
+
+	if (!selection)
+	{
+		if (rtf)
+			ctrl.StreamIn(SF_RTF, es);
+		else
+			ctrl.StreamIn(SF_TEXT, es);
+	}
+	else
+	{
+		if (rtf)
+			ctrl.StreamIn(SF_RTF | SFF_SELECTION, es);
+		else
+			ctrl.StreamIn(SF_TEXT | SFF_SELECTION, es);
+	}	
+}
+
+--Chet Murphy
+ModelWorks Software
+cmurphy@modelworks.com
+http://www.modelworks.com/express
+
+-----From: Rih Saad <windrih@onpt.mci.net>
+
+
+
+This Sample Code is what i wrote for handling RichEd in VC 2.2 i thing it should work for you
+typedef struct __tagRtfStream
+{
+	LPCSTR    m_lpString;
+	int 	 m_index;
+	int		 m_Length;
+} RtfStream;
+
+DWORD CALLBACK RtfSetCallBack(DWORD dwCookie, LPBYTE pbBuffer, LONG cb, LONG *pcb);
+void CRichEdView::SetRtfText(CString &Str,int Type /*=SF_RTF*/ )
+{
+	RtfStream Rtf;
+	Rtf.m_lpString = (LPCSTR)Str;
+	Rtf.m_index=0;
+	Rtf.m_Length = Str.GetLength();
+	EDITSTREAM es;
+	es.dwCookie = (DWORD)&Rtf;
+ 
+	SendMessage(WM_SETREDRAW, (WPARAM) FALSE);
+
+	es.dwError = 0;
+	es.pfnCallback = RtfSetCallBack;
+
+	SendMessage(EM_STREAMIN,(WPARAM) Type,(LPARAM) &es);
+	
+	SendMessage(EM_SETMODIFY, (WPARAM) FALSE, 0);	
+	SendMessage(WM_SETREDRAW, (WPARAM) TRUE, 0);
+	InvalidateRect( NULL, TRUE);
+	UpdateWindow();
+
+}
+
+DWORD CALLBACK RtfSetCallBack(DWORD dwCookie, LPBYTE pbBuffer, LONG cb, LONG *pcb)
+{
+	RtfStream *pRtf= (RtfStream *) dwCookie;
+
+	if(pRtf == NULL)
+		return (DWORD) E_FAIL;
+	int HowMuch = (pRtf->m_Length-pRtf->m_index);
+	if( HowMuch > cb  )
+		HowMuch = cb;
+
+	memcpy(pbBuffer,&pRtf->m_lpString[pRtf->m_index],HowMuch);
+	*pcb = HowMuch;
+	pRtf->m_index+=HowMuch;
+
+	return NOERROR;
+}
+
+DWORD CALLBACK RtfGetCallBack(DWORD dwCookie, LPBYTE pbBuffer, LONG cb, LONG *pcb);
+void CRichEdView::GetRtfText(CString &Str)
+{
+	RtfStream Rtf;
+	// just make an assumption to allocate a buffer
+	// i didn't find how to know the size of
+	// the text it will get.
+	Rtf.m_lpString = Str.GetBuffer(65000); 
+	Rtf.m_index=0;
+	Rtf.m_Length = 65000;
+	EDITSTREAM es;
+
+	es.dwCookie = (DWORD)&Rtf;
+	es.dwError = 0;
+	es.pfnCallback = RtfGetCallBack;
+
+	LRESULT cc=SendMessage(EM_STREAMOUT,(WPARAM) SF_RTF,(LPARAM) &es);
+
+	Str.ReleaseBuffer(cc);
+	
+	
+}
+
+DWORD CALLBACK RtfGetCallBack(DWORD dwCookie, LPBYTE pbBuffer, LONG cb, LONG *pcb)
+{
+	RtfStream *pRtf= (RtfStream *) dwCookie;
+
+	if(pRtf == NULL)
+		return (DWORD) E_FAIL;
+
+	int HowMuch = (cb<pRtf->m_Length?cb:pRtf->m_Length);
+	// you must handle this more robustly
+	// or expand the buffer for each request
+	ASSERT ( HowMuch+pRtf->m_Length < 65000 );
+	memcpy((LPSTR)&pRtf->m_lpString[pRtf->m_index],pbBuffer,HowMuch);
+	*pcb = HowMuch;
+	pRtf->m_index+=HowMuch;
+
+	return NOERROR;
+}
+
+Rih Saad
+Wind Systeme.
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

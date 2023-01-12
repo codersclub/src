@@ -1,0 +1,166 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3 align="center">Как долго простаивает операционная
+    система.</h3>
+    <p>Автор: <a href="http://www.dilascia.com">Paul DiLascia</a></p>
+    <p><a href="getlastinputinfo.zip">Скачать исходник к статье - 21
+    Кб</a> (Компилятор: Visual C++ 6.0)</p>
+    <p>Вы задавались когда-нибудь вопросом, как можно
+    определить сколько времени бездействует
+    операционная система ? Или, например, как аська
+    определяет, что пользователя нет за компьютером ?
+    Проще говоря, как определить, сколько времени не
+    трогали мышку или не стучали по клавиатуре ?</p>
+    <p>В Windows 2000 для этих целей предусмотрена
+    системная функция GetLastInputInfo, которая заполняет
+    структуру LASTINPUTINFO нужной нам информацией:</p>
+    <pre>
+ LASTINPUTINFO lpi;
+ lpi.cbSize = sizeof(lpi);
+ GetLastInputInfo(&amp;lpi);
+</pre>
+    <p>После вызова GetLastInputInfo, lpi.dwTime содержит
+    количество миллисекунд, прошедших с момента
+    прекращения каких либо действий пользователя. С
+    одной стороны, это то, что нам нужно, но с другой -
+    эта функция доступна только в Windows 2000 - но не в Windows
+    9x и не в Windows NT 4.0. Надо бы подумать, что в таком
+    случае можно предпринять.</p>
+    <p>Наверное, проще всего будет написать свою
+    версию GetLastInputInfo, а именно поставить глобальную
+    ловушку (systemwide hook). Ловушка, это callback-функция,
+    которую Windows вызывает каждый раз, когда случается
+    что-нибудь интересное, например, когда
+    пользователь что-нибудь напечатает на
+    клавиатуре. Универсальной ловушки не существует,
+    однако ловушкой на клавиатуру и ловушкой на мышь
+    мы спокойно сможем перехватить весь
+    пользовательский ввод. Единственное, что может
+    раздражать в таком случае, это то, что ловушки
+    должны жить в DLL.</p>
+    <p>Итак, для этой цели я написал простенькую DLL,
+    которую назвал IdleUI и которая имеет всего три
+    функции:</p>
+    <pre>
+ BOOL  IdleUIInit()
+ void  IdleUITerm();
+ DWORD IdleUIGetLastInputTime();
+</pre>
+    <p>Как Вы наверное уже догадались, IdleUIInit служит
+    для инициализации, а IdleUITerm для завершения. Их
+    можно спокойно вызывать из приложения MFC в
+    функциях InitInstance и ExitInstance соответственно. Как
+    только проинициализируется IdleUI, можно вызвать
+    третью функцию IdleUIGetLastInputTime, чтобы получить
+    количество тиков, прошедших с момента последнего
+    пользовательского ввода, как это делает
+    GetLastInputInfo.</p>
+    <p>Чтобы протестировать свою DLL, я написал
+    программку TestIdleUI. Она вызывает IdleUIInit и IdleUITerm как
+    описано выше и при этом отображает количество
+    секунд бездействия клавиатуры и мышки.</p>
+    <pre>
+ void CMainFrame::OnPaint()
+ {
+   CPaintDC dc(this);
+   CString s;
+   DWORD nsec = (GetTickCount()-
+     IdleUIGetLastInputTime())/1000;
+   s.Format(
+     &quot;No mouse or keyboard input for %d seconds.&quot;,nsec);
+   CRect rc;
+   GetClientRect(&amp;rc);
+   dc.DrawText(s, &amp;rc,   
+     DT_CENTER|DT_VCENTER|DT_SINGLELINE);
+ }
+</pre>
+    <p>Как это выглядит, можно посмотреть на рисунке 1.
+    Для обеспечения непрерывности процесса отсчёта,
+    в TestIdleUI используется односекундный таймер,
+    который обновляет клиентскую область каждую
+    секунду.</p>
+    <pre>
+ void CMainFrame::OnTimer(UINT)
+ {
+   Invalidate();
+   UpdateWindow();
+ }
+</pre>
+    <p>Что может быть проще? Запускаем TestIdleUI и
+    наблюдаем по секундам, как Ваш компьютер
+    бездействует. Достаточно сдвинуть мышку и
+    щёлкнуть по клавиатуре, как счётчик сбросится в
+    ноль.</p>
+    <p><img src="getlastinputinfo.gif" width="300" height="56"><b><br>
+    Рисунок 1 TestIdleUI</b></p>
+    <p>Как работает IdleUI? Когда Вы вызваете IdleUIInit, то
+    она инсталлирует две ловушки: одну для мышки, а
+    вторую для клавиатуры.</p>
+    <pre>
+ HHOOK g_hHookKbd;
+ HHOOK g_hHookMouse;
+ g_hHookKbd = SetWindowsHookEx(WH_KEYBOARD,
+                               MyKbdHook, 
+                               hInst, 0);
+ g_hHookMouse = SetWindowsHookEx(WH_MOUSE,
+                                 MyMouseHook, 
+                                 hInst, 0);
+</pre>
+    <p>Теперь если пользователь двигает мышку или
+    нажимает клавишу на клавиатуре, Windows вызывает
+    одну из этих ловушек и соответствующую ей
+    функцию, которая записывает время:</p>
+    <pre>
+ LRESULT CALLBACK MyMouseHook(int code, 
+                              WPARAM wp, 
+                              LPARAM lp)
+ {
+   if (code==HC_ACTION) {
+     // уведомляем счётчик тиков
+     g_dwLastInputTick = GetTickCount();
+   }
+   return ::CallNextHookEx(g_hHookMouse,
+                           code, wp, lp);
+ }
+</pre>
+    <p>Аналогичная операция делается для MyKbdHook.
+    IdleUIGetLastInputTime возвращает g_dwLastInputTick, а IdleUITerm
+    деинсталлирует обе ловушки.</p>
+    <p>Есть только одна тонкость. Обычно, когда Вы
+    создаёте DLL, то компилятор помечает статические
+    данные как нерасшаренные (nonshared), что означает,
+    что каждый процесс, который вызывает DLL получает
+    свою собственную копию данных - в данном случае
+    g_hHookKbd, g_hHookMouse, и g_dwLastInputTick. Но нам-то нужен один и
+    только один экземпляр этих данных. Поэтому
+    необходимо сделать данные доступными. Для этого
+    необходимо поместить их в специальный сегмент,
+    который помен как доступный (shared). В коде это
+    выглялит так:</p>
+    <pre>
+ #pragma data_seg (&quot;.IdleUI&quot;) // или любое другое имя
+ HHOOK g_hHookKbd = NULL;
+ HHOOK g_hHookMouse = NULL;
+ DWORD g_dwLastInputTick = 0;
+ #pragma data_seg ()
+</pre>
+    <p>Этот код указывает компилятору, что три
+    переменные необходимо поместить в сегмент
+    данных с именем .IdleUI. Затем необходимо добавить
+    следующую строчку в IdleUI.def, сделав тем самым
+    сегмент расшаренным (доступным):</p>
+    <pre>
+ // в IdleUI.def
+ SECTIONS .IdleUI READ WRITE SHARED
+</pre>
+    <p>Вот собственно и всё. Удачи!</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

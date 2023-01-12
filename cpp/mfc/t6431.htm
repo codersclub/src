@@ -1,0 +1,182 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Problems catching WM_NOTIFY
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Jonas Yngvesson -- <A HREF="mailto:jonas-y@sectra.se">jonas-y@sectra.se</A>
+Monday, August 26, 1996
+</B>
+
+Environment: VC++ 4.0, NT 3.51
+
+Hi!
+=20
+I am building an application using a small part of the MFC framework. I
+have an application class (derived from CWinApp) but no document
+templates, documents or views. Instead I have my own top level window
+derived directly from CWnd, this window is built and installed as the
+m_pMainWnd member by my own code. (I wont go into the reasons for this
+architecture, but it has to do with configurability and compatibility
+over to UNIX/X).
+=20
+Anyway, I have built a toolbar in this main window using a CToolBarCtrl
+directly and everything works find except for one thing: I cant seem to
+catch any WM_NOTIFY messages sent from the toolbar. The result is that I
+can't get neither tooltips (need to catch TTN_NEEDTEXT) nor toolbar
+configuration (needs TBN_BEGINADJUST etc.) working.
+=20
+I try to declare the message handlers in my message map of the main
+window, for instance like:
+=20
+BEGIN_MESSAGE_MAP(My_Main_window, CWnd)
+  ...
+  ON_NOTIFY_RANGE(TTN_NEEDTEXT, TB_BTN_FIRST, TB_BTN_LAST, get_tooltips_t=
+ext)
+  ON_NOTIFY(TBN_BEGINDRAG, TOOLBAR_ID, tb_button_drag)
+  ...
+END_MESSAGE_MAP()
+=20
+(TB_BTN_* are id's assigned by me when adding buttons to the toolbar)
+=20
+None of these message handlers ever gets called.
+=20
+If I override CWnd::OnNotify() in my own class I can see that this
+function is called as supposed to but the messages are never routed any
+further through the message map.=20
+=20
+I can of course call the message handlers direcly from my own OnNotify()
+but it seems to me CWnd::OnNotify should handle it for me.
+=20
+Am I missing something obvious here, or what's the story?
+
+
+--Jonas
+
+----
+Jonas Yngvesson <jonas-y@sectra.se>        SECTRA AB, Teknikringen 1
+Phone: +46-13-235222                       S-583 30 Link=F6ping, Sweden
+Fax: +46-13-212185                         "The Internet is full - Go Awa=
+y!"
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:ppbillc@srv2.sj.ablecom.net">ppbillc@srv2.sj.ablecom.net</A>
+Tuesday, August 27, 1996
+</B>
+[Mini-digest: 3 responses]
+
+Jonas,
+
+You can Try 3  things :
+
+ 1) Create a messageMap for the ToolBar and forward to the MainWnd
+ 2) Implement the virtual function OnUpdateCmdUI for the Toolbar Class
+     and Call UpdateDialogContols(..., FALSE); This may be the cause 
+     of the messages not getting through.
+ 3) Get very drunk and forget about the whole thing :)
+
+Bill
+
+
+
+    
+-----From: "Rommel Songco" <rsongco@spectrasoft.com>
+
+	The MFC documentation says that when handling the WM_NOTIFY message, an
+override will not process the message map unless you call the base class
+OnNotify.  
+
+>BEGIN_MESSAGE_MAP(My_Main_window, CWnd)
+>  ...
+>  ON_NOTIFY_RANGE(TTN_NEEDTEXT, TB_BTN_FIRST, >TB_BTN_LAST,
+get_tooltips_text)
+>  ON_NOTIFY(TBN_BEGINDRAG, TOOLBAR_ID, tb_button_drag)
+>  ...
+>END_MESSAGE_MAP()
+
+	What you've done here is trap WM_NOTIFY messages.  
+Have you actually provided handler functions and message-map entries for
+each of the messages you're interested in?  
+
+Regards,
+
+Rommel Songco
+rsongco@spectrasoft.com
+
+-----From: Serge Lalonde <serge@infolytica.qc.ca>
+
+Hi there!
+
+I think that the parent window is intercepting the command and not passing
+it to its children. Try overriding the window's OnCmdMsg() method and call
+the OnCmdMsg() method for the toolbar. This should reroute the command to
+the toolbar. Example,
+
+BOOL myWindowClass::OnCmdMsg
+  (UINT               nID,
+   int                nCode,
+   void               *pExtra,
+   AFX_CMDHANDLERINFO *pHandlerInfo)
+{
+   if (baseWindowClass::OnCmdMsg(nID, nCode, pExtra, pHandlerInfo))
+      return(TRUE);
+
+   if (m_toolbar.OnCmdMsg(nID, nCode, pExtra, pHandlerInfo))
+      return(TRUE);
+
+   return(FALSE);
+}
+
+--
+Have a tremendous day!
+    _/_/_/_/ _/_/_/_/ _/_/_/    _/_/_/  _/_/_/_//  300 Leo Parizeau, Suite 2222
+   _/       _/       _/    _/ _/       _/      /  Montreal, PQ, Canada H2W 2P4
+  _/_/_/_/ _/_/_/   _/_/_/_/ _/  _/_/ _/_/_/  /  Voice: (514) 849-8752 x236
+       _/ _/       _/  _/   _/    _/ _/      /__Fax: (514) 849-4239__
+_/_/_/_/ _/_/_/_/ _/    _/   _/_/_/ _/_/_/_/ Lalonde, Infolytica Corp.
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

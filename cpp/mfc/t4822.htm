@@ -1,0 +1,292 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CRecordSet in MFC 4.1
+</B></FONT>
+<BR>
+<PRE>
+<B>
+A109793 AT DECMAIL A109793 - DECMAIL -- <A HREF="mailto:w_vd_akker@hoogovens.e-mail.com">w_vd_akker@hoogovens.e-mail.com</A>
+Friday, April 19, 1996
+</B>
+
+
+
+
+Platform MFC 4.1, NT 3.51
+
+Programmers,
+
+When I open a Recordset, I get a 'Out of memory'-error. This error occurs
+in every Recordset with Memo-Fields in it.
+In a Debugsession I saw the function SQLDescribeCol return a cbColumn
+value far to big. In the next statement, which allocate memory for the
+Memo-variable, the Out of memory error occurs.
+
+Has anyone has a solution for this?
+
+Greetings,
+
+W. vdAkker
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dr. Daniel L. Jones -- <A HREF="mailto:djones@jcc-one.dljones.com">djones@jcc-one.dljones.com</A>
+Monday, April 22, 1996
+</B>
+[Mini-digest: 3 responses]
+
+MFC4.1/Any 32 bit platform
+
+It is a bug in the MS RFX_Text code.
+
+Look at lines 526-528 in dbrfx.cpp and note that the conditional is reversed.
+Thus text fields in Sybase force a 2GB allocation and then ka-boom.
+
+Until MS fixes this, I replace all calls to RFX_Text to RFX_MyText and link
+in a RFX_MyText object.  I prefer this to distributing a fixed mfc40.dll for
+MFC4.1, but the 4.1 DLL is going to break a lot of dynamically linked
+code out there in the field.  You might want to avoid 4.1 based releases
+until MS fixes this.
+
+I certainly wish that MS would at least regression test their code before
+release.  This is *not* a minor bug.
+
+Here is the diff of RFX_Text.cpp.original as cut from dbrfx.cpp and
+RFX_MyText.cpp
+
+0a1,2
+> //// DLJ - this works around bug in MFC4.1 where someone typoed the size 
+allocation
+> ////  check in RFX_Text so that any text or memo field will blow ODBC code up.
+4c6
+< void AFXAPI RFX_Text(CFieldExchange* pFX, LPCTSTR szName,
+---
+> void AFXAPI RFX_MyText(CFieldExchange* pFX, LPCTSTR szName,
+147c149
+<                       if (cbColumn < (UINT)nMaxLength)
+---
+>                       if (cbColumn > (UINT)nMaxLength)
+
+I haven't had time to report this to MS, so could someone verify my diagnosis
+and report it to MS so it will get officially fixed?  I probably won't
+have time to report it for another couple of weeks.  Thanks.
+
+
+-- 
+djones@sykes.com            Daniel L. Jones            Office: 970-522-6638
+djones@dljones.com                                     Direct: 970-522-0652
+-----From: Pete <psilvest@village.ios.com>
+
+I had the same problem, I noticed that the problem didnt exist in MFC 3.0 and
+then when I moved on the MFC 4.0 it broke.  Comparing the code it seemed that
+they took out the very check that existed in MFC 3.0 that fixes the problem.
+I created my own version of RFX_Text() with the following change and then I
+call this version in DoFieldExchange().  As you pointed out, its still broken
+in MFC 4.1;  when I originally found the problem I posted it in an MFC newsgroup
+and no one ever responded so I assumed it was something specific that I was
+doing - I'll be interested to see if anybody else on MFC-L responds..
+
+RFX_Text()
+...
+
+			// Determine string pre-allocation size
+			if (cbColumn < (UINT)nMaxLength)
+				cbColumn = nMaxLength;
+
+//// PETE MOD START (ADD)			
+			// Constrain to user specified max length
+			if (cbColumn > (UINT)nMaxLength)
+				cbColumn = nMaxLength;
+//// PETE MOD END
+
+			// Set up binding addres
+			void* pvData;
+			value.GetBufferSetLength(cbColumn+1);
+			pvData = value.LockBuffer();    // will be overwritten if UNICODE
+>
+
+-----From: Dan Kirby <dkirby@accessone.com>
+
+This is a bug in VC++ 4.1.  You'll need to copy the RFX_Text function from 
+DBRFX.CPP and change the code :
+
+if (cbColumn < (UINT)nMaxLength)
+   cbColumn = nMaxLength;
+
+to:
+
+if (cbColumn > (UINT)nMaxLength)
+   cbColumn = nMaxLength;
+
+This problem will only occur with certain types of  fields where the 
+precision value returned from SQLDescribecol will be large as is the case 
+with the memo fields (Foxpro driver returns 1G for a precision value for 
+example).
+
+--dan
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Roderick Prince -- <A HREF="mailto:RPrince@msn.com">RPrince@msn.com</A>
+Monday, April 29, 1996
+</B>
+FYI,
+
+This issue has been acknowledged by MS...
+
+BUG: Run Out of Memory or Assertion in GetBufferSetLength()
+[visualc] ID: Q148787    CREATED: 22-MAR-1996   MODIFIED: 25-MAR-1996
+4.10
+WINDOWS NT
+PUBLIC | kbprg kbbuglist
+
+Happy trails,
+Roderick...
+
+----------
+From: 	owner-mfc-l@netcom.com on behalf of Dr. Daniel L. Jones
+Sent: 	Monday, April 22, 1996 4:05 AM
+To: 	mfc-l@netcom.com
+Cc: 	w_vd_akker@hoogovens.e-mail.com
+Subject: 	Re: CRecordSet in MFC 4.1
+
+[Mini-digest: 3 responses]
+
+MFC4.1/Any 32 bit platform
+
+It is a bug in the MS RFX_Text code.
+
+Look at lines 526-528 in dbrfx.cpp and note that the conditional is reversed.
+Thus text fields in Sybase force a 2GB allocation and then ka-boom.
+
+Until MS fixes this, I replace all calls to RFX_Text to RFX_MyText and link
+in a RFX_MyText object.  I prefer this to distributing a fixed mfc40.dll for
+MFC4.1, but the 4.1 DLL is going to break a lot of dynamically linked
+code out there in the field.  You might want to avoid 4.1 based releases
+until MS fixes this.
+
+I certainly wish that MS would at least regression test their code before
+release.  This is *not* a minor bug.
+
+Here is the diff of RFX_Text.cpp.original as cut from dbrfx.cpp and
+RFX_MyText.cpp
+
+0a1,2
+> //// DLJ - this works around bug in MFC4.1 where someone typoed the size 
+allocation
+> ////  check in RFX_Text so that any text or memo field will blow ODBC code 
+up.
+4c6
+< void AFXAPI RFX_Text(CFieldExchange* pFX, LPCTSTR szName,
+---
+> void AFXAPI RFX_MyText(CFieldExchange* pFX, LPCTSTR szName,
+147c149
+<                       if (cbColumn < (UINT)nMaxLength)
+---
+>                       if (cbColumn > (UINT)nMaxLength)
+
+I haven't had time to report this to MS, so could someone verify my diagnosis
+and report it to MS so it will get officially fixed?  I probably won't
+have time to report it for another couple of weeks.  Thanks.
+
+
+-- 
+djones@sykes.com            Daniel L. Jones            Office: 970-522-6638
+djones@dljones.com                                     Direct: 970-522-0652
+-----From: Pete <psilvest@village.ios.com>
+
+I had the same problem, I noticed that the problem didnt exist in MFC 3.0 and
+then when I moved on the MFC 4.0 it broke.  Comparing the code it seemed that
+they took out the very check that existed in MFC 3.0 that fixes the problem.
+I created my own version of RFX_Text() with the following change and then I
+call this version in DoFieldExchange().  As you pointed out, its still broken
+in MFC 4.1;  when I originally found the problem I posted it in an MFC 
+newsgroup
+and no one ever responded so I assumed it was something specific that I was
+doing - I'll be interested to see if anybody else on MFC-L responds..
+
+RFX_Text()
+...
+
+			// Determine string pre-allocation size
+			if (cbColumn < (UINT)nMaxLength)
+				cbColumn = nMaxLength;
+
+//// PETE MOD START (ADD)			
+			// Constrain to user specified max length
+			if (cbColumn > (UINT)nMaxLength)
+				cbColumn = nMaxLength;
+//// PETE MOD END
+
+			// Set up binding addres
+			void* pvData;
+			value.GetBufferSetLength(cbColumn+1);
+			pvData = value.LockBuffer();    // will be overwritten if UNICODE
+>
+
+-----From: Dan Kirby <dkirby@accessone.com>
+
+This is a bug in VC++ 4.1.  You'll need to copy the RFX_Text function from 
+DBRFX.CPP and change the code :
+
+if (cbColumn < (UINT)nMaxLength)
+   cbColumn = nMaxLength;
+
+to:
+
+if (cbColumn > (UINT)nMaxLength)
+   cbColumn = nMaxLength;
+
+This problem will only occur with certain types of  fields where the 
+precision value returned from SQLDescribecol will be large as is the case 
+with the memo fields (Foxpro driver returns 1G for a precision value for 
+example).
+
+--dan
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

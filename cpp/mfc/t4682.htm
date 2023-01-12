@@ -1,0 +1,177 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+How to remove highlight/focus from an ownerdraw CListCtrl
+</B></FONT>
+<BR>
+<PRE>
+<B>
+<A HREF="mailto:Gary_Shank@stercomm.com">Gary_Shank@stercomm.com</A>
+Thursday, April 11, 1996
+</B>
+     I'm using MSVC 4.1 on Windows NT 4.0 beta.
+     I've got an ownerdraw CListCtrl and I'm trying to write a function 
+     that will remove the highlight and focus of an item that is selected.  
+     Below is some code that I've tried but failed to produce the desired 
+     results.  I do get the correct item using GetItem but then it's as if 
+     SetItemState isn't working.  I've tried using Update by itself, then 
+     InvalidateRect by itself, then Update and InvalidateRect together, but 
+     nomatter what, my DrawItem function gets an itemState (from 
+     DRAWITEMSTRUCT) of ODS_SELECTED and ODS_FOCUS.  Any ideas?
+     
+     void CMyCListCtrl::RemoveHighlight()
+     {
+        // get selected item
+        memset(&m_lvItem, NULL, sizeof(m_lvItem));
+        m_lvItem.mask = LVIF_STATE;
+        m_lvItem.state = LVIS_SELECTED;
+        m_lvItem.stateMask = LVIS_SELECTED;
+        if ( GetItem(&m_lvItem) == FALSE )
+           return;
+     
+        SetItemState(m_lvItem.iItem, 0, LVIF_STATE);
+        Update(m_lvItem.iItem);
+        InvalidateRect(NULL, TRUE);
+     }
+     
+     Gary_Shank@stercomm.com
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Glen Okita -- <A HREF="mailto:go@svpal.org">go@svpal.org</A>
+Monday, April 15, 1996
+</B>
+[Mini-digest: 3 responses]
+
+The 3rd parameter to SetItemState() is a bit mask.  The constant
+LVIF_STATE has the value 0x0008, which means the low order focus
+and select bits are never affected.  Use a mask value of 0x000F or
+possibly (LVIS_FOCUSED | LVIS_SELECTED | LVIS_CUT | LVIS_DROPHILITED).
+
+BTW - I have noticed that my state icon does not update properly
+when I grab LVN_ITEMCHANGING and modify the state icon bits.
+I need to post a message to myself and call SetItemState() to get
+the display corrected.  (I don't call Update() cause it repaints the
+entire control unnecessarily.)  Anyone else notice something like this?
+
+                                                               Glen Okita
+ti desrever sediT -- Tides reversed it                         go@svpal.org
+
+
+
+-----From: "Joseph M. Koral" <jkoral@ftp.com>
+
+>> SetItemState(m_lvItem.iItem, 0, LVIF_STATE);
+
+You need to provide the stateMask as the third parameter to SetItemState, not the mask.  So in your case, you would want:
+
+     SetItemState(m_lvItem.iItem, 0, LVIS_SELECTED);
+
+
+Also, why are you using GetItem to find the selected item?  How will this work when multiple items are selected?
+
+- Joseph
+     
+-----From: "Frederic Steppe" <FredericS@msn.com>
+
+>I've got an ownerdraw CListCtrl and I'm trying to write a function 
+>that will remove the highlight and focus of an item that is selected.
+
+Try something like this (not tested, but it should work) :
+
+void CMyCListCtrl::RemoveState(int nState)
+{
+    int nItem = -1;
+
+    while((nItem = GetNextItem(nItem, nState)) >= 0)
+    {
+        SetItemState(nItem, 0, nState);
+    }
+}
+
+void CMyCListCtrl::RemoveHighlight()
+{
+    int nItem = -1;
+
+    RemoveState(LVIS_SELECTED);
+    RemoveState(LVIS_FOCUSED);
+}
+
+Frederic. (frederics@msn.com)
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Joseph Koral -- <A HREF="mailto:jkoral@ftp.com">jkoral@ftp.com</A>
+Thursday, April 18, 1996
+</B>
+Frederic. (frederics@msn.com) wrote:
+
+>> void CMyCListCtrl::RemoveState(int nState)
+>> {
+>>     int nItem = -1;
+>>     while((nItem = GetNextItem(nItem, nState)) >= 0)
+>>     {
+>>         SetItemState(nItem, 0, nState);
+>>     }
+>> }
+>> 
+>> 
+>> void CMyCListCtrl::RemoveHighlight()
+>> {
+>>     int nItem = -1;
+>> 
+>>     RemoveState(LVIS_SELECTED);
+>>     RemoveState(LVIS_FOCUSED);
+>> }
+
+
+Ouch.  Why so expensive?  You can change multiple states at the same
+time.  Why not just RemoveState(LVIS_SELECTED | LVIS_FOCUSED)?
+
+- Joseph
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

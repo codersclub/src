@@ -1,0 +1,266 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Repeating the scroll
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Doncho Angelov -- <A HREF="mailto:alian@plovdiv.techno-link.com">alian@plovdiv.techno-link.com</A>
+Sunday, February 02, 1997
+</B>
+Environment: VC++ 4.0, Win 95
+
+Hello everybody !
+
+I have the following problem:
+	I'm implementing drag operation in my CScrollView. It's simple dragging =
+of graphical object from one place to another. But as you know the =
+ScrollView has size, which is (sometimes) much bigger than the window's =
+client area. So I want after I go outside the client area during =
+dragging with the mouse, the CScrollView to scroll automatically while =
+I'm 'away' from the client area and to finish scrolling at the end or =
+when I return to the client area. I've checked some materials to find =
+'ready' code, but I couldn't find even an idea. The only one idea which =
+came into my mind was to initialize timer who's going to check and to =
+send scrolling messages while the cursor is outside the client area, but =
+this is a little 'confusing'.
+	Any better ideas ?
+
+Thanks in advance !
+
+Doncho
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Simon Salter -- <A HREF="mailto:Simon@chersoft.co.uk">Simon@chersoft.co.uk</A>
+Wednesday, February 05, 1997
+</B>
+Good scrolling is, imho, quite hard to do and also fairly rare. Here are
+some ideas which build on what I suspect you are already thinking about.
+
+When you are dragging the object you will have set capture to the view.
+In OnMouseMove() you can test to see if you are outside or inside the
+client rect and use this to start/stop scrolling of the view. You might
+like to actually test a rect slightly smaller than the client area so
+that scrolling starts when you get close to the edge.
+
+To implement the scrolling you will first need to work out what
+direction to scroll in (by looking where the mouse is in relation to the
+client area). Controlling the scroll can be tricky. My preference is
+that you do it in some controlled fashion which means when someone runs
+your app on a super wizz cpu the scrolling does not rush past at an
+unreasonable rate. (The MSDEV edit windows do this if you drag sideways
+- it can sometimes need some deft mouse handling). So I'd use a timer to
+set up a regular scrolling interval and start it from OnMouseMove(). I
+might also calculate how far from the client area the cursor is and
+increase the rate of scrolling proportionately. The OnTimer() would have
+to calculate how much scrolling to do for one 'tick' and either do the
+scroll or, if the mouse was back on the client area, kill the timer.
+
+>-----Original Message-----
+>From:	Doncho Angelov [SMTP:alian@plovdiv.techno-link.com]
+>Sent:	Fri, 02 February 1996 23:22
+>To:	'MFC-L'
+>Subject:	Repeating the scroll
+>
+>Environment: VC++ 4.0, Win 95
+>
+>Hello everybody !
+>
+>I have the following problem:
+>	I'm implementing drag operation in my CScrollView. It's simple dragging =
+>of graphical object from one place to another. But as you know the =
+>ScrollView has size, which is (sometimes) much bigger than the window's =
+>client area. So I want after I go outside the client area during =
+>dragging with the mouse, the CScrollView to scroll automatically while =
+>I'm 'away' from the client area and to finish scrolling at the end or =
+>when I return to the client area. I've checked some materials to find =
+>'ready' code, but I couldn't find even an idea. The only one idea which =
+>came into my mind was to initialize timer who's going to check and to =
+>send scrolling messages while the cursor is outside the client area, but =
+>this is a little 'confusing'.
+>	Any better ideas ?
+>
+>Thanks in advance !
+>
+>Doncho
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+John Young -- <A HREF="mailto:jyoung@gol.com">jyoung@gol.com</A>
+Thursday, February 06, 1997
+</B>
+Hi Doncho,
+
+At 11:21 pm 2/2/96 +-200, Doncho Angelov wrote:
+>Environment: VC++ 4.0, Win 95
+>
+>Hello everybody !
+>
+>I have the following problem:
+>	I'm implementing drag operation in my CScrollView. It's simple dragging =
+>of graphical object from one place to another. But as you know the =
+>ScrollView has size, which is (sometimes) much bigger than the window's =
+>client area. So I want after I go outside the client area during =
+>dragging with the mouse, the CScrollView to scroll automatically while =
+>I'm 'away' from the client area and to finish scrolling at the end or =
+>when I return to the client area. I've checked some materials to find =
+>'ready' code, but I couldn't find even an idea. The only one idea which =
+>came into my mind was to initialize timer who's going to check and to =
+>send scrolling messages while the cursor is outside the client area, but =
+>this is a little 'confusing'.
+>	Any better ideas ?
+
+I did this recently.  What I did was to capture the mouse in the view's 
+OnLButtonDown() handler, detect when the mouse is dragged out of the 
+client area in the OnMouse() handler and start a timer.  In the 
+OnTimer() handler, simply calculate the new scroll and call 
+ScrollToPosition().  When the mouse button is released, then release 
+the capture and kill the timer.
+
+The timer value can be varied so that the scrolling slows down when the 
+mouse nears the client area, and speeds up when it is further away. 
+
+Here's the heart of the code I use...
+
+
+void CPredView::OnLButtonDown(UINT nFlags, CPoint point) 
+{
+    	theMouse.Capture (this);
+	CScrollView::OnLButtonDown (nFlags, point);
+}
+
+void CPredView::OnMouseMove (UINT nFlags, CPoint point) 
+{
+	if ( nFlags & MK_LBUTTON )
+	{
+		CRect rectClient;
+		GetClientRect (&rectClient);
+		if ( point.y >= rectClient.top &&
+			point.y <= rectClient.bottom )
+		{			
+			m_bMouseScrolling = FALSE;
+			KillTimer (TIMER_MOUSESCROLL);
+		}
+		else 
+		{
+			// Mouse is outside the client area, so scroll
+			if ( !m_bMouseScrolling )
+			{
+				m_bMouseScrolling = TRUE;
+				SetTimer (TIMER_MOUSESCROLL, 50, NULL);
+			}
+		}
+	}
+	
+	CScrollView::OnMouseMove(nFlags, point);
+}
+
+
+
+void CPredView::OnLButtonUp(UINT nFlags, CPoint point) 
+{
+	m_bMouseScrolling = FALSE;
+	KillTimer (TIMER_MOUSESCROLL);
+	theMouse.Release();
+	CScrollView::OnLButtonUp(nFlags, point);
+}
+
+
+void CPredView::OnTimer (UINT nIDEvent) 
+{
+	if ( nIDEvent == TIMER_MOUSESCROLL )
+	{
+		CPoint pt = theMouse;
+		ScreenToClient (&pt);
+		OnMouseScroll (pt);
+	}
+	
+	CScrollView::OnTimer(nIDEvent);
+}
+
+void CPredView::OnMouseScroll (CPoint ptMouse)
+{
+	// Mouse is outside the client window.
+	CPoint ptScroll = GetScrollPosition();
+
+	if ( IsBelowClient (ptMouse) )
+	{
+		// Scroll up by some amount
+		ptScroll += ?
+
+		ScrollToPosition (ptScroll);
+
+		// Adjust speed
+		if ( ptMouse.y > rectClient.bottom + m_nSpeedThreshold )
+			SetTimer (TIMER_MOUSESCROLL, 10, NULL);	// Fast
+		else	SetTimer (TIMER_MOUSESCROLL, 300, NULL);	// Slow
+	}
+	else if ( IsAboveClient (ptMouse) )
+	{
+		// Scroll down
+		ptScroll -= ?
+
+		ScrollToPosition (ptScroll);
+
+		// Adjust speed
+		if ( ptMouse.y < rectClient.top - m_nSpeedThreshold )
+			SetTimer (TIMER_MOUSESCROLL, 10, NULL);	// Fast
+		else SetTimer (TIMER_MOUSESCROLL, 300, NULL);	// Slow
+	}
+}
+
+HTH
+
+-John
+
+
+John Young, Yaesu Musen Co., Ltd., Japan.
+If only computers did what you wanted, not what you tell them.
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+    <A HREF="http://www.digiday.com/mfcpro/joinmfcl.htm">Become an MFC-L member</A>
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

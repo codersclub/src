@@ -1,0 +1,376 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+MFC/GDI question
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Jeff Wishnie -- <A HREF="mailto:jwishnie@swellsoft.com">jwishnie@swellsoft.com</A>
+Friday, January 12, 1996
+</B>
+After having read through the documentation on CGdiObject and its
+descendents, and having looked through sample code and the available source,
+I am still confused about memory/resource managment.
+
+Here is what I do understand:
+
+1. CGdiObjects are simple wrappers around "GDI Objects" (data structures
+allocated by the Win32 C-API which live in some global memory space).
+
+2. when new a CGdiObject with the default constructer I allocated only local
+memory for the mfc wrapper. I need to call some creation method like
+"CBitmap::LoadBitmap" to acutally allocate memory for the wrapped GDI object.
+
+3. Memory for the MFC wrapper is reclaimed as with any C++ object when I
+call "delete" for a newed object, or exit the stack-frame for a stack-based
+object.
+
+Here is what I DON'T understand: 
+
+1. when does the memory for the GDI Object get reclaimed? I see an explicit
+"DeleteObject()" call on CGdiObject, but do I need to call it directly OR is
+it called from CGdiObject::~CGdiObject?
+
+In particular, I'm using the CTreeCtrl and I'm concerned about the memory
+used by my Bitmaps and ImageList when I call CtreeCtrl::SetImageList().
+
+My tests show that I can safetly destroy the CImageList mfc object after
+setting it in a CTreeCtrl, but what happened to the memory used by the GDI
+Objects? Can I trust that the GDI Objects are being handled by the CTreeCtrl
+and will be freed when I delete the CTreeCtrl?
+
+Thanks in advance for any help.
+
+regards,
+Jeff
+jwishnie@swellsoft.com
+415 437-0922 (w)
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Martijn Vels -- <A HREF="mailto:Vels0020@exact.nl">Vels0020@exact.nl</A>
+Monday, January 15, 1996
+</B>
+[Mini-digest: 6 responses]
+
+DeleteObject() function:
+Normally you don't need to call the DeleteObject() function because it is 
+automatically destroyed.
+However, if you have a font for instance, and you would like to load another 
+font you should clear the GDI object first by calling the base member 
+DeleteFont, and then call the LoadFont(...) function.
+If you don't I guess the GDI object will start floating around and have a 
+life of its own.
+
+M.
+
+-----From: Brad Wilson <bradw@netnet.net>
+
+[ I am assuming Visual C++ 4.0, since you didn't say which version you are
+  using and 4.0 is all I have installed close to me ]
+
+>> Here is what I DON'T understand: 
+
+For what it's worth, the MFC source is an excellent source of information
+for things like this.
+
+>> 1. when does the memory for the GDI Object get reclaimed? I see an explicit
+>> "DeleteObject()" call on CGdiObject, but do I need to call it directly OR is
+>> it called from CGdiObject::~CGdiObject?
+
+DeleteObject() is called in the destructor.  You can find the destructor for
+CGdiObject in AFXWIN1.INL in the MFC\INCLUDE directory.
+
+>> In particular, I'm using the CTreeCtrl and I'm concerned about the memory
+>> used by my Bitmaps and ImageList when I call CtreeCtrl::SetImageList().
+
+In WINCTRL2.CPP, you see that in CTreeCtrl::OnDestroy(), there are two
+calls to RemoveImageList, which would indicate that the image list is
+cleaned up when the control is destroyed.
+
+Good luck!
+Brad
+
+--
+class CBradWilson : public CWorldWatchProgrammingTeam {
+  public:
+    CString GetInetAddr()   { return CString("bradw@exptech.com");      }
+    CString GetPhone()      { return CString("+1 (810) 620-9803");      }
+    CString GetURL()        { return CString("http://www.exptech.com"); }
+    CString GetDisclaimer() { return CString("All I say is fact :-p");  }
+};
+
+//  QOTW: "There is no right or wrong ... just popular opinion"
+
+-----From: a.will@T-Online.de (Andreas Will)
+
+Jeff Wishnie wrote:
+
+>After having read through the documentation on CGdiObject and its
+>descendents, and having looked through sample code and the available source,
+>I am still confused about memory/resource managment.
+>
+>Here is what I do understand:
+>
+>1. CGdiObjects are simple wrappers around "GDI Objects" (data structures
+>allocated by the Win32 C-API which live in some global memory space).
+>
+>2. when new a CGdiObject with the default constructer I allocated only local
+>memory for the mfc wrapper. I need to call some creation method like
+>"CBitmap::LoadBitmap" to acutally allocate memory for the wrapped GDI object.
+>
+>3. Memory for the MFC wrapper is reclaimed as with any C++ object when I
+>call "delete" for a newed object, or exit the stack-frame for a stack-based
+>object.
+>
+>Here is what I DON'T understand: 
+>
+>1. when does the memory for the GDI Object get reclaimed? I see an explicit
+>"DeleteObject()" call on CGdiObject, but do I need to call it directly OR is
+>it called from CGdiObject::~CGdiObject?
+>
+>In particular, I'm using the CTreeCtrl and I'm concerned about the memory
+>used by my Bitmaps and ImageList when I call CtreeCtrl::SetImageList().
+>
+>My tests show that I can safetly destroy the CImageList mfc object after
+>setting it in a CTreeCtrl, but what happened to the memory used by the GDI
+>Objects? Can I trust that the GDI Objects are being handled by the CTreeCtrl
+>and will be freed when I delete the CTreeCtrl?
+
+VC4, Win32 SDK doc (Win32; Overviews; Window Controls; List View
+Controls; About...; List View Image Lists) says:  "By default, a list
+view control destroys the image lists assigned to it when it is
+destroyed. However, if a list view control has the LVS_SHAREIMAGELISTS
+window style, the application is responsible for destroying the image
+lists when they are no longer in use. You should specify this style if
+you assign the same image lists to multiple list view controls;
+otherwise, more than one control might try to destroy the same image
+list."
+
+
+Fairly often questions like this one pop up. They are caused by
+confusing the heavily overloaded meaning of the word "object" (at least
+that's what I believe to be the root of all evil).
+
+Part of the problem may be that programming in C++ using MFC seems to
+be a lot easier than coding window callback functions and dialog boxes
+manually in plain C. - No doubt, clicking a few buttons in the
+AppWizard and compiling the generated code to create an OLE2 compliant
+RTF-editor doesn't compare against manually hacking in a few pages to
+produce a boring "Hello Windows" output.  However the latter approach
+teaches a lot about the inner workings and the essentials of our
+beloved operating system, while the first is mainly a mouse pointing
+exercise :-).  I can still recommend the lecture of "The Petzold"
+(Charles Petzold, Programming Windows).
+
+// End of prologue, begin of answer to the above question
+Windows doesn't know anything about C++ objects it only knows windows
+objects. Any windows object is accessed through a HANDLE (HWND, HBRUSH,
+HBITMAP etc.).  MFC classes use member variables to wrap these HANDLEs
+and usually free the associated memory in the destructor (I'm saying
+*usually* because there are exceptions to every rule - usually).
+
+// AFXWIN1.INL contains:
+_AFXWIN_INLINE CGdiObject::~CGdiObject()
+	{ DeleteObject(); }
+
+DeleteObject() detaches the windows object handle from the C++ object
+and calls the ::DeleteObject(HGDIOBJ) function (you may attach/detach
+windows objects to/from the same C++ object as often as you like).
+
+C++ objects are created and destroyed by compiler generated code - on
+the stack or the heap - and are not to be confused with globally
+allocated windows objects.  C++ classes commonly implement a "operator
+HANDLE" (i.e. CBitmap::operator HBITMAP) function to cast C++ objects
+directly to their respective HANDLEs.
+
+Whenever you call windows API functions (the majority of all class
+member functions) either direct (i.e. ::GetDC()) or indirect through
+class member functions the attached HANDLE will be used to pass
+information to the operating system.  Class pointers/references are
+meaningful only in the C++ world.
+
+Best regards
+  Andy
+/////////////////
+Andreas Will
+Jever, Germany
+a.will@t-online.de
+/////////////////
+
+-----From: Larry Wall <tech@clearguis.com>
+
+Jeff,
+
+In my experiences with CPens, I found the following:
+
+CPen myPen(PS_SOLID, 1, mycolor);
+CPen* pOldPen =3D pDC->SelectObject(&myPen);
+later on....
+pDC->SelectObject(pOldPen);
+myPen.DeleteObject();
+
+In the previous code, I found that if I didn't add myPen.DeleteObject(), =
+my resources in Windows would eventually be eaten up. On the other hand:
+
+CPen myPen;
+myPen.CreatePen(PS_SOLID, 1, myPen);
+CPen* pOldPen =3D pDC->SelectObject(&myPen);
+later on...
+pDC->SelectObject(pOldPen);
+
+Creating the pen this way showed no problem when using the windows =
+resources. I never was able to figure out why this was happening though, =
+I just changed my code to reflect the CreatePen method because I believe =
+it is a cleaner method.
+
+According to all the MFC information I have read in the past, you should =
+not have to call DeleteObject directly but as you can see in the =
+previous code example, it may depend on how you create your object.=20
+
+Hope this helps.
+
+Larry Wall
+tech@clearguis.com
+
+-----From: Eric Kenslow <kenslowe@internet.OIT.OSSHE.EDU>
+
+[snip]
+>Here is what I do understand:
+
+>1. CGdiObjects are simple wrappers around "GDI Objects" (data =
+structures
+>allocated by the Win32 C-API which live in some global memory space).
+Good.
+
+>2. when new a CGdiObject with the default constructer I allocated only =
+local
+>memory for the mfc wrapper. I need to call some creation method like
+>"CBitmap::LoadBitmap" to acutally allocate memory for the wrapped GDI =
+object.
+Good.
+
+>3. Memory for the MFC wrapper is reclaimed as with any C++ object when =
+I
+>call "delete" for a newed object, or exit the stack-frame for a =
+stack-based
+>object.
+Again, good.
+
+>Here is what I DON'T understand:=20
+
+>1. when does the memory for the GDI Object get reclaimed? I see an =
+explicit
+>"DeleteObject()" call on CGdiObject, but do I need to call it directly =
+OR is
+>it called from CGdiObject::~CGdiObject?
+Yes, the CGdiObject destructor destroys its handle.  So either; call =
+DeleteObject() to kill the Windows object, or wait for it to go out of =
+scope, and it will do this for you.
+
+>In particular, I'm using the CTreeCtrl and I'm concerned about the =
+memory
+>used by my Bitmaps and ImageList when I call CtreeCtrl::SetImageList().
+
+>My tests show that I can safetly destroy the CImageList mfc object =
+after
+>setting it in a CTreeCtrl, but what happened to the memory used by the =
+GDI
+>Objects? Can I trust that the GDI Objects are being handled by the =
+CTreeCtrl
+>and will be freed when I delete the CTreeCtrl?
+
+In general, no, you can't trust that MFC objects will correctly manage =
+your resources for you; normally you have to manage them for yourself.  =
+For MFC image lists, for example, I would derive from the base imagelist =
+and, in its destructor, destroy all remaining images.  Just my $0.02.
+
+-----From: bobe@tiac.net (Bob Edison)
+
+>After having read through the documentation on CGdiObject and its
+>descendents, and having looked through sample code and the available source,
+>I am still confused about memory/resource managment.
+>
+>Here is what I do understand:
+>
+>1. CGdiObjects are simple wrappers around "GDI Objects" (data structures
+>allocated by the Win32 C-API which live in some global memory space).
+>
+
+That's right!
+
+>2. when new a CGdiObject with the default constructer I allocated only local
+>memory for the mfc wrapper. I need to call some creation method like
+>"CBitmap::LoadBitmap" to acutally allocate memory for the wrapped GDI object.
+>
+Right again!
+
+>3. Memory for the MFC wrapper is reclaimed as with any C++ object when I
+>call "delete" for a newed object, or exit the stack-frame for a stack-based
+>object.
+>
+Three for Three!
+
+>Here is what I DON'T understand:
+>
+>1. when does the memory for the GDI Object get reclaimed? I see an explicit
+>"DeleteObject()" call on CGdiObject, but do I need to call it directly OR is
+>it called from CGdiObject::~CGdiObject?
+>
+The correct style for any class whether it's a wrapper or otherwise is to do the
+deletes in the destructor. However because Windows has it's own separate
+allocation and deallocation of objects apart from the MFC wrapper objects,
+it's
+often necessary to explicitly destroy the Windows object.  You can get
+around this if you create your own subclass of the MFC class.
+
+I'm not sure of the way the tree-control deletes its contents since I have
+yet to use it (still stuck on Windows 3.1x development for the moment) but
+if you look at the source for the destructor it should be pretty clear what
+being deleted automatically and what you may need to delete.
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

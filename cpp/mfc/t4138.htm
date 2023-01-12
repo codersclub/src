@@ -1,0 +1,356 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Propertysheet & Wizards
+</B></FONT>
+<BR>
+<PRE>
+<B>
+<A HREF="mailto:lamrv@nt.com">lamrv@nt.com</A>
+Tuesday, February 27, 1996
+</B>
+Fellow MFCers,
+
+I am having some problems using CPropertySheet to implement a wizard.
+I add CPropertyPage-derived pages in the ctor of CPropertySheet-derived
+class.  I set the wizard mode by calling SetWizardMode() prior to calling
+DoModal().
+
+1. Where should page navigation code goes?
+
+   The pages are automatically traversed sequentially.  However, depending
+   on user input, one page can "jump" to another.  I am not sure where this page
+   navigation should be.  It seems the most logical place to put is my 
+   CPropertySheet-derived class.  I override the CPropertyPage virtual methods 
+   OnWizardNext(), OnWizardBack(), & OnWizardFinish() to notify the
+   CPropertySheet-derived class which consequently make the decision as
+   what should be the next active page and call SetActivePage() accordingly.
+   Although this seems to work, I am not sure if it is the easiest & most efficient
+   way of doing it.  Is there an easier way that I missed?
+   Anyone has any idea?
+
+2. How to disable the propertysheet buttons (NEXT, BACK, FINISH)?
+   
+   I thought of using GetDlgItem() to get a CWnd::EnableWindow() but
+   I can't seem to find correct resid for the propertysheet buttons.
+
+3. For modeless propertysheet, how does one going about to enable the
+   OK, CANCEL & APPLY buttons?
+   
+
+Thanks for your help in advance..
+-Rex Lam
+lamrv@nt.com
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+David W. Gillett -- <A HREF="mailto:DGILLETT@expertedge.com">DGILLETT@expertedge.com</A>
+Thursday, February 29, 1996
+</B>
+> I am having some problems using CPropertySheet to implement a wizard.
+> I add CPropertyPage-derived pages in the ctor of CPropertySheet-derived
+> class.  I set the wizard mode by calling SetWizardMode() prior to calling
+> DoModal().
+> 
+> 1. Where should page navigation code goes?
+> 
+>    The pages are automatically traversed sequentially.  However, depending
+>    on user input, one page can "jump" to another.  I am not sure where this page
+>    navigation should be.  It seems the most logical place to put is my 
+>    CPropertySheet-derived class.  I override the CPropertyPage virtual methods 
+>    OnWizardNext(), OnWizardBack(), & OnWizardFinish() to notify the
+>    CPropertySheet-derived class which consequently make the decision as
+>    what should be the next active page and call SetActivePage() accordingly.
+>    Although this seems to work, I am not sure if it is the easiest & most efficient
+>    way of doing it.  Is there an easier way that I missed?
+>    Anyone has any idea?
+
+  This doesn't sound right at all.  Those methods are invoked when 
+the CPropertySheet is telling the CPropertyPage that it is about to 
+be switched away from -- the CPropertySheet believes it already knows 
+where it will be switching to.  You want a method in your 
+CPropertySheet-derived class that a CPropertyPage can call when it 
+wants a jump to happen, and this in turn implies that your 
+CPropertyPage objects know that their parent is of your class and not 
+just any CPropertySheet.
+ 
+Dave
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+LeRoy Baxter -- <A HREF="mailto:lbaxter@cinfo.com">lbaxter@cinfo.com</A>
+Friday, March 01, 1996
+</B>
+[Mini-digest: 2 responses]
+
+ for item 1.) you can provide simplistic navigation if you have your the OnSetActive() 
+     return FALSE if the page is to be bypassed:
+
+ // -------------------------------------------------------------------------------
+BOOL CMyPageX::OnSetActive()
+{
+ CMyPage2* pPg = (CMyPage2*)((CPropertySheet*)GetParent())->GetPage(1); // base 0 indexing
+   if (pPg->m_bBool == TRUE)       return FALSE;
+
+   if (!CPropertyPage::OnSetActive()){
+      return FALSE;
+   }
+
+for item 2, you can also handle this in the OnSetActive() (actually, you don't disable, you
+specifically enable)
+
+ // -------------------------------------------------------------------------------
+BOOL CMyPageX::OnSetActive()
+{
+   if (!CPropertyPage::OnSetActive()){
+      return FALSE;
+   }
+   ((CPropertySheet*)GetParent())->SetWizardButtons(PSWIZB_BACK | PSWIZB_NEXT);
+
+   return TRUE;
+}
+
+For item 3) I don't know, I haven't used modeless PropertySheets
+
+-----From: "Brian Eriksen" <beriksen@cda.com>
+
+     
+1) I do my navigation how you describe.
+2) The IDs are ID_WIZNEXT, ID_WIZBACK, and ID_WIZFINISH, and they're children
+   of your CPropertySheet.  (There is a function to do this in CPropertySheet,
+   but the function only allows a Back button and either a Next OR Finish; you
+   can't ever use all 3 with the built-in methods.  You can, however, move the
+   Back and Next buttons to the left, and then handle enabling with
+
+        MyPropertySheet.GetDlgItem(ID_WIZXXXX)->EnableWindow()
+
+3) I don't have experience in this area.
+
+
+With regards to 1), I have questions about this also.  I found that if I 
+override OnWizardNext, and in my override I do a 
+MyPropertySheet.SetActivePage(), what happens is that the page is switched to 
+the page I specify, but the "next" still happens, so I'm always one ahead.  (The
+same kind of thing happens with going back; you end up one page behind where you
+specified.)  What I did to resolve this was to use
+
+        GetParent()->PostMessage(PSM_SETCURSEL,<page #>);
+
+inside my OnWizardNext/Back overrides so that the "Next" or "Back" that was 
+underway could finish and then the page would switch.  There's got to be a 
+better way, right?
+
+Brian Eriksen
+CDA Investment Technologies, Inc.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:beriksen@cda.com">beriksen@cda.com</A>
+Monday, March 04, 1996
+</B>
+     
+But there must be a way to do this in the CPropertyPage.  If not, then the 
+CPropertySheet would have to know about all the "decision making" controls on 
+each CPropertyPage, which then makes your code much more complicated.
+
+If you were going to implement this, though, then what function in the 
+CPropertySheet would you override?
+
+______________________________ Reply Separator _________________________________
+Subject: Re: Propertysheet & Wizards
+Author:  mfc-l@netcom.com at Internet_Mail
+Date:    2/29/96 5:48 PM
+
+
+> I am having some problems using CPropertySheet to implement a wizard.
+> I add CPropertyPage-derived pages in the ctor of CPropertySheet-derived
+> class.  I set the wizard mode by calling SetWizardMode() prior to calling 
+> DoModal().
+> 
+> 1. Where should page navigation code goes? 
+> 
+>    The pages are automatically traversed sequentially.  However, depending 
+>    on user input, one page can "jump" to another.  I am not sure where this 
+page
+>    navigation should be.  It seems the most logical place to put is my 
+>    CPropertySheet-derived class.  I override the CPropertyPage virtual methods
+     
+>    OnWizardNext(), OnWizardBack(), & OnWizardFinish() to notify the
+>    CPropertySheet-derived class which consequently make the decision as
+>    what should be the next active page and call SetActivePage() accordingly. 
+>    Although this seems to work, I am not sure if it is the easiest & most 
+efficient
+>    way of doing it.  Is there an easier way that I missed? 
+>    Anyone has any idea?
+     
+  This doesn't sound right at all.  Those methods are invoked when 
+the CPropertySheet is telling the CPropertyPage that it is about to 
+be switched away from -- the CPropertySheet believes it already knows 
+where it will be switching to.  You want a method in your 
+CPropertySheet-derived class that a CPropertyPage can call when it 
+wants a jump to happen, and this in turn implies that your 
+CPropertyPage objects know that their parent is of your class and not 
+just any CPropertySheet.
+     
+Dave
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+David W. Gillett -- <A HREF="mailto:DGILLETT@expertedge.com">DGILLETT@expertedge.com</A>
+Tuesday, March 05, 1996
+</B>
+> But there must be a way to do this in the CPropertyPage.  If not,
+> then the CPropertySheet would have to know about all the "decision
+> making" controls on each CPropertyPage, which then makes your code
+> much more complicated.
+
+  I can see that it can be useful, if not exactly "normal", for 
+navigation to another page to be initiated from inside a page (see 
+below).  My quibble was that this should not be happening inside the 
+handling of a notification from the sheet that navigation HAS BEEN 
+initiated -- that's a recipe for ping-pong:
+
+sheet tells page that we're moving to another page
+page tells sheet to move to some other page
+sheet tells page that we're moving to another page
+page tells sheet to move to some other page
+sheet tells page that we're moving to another page
+page tells sheet to move to some other page
+
+  and so on....
+
+
+> If you were going to implement this, though, then what function in
+> the CPropertySheet would you override? 
+
+  I'd look at how a tab tells a property sheet where to navigate to 
+-- I'm pretty sure that's done by a PSM_ message.  I'd have to look 
+up the details, and determine how the page would know what window to 
+send the message to.
+  I wouldn't be surprised if MFC doesn't already provide a specific 
+wrapper for this case.  The normal UI behaviour for sheets is to 
+navigate between pages as dictated by a tab control, or by the 
+prev/next buttons of a wizard.  Having a page navigate to another 
+page in the same sheet is unusual, and I'm not sure it's good UI 
+design.
+
+Dave
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Erik van der Goot -- <A HREF="mailto:erik.van-der-goot@jrc.it">erik.van-der-goot@jrc.it</A>
+Thursday, March 07, 1996
+</B>
+At 10:41 05/03/96, you wrote:
+>> But there must be a way to do this in the CPropertyPage.  If not,
+>> then the CPropertySheet would have to know about all the "decision
+>> making" controls on each CPropertyPage, which then makes your code
+>> much more complicated.
+>
+>  I can see that it can be useful, if not exactly "normal", for 
+>navigation to another page to be initiated from inside a page (see 
+>below).  My quibble was that this should not be happening inside the 
+>handling of a notification from the sheet that navigation HAS BEEN 
+>initiated -- that's a recipe for ping-pong:
+>
+>sheet tells page that we're moving to another page
+>page tells sheet to move to some other page
+>sheet tells page that we're moving to another page
+>page tells sheet to move to some other page
+>sheet tells page that we're moving to another page
+>page tells sheet to move to some other page
+>
+>  and so on....
+>
+>
+>> If you were going to implement this, though, then what function in
+>> the CPropertySheet would you override? 
+>
+>  I'd look at how a tab tells a property sheet where to navigate to 
+>-- I'm pretty sure that's done by a PSM_ message.  I'd have to look 
+>up the details, and determine how the page would know what window to 
+>send the message to.
+>  I wouldn't be surprised if MFC doesn't already provide a specific 
+>wrapper for this case.  The normal UI behaviour for sheets is to 
+>navigate between pages as dictated by a tab control, or by the 
+>prev/next buttons of a wizard.  Having a page navigate to another 
+>page in the same sheet is unusual, and I'm not sure it's good UI 
+>design.
+>
+>Dave
+
+My 2 Lire
+
+I don't think you should see it as ' a page navigate to ..'. It could be
+depending on information that the user supplies somewhere in the
+propertysheet wether or not to show another page. e.g. I have an application
+where I use a wizard to guide the user through several steps of input for a
+rather complicated simulation. the simulation consists of several steps
+which do not all need to be executed, but which do need user input when
+selected. The first page allows the user to select the steps to perform, but
+then depending on the info on THAT page, other pages are shown or not as the
+case may be. So the navigation through the pages depends on user input. HOW
+to do this cleanly is another matter, and you are right that you have to be
+careful.. (The reason I am following this discussion..) I am almost certain
+that that code belongs in the sheet though, since that is what 'controls'
+the pages..
+
+Ciao
+
+Erik
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,177 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+VBX in resource only DLL
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Filippo Davalli -- <A HREF="mailto:filippod@mbox.vol.it">filippod@mbox.vol.it</A>
+Sunday, April 28, 1996
+</B>
+Hello,
+
+My environment is : Visual C++ 1.51, MFC 2.51 / WIN 95
+
+I'm implementing a multilingual application 16 bits. 
+I wrote a series of single language resource DLLs and
+the program runs fine. 
+But if I add a VBX control in a dialog, this becomes hidden.
+
+The DLL project contains
+
+resource.cpp with this code only:
+
+#include <windows.h>
+int CALLBACK LibMain(HINSTANCE hInstance,WORD,WORD,LPSTR)
+{
+    return 1;   
+}
+
+resource.rc (strings, dialogs, bitmaps, menus...)
+
+resource.def
+
+LIBRARY      RESOURCE
+EXETYPE      WINDOWS
+CODE         PRELOAD MOVEABLE DISCARDABLE
+DATA         PRELOAD MOVEABLE SINGLE
+SEGMENTS
+    _TEXT   PRELOAD MOVEABLE DISCARDABLE
+    WEP_TEXT PRELOAD MOVEABLE DISCARDABLE
+
+HEAPSIZE     1024
+EXPORTS
+    WEP @1 RESIDENTNAME PRIVATE
+
+To use a resource-only DLL, my program load it using
+a call to ::LoadLibrary :
+
+m_hInstDLL = ::LoadLibrary("resource.dll");
+AfxSetResourceHandle(m_hInstDLL);
+
+Nothing changes if I add this in LibMain:
+
+int FAR PASCAL LibMain (HANDLE hInstance, WORD wDataSeg,                
+       WORD wHeapSize, LPSTR lpszCmdLine)
+{
+     WNDCLASS wndClass;
+     if(::GetClassInfo(hInstance,"VBControl",&wndClass)==0)
+     {
+      	wndClass.hInstance = hInstance; 
+      	::RegisterClass(&wndClass);
+     }
+  
+     return 1 ;
+}
+
+Does anyone know how to put a VBX in a dialog 
+with a resource only DLL ?
+
+F. Davalli
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Stacey Blaschke -- <A HREF="mailto:Stacey_Blaschke@msn.com">Stacey_Blaschke@msn.com</A>
+Tuesday, April 30, 1996
+</B>
+[Mini-digest: 2 responses]
+
+You said you are using MFC but not whether this is an AFXDLL or an  USRDLL.If 
+it is an AFXDLL then take a look at the PSS article Q104239
+(available on MSDN or the MS Web site) for an example
+of this.
+
+Basically from the code you posted you are leaving out
+the second call to GetClassInfo (see below) which
+actually fills the wndClass structure with information
+about the VBControl class using the calling applications
+instance handle. The first call just checks
+for the existence of the class and does not fill the
+structure if it does not find the class. Also, take a 
+look at the comment the code below. In your
+calling application you must have called EnableVBX 
+in order for the line:
+
+VERIFY(::GetClassInfo(AfxGetInstanceHandle(),"VBControl",
+                           &wndClass));
+
+to find the already registered class. So you have to call
+EnableVBX before you call LoadLibrary.
+
+
+// Check to see if the class is already registered.
+   if(::GetClassInfo(hInstDLL,"VBControl",&wndClass)==0)
+    {
+     // If not registered, get the class information from the
+     // application. This assumes that the application has called
+     // EnableVBX to register the VBControl class.
+     VERIFY(::GetClassInfo(AfxGetInstanceHandle(),"VBControl",
+                           &wndClass));
+     wndClass.hInstance = hInstDLL; // Change the instance handle so
+                                    // it is that of the DLL and not
+                                    // the App.
+     VERIFY(::RegisterClass(&wndClass));  // Register the class.
+    }
+
+Stacey_Blaschke@msn.com
+
+-----From: Phil Reeves <p.reeves@rbh.nthames.nhs.uk>
+
+I have never tried what this, but one thought that occurs is that you need
+to make sure EnableVBX() is called before you try to use the dialog
+otherwise it will not appear.
+Philip Reeves
+Knowledge Engineer
+Royal Brompton Hospital
+Sydney Street
+London
+SW3 6NP
+UK
+Tel: +44 (0)171 351 8702
+Fax: +44 (0)171 351 8743
+e-mail: p.reeves@rbh.nthames.nhs.uk
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

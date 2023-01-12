@@ -1,0 +1,329 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+How to make a non Cobject derived class serializable.
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Kalyan -- <A HREF="mailto:chakri@sunserv.cmc.stph.net">chakri@sunserv.cmc.stph.net</A>
+Thursday, October 10, 1996
+</B>
+Environment : Win95, VC++ 4.1
+
+Hi all,
+    I have a class which is not derived from CObject and I would like
+    to make the class serializable. The class is like this :
+
+    class minutia : public CPoint {
+    public :
+	   float lefCurvature, rightCurvature;
+
+	   operator >> (ofstream& ofs);
+	   operator << (ifstream& ifs);
+	   operator >> (Display& d);
+    };
+
+    Any help in this regard would be appreciated.
+
+Thanx,
+Kalyan.V
+---------------------------------------------------------------
+ Kalyana Chakravarthy.V   Ph  : +91-040-259401/259501      
+ Engineer (R&D),          Fax : +91-040-259509
+ CMC Limited,					
+ Hyderabad, A.P.,         Email : chakri@hp735.cmc.stph.net
+ INDIA.			          chakri@sunserv.cmc.stph.net
+---------------------------------------------------------------
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Gerry Sweeney -- <A HREF="mailto:gerry@hornbill.com">gerry@hornbill.com</A>
+Friday, October 11, 1996
+</B>
+[Mini-digest: 6 responses]
+
+Environment : Win95, VC++ 4.1
+
+The following should work:-
+
+// Instance of your class
+minutia myInstance;
+
+// An archive object
+CArchive ar;
+...
+
+// To store your object
+ar.Write(&myInstance, sizeof(minutia));
+
+// To load your object
+ar.Read(&myInstance, sizeof(minutia));
+
+
+Please note that there is no checking done here so If you archive is not a 
+the right position when you read or write you will get problems. This code 
+also assumes the following:-
+
+1. The object is always a fixed size
+2. There are no pointers stored within the class
+3. There are not variable 'size' objects contained within the class
+
+
+Hope this helps
+
+Gerry Sweeney
+gerry@hornbill.com
+
+
+>Hi all,
+>    I have a class which is not derived from CObject and I would like
+>    to make the class serializable. The class is like this :
+>
+>    class minutia : public CPoint {
+>    public :
+>           float lefCurvature, rightCurvature;
+>
+>           operator >> (ofstream& ofs);
+>           operator << (ifstream& ifs);
+>           operator >> (Display& d);
+>    };
+
+>    Any help in this regard would be appreciated.
+
+>Thanx,
+>Kalyan.V
+>---------------------------------------------------------------
+> Kalyana Chakravarthy.V   Ph  : +91-040-259401/259501
+> Engineer (R&D),          Fax : +91-040-259509
+> CMC Limited,
+> Hyderabad, A.P.,         Email : chakri@hp735.cmc.stph.net
+> INDIA.                           chakri@sunserv.cmc.stph.net
+ ---------------------------------------------------------------
+-----From: "Robertson David" <davidr@devmail.sps.mot.com>
+
+
+     What about this:
+     
+     
+     class minutia....
+     {
+     .
+     .
+     .
+        virtual void Serialize(CArchive& ar);
+     .
+     .
+     .
+     };
+     
+     
+     void minutia::Serialize(CArchive& ar)
+     {
+        if (ar.IsStoring())
+        {
+            // Store members here.
+        }
+        else
+        {
+            // Load members here.
+        }
+     }
+     
+     
+     And then call this from one of you other serialization handlers.
+-----From: Ash Williams <ash@digitalworkshop.co.uk>
+
+Kaylan,
+
+Sounds to me like you need a containment relationship, ie you can't 
+derive from CObject (no multiple inheritence in MFC) so make a CObject 
+derived instance a member of your class and pass on all serialize 
+requests to that member:
+
+*************************************************************
+
+(I've taken the liberty of changing your operator overloads to 
+Serialize - you should be able to change it back. Also if it doesn't 
+compile, make the nested class not nested, since the microsoft macros 
+might not like it)
+
+    class minutia : public CPoint {
+    private:
+        // nested CObject derived class
+        class Mydata : public CObject
+        {
+        DECLARE_DYNCREATE(Mydata)
+        public:
+        Mydata( minutia& rContainer )
+        {
+            m_pContainer = rContainer;
+        }
+        virtual void Serialize( CArchive& ar )
+        {
+            if(ar.IsStoring())
+            {
+                ar << m_pContainer->x;
+                ar << m_pContainer->y;
+                ar << m_pContainer->lefCurvature;
+                ar << m_pContainer->rightCurvature;
+            }
+            else
+            {
+                ar >> m_pContainer->x;
+                ar >> m_pContainer->y;
+                ar >> m_pContainer->lefCurvature;
+                ar >> m_pContainer->rightCurvature;
+            }
+        }
+        
+        private:
+        minutia* m_pContainer = &rContainer;
+        };
+    
+    public :
+    float lefCurvature, rightCurvature;
+
+    virtual void Serialize( CArchive& ar )
+    {
+        Mydata data(*this);
+        data.Serialize(ar);
+    }
+ //    operator >> (ofstream& ofs);
+ //    operator << (ifstream& ifs);
+ //    operator >> (Display& d);
+
+    };
+
+    IMPLEMENT_DYNCREATE(minutia::Mydata, CObject)
+    
+*************************************************************
+
+Hope this nearly compiles/works,
+Ash
+
+
+-----From: mss@tartus.com (Michael Scherotter)
+
+Implement void Serialize(CArchive& ar)
+
+void minutia::Serialize(CArchive& ar)
+{
+    if (ar.IsStoring())
+    {
+        ar << lefCurvature;
+        ar << rightCurvature;
+    }
+    else
+    {
+        ar >> lefCurvature;
+        ar >> rightCurvature;
+    }
+-- 
+Michael S. Scherotter            |Architectural Design Tools
+Lead Software Developer          |AutoCAD Applications
+Tartus Development, Inc.         |Custom CAD Solutions
+630 Las Gallinas Ave #300        |__________________________ 
+San Rafael, CA 94903                   <A HREF="mailto:mss@tartus.com">mailto:mss@tartus.com</A>
+(415) 491-8925                   <A HREF="mailto:michael@charette.com">mailto:michael@charette.com</A>
+(415) 491-8921 (fax)        <A HREF="mailto:71035.1675@compuserve.com">mailto:71035.1675@compuserve.com</A>
+               <A HREF="http://www.tartus.com/people/mss">http://www.tartus.com/people/mss</A>
+____________________________________________________________
+-----From: Slh1995@aol.com
+
+IMHO the easiest way would be to add your data members to some class that is
+serializable, then in that serialize method, read/write the data and just
+copy the data (after creating a new object yourself when reading).  You can
+create a dummy CObject-based class for this or use any other serializable
+class.
+-Steve
+
+-----From: Amit Ramon <amitra@ix.netcom.com>
+
+Hi Kalyan,
+
+Define these two functions:
+
+CArchive& AFXAPI operator<<(CArchive& ar, const minutia& m)
+{
+        ar << m.x << m.y;
+}
+
+
+CArchive& AFXAPI operator>>(CArchive& ar, minutia & m);
+{
+        ar >> m.x >> m.y;
+}
+
+(if the data members that you want to serialize are private, make this
+functions friends
+of your class).
+
+Now  you can do that in your CDocument derived class Serialize() function
+(assuming you have a member variable minutia m_minuta):
+
+MyDoc::Serialize(CArchive& ar)
+{
+        if (ar.IsStoring())
+                ar << m_minutia;
+        else
+                ar >> m_minutia;
+}
+
+You can define this pair of funcions for any class that you wish to
+serialize, no matter
+how complex it is. For more complex data members (e.g. arrays) you can use the
+CArchive::Read and CArchive::Write methods. For a good example, look at the MFC 
+source code for serializing a CString (arccore.cpp). 
+
+Hope it helps,
+
+Amit.
+
+----------------------------------
+Amit Ramon
+amitra@ix.netcom.com
+----------------------------------
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,672 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+STL vector versus CArray - CArray loses badly
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Ken Nicolson -- <A HREF="mailto:kenn@owl.co.uk">kenn@owl.co.uk</A>
+Wednesday, November 13, 1996
+</B>
+Environment: VC++ 4.2-flat, Win 95
+
+I've recommended to all our developers that we stop using CArrays and
+replace them with the STL's vector class due to a fundamental design flaw
+in the Microsoft class. Here's why:
+
+I had to help out a colleague yesterday who was having a problem with the
+CArray templated class. He had an array of objects, each of which had
+pointers to other objects, which in turn had pointers back to these
+objects. This is to implement a many-to-many relationship between two
+classes. However, he had a problem of losing references after Add()ing a
+second element to the CArray.
+
+On investigation, I discovered that the CArray::SetSize() code for =
+growing
+the array looks like this:
+
+    TYPE* pNewData =3D (TYPE*) new BYTE[nNewMax * sizeof(TYPE)];
+
+    // copy new data from old
+    memcpy(pNewData, m_pData, m_nSize * sizeof(TYPE));
+
+    // construct remaining elements
+    ASSERT(nNewSize > m_nSize);
+    ConstructElements(&pNewData[m_nSize], nNewSize-m_nSize);
+
+    // get rid of old stuff (note: no destructors called)
+    delete[] (BYTE*)m_pData;
+
+So, existing objects are directly memcpy()ed, therefore any other objects
+that have noted the object's address within the array are invalid, and =
+have
+no way of being informed. Have the designers never read the C++ FAQ? =
+Here's
+the key FAQ:
+
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D
+
+Q36: Why doesn't C++ have a "realloc()" along with "new" and "delete"?
+
+To save you from disaster.
+
+When realloc() has to copy the allocation, it uses a BITWISE copy
+operation, which will tear most C++ objects to shreds.  C++ objects =
+should
+be allowed to copy themselves: they use their own copy constructor or
+assignment operator.
+
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D
+
+Here's a trival bit of code to demonstrate the problem - it's a console
+app, and it spews a memory dump at the end because there's something =
+fishy
+going on with including <iostream>. You'll need to use the static link
+libraries to get this to link correctly.
+
+Note from the output how two things go wrong: the address stored in the
+object is the address of the temporary object constructed within the =
+for()
+loop, and the global counter increments twice for each object.
+
+The STL version may call more constructors and destructors, but at least
+its output is the expected result.
+
+Note, overriding the ConstructElements() will not help, as the original
+array is not passed in.
+
+Ken
+
+=3D=3D>> test.cpp
+
+#include <afxtempl.h>
+#include <iostream>
+#include <vector>
+
+int next_id =3D 0;
+
+class foo
+{
+public:
+  foo * a;
+  int	id;
+
+public:
+  foo()
+  {
+    cout << "foo()" << endl;
+    a =3D this;
+    id =3D next_id++;
+  }
+
+  foo ( const foo & f )
+  {
+    cout << "foo( foo& )" << endl;
+    a =3D this;
+    id =3D f.id;
+  }
+
+  ~foo()
+  {
+    cout << "~foo()" << endl;
+  }
+};
+
+main()
+{
+  {
+    vector < foo, allocator <foo> > a;
+
+    for ( int i =3D 0; i < 4; i++ )
+    {
+      foo bar;
+      a.push_back( bar );
+    }
+
+    for ( i =3D 0; i < 4; i++ )
+      cout << a[i].id << '\t' << a[i].a << '\t'<< &a[i] << endl;
+  }
+
+  cout << "=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D" << endl;
+
+  {
+    CArray < foo , foo & > a;
+    //	CArray < foo , foo > a; Wrong too!
+
+    for ( int i =3D 0; i < 4; i++ )
+    {
+      foo bar;
+      a.Add( bar );
+    }
+
+    for ( i =3D 0; i < 4; i++ )
+        cout << a[i].id << '\t' << a[i].a << '\t' << &a[i] << endl;
+  }
+
+  return 0;
+}
+--=20
+  ___        ,_,         ___      Ken Nicolson
+ (o,o)      (o,o)    ,,,(o,o),,,
+ {`"'}      {`"'}     ';:`-':;'   Work: kenn@owl.co.uk
+ -"-"-      -"-"-       -"-"-           +44 131 555 6055
+                                  Home: ken@ride.demon.co.uk
+                                  Web:  <A HREF="http://www.ride.demon.co.uk">http://www.ride.demon.co.uk</A>
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Manos D. Anastasiadis -- <A HREF="mailto:manos@ced.tuc.gr">manos@ced.tuc.gr</A>
+Thursday, November 14, 1996
+</B>
+[Mini-digest: 4 responses]
+
+I personally dislike deign decisions that involve
+arrays (or any other known ADT) of *objects*.
+It is always better to let your ADT hold *pointers*
+to objects, though you may say it's too 'C' style.
+The latter always works, but you have to remember
+clean-up. Futhermore, it *would* work with CArray.
+
+Secondly, about the example code you've included,
+it's a great example of how programs should NOT
+be written. The 'foo' object SHOULD be DESTROYED
+when it goes out of scope (the loop's block) and
+it DOES.
+A container class IS NOT SUPPOSED to create copies
+of objects, as the code expects. The container
+should keep the objects it is 'told' to. Of course,
+the array in the example has no way of knowing
+that the object it holds was destroyed...
+
+>   for ( int i = 0; i < 4; i++ )
+>   {
+>     foo bar;
+>     a.Add( bar );
+>   }
+
+So the 'poor' iostream is passed trash when you walk
+through the array, and the program ends as it should
+(crash).
+
+On the contrary, I think that (although I haven't
+ever used STL because I hate C-style names :-) )
+using that 'allocator' object forces the 'vector'
+class to use *copies* of the 'foo' objects,
+so it works as you wish...
+
+IMHO: The decision on whether to use STL or MFC
+depends on the design.
+Your example, however, cannot be considered
+a guiding issue.
+
+/*==================================*
+ * Manos D. Anastasiadis            *
+ * Computer Engineer                *
+ * Technical University of Crete    *
+ * Mu.S.I.C.                        *
+ * manos@ced.tuc.gr                 *
+ *==================================*/
+
+-----From: Dave Krofssik <davek@soft-tek.com>
+
+I'm afraid STL vectors have (explicitly) the same problem, insering into
+a vector invalidates all pointers or references to objects in the
+vector.
+
+Fortunately, STL does have containers that can do what you want (at the
+expense of some overhead).  If you only need to insert and erase at the
+beginning or end of the array, you could use a dequeue.  If you need to
+do so at random positions, you could use a list.
+
+------------------------+---------------------------
+    Dave Krofssik       |  Soft-tek International
+    Lead Engineer       |  <A HREF="http://www.soft-tek.com">http://www.soft-tek.com</A>
+  davek@soft-tek.com    |   Phone: (316)838-7200
+                        |   FAX:   (316)838-3789
+-----From: "Samuel R. Blackburn" <sblackbu@csc.com>
+
+Why not use CPtrArray?
+
+-----From: "Weeder, John" <John.Weeder@abii.com>
+
+First, if you have a copy constructor, you should also have an
+assignment operator.  
+
+template<class TYPE, class ARG_TYPE>
+void CArray<TYPE, ARG_TYPE>::SetAtGrow(int nIndex, ARG_TYPE newElement)
+{
+	ASSERT_VALID(this);
+	ASSERT(nIndex >= 0);
+
+	if (nIndex >= m_nSize)
+		SetSize(nIndex+1, -1);
+	m_pData[nIndex] = newElement; // <<<---- Need assignment operator
+}
+
+Second, using the STL doesn't necessarily fix the problem you describe.
+Sure, the simple sample you provide allows the foo object to update
+pointers to itself...but this method of updating will get ugly (or
+>impossible) when implementing "a many-to-many relationship between two
+classes." ---  in the simplist case, each time an object is
+copy-constructed or assigned, it will need to locate every object which
+refers to it and update that object/relationship. This means either a
+search or maintaining pointers in both directions.
+
+A better solution is to store pointers in your CArray/vector... not
+objects. It's more efficient (generally) and it solves the problem.
+
+ie
+  {
+    CArray < foo* , foo * > a;
+    
+    for ( int i = 0; i < 4; i++ )
+      a.Add(new foo);
+    for ( i = 0; i < 4; i++ )
+        cout << a[i]->id << '\t' << a[i]->a << '\t' << a[i] << endl;
+    for ( i = 0; i < 4; i++ )
+        delete a[i];
+  }
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Roger Onslow/Newcastle/Computer Systems Australia/
+Friday, November 15, 1996
+</B>
+[Mini-digest: 4 responses]
+
+>I've recommended to all our developers that we stop using CArrays and
+>replace them with the STL's vector class due to a fundamental design flaw
+>in the Microsoft class. Here's why:
+
+Seems a rather "radical" solution to a simple problem.  But I guess if you want 
+to mix MFC with STL, then thats up to you, but (when I looked at STL last) 
+there seemed to be some problems when you use both together (that had to be 
+resolved with namespaces) - or has that changed with 4.2 implementation?
+
+>I had to help out a colleague yesterday who was having a problem with the
+>CArray templated class. He had an array of objects, each of which had
+>pointers to other objects, which in turn had pointers back to these
+>objects. This is to implement a many-to-many relationship between two
+>classes. However, he had a problem of losing references after Add()ing a
+>second element to the CArray.
+
+Easy solution is to have an array of pointers to objects, rather than an array 
+of objects themselves.  Then you can stay with the (familiar) MFC framework.
+
+>On investigation, I discovered that the CArray::SetSize() code for growing
+>the array looks like this:
+>
+>    TYPE* pNewData = (TYPE*) new BYTE[nNewMax * sizeof(TYPE)];
+>
+>    // copy new data from old
+>    memcpy(pNewData, m_pData, m_nSize * sizeof(TYPE));
+>
+>    // construct remaining elements
+>    ASSERT(nNewSize > m_nSize);
+>    ConstructElements(&pNewData[m_nSize], nNewSize-m_nSize);
+>
+>    // get rid of old stuff (note: no destructors called)
+>    delete[] (BYTE*)m_pData;
+>
+>So, existing objects are directly memcpy()ed, therefore any other objects
+>that have noted the object's address within the array are invalid, and have
+>no way of being informed. Have the designers never read the C++ FAQ? Here's
+>the key FAQ:
+[snip]
+
+Yeup -- a bit nasty that.  The alternative, I suppose, would be to copy from 
+the old to new location and then delete from the old location.  So one would 
+need to use a "CopyElements" helper followed by the "DestructElements" helper.  
+To solve your colleague's problem, his objects would then need to do a deep 
+copy in their assignment operator - that would end up very messy anyway.  I 
+guess the reason why that was not done is that there would be lots of 
+construction, assignment and destruction of objects going on when the array got 
+resized, so they went for a faster method, which works OK in most simpler 
+cases.  Of course, the behaviour of CArray when resizing should be well 
+documented (I don't believe it is) - then its just caveat emptor when it comes 
+to using CArray.
+
+Anyway, as mentioned above, keeping a CArray of pointers (or a CPtrArray) would 
+be the way around this without leaving the MFC fold.
+
+BTW, how does STL handle dynamic arrays/vectors - what does it do when the 
+locations of objects in the array/vector change??
+
+Roger
+-----From: kenn@owl.co.uk (Ken Nicolson)
+
+On Wed, 13 Nov 1996 10:08:58 GMT, I wrote:
+
+>Environment: VC++ 4.2-flat, Win 95
+>
+>I've recommended to all our developers that we stop using CArrays and
+>replace them with the STL's vector class due to a fundamental design =
+flaw
+>in the Microsoft class. Here's why:
+
+[snip!]
+
+I've had a number of follow-ups in private email, I've had a bug in my =
+code
+pointed out - no assignment operator - and I've come up with a good
+solution that combines both CArray's serialisation (if needed) with the
+STL's functionality, and optimal ctor/dtor handling.
+
+However, all this still doesn't get round the fact that the CArray class
+does not work as expected when compared to the STL.
+
+=46irst, the missing assignment operator:
+
+	foo &foo::operator=3D( const foo &f )
+	{
+		cout << "=3D( foo&" << f.id << " )" << endl;
+		a =3D this;
+		id =3D f.id;
+
+		return *this;
+	}
+
+This makes the CArray solution work a bit better, but element 0 of the
+array is still wrong.
+
+Next, I had many recommendations to use pointers rather than the actual
+objects in the CArray or vector. However, this loses the automatic memory
+tidy-ups, so I decided to use the STL's auto_ptr class. Thus, the loop
+becomes:
+
+    vector < auto_ptr < foo >, allocator < auto_ptr < foo > > > a;
+... or ...
+    CArray < auto_ptr < foo >, auto_ptr < foo > > a;
+
+    for ( int i =3D 0; i < 4; i++ )
+        a.push_back( new foo() );
+... or ...
+        a.Add( new foo() );
+
+    for ( i =3D 0; i < 4; i++ )
+        cout << a[i]->id << '\t' << a[i]->a << '\t'<< a[i].get() << endl;
+
+This works as desired, with the additional benefit of minimisation of
+construction and deletion.
+
+Big thanks to the guys who emailed me with various suggestions!
+
+Ken
+
+PS: Here's the fixed code, with the assignment operator added and the
+auto_ptr solution:
+
+=3D=3D=3D=3D=3D=3D>> test.cpp
+
+#include <afxtempl.h>
+#include <iostream>
+#include <vector>
+
+int next_id =3D 0;
+
+class foo
+{
+public:
+	foo * a;
+	int	id;
+
+public:
+	foo() {
+		a =3D this;
+		id =3D next_id++;
+		cout << "foo(" << id << ")" << endl;
+	}
+
+	foo ( const foo & f )
+	{
+		cout << "foo( foo&" << f.id << ")" << endl;
+		a =3D this;
+		id =3D f.id;
+	}
+
+	foo &foo::operator=3D( const foo &f )
+	{
+		cout << "=3D( foo&" << f.id << " )" << endl;
+		a =3D this;
+		id =3D f.id;
+
+		return *this;
+	}
+=20
+	~foo()
+	{
+		cout << "~foo(" << id << ")" << endl;
+	}
+};
+
+main()
+{
+	{
+		vector < foo, allocator <foo> > a;
+
+		for ( int i =3D 0; i < 4; i++ )
+			a.push_back( foo() );
+
+		for ( i =3D 0; i < 4; i++ )
+			cout << a[i].id << '\t' << a[i].a << '\t'<< &a[i]
+<< endl;
+	}
+
+	cout << "=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D" << endl;
+
+	{
+		CArray < foo , foo & > a;
+
+		for ( int i =3D 0; i < 4; i++ )
+			a.Add( foo() );
+
+		for ( i =3D 0; i < 4; i++ )
+			cout << a[i].id << '\t' << a[i].a << '\t' << &a[i]
+<< endl;
+	}
+
+	cout << "=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D" << endl;
+
+	{
+		foo a[4];
+
+		for ( int i =3D 0; i < 4; i++ )
+		{
+			a[i] =3D foo();
+		}
+
+		for ( i =3D 0; i < 4; i++ )
+			cout << a[i].id << '\t' << a[i].a << '\t'<< &a[i]
+<< endl;
+	}
+
+	cout << "=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D" << endl;
+
+	{
+		vector < auto_ptr < foo >, allocator < auto_ptr < foo > > >
+a;
+
+		for ( int i =3D 0; i < 4; i++ )
+			a.push_back( new foo() );
+
+		for ( i =3D 0; i < 4; i++ )
+			cout << a[i]->id << '\t' << a[i]->a << '\t'<<
+a[i].get() << endl;
+	}
+
+	cout << "=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D" << endl;
+
+	{
+		CArray < auto_ptr < foo >, auto_ptr < foo > > a;
+
+		for ( int i =3D 0; i < 4; i++ )
+			a.Add( new foo() );
+
+		for ( i =3D 0; i < 4; i++ )
+			cout << a[i]->id << '\t' << a[i]->a << '\t'<<
+a[i].get() << endl;
+	}
+
+	return 0;
+}
+
+--=20
+  ___        ,_,         ___      Ken Nicolson
+ (o,o)      (o,o)    ,,,(o,o),,,  Work: kenn@owl.co.uk
+ {`"'}      {`"'}     ';:`-':;'   <A HREF="http://www.owl.co.uk">http://www.owl.co.uk</A>
+ -"-"-      -"-"-       -"-"-           +44 131 555 6055
+                                  Home: ken@ride.demon.co.uk
+                                  <A HREF="http://www.ride.demon.co.uk">http://www.ride.demon.co.uk</A>
+-----From: Dan Jerghiuta <danjer@poboxes.com>
+
+1. About the first problem, with CArray:
+
+I think that the problem is not in CArray, but in the way it is used. 
+In my help file (VC++ 4.0) CArray is described as "The CArray class 
+supports arrays that are are similar to C arrays, but can dynamically 
+shrink and grow as necessary." You should not expect anything more.
+
+The way your colleague was using it violates the concept of encapsulation.
+He makes assumptions on how the array works internally. Even if his program
+would work, nobody can guarantee that it will still work in the next version
+of MFC.
+
+If he needs to keep pointers to his objects, the best way is to allocate 
+the objects externally and store their addresses in the array. So use
+CArray<CYourClass*> instead of CArray<CYourClass>. If your colleague will
+feel unconfortable with this approach, he may use smart pointers, but I 
+think they would just complicate the problem.
+
+BTW, when you find a bug in MFC (which is not the case here, you should not 
+say "use STL instead", but "keep on using MFC, but keep in mind these bugs". 
+It's a great advantage to use a library with known bugs than to use a new one. 
+For sure no library is bug-free. 
+
+It is true that MFC has both implementation errors
+   (e.g. COleCurrency. It's not sistematically wrong, but makes wrong 
+    calculations for a few values. At least in VC++4.0)
+and design errors
+   (e.g. CObArray has two methods with the same name, doing different things:
+    void InsertAt( int nIndex, CObject* newElement, int nCount = 1 );
+    void InsertAt( int nStartIndex, CObArray* pNewArray );
+    So if you want to make an array of CObArrays, you have to call either
+    myArrayOfArrays.InsertAt( nIndex, (CObject*)pMyNewObArray );
+    or
+    myArrayOfArrays.InsertAt( nIndex, pMyNewObArray, 1 );
+    which are both stupid, but if you simply call
+    myArrayOfArrays.InsertAt( nIndex, pMyNewObArray );
+    which is the usual way, you get the wrong method called)
+but I think we should follow what the creators of MFC said:
+   - if the module has user interface, *use* MFC
+   - if the module has nothing to do with the user interface use STL, ATL
+     or whatever you want.
+    
+2. About the second question, with the FAQ:
+
+FAQ is not a bible, nor an ARM. It's just a collection of questions and answers
+belonging to different persons that are not necessary gods in that field. FAQs
+are useful, but you should not believe them blindly.
+
+For example, the answer you included in your message simply says nothing. It 
+explains why not to use the C runtime function realloc(), but does not say why
+there is no C++ specific implementation.
+
+I personally think that realloc() simply does not fit with C++. In C you deal
+only with *memory*. In C++ you deal only with *objects* that do not shrink nor
+grow. Even if we would like to use it with arrays (that are inherited from C 
+unfortunately), the copy constructor and assignment operator wil not help. 
+And "how should it be implemented" is the start of a probably infinite
+discussion, 
+so I stop here.
+
+Dan Jerghiuta
+danjer@POboxes.com
+
+-----From: "Weeder, John" <John.Weeder@abii.com>
+
+>Manos D. Anastasiadis wrote:
+
+>> Of course, the array in the example has no way of knowing
+>> that the object it holds was destroyed...
+>> 
+>> >   for ( int i = 0; i < 4; i++ )
+>> >   {
+>> >     foo bar;
+>> >     a.Add( bar );
+>> >   }
+
+Actually, the problem with this code is that class foo does not define
+an assignment operator. If an assignment operator is defined, this code
+is perfectly correct, except for the pointer reference problem.  Add()
+eventually calls SetAtGrow() which assigns the object to another object
+of the same type (before bar is destroyed).
+
+>template<class TYPE, class ARG_TYPE> void CArray<TYPE,
+>ARG_TYPE>::SetAtGrow(int nIndex, ARG_TYPE newElement)
+>{
+	...
+>	m_pData[nIndex] = newElement; // <<<---- Need assignment operator here
+>}
+
+OTOH, MFC _does_ have a design flaw in that it does a byte by byte copy
+instead of an element-by-element assignment when the array is resized in
+the function SetSize().
+
+In other words, the foo sample has TWO problems: 1) foo needs an
+assignment operator, and 2) MFC should not do a byte-wise copy.
+
+-- John
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

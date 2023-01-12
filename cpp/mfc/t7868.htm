@@ -1,0 +1,303 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+AfxMessageBox corrupts data
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Harry Hahne -- <A HREF="mailto:hahne@epas.utoronto.ca">hahne@epas.utoronto.ca</A>
+Wednesday, November 20, 1996
+</B>
+Environment: Win 95, VC 4.1
+
+My MFC program has a command handler function in my view class (CView derived)
+that includes a call to AfxMessageBox() to report an error condition that may 
+occur inside the command handler.  The command handler creates an object that 
+uses a custom class not derived from any MFC class.  Everything works fine 
+unless I call the AfxMessageBox() function.  WHen that happens a pointer 
+inside my custom data object gets set to NULL.  This eventually crashes the 
+program when that pointer later needs to be used.
+
+I cannot determine any reason why calling a message box inside a command 
+handler should cause data corruption.  Does anyone have any ideas about what to 
+look for?  I assume that it is legal to have a message box inside a command 
+handler.
+
+The relevant bits of code are something like this:
+
+ON_COMMAND(ID_VIEW_SUBSET, OnViewSubset)
+
+//command handler for the View-Subset menu item
+
+void CBriefView::OnViewSubset() 
+{
+    char SubsetName[SUBSETNAMLEN+1];//Subset name
+    CSubsetDialog AskSubsetDialog;//dialog box to ask for Subset name
+
+    if(AskSubsetDialog.AskOpen(SubsetName)) != ASK_ABORT)
+    {	//ask for Subset name
+		if(m_pRecBrowser->SelectSubset(SubsetName) != ERR) 
+		{   //change browse method to Subset
+			/***DO STUFF TO CHANGE TO BROWSE SUBSET*****/
+		}
+    }
+}
+
+//Select subset of database to view
+
+int CRecBrowser::SelectSubset(char *SubsetName)
+{
+    try
+    {
+         CurrentPos.pSubset = new CSubset;//create subset object
+    }
+    catch(CMemoryException *e)
+    {
+         e->Delete;
+         Message_Memory();
+         return(ERR);
+    }
+
+    if(CurrentPos.pSubset->OpenSubset(SubsetName))
+    {	//open database subset
+        return(ERR);
+    }
+
+    if(FirstRec() == 0)
+    {	//go to first record in subset
+
+		/*** AT THIS POINT CurrentPos.pSubset POINTS TO THE SUBSET OBJECT***/
+
+		AfxMessageBox(IDS_SUBSET_EMPTY);//message indicating subset has no records
+
+		/*** AT THIS POINT CurrentPos.pSubset IS SET TO NULL
+			THIS CAUSES THE NEXT FUNCTION TO CRASH *****/
+
+       CurrentPos.pRecList->CloseList();
+
+       delete CurrentPos.pRecList;
+       return(ERR);
+    }
+	return(0);
+}
+
+Thanks for any suggestions.
+
+Harry Hahne
+hahne@chass.utoronto.ca
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Thursday, November 21, 1996
+</B>
+At 09:36 11/20/96 +0000, Harry Hahne wrote:
+>Environment: Win 95, VC 4.1
+
+> if(FirstRec() == 0)
+> { //go to first record in subset
+>
+>   /*** AT THIS POINT CurrentPos.pSubset POINTS TO THE SUBSET OBJECT***/
+>
+>   AfxMessageBox(IDS_SUBSET_EMPTY);//message indicating subset has no records
+>
+>   /*** AT THIS POINT CurrentPos.pSubset IS SET TO NULL
+>      THIS CAUSES THE NEXT FUNCTION TO CRASH *****/
+>
+>   CurrentPos.pRecList->CloseList();
+
+How is pSubset related to pRecList?
+
+Anyway, if you think the call to AfxMessageBox() is changing one of these
+values, prove it: use the "Data" tab in the Breakpoint dialog, which is
+reachable by using the "Breakpoints" command in the "Edit" menu to set
+a breakpoint that fires when the value of that variable changes.
+
+Then, you'll be able to see _exactly_ what causes it to change firsthand.
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+I'm afraid I've become some sort of speed freak.
+These words are my own. I do not speak on behalf of Microsoft.
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Harry Hahne -- <A HREF="mailto:hahne@epas.utoronto.ca">hahne@epas.utoronto.ca</A>
+Tuesday, November 26, 1996
+</B>
+Environment: Win 95, VC 4.1
+
+.B ekiM wrote:
+
+> How is pSubset related to pRecList?
+
+Sorry, in an attempt to simply the code I did not post it to the list 
+correctly.  Here is the corrected code (pRecList should be pSubset):
+
+> int CRecBrowser::SelectSubset(char *SubsetName)
+> {
+>     try
+>     {
+>          CurrentPos.pSubset = new CSubset;//create subset object
+>     }
+>     catch(CMemoryException *e)
+>     {
+>          e->Delete;
+>          Message_Memory();
+>          return(ERR);
+>     }
+> 
+>     if(CurrentPos.pSubset->OpenSubset(SubsetName))
+>     {	//open database subset
+>         return(ERR);
+>     }
+> 
+>     if(FirstRec() == 0)
+>     {	//go to first record in subset
+> 
+>   /*** AT THIS POINT CurrentPos.pSubset POINTS TO THE SUBSET OBJECT***/
+> 
+>   AfxMessageBox(IDS_SUBSET_EMPTY);//message indicating subset has no
+> records
+> 
+>   /*** AT THIS POINT CurrentPos.pSubset IS SET TO NULL
+>    THIS CAUSES THE NEXT FUNCTION TO CRASH *****/
+> 
+>        CurrentPos.pSubset->CloseList();
+> 
+>        delete CurrentPos.pSubset;
+>        return(ERR);
+>     }
+>  return(0);
+> }
+
+> Anyway, if you think the call to AfxMessageBox() is changing one of these
+> values, prove it: use the "Data" tab in the Breakpoint dialog, which is
+> reachable by using the "Breakpoints" command in the "Edit" menu to set a
+> breakpoint that fires when the value of that variable changes.
+
+When I set a data Breakpoint, the program stops in CWinApp::DoMessageBox() 
+in the line:
+
+   MessageBox(pWnd->GetSafeHwnd(), lpszPrompt, m_pszAppName, nType);
+
+The data breakpoint confirms that this pointer is changed at this time.
+
+There are actually other variables in the CurrentPos structure.  They are also 
+changed as well.
+
+Harry Hahne
+hahne@chass.utoronto.ca
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Wednesday, November 27, 1996
+</B>
+[Mini-digest: 2 responses]
+
+At 10:18 11/26/96 +0000, Harry Hahne wrote:
+>Environment: Win 95, VC 4.1
+
+>When I set a data Breakpoint, the program stops in CWinApp::DoMessageBox() 
+>in the line:
+
+>   MessageBox(pWnd->GetSafeHwnd(), lpszPrompt, m_pszAppName, nType);
+
+>The data breakpoint confirms that this pointer is changed at this time.
+
+Has it yet made the call to the API, or not?  It's pretty easy to show that
+this code doesn't do anything but call the API.  This line of code generates
+about a dozen lines of assembler code.
+
+If the call to the API has been made, maybe something is happening on
+a killfocus message in your application.  But, if that were the case,
+it would seem that the debugger should have trapped on that message handler
+and not here.
+
+The evidence points at memory corruption in your application.
+
+>There are actually other variables in the CurrentPos structure.  They are also 
+>changed as well.
+
+Is your pointer to the CurrentPos structure changed, or are the actual values
+changed?  Nobody in CWinApp::DoMessageBox() is doing a memset().  Are the values
+changed to something totally bogus, or are they changed to something
+identifiable?
+
+Just before this line of code, MFC goes looking for the thread state. 
+Are you using multiple threads in your application?  Was your database access
+via DAO or ODBC?  Do you have more than one CWinApp instance in your
+application?
+What message are you handling when you pop up this message box?
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+I'm afraid I've become some sort of speed freak.
+These words are my own. I do not speak on behalf of Microsoft.
+
+-----From: "Dean Wiles" <deanw@isc-br.isc-br.com>
+
+Is your CurrentPos variable a global, member, or auto variable, and where
+else does it get changed?  MessageBox won't mess with your data but it does
+allow your message queue to run, so window messages like paint, focus, etc
+will get dispatched.  Check the rest of your code or set some breakpoints
+where CurrentPos can get changed - like maybe where SelectSubset() gets
+called from.
+
+Hope this helps. Dean.
+
+--------------------------------------------------------------------------
+Dean Wiles (deanw@mail.isc-br.com)          Olivetti North America
+Phone:  (509)927-7037                       22425 East Appleway Ave
+Fax:    (509)927-2499                       Liberty Lake, WA 99019-9534
+If the Son sets you free, you will be free indeed.  (John 8:36)
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

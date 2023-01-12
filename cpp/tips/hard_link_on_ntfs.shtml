@@ -1,0 +1,98 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как создать hard link на NTFS?</h3>
+    <pre>#include &lt;windows.h&gt;
+#include &lt;stdio.h&gt;
+#pragma hdrstop
+#define err doerr( __FILE__, __LINE__ )
+
+void doerr( const char *file, int line )
+{
+ DWORD e;
+
+ e = GetLastError();
+ if ( e == 0 )
+  return;
+
+ printf( &quot;%s(%d): gle = %lu\n&quot;, file, line, e );
+ exit( 2 );
+}
+
+void enableprivs()
+{
+ HANDLE hToken;
+ byte buf[sizeof TOKEN_PRIVILEGES * 2];
+ TOKEN_PRIVILEGES &amp; tkp = *( (TOKEN_PRIVILEGES *) buf );
+
+ if ( ! OpenProcessToken( GetCurrentProcess(),
+  TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &amp;hToken ) )
+  err;
+
+ // берем SeBackupPrivilege и SeRestorePrivilege
+
+ if ( !LookupPrivilegeValue( NULL, SE_BACKUP_NAME, &amp;tkp.Privileges[0].Luid ) )
+  err;
+
+ if ( !LookupPrivilegeValue( NULL, SE_RESTORE_NAME, &amp;tkp.Privileges[1].Luid ) )
+  err;
+
+ tkp.PrivilegeCount = 2;
+ tkp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+ tkp.Privileges[1].Attributes = SE_PRIVILEGE_ENABLED;
+
+ AdjustTokenPrivileges( hToken, FALSE, &amp;tkp, sizeof tkp,
+  NULL, NULL );
+}
+
+int main( int argc, char *argv[] )
+{
+ HANDLE fh;
+
+ if ( argc != 3 )
+ {
+ printf( &quot;usage: lnw {file} {new_link_name}\n&quot; );
+ return 1;
+ }
+ enableprivs();
+
+ fh = CreateFile( argv[1], GENERIC_WRITE, 0, NULL, OPEN_EXISTING,
+  FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_POSIX_SEMANTICS, NULL );
+ if ( fh == INVALID_HANDLE_VALUE || fh == NULL ) err;
+
+ static char buf1[MAX_PATH];
+ static wchar_t buf2[MAX_PATH * 2];
+ char *p;
+ void *ctx = NULL;
+ WIN32_STREAM_ID wsi;
+ DWORD numwritten;
+
+ GetFullPathName( argv[2], MAX_PATH, &amp;buf1[0], &amp;p );
+
+ wsi.dwStreamId = BACKUP_LINK;
+ wsi.dwStreamAttributes = 0;
+ wsi.dwStreamNameSize = 0;
+ wsi.Size.QuadPart = strlen( buf1 ) * 2 + 2;
+ MultiByteToWideChar( CP_ACP, 0, buf1, strlen( buf1 ) + 1, buf2, MAX_PATH );
+
+ if ( ! BackupWrite( fh, (byte *) &amp;wsi, 20, &amp;numwritten, FALSE, FALSE, &amp;ctx )
+)err;
+ if ( numwritten != 20 ) err;
+
+ if ( ! BackupWrite( fh, (byte *) buf2, wsi.Size.LowPart, &amp;numwritten, FALSE,
+FALSE, &amp;ctx ) )err;
+ if ( numwritten != wsi.Size.LowPart )err;
+
+ BackupWrite( fh, (byte *) &amp;buf1[0], 0, &amp;numwritten, TRUE, FALSE, &amp;ctx );
+ CloseHandle( fh );
+ return 0;
+}</pre>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

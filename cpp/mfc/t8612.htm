@@ -1,0 +1,240 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+OnFileSendMail with two attachments?
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Calin Cojocariu -- <A HREF="mailto:calin@cs.ucf.edu">calin@cs.ucf.edu</A>
+Friday, December 20, 1996
+</B>
+Environment: VC++ 4.0, Win 95
+
+Each document in my application is an image file and for each
+file/document there is also a text file with the same name but
+different suffix. Example:
+Document file: MRI001.JPG has a corresponding MRI001.TXT
+
+Any idea or sample code of how can I implement OnFileSendMail()
+which will attach both files to the mail message?
+The code for that, which can be found in DocMapi.cpp, is very 
+confusing and I am sure that it is a simpler way to deal with that.
+
+Is there any sample of how to use simple MAPI in a MFC application
+to send several files as attachments?
+
+------------------------------------------------------------------------
+                            CALIN COJOCARIU
+Computer Science Dept.                          Phone : (407)823-4733
+Univ. of Central Florida                        Fax   : (407)823-5419
+Orlando, FL 32816                               E-mail: calin@cs.ucf.edu
+------------------------------------------------------------------------
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+P.J. Tezza -- <A HREF="mailto:pj@exemplarsoftware.com">pj@exemplarsoftware.com</A>
+Monday, December 23, 1996
+</B>
+[Mini-digest: 3 responses]
+
+>Any idea or sample code of how can I implement OnFileSendMail()
+>which will attach both files to the mail message?
+
+For a free alternative to the MAPI API which is portable to other =
+platforms, check out the API defined in xcmc*.h. The cmc_send_documents =
+function looks like what you want.
+
+PJ
+pj@exemplarsoftware.com
+
+-----From: John Toebes <Toebes@southpeak.com>
+
+Actually, the code in DocMapi.cpp is really not that bad to modify once
+you figure out what it is doing.  To do so, here's a quick tour of the
+code in CDocument::OnFileSendMail():
+
+1) Locate the MAPISendMail function (everything up to the declaration of
+bRemoveTemp)
+2) Determine a file name for the current document by using the document
+if it is saved and a temporary file if it has not been.
+3) Determine a title for the file by using the current doc template
+After this:    szTempName(A) holds the name of the file which is to be
+attached.  szTitle(A) has the title for the file.
+4) Fill in a MapiFileDesc structure for the file to be attached
+5) Create a MapiMessage structure and point it to the MapiFileDesc
+structure.
+6) Call MAPISendMail (with some MFC magic around it to keep the window
+states happy
+7) Cleanup and delete any temp file created in step 2.
+
+So, if you wanted to send more than one file in the attachment, you
+would declare
+	MapiFileDesc fileDesc[2];
+And then fill in the structure for the files
+	memset(&fileDesc, 0, sizeof(fileDesc));
+	fileDesc[0].nPosition = (ULONG)-1;
+	fileDesc[0].lpszPathName = szTempName;
+	fileDesc[0].lpszFileName = szTitle;
+	fileDesc[1].nPosition = (ULONG)-1;
+	fileDesc[1].lpszPathName = szTempName1;
+	fileDesc[1].lpszFileName = szTitle1;
+You would also have to set the nFileCount field to the actual number of
+files you attached.
+	message.nFileCount = 2;
+
+Note that the nPosition field is pretty important.  What it tells MAPI
+is where in the document you want the file to be attached.  I played
+around with this and discovered that if you want to attach to the end of
+the document, any trailing \n characters are trimmed from the message
+text, causing the attachment to fail.  I solved this by putting in a
+space as the last character.
+	message.lpszNoteText = "This is the text\nAnd here is the attachment:
+";
+	fileDesc[0].nPosition = strlen(message.lpszNoteText)-1;
+
+I ended up overriding this function and cutting/pasting the code from
+DocMapi into my function and then modified it to take a string for the
+contents of the message as well as the list of files to send.  You don't
+have to go through the work of steps 2 and 3 (which are the bulk of the
+function) if you have a file that you know exists and you want to send
+it.
+
+If you want fancier control (such as fonts and the like), you will have
+to skip past Simple MAPI and go to the full blown MAPI interface (with a
+much steeper learning curve).
+
+Enjoy.
+
+>---- John A. Toebes, VIII ----         toebes@southpeakcom
+> Vice President Research and Development
+> SouthPeak Interactive
+
+
+>From: 	Calin Cojocariu[SMTP:calin@cs.ucf.edu]
+>Sent: 	Friday, December 20, 1996 7:17 PM
+>To: 	MFC-L
+>Subject: 	OnFileSendMail with two attachments?
+>
+>
+>Environment: VC++ 4.0, Win 95
+>
+>Each document in my application is an image file and for each file/document
+>there is also a text file with the same name but different suffix. Example:
+>Document file: MRI001.JPG has a corresponding MRI001.TXT
+>
+>Any idea or sample code of how can I implement OnFileSendMail() which will
+>attach both files to the mail message? The code for that, which can be found
+>in DocMapi.cpp, is very confusing and I am sure that it is a simpler way to
+>deal with that.
+>
+>Is there any sample of how to use simple MAPI in a MFC application to send
+>several files as attachments?
+>
+>------------------------------------------------------------------------
+>                            CALIN COJOCARIU
+>Computer Science Dept.                          Phone : (407)823-4733
+>Univ. of Central Florida                        Fax   : (407)823-5419
+>Orlando, FL 32816                               E-mail: calin@cs.ucf.edu
+>------------------------------------------------------------------------
+>
+-----From: Severino Delaurenti <del@alpha.ICO.Olivetti.Com>
+
+Try to look on books online of your Visual C++ under:
+
+SDKs \ Win32 SDK \ Win32 Messaging (MAPI) \ MAPI Programmer's Reference \ Guide \ Programming with Simple MAPI
+
+Here there is some little example of how to use Simple MAPI, that are used by MFC to send mail
+(You can also watch at the file "Docmapi.cpp", in the MFC source files to see how Send Mail is implemented).
+
+What you need is to understand how to integrate Simple MAPI in your application and how to use the following MapiMessage structure:
+
+typedef struct {  
+     ULONG ulReserved;      
+     LPTSTR lpszSubject;      
+     LPTSTR lpszNoteText;      
+     LPTSTR lpszMessageType; 
+     LPTSTR lpszDateReceived; 
+     LPTSTR lpszConversationID;      
+     FLAGS flFlags;      
+     lpMapiRecipDesc lpOriginator; 
+     ULONG nRecipCount;      
+     lpMapiRecipDesc lpRecips;      
+     ULONG nFileCount;      
+     lpMapiFileDesc lpFiles;           
+} MapiMessage, FAR *lpMapiMessage;
+
+Above all the last member of the structure is what you need:
+
+lpFiles
+Points to an array of MapiFileDesc structures, each containing information about a file attachment.
+
+Hope this help
+
+Bye
+				Severino Delaurenti
+				del@alpha.ico.olivetti.com
+				Olivetti Lexikon Spa
+				Italy
+
+P.S.
+	Merry Christmas and Happy New Year
+
+----------
+From: 	Calin Cojocariu[SMTP:calin@cs.ucf.edu]
+Sent: 	21 December 1996 1:17
+To: 	MFC-L
+Subject: 	OnFileSendMail with two attachments?
+
+Environment: VC++ 4.0, Win 95
+
+Each document in my application is an image file and for each
+file/document there is also a text file with the same name but
+different suffix. Example:
+Document file: MRI001.JPG has a corresponding MRI001.TXT
+
+ecc.
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

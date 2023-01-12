@@ -1,0 +1,423 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Height of an Ownerdraw ComboBox
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Karl Lukas -- <A HREF="mailto:lukas@deos.ch">lukas@deos.ch</A>
+Wednesday, September 18, 1996
+</B>
+Environment: VC++ 4.2, NT 4.0
+
+It looks like the height of a ComboBox depends on the state of it's
+ownerdraw
+style. When I set a ComboBox's (droplist) ownerdraw style, the height of
+it's
+static portion gets bigger than without the onwerdraw style. Does
+anybody
+know how I can make the height of an ownerdraw ComboBox smaller (i.e.
+independent of the ownerdraw style)?
+
+Karl
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+GoroKhM1 -- <A HREF="mailto:gorokhm1@SMTP.ATG-NET.COM">gorokhm1@SMTP.ATG-NET.COM</A>
+Friday, September 20, 1996
+</B>
+It is the third ComboBox Height thread this month!
+
+There are three heights for ComboBox.
+
+1. Height of Static/Edit portion. It means Static for CBS_DROPDOWNLIST
+and Edit for CBS_DROPDOWN styles.
+That height cannot be changed in Dialog Editor and may be set at run-time:
+
+  pComboBox->SetItemHeight(-1, iHeight);
+
+Recommended value for iHeight is 18. That is OK for MS Sans Serif font 
+with size 8. It is the same height = 12 for edit controls in Dialog Editor.
+That "18" is somehow calculated by framework for above mentioned font. 
+If somebody knows a formula let me know.
+
+2. Height of each item in a drop-down list. That height make sense only
+for CBS_OWNERDRAWFIXED and CBS_OWNERDRAWVARIABLE styles. To set height for 
+CBS_OWNERDRAWFIXED I'd prefer to call
+
+  pComboBox->SetItemHeight( 0, iHeight);
+
+You can use virtual MeasureItem().
+
+3. Height of drop-down portion. That height is set in the Dialog Editor 
+and may be changed at run-time for any kind of ComboBox with the function
+recently posted to MFC-L. Here is a bit updated version of it:
+
+void FuncSetComboBoxHeight(CComboBox* pComboBox, int nLines)
+/*---------------------------------------------------------------------
+* Purpose:     
+*   Set the proper number of lines in a drop-down list of a combo box.
+* Description: 
+*   Resizes the combo box window to fit the proper number of lines. 
+*   The window must exist before calling this function.
+*   This function should be called when the combo box is created, and 
+*   when the font of the combo box changes.
+* Testing needed:
+*   - OS other than Windows '95, where SM_CYBORDER might be appropriate 
+*   - owner-draw variable height combo box
+*   - Subclassed combo box with horizontal scroll-bar 
+* Returns:         
+*   nothing
+* Author:          
+*   KTM <ktm@ormec.com> from MFC-L
+* See Also:
+---------------------------------------------------------------------*/
+{
+  // Window must exist or SetWindowPos won't work
+  ASSERT(::IsWindow(*pComboBox));  
+
+  CRect cbSize;  // current size of combo box 
+  int iHeight;   // new height for combo box
+
+  pComboBox->GetClientRect(cbSize);
+  iHeight  = pComboBox->GetItemHeight(-1);  
+    // height of the edit-box portion 
+  iHeight += pComboBox->GetItemHeight(0) * nLines;  
+    // add height of lines of text
+    // this assumes that all lines are the same height, and is wrong for 
+    // CBS_OWNERDRAWVARIABLE
+
+  // Note: The use of SM_CYEDGE assumes that we're using Windows '95 
+  //       SM_CYBORDER is appropriate for NT 3.51
+  //       not sure what to use for NT 4.0 or Win 3.x + Win32s 1.3c 
+  // Now add on the height of the border of the edit box
+  iHeight += GetSystemMetrics(SM_CYEDGE) * 2; // top & bottom edges
+
+  // The height of the border of the drop-down box
+  iHeight += GetSystemMetrics(SM_CYEDGE) * 2; // top & bottom edges
+
+  // now set the size of the window
+  pComboBox->SetWindowPos(
+    NULL,         // not relative to any other windows
+    0, 0,         // TopLeft corner doesn't change 
+    cbSize.right, // existing width
+    iHeight,      // new height 
+    SWP_NOMOVE | SWP_NOZORDER  // don't move box or change z-ordering. 
+    );
+} // FuncSetComboBoxHeight()
+
+
+--Mark
+
+<MarkG@usa.net>
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Phil Daley -- <A HREF="mailto:pdaley@relay.com">pdaley@relay.com</A>
+Monday, September 23, 1996
+</B>
+At 02:49 PM 9/18/96 +0200, you wrote:
+
+Environment: VC++ 4.2, NT 4.0
+
+
+It looks like the height of a ComboBox depends on the state of it's
+ownerdraw style. When I set a ComboBox's (droplist) ownerdraw style,
+the height of it's static portion gets bigger than without the
+onwerdraw style. Does anybody know how I can make the height of an
+ownerdraw ComboBox smaller (i.e.  independent of the ownerdraw style)?
+
+
+Karl
+
+
+----------------------------------------
+
+
+>From <<owner-mfc-l@majordomo.netcom.com> Tue Sep 17 21:58:45 1996
+
+From: ktm@ormec.com
+
+To: mfc-l@netcom.com, gorokhm1@SMTP.ATG-NET.COM, markg@usa.net
+
+Subject: Re: ComboBox List height
+
+X-Charset: us-ascii
+
+Date:      Mon, 16 Sep 1996 09:01:03 -0500
+
+Sender: owner-mfc-l@majordomo.netcom.com
+
+Errors-To: owner-mfc-l@majordomo.netcom.com
+
+Reply-To: mfc-l@netcom.com
+
+
+[Mini-digest: 2 responses]
+
+
+Mark, <<MarkG@usa.net> wrote:
+
+> Environment: Win95, VC4.2
+
+> 
+
+> Question: How to set ComboBox List height?
+
+> (for CBS_DROPDOWNLIST | CBS_OWNERDRAWFIXED)
+
+> 
+
+> [...]
+
+> 
+
+> No problems with CStatic and CEdit items. My ComboBox is placed 
+
+> and sized correctly too, except the List Height. It is ZERO. 
+
+
+Matt Kimberling, <<mattk@ticketmaster.com> also asks:
+
+>How can I control the vertical size of the drop down for a Combo Box? 
+
+
+This also came up at the beginning of the month - check the archives,
+
+searching for the header "Pulling Hair over CComboBox sizing". As other
+
+people have stated, you can use MoveWindow to set the size of the drop 
+
+down. If you're trying to set the drop-down to show a specific number 
+
+of
+
+lines, the following function may be useful:
+
+
+const int LINECOUNT = 8;        // standard # of lines
+
+void set_DropDownSize(CComboBox& box)
+
+/*--------------------------------------------------------------------------
+
+ * Purpose:         Set the proper number of lines in a drop-down list or
+
+
+
+ *  combo box.
+
+ * Description:     Resizes the combo box window to fit the proper number
+
+
+
+ *  of lines. The window must exist before calling this function.
+
+ *  This function should be called when the combo box is created, and
+
+when
+
+ *  the font of the combo box changes.
+
+ *  Testing needed:
+
+ *    OS other than Windows '95, where SM_CYBORDER might be appropriate
+
+ *    owner-draw variable height combo box
+
+ *    Subclassed combo box with horizontal scroll-bar
+
+ * Returns:         nothing
+
+ * Author:          KTM
+
+ * See Also:
+
+ *--------------------------------------------------------------------------*/
+
+    {
+
+    ASSERT(IsWindow(box));  // Window must exist or SetWindowPos won't
+
+work
+
+
+    CRect cbSize;       // current size of combo box
+
+    int Height;         // new height for combo box
+
+
+    box.GetClientRect(cbSize);
+
+    Height = box.GetItemHeight(-1);  // start with size of the edit-box
+
+portion
+
+    Height += box.GetItemHeight(0) * LINECOUNT;  // add height of lines
+
+of text
+
+      // this assumes that all lines are the same height, and is wrong
+
+for
+
+      // CBS_OWNERDRAWVARIABLE
+
+
+    // Note: The use of SM_CYEDGE assumes that we're using Windows '95
+
+    //       SM_CYBORDER is appropriate for NT 3.51
+
+    //       not sure what to use for NT 4.0 or Win 3.x + Win32s 1.3c
+
+    // Now add on the height of the border of the edit box
+
+    Height += GetSystemMetrics(SM_CYEDGE) * 2; // top & bottom edges
+
+
+    // The height of the border of the drop-down box
+
+    Height += GetSystemMetrics(SM_CYEDGE) * 2; // top & bottom edges
+
+
+    // now set the size of the window
+
+    box.SetWindowPos(NULL,              // not relative to any other
+
+windows
+
+        0, 0,                           // TopLeft corner doesn't 
+
+change
+
+        cbSize.right, Height,           // existing width, new height
+
+        SWP_NOMOVE | SWP_NOZORDER       // don't move box or change
+
+z-ordering.
+
+        );
+
+    }
+
+-----From: "GoroKhM1" <<gorokhm1@SMTP.ATG-NET.COM>
+
+
+Thanks for response and help. The function <<ktm@ormec.com> 
+
+suggested is working fine and the problem is solved.
+
+The trick was:
+
+  pCombo->SetWindowPos(
+
+    NULL,
+
+    0, 0,
+
+    iWidth, iHeight,  // new drop-down list size
+
+    SWP_NOMOVE | SWP_NOZORDER);
+
+
+I have a question. Assume I have a combo box in a resource file:
+
+
+  COMBOBOX IDC_MY_COMBO,40,50,60,70,CBS_DROPDOWNLIST | 
+
+           CBS_OWNERDRAWFIXED | CBS_SORT | CBS_HASSTRINGS | 
+
+           WS_VSCROLL | WS_TABSTOP
+
+
+The numbers in the resource mean the following:
+
+  40,50 - left/upper corner coord.
+
+  60    - width of static and drop-down list portion
+
+  70    - height of drop-down list portion
+
+
+The height of static portion isn't defined at all and I think is 
+
+calculated depending on font size in creation time.
+
+
+Assume the dialog is created and pCombo is a pointer to that control.
+
+
+1. pCombo->GetClientRect() returns the size of static portion.
+
+2. pCombo->GetWindowRect() returns the location and size of static
+
+portion.
+
+
+How to find the value "height of drop-down list portion" i.e. "70" ?
+
+
+Mark
+
+
+<<MarkG@usa.net>
+
+
+
+
+
+
+
+
+Phil Daley          Relay Technology
+
+<A HREF="http://www.conknet.com/~p_daley">http://www.conknet.com/~p_daley</A>
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

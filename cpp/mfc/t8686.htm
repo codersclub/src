@@ -1,0 +1,891 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+DDX Assertion on Dialog Initialization
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Rick Esterling -- <A HREF="mailto:rick@eco.twg.com">rick@eco.twg.com</A>
+Saturday, December 28, 1996
+</B>
+Environment: MSVC 4.2b Windows 95
+
+I have a dialog based application.  On it there is an edit control
+immediately followed in z-order by a spin control whose properties include
+UDS_AUTOBUDDY and UDS_SETBUDDYINT.  The edit control has a ddx variable of
+type int associated with it.  Also on the dialog is a Checkbox which
+*follows* the spin control in the z-order and this control has a ddx
+variable of type BOOL associated with it.
+
+I have an OnUpdate() handler member method for the edit control.  The first
+thing this method does, naturally, is call UpdateData( TRUE ).  Given the
+setup of the app, here's the sequence of events that occurs when the dialog
+is invoked:
+
+   CDlg::CDlg  //  ddx variables are initialized
+   CDlg::OnUpdateEdit1 // (then CDlg::OnChange if mapped)
+   CDlg::DoDataExchange
+   CDlg::OnInitDialog
+
+Just as a matter of clarification, OnUpdateEdit1 is being called here
+because of the UDS_SETBUDDYINT flag on the spin control.  Without that
+flag, OnChangeEdit1 (and/or OnUpdateEdit1) are not called at this point. 
+But, I'm using that flag so this is what I'm seeing.
+
+When OnUpdateEdit1 calls UpdateData( TRUE ) the first time through, the
+checkbox has not been created yet so dlgdata.cpp asserts at line 45 inside
+CDataExchange::PrepareCtrl:
+
+   m_pDlgWnd->GetDlgItem(nIDC, &hWndCtrl); // Line 41
+   if (hWndCtrl == NULL)
+   {
+      TRACE1("Error: no data exchange control with ID 0x%04X.\n", nIDC);
+      ASSERT(FALSE); 
+      AfxThrowNotSupportedException();
+   }
+
+The control ID it's referring to (nIDC) is the ID of the checkbox which, as
+I said, has not been created yet so the assertion makes sense. 
+Nonetheless, it's an assertion that I'd like to get rid of.
+
+As a work around, I have added a member varible to the dialog class,
+m_bInitDone, that I set to FALSE in the dialog's constructor and then to
+TRUE in OnInitDialog.  In OnChangeEdit1, I check this variable and if it's
+FALSE, I simply return before doing anything else; i.e.,
+
+CDlg::OnChangeEdit1( ) {
+   if( !m_bInitDone ) {
+      return;
+   }
+
+   UpdateData( TRUE );
+   // etc., etc., etc.
+}
+
+BTW, if the checkbox (remember the checkbox?) precedes the edit/spin
+controls in the z-order, then, of course, the assertion doesn't always
+occur (see note) because the checkbox has already been created by the time
+OnChangeEdit1 -- and subsequently UpdateData( TRUE ) -- is called for the
+edit control.  This, too, makes sense.  
+
+Note: I say "doesn't always occur" because it still does occur the first
+time you run your app and will continue occurring as long as you select
+"Ignore" on the assertion messagebox and "OK" on the error dialog that
+follows the assertion.  If you select "Abort" on the assertion messagebox,
+the assertion won't happen again until you reboot Win95 and run your app
+the first time again.  The real point is if you want to see this assertion
++consistently+, set the z-order as described in this message.
+
+My real question, then, is simply this: Is my work around appropriate?  Is
+there a preferred method for handling this type of problem?
+
+Later,
+Rick
+
+"If you can't explain something to a six-year old, you really don't
+understand it yourself." -- Albert Einstein
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dan Kirby -- <A HREF="mailto:dkirby@accessone.com">dkirby@accessone.com</A>
+Saturday, December 28, 1996
+</B>
+Hi,
+Why are you calling UpdateData(TRUE) as a result of the EN_UPDATE or
+EN_CHANGE notifications?  UpdateData() is basically designed for calling
+during an OnOK() situation where everthing is typed in and then user
+presses OK for example.  The way you have it srtup now is that UpdateData
+will be called for every change in the edit control.  So for every
+keystroke for example, this is being called, this is excessive and actually
+could be a bad thing if you have DDV routines.  For example, if a DDV
+routine forced the user to be between 100 and 200 in the edit control and
+the user begins to type and presses a 1 for example, the UpdateData() is
+going to make the DDV routines kick in and of course you'll get a message
+about being out of a valid range.
+
+Basically, don't call UpdateData. If you need to know what the value is in
+the edit control at anytime before OnOK, you can call GetWindowText on the
+control.  Or if you really need to transfer the data to the variable for
+every EN_UPDATE notification, then don't call UpdateData() but instead just
+call GetWindowText on the edit control and assign the value to the specific
+variable yourself.
+
+--dan
+
+----------
+> From: Rick Esterling <rick@eco.twg.com>
+> To: mfc-l@netcom.com
+> Subject: DDX Assertion on Dialog Initialization
+> Date: Saturday, December 28, 1996 1:41 PM
+> 
+> Environment: MSVC 4.2b Windows 95
+> 
+> I have a dialog based application.  On it there is an edit control
+> immediately followed in z-order by a spin control whose properties
+include
+> UDS_AUTOBUDDY and UDS_SETBUDDYINT.  The edit control has a ddx variable
+of
+> type int associated with it.  Also on the dialog is a Checkbox which
+> *follows* the spin control in the z-order and this control has a ddx
+> variable of type BOOL associated with it.
+> 
+> I have an OnUpdate() handler member method for the edit control.  The
+first
+> thing this method does, naturally, is call UpdateData( TRUE ).  Given the
+> setup of the app, here's the sequence of events that occurs when the
+dialog
+> is invoked:
+> 
+>    CDlg::CDlg  //  ddx variables are initialized
+>    CDlg::OnUpdateEdit1 // (then CDlg::OnChange if mapped)
+>    CDlg::DoDataExchange
+>    CDlg::OnInitDialog
+> 
+> Just as a matter of clarification, OnUpdateEdit1 is being called here
+> because of the UDS_SETBUDDYINT flag on the spin control.  Without that
+> flag, OnChangeEdit1 (and/or OnUpdateEdit1) are not called at this point. 
+> But, I'm using that flag so this is what I'm seeing.
+> 
+> When OnUpdateEdit1 calls UpdateData( TRUE ) the first time through, the
+> checkbox has not been created yet so dlgdata.cpp asserts at line 45
+inside
+> CDataExchange::PrepareCtrl:
+> 
+>    m_pDlgWnd->GetDlgItem(nIDC, &hWndCtrl); // Line 41
+>    if (hWndCtrl == NULL)
+>    {
+>       TRACE1("Error: no data exchange control with ID 0x%04X.\n", nIDC);
+>       ASSERT(FALSE); 
+>       AfxThrowNotSupportedException();
+>    }
+> 
+> The control ID it's referring to (nIDC) is the ID of the checkbox which,
+as
+> I said, has not been created yet so the assertion makes sense. 
+> Nonetheless, it's an assertion that I'd like to get rid of.
+> 
+> As a work around, I have added a member varible to the dialog class,
+> m_bInitDone, that I set to FALSE in the dialog's constructor and then to
+> TRUE in OnInitDialog.  In OnChangeEdit1, I check this variable and if
+it's
+> FALSE, I simply return before doing anything else; i.e.,
+> 
+> CDlg::OnChangeEdit1( ) {
+>    if( !m_bInitDone ) {
+>       return;
+>    }
+> 
+>    UpdateData( TRUE );
+>    // etc., etc., etc.
+> }
+> 
+> BTW, if the checkbox (remember the checkbox?) precedes the edit/spin
+> controls in the z-order, then, of course, the assertion doesn't always
+> occur (see note) because the checkbox has already been created by the
+time
+> OnChangeEdit1 -- and subsequently UpdateData( TRUE ) -- is called for the
+> edit control.  This, too, makes sense.  
+> 
+> Note: I say "doesn't always occur" because it still does occur the first
+> time you run your app and will continue occurring as long as you select
+> "Ignore" on the assertion messagebox and "OK" on the error dialog that
+> follows the assertion.  If you select "Abort" on the assertion
+messagebox,
+> the assertion won't happen again until you reboot Win95 and run your app
+> the first time again.  The real point is if you want to see this
+assertion
+> +consistently+, set the z-order as described in this message.
+> 
+> My real question, then, is simply this: Is my work around appropriate? 
+Is
+> there a preferred method for handling this type of problem?
+> 
+> Later,
+> Rick
+> 
+> "If you can't explain something to a six-year old, you really don't
+> understand it yourself." -- Albert Einstein
+> 
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Rick Esterling -- <A HREF="mailto:rick@eco.twg.com">rick@eco.twg.com</A>
+Monday, December 30, 1996
+</B>
+Dan Kirby wrote:
+
+> Basically, don't call UpdateData. If you need to know what the value 
+> is in the edit control at anytime before OnOK, you can call 
+> GetWindowText on the control.  
+
+Appreciate the recommendation, Dan, it helped streamline the design of my
+application. The original problem, however, remains even though I'm no
+longer calling UpdateData() anywhere in my project.  Let me start from
+scratch so any newcomers to this conversation can join in.
+
+VC 4.2b, Win95
+Dialog-based app (AppWiz generated)
+
+Use the resource editor to add an edit control and a spin control to the
+dialog.  Modify the properties of the spin control such that "Auto Buddy"
+and "Set Buddy Integer" are set.  Ensure the spin control follows the edit
+control in the z-order so it will, in fact, be a "buddy" control.
+
+Use class wizard to create a control ddx variable for the edit control
+(type CEdit, of course).  I'll call this variable "m_edtOne".  Use class
+wizard to map EN_CHANGE for the edit control to the dialog; i.e.,
+CDlg::OnChangeEdit1.  Modify the message handler as follows:
+
+   void CDlg::OnChangeEdit1( ) {
+      CString strText;
+      m_edtOne.GetWindowText( strText );
+   }
+
+Launch the app.  The code shown above will fire before the edit control has
+been created.  This causes an assertion in wincore.cpp at line 1012.  That
+code reads as follows:
+
+   void CWnd::GetWindowText(CString& rString) const
+   {
+      ASSERT(::IsWindow(m_hWnd));  // Line 1012
+      // etc.
+   }
+
+The order in which my dialog class' member methods are being called is as
+follows:
+
+   CDlg::CDlg
+   CDlg::OnChangeEdit1
+   CDlg::OnInitDialog
+   CDlg::DoDataExchange
+
+Clearing the UDS_SETBUDDYINT flag from the spin control makes this problem
+go away; OnChangeEdit1 does not get called during creation as shown above.
+
+One more oddity.  On the assertion messagebox that shows up to report this
+problem, there are three buttons:  Abort, Retry, and Ignore.  If I click
+Abort, my app closes after which I can run it over and over again without
+ever seeing the assertion recurring until I reboot Win95 and run the app
+again.  If, on the other hand, I press Ignore, the app continues but I'll
+get the assertion everytime I start the app over (and will keep asserting
+as long as I click Ignore everytime and not Abort).  I add this because if
+you're trying to debug this problem and you hit abort on the assertion
+messagebox, you won't see the assertion again until you reboot. 
+Alternatively, you can run the first instance of the application and simply
+leave the assertion box on the screen.  Fire up another instance of the app
+and it won't assert.  You can do this as many times as you want until you
+dismiss the assertion messagebox from the first instance of the app, and
+then the same rules outlined above are back in effect (if you press Abort,
+no more problems for the duration of your Win95 session, if you press
+ignore, problem keeps happening.)  That, at least, is what's happening
+here. 
+
+The assertion itself is easy enough to avoid altogether by adding a class
+variable, BOOL m_bInit, that gets set to FALSE in the contructor and TRUE
+in OnInitDialog.  In OnChangeEdit1, check m_bInit == TRUE before calling
+GetWindowText. While this is effective for avoiding the assertion, I would
+rather understand what's really going on and what other alternatives I have
+for eliminating the assertion.  If anyone has a better understanding of
+this whole subject and the root cause of this particular problem, I'd
+appreciate their enlightement.
+
+Later,
+Rick
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+P.J. Tezza -- <A HREF="mailto:pj@exemplarsoftware.com">pj@exemplarsoftware.com</A>
+Tuesday, December 31, 1996
+</B>
+>The assertion itself is easy enough to avoid altogether by adding a =
+class
+variable, BOOL m_bInit, that gets set to FALSE in the contructor and =
+TRUE
+in OnInitDialog.  In OnChangeEdit1, check m_bInit =3D=3D TRUE before =
+calling
+GetWindowText. While this is effective for avoiding the assertion, I =
+would
+rather understand what's really going on and what other alternatives I =
+have
+for eliminating the assertion.  If anyone has a better understanding of
+this whole subject and the root cause of this particular problem, I'd
+appreciate their enlightement.
+
+It sounds like you found a bug (feature?). Grep for WINBUG in the MFC =
+source code to see how MFC deals with these kinds of problems. A =
+possible workaround is to test the validity of m_edtOne.m_hWnd before =
+calling UpdateData and/or m_edtOne.GetWindowText.
+
+PJ
+pj@exemplarsoftware.com
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Ronald D. Patton -- <A HREF="mailto:rpatton@sky.net">rpatton@sky.net</A>
+Wednesday, January 01, 1997
+</B>
+Rick,
+
+Try this:
+
+	if (::IsWindow(m_edtOne.m_hWnd))
+		m_edtOne.GetWindowText( strText );
+
+instead of just:
+
+	m_edtOne.GetWindowText( strText );
+
+Ron Patton
+Informix Software
+----------
+> From: Rick Esterling <rick@eco.twg.com>
+> To: mfc-l@netcom.com
+> Subject: Re: DDX Assertion on Dialog Initialization
+> Date: Monday, December 30, 1996 11:13 PM
+> 
+> Dan Kirby wrote:
+> 
+> > Basically, don't call UpdateData. If you need to know what the value 
+> > is in the edit control at anytime before OnOK, you can call 
+> > GetWindowText on the control.  
+> 
+> Appreciate the recommendation, Dan, it helped streamline the design of my
+> application. The original problem, however, remains even though I'm no
+> longer calling UpdateData() anywhere in my project.  Let me start from
+> scratch so any newcomers to this conversation can join in.
+> 
+> VC 4.2b, Win95
+> Dialog-based app (AppWiz generated)
+> 
+> Use the resource editor to add an edit control and a spin control to the
+> dialog.  Modify the properties of the spin control such that "Auto Buddy"
+> and "Set Buddy Integer" are set.  Ensure the spin control follows the
+edit
+> control in the z-order so it will, in fact, be a "buddy" control.
+> 
+> Use class wizard to create a control ddx variable for the edit control
+> (type CEdit, of course).  I'll call this variable "m_edtOne".  Use class
+> wizard to map EN_CHANGE for the edit control to the dialog; i.e.,
+> CDlg::OnChangeEdit1.  Modify the message handler as follows:
+> 
+>    void CDlg::OnChangeEdit1( ) {
+>       CString strText;
+>       m_edtOne.GetWindowText( strText );
+>    }
+> 
+> Launch the app.  The code shown above will fire before the edit control
+has
+> been created.  This causes an assertion in wincore.cpp at line 1012. 
+That
+> code reads as follows:
+> 
+>    void CWnd::GetWindowText(CString& rString) const
+>    {
+>       ASSERT(::IsWindow(m_hWnd));  // Line 1012
+>       // etc.
+>    }
+> 
+> The order in which my dialog class' member methods are being called is as
+> follows:
+> 
+>    CDlg::CDlg
+>    CDlg::OnChangeEdit1
+>    CDlg::OnInitDialog
+>    CDlg::DoDataExchange
+> 
+> Clearing the UDS_SETBUDDYINT flag from the spin control makes this
+problem
+> go away; OnChangeEdit1 does not get called during creation as shown
+above.
+> 
+> One more oddity.  On the assertion messagebox that shows up to report
+this
+> problem, there are three buttons:  Abort, Retry, and Ignore.  If I click
+> Abort, my app closes after which I can run it over and over again without
+> ever seeing the assertion recurring until I reboot Win95 and run the app
+> again.  If, on the other hand, I press Ignore, the app continues but I'll
+> get the assertion everytime I start the app over (and will keep asserting
+> as long as I click Ignore everytime and not Abort).  I add this because
+if
+> you're trying to debug this problem and you hit abort on the assertion
+> messagebox, you won't see the assertion again until you reboot. 
+> Alternatively, you can run the first instance of the application and
+simply
+> leave the assertion box on the screen.  Fire up another instance of the
+app
+> and it won't assert.  You can do this as many times as you want until you
+> dismiss the assertion messagebox from the first instance of the app, and
+> then the same rules outlined above are back in effect (if you press
+Abort,
+> no more problems for the duration of your Win95 session, if you press
+> ignore, problem keeps happening.)  That, at least, is what's happening
+> here. 
+> 
+> The assertion itself is easy enough to avoid altogether by adding a class
+> variable, BOOL m_bInit, that gets set to FALSE in the contructor and TRUE
+> in OnInitDialog.  In OnChangeEdit1, check m_bInit == TRUE before calling
+> GetWindowText. While this is effective for avoiding the assertion, I
+would
+> rather understand what's really going on and what other alternatives I
+have
+> for eliminating the assertion.  If anyone has a better understanding of
+> this whole subject and the root cause of this particular problem, I'd
+> appreciate their enlightement.
+> 
+> Later,
+> Rick
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Wednesday, January 01, 1997
+</B>
+At 21:13 12/30/96 -0800, Rick Esterling wrote:
+
+>The original problem, however, remains even though I'm no
+>longer calling UpdateData() anywhere in my project. 
+
+Calling UpdateData() isn't the cause of your problem.
+
+UpdateData() ends up calling DoDataExchange().  If you're calling
+UpdateData(FALSE), DoDataExchange() does two things:
+
+  + it copies and validates data from controls involved in DDX and DDV.
+  + it subclasses controls that you've set up for DDX_Control().
+
+That means that the control member variable in your dialog class
+isn't initialized until UpdateData() has been called at least once.
+MFC's implementation of CDialog::OnInitDialog() calls UpdateData()
+for you, so after your dialog is initialized, it is done. I don't have
+4.2b installed at home (I do, but my laptop is charging) but the code
+is someplace around line 650 of DLGCORE.CPP.
+
+>Use the resource editor to add an edit control and a spin control to the
+>dialog.  Modify the properties of the spin control such that "Auto Buddy"
+>and "Set Buddy Integer" are set.  Ensure the spin control follows the edit
+>control in the z-order so it will, in fact, be a "buddy" control.
+>
+>Use class wizard to create a control ddx variable for the edit control
+>(type CEdit, of course).  I'll call this variable "m_edtOne".  Use class
+>wizard to map EN_CHANGE for the edit control to the dialog; i.e.,
+>CDlg::OnChangeEdit1.  Modify the message handler as follows:
+
+So, the reason you're noticing these symptoms is because the order
+of events is out of your control.  What happens is that:
+
+  You call yourDialog.DoModal() to create the box.
+  MFC asks Windows to create the box from the template
+  MFC creates the template
+  The newly created up/down control sees that it is autobuddy, so:
+     it buddies with its edit control
+  The newly buddied control sees that it has the "set buddy integer" style, so:
+     it sets its buddy's integer
+  The edit control has been changed, so it fires the changed notification
+  Your CDlg::OnChangeEdit() function gets called
+
+Since your implementation of this function:
+
+>   void CDlg::OnChangeEdit1( ) {
+>      CString strText;
+>      m_edtOne.GetWindowText( strText );
+>   }
+
+tries to play with m_edtOne, which hasn't yet been initialized, you get
+the assertion.
+
+There's nothing MFC can do about this; Windows is behaving as designed,
+and MFC can't be modified to account for that behaviour without risking
+the demise of other applications that expect the control not to be subclassed
+(or the DDX variables to be stuffed) until after CDialog::OnInitDialog() is
+called.
+
+>The assertion itself is easy enough to avoid altogether by adding a class
+>variable, BOOL m_bInit, that gets set to FALSE in the contructor and TRUE
+>in OnInitDialog. 
+
+Right.
+
+> ... oddity ...
+
+I can't reproduce the problem you're having with not being able to repeat
+the problem after abort.  I'm using Windows 95 and a different version of
+Visual C++ and MFC, though.
+
+>While this is effective for avoiding the assertion, I would
+>rather understand what's really going on and what other alternatives I have
+>for eliminating the assertion. 
+
+You don't say what you're doing in your OnChangeEdit1() function, but if
+you really need this first change notification, you could call UpdateData(FALSE)
+if !m_bInitalized.  That is, something like:
+
+void CDlg::OnChangeEdit()
+{
+   if (!m_bInitialized)
+      UpdateData(FALSE);
+   CString strText;
+   m_edtOne.GetWindowText(strText);
+}
+
+so you can get your m_edtOne member initialized before you use it but after
+the edit control gets stuffed by its buddy.
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+I'm afraid I've become some sort of speed freak.
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+P. Senthil -- <A HREF="mailto:senthilp@geocities.com">senthilp@geocities.com</A>
+Thursday, January 02, 1997
+</B>
+Rick Esterling wrote:
+> Dan Kirby wrote:
+> 
+> > Basically, don't call UpdateData. If you need to know what the value
+> > is in the edit control at anytime before OnOK, you can call
+> > GetWindowText on the control.
+> 
+> Appreciate the recommendation, Dan, it helped streamline the design of my
+> application. The original problem, however, remains even though I'm no
+> longer calling UpdateData() anywhere in my project.  Let me start from
+> scratch so any newcomers to this conversation can join in.
+> 
+> VC 4.2b, Win95
+> Dialog-based app (AppWiz generated)
+> 
+> Use the resource editor to add an edit control and a spin control to the
+> dialog.  Modify the properties of the spin control such that "Auto Buddy"
+> and "Set Buddy Integer" are set.  Ensure the spin control follows the edit
+> control in the z-order so it will, in fact, be a "buddy" control.
+> 
+> Use class wizard to create a control ddx variable for the edit control
+> (type CEdit, of course).  I'll call this variable "m_edtOne".  Use class
+> wizard to map EN_CHANGE for the edit control to the dialog; i.e.,
+> CDlg::OnChangeEdit1.  Modify the message handler as follows:
+> 
+>    void CDlg::OnChangeEdit1( ) {
+>       CString strText;
+>       m_edtOne.GetWindowText( strText );
+>    }
+> 
+> Launch the app.  The code shown above will fire before the edit control has
+> been created.  This causes an assertion in wincore.cpp at line 1012.  That
+> code reads as follows:
+> 
+>    void CWnd::GetWindowText(CString& rString) const
+>    {
+>       ASSERT(::IsWindow(m_hWnd));  // Line 1012
+>       // etc.
+>    }
+> 
+> The order in which my dialog class' member methods are being called is as
+> follows:
+> 
+>    CDlg::CDlg
+>    CDlg::OnChangeEdit1
+>    CDlg::OnInitDialog
+>    CDlg::DoDataExchange
+> 
+> Clearing the UDS_SETBUDDYINT flag from the spin control makes this problem
+> go away; OnChangeEdit1 does not get called during creation as shown above.
+> 
+> One more oddity.  On the assertion messagebox that shows up to report this
+> problem, there are three buttons:  Abort, Retry, and Ignore.  If I click
+> Abort, my app closes after which I can run it over and over again without
+> ever seeing the assertion recurring until I reboot Win95 and run the app
+> again.  If, on the other hand, I press Ignore, the app continues but I'll
+> get the assertion everytime I start the app over (and will keep asserting
+> as long as I click Ignore everytime and not Abort).  I add this because if
+> you're trying to debug this problem and you hit abort on the assertion
+> messagebox, you won't see the assertion again until you reboot.
+> Alternatively, you can run the first instance of the application and simply
+> leave the assertion box on the screen.  Fire up another instance of the app
+> and it won't assert.  You can do this as many times as you want until you
+> dismiss the assertion messagebox from the first instance of the app, and
+> then the same rules outlined above are back in effect (if you press Abort,
+> no more problems for the duration of your Win95 session, if you press
+> ignore, problem keeps happening.)  That, at least, is what's happening
+> here.
+> 
+> The assertion itself is easy enough to avoid altogether by adding a class
+> variable, BOOL m_bInit, that gets set to FALSE in the contructor and TRUE
+> in OnInitDialog.  In OnChangeEdit1, check m_bInit == TRUE before calling
+> GetWindowText. While this is effective for avoiding the assertion, I would
+> rather understand what's really going on and what other alternatives I have
+> for eliminating the assertion.  If anyone has a better understanding of
+> this whole subject and the root cause of this particular problem, I'd
+> appreciate their enlightement.
+> 
+> Later,
+> Rick
+
+I did what you said and yes there was an assertion as you said. The
+calling of OnChangeEdit1 for the Edit control in the case of a buddy
+with Auto buddy set seems to be the design of Win 32, which MFC
+redirects to the control. But it appears that the problem is actually
+with MFC DDX/DDV framework.
+
+If the line 
+      m_edtOne.GetWindowText( strText );
+is replaced with
+      GetDlgItem(IDC_EDIT1)->GetWindowText(strText);
+
+then it works fine.
+
+The variable m_edtOne is associated with the edit control (valid m_hWnd)
+only when DoDataExchange is called. This occurs only after OnInitDialog
+is processed.
+
+So I guess it is a bug with MFC.
+
+PS: I've tried it with MSVC 4.0 only.
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Thursday, January 02, 1997
+</B>
+At 21:10 1/2/97 +0530, P. Senthil wrote:
+
+>The variable m_edtOne is associated with the edit control (valid m_hWnd)
+>only when DoDataExchange is called. This occurs only after OnInitDialog
+>is processed.
+
+>So I guess it is a bug with MFC.
+
+I'm afraid your guess is incorrect.
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+sunil Kumar -- <A HREF="mailto:suniln@geocities.com">suniln@geocities.com</A>
+Friday, January 03, 1997
+</B>
+Mike Blaszczak wrote:
+> There's nothing MFC can do about this; Windows is behaving as designed,
+
+MFC was designed long before Windows came up with this Buddy stuff. So,
+by way of design of MFC this Windows feature could not (could be for a
+variety of reasons) be incorporated in MFC. But telling that MFC can do
+nothing about this is going too far.
+
+> and MFC can't be modified to account for that behaviour without risking
+> the demise of other applications that expect the control not to be subclassed
+> (or the DDX variables to be stuffed) until after CDialog::OnInitDialog() is
+> called.
+
+I can't understand why applications would want the control to be
+subclassed ~only~ after OnInitDialog() is called. I don't think current
+applications would be affected if the control was actually subclassed
+before OnInitDialog.
+
+> You don't say what you're doing in your OnChangeEdit1() function, but if
+> you really need this first change notification, you could call UpdateData(FALSE)
+> if !m_bInitalized.  That is, something like:
+> 
+> void CDlg::OnChangeEdit()
+> {
+>    if (!m_bInitialized)
+>       UpdateData(FALSE);
+>    CString strText;
+>    m_edtOne.GetWindowText(strText);
+> }
+> 
+
+Is this good programming? What about the overhead of time?
+
+P. Senthil
+
+mail : senthilp@geocities.com
+www  : www.geocities.com/SiliconValley/Heights/6504
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Friday, January 03, 1997
+</B>
+At 19:46 1/3/97 +0530, sunil Kumar wrote:
+>Mike Blaszczak wrote:
+>> There's nothing MFC can do about this; Windows is behaving as designed,
+>
+>MFC was designed long before Windows came up with this Buddy stuff. So,
+>by way of design of MFC this Windows feature could not (could be for a
+>variety of reasons) be incorporated in MFC. But telling that MFC can do
+>nothing about this is going too far.
+
+Really?  What solution would you suggest?
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+I'm afraid I've become some sort of speed freak.
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Saturday, January 04, 1997
+</B>
+At 09:37 1/3/97 +0300, Alexander Grigoriev wrote:
+
+>It is dangerous to call UpdateData() here, because the EN_CHANGE
+>notification is sent _before_ OnInitDialog() is called, thus some class
+>data may not be properly initialized yet.
+
+The only data that won't be initialized is whatever you've decided to
+set up for yourself in your OnInitDialog() handler.  If you add this code
+to your OnChangeEdit(), you're doing so because you know you need it
+(as I said: 
+
+>> You don't say what you're doing in your OnChangeEdit1() function, but if
+>> you really need this first change notification, you could call
+>> UpdateData(FALSE) if !m_bInitalized.  
+
+).  CDialog itself is ready to be used by this time. If you need to
+do intialization in your OnInitDialog() that you'll depend on for your
+first call to DoDataExchange(), you're right--the UpdateData() call is
+better off not being made from OnChangeEdit(). 
+
+But I wouldn't categorize this as "dangerous"; it's no more dangerous
+than any other code you'll write yourself--you need to know the order
+in which functions are called and what do to in reponse to them so
+that you can handle dependencies you've created yourself.
+
+This is, though, why I say that it is inappropriate for MFC to change
+the order of calls: that _would_ be fatally dangerous. If MFC forced
+a call to DoDataExchange() before OnInitDialog(), many programs would
+break. (MFC would have to jump through some funny hoops to get the
+call to happen, anyway; both the EN_CHANGED notification and the
+WM_INITDIALOG messages are sent, and they are fired before MFC's
+call to CreateDialogIndirect() returns, so MFC would have to actually
+subclass the dialog in order to make the early OnInitDialog() call.)
+
+I don't see a reasonable way around that problem, and I don't think
+it would be a safe change, anyway, and thus I'm eager to hear back from
+Sunil Kumar (or was it actually P. Senthil?--the signature didn't match
+the message header) about why it's going "too far" to say that  MFC can't
+reasonably do something about the rare situation the original poster was
+experiencing.
+
+Letting the developer decide to handle things in their own special way
+is fine, but for me to change the way MFC works in this area would
+simply be irresponsible.
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+I'm afraid I've become some sort of speed freak.
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+P. Senthil -- <A HREF="mailto:senthilp@geocities.com">senthilp@geocities.com</A>
+Sunday, January 05, 1997
+</B>
+Mike Blaszczak wrote:
+> 
+> This is, though, why I say that it is inappropriate for MFC to change
+> the order of calls: that _would_ be fatally dangerous. If MFC forced
+> a call to DoDataExchange() before OnInitDialog(), many programs would
+> break. (MFC would have to jump through some funny hoops to get the
+> call to happen, anyway; both the EN_CHANGED notification and the
+> WM_INITDIALOG messages are sent, and they are fired before MFC's
+> call to CreateDialogIndirect() returns, so MFC would have to actually
+> subclass the dialog in order to make the early OnInitDialog() call.)
+> 
+> I don't see a reasonable way around that problem, and I don't think
+> it would be a safe change, anyway, and thus I'm eager to hear back from
+> Sunil Kumar (or was it actually P. Senthil?--the signature didn't match
+> the message header) about why it's going "too far" to say that  MFC can't
+> reasonably do something about the rare situation the original poster was
+> experiencing.
+> 
+I give up. I can't see of any possible workaround in the MFC source. I
+was bothered about subclassing the edit control with the autobuddy
+property set only (which happens in the DoDataExchange) and not the
+entire OnInitDialog process. This can't be done the first time the
+OnChangeEdit is called. I guess "Letting the developer decide to handle
+things in their own special way is fine".
+
+PS: It was me. I sent it from my friends machine.
+P. Senthil
+-----------------------------------------------------------------------
+1, 7th Avenue (West),
+7th Main Road,
+Dhandeeswaram Nagar,
+Velachery,
+MADRAS - 600 042.
+
+Mail:  senthilp@geocities.com
+
+Homepage: www.geocities.com/SiliconValley/Heights/6504
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

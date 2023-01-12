@@ -1,0 +1,275 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+[Q] How do I reduced screen flicker in this small app, How n
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Alain Barrette -- <A HREF="mailto:abarrette@sth1.maska.net">abarrette@sth1.maska.net</A>
+Tuesday, January 09, 1996
+</B>
+Using Msvc++2.0 & Mfc3.0 under w95 I generated using Appwizard a Dlg
+based application.
+
+In the application I set up a timer of 1 sec on which I call OnPaint()
+And in Onpaint I put the following code.
+
+CMyDlg::OnPaint() {	
+
+CTime TmeNow 	= CTime::GetCurrentTime();
+CString TxtAff 	= TmeNow.Format("%H:%M:%S");
+CRect RectAff;	GetClientRect(RectAff);
+
+CPaintDC dc(this);
+
+dc.SetTextAlign(TA_BASELINE|TA_CENTER);
+dc.SetBkMode(OPAQUE /*TRANSPARENT*/);
+dc.TextOut(	RectAff.Width() / 2, 	RectAff.Height() / 2, 
+   TxtAff, 		TxtAff.GetLength());
+InvalidateRect(RectAff,FALSE);
+}
+
+However, as simple as the code may sound, there seem to be 2 problems
+with this approach. 
+
+First, there is lot of screen flicking on the redraw of the string via
+InvalidateRect(). Yup, the screen refresh is not clean at all. 
+
+Since I am a complete newbie in mfc prgming (but not to prgramming in
+general) I can't thing of what to do next. So here I am, What should
+be done in order to reduce the flicker ? There should be a better way
+to do it...
+
+I get out and buy the microsoft press book for mfc 3.0, and take a 
+look at the member fct() of CDC, but woa... I am lost in the jungle 
+here...
+
+Second, my small app seem to take 100% cpu. :) And I can't find out
+why. While system monitor is running, I can see that the processor
+utilization jump to 100 when I start my app...  Any idea as why do I
+get this behavior, and what is needed to correct this ? It seem to me
+that the app is not doing much in each call to the onpaint(), so
+what's causing this ?
+
+Thanks in advance...
+       ,,,         
+      (o o)      
+--oOOo-(_)-oOOo--abarrette@sib.qc.ca
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:Don.Irvine@net-tel.co.uk">Don.Irvine@net-tel.co.uk</A>
+Thursday, January 11, 1996
+</B>
+[Mini-digest: 6 responses]
+
+> First, there is lot of screen flicking on the redraw of the string via
+> InvalidateRect(). Yup, the screen refresh is not clean at all. 
+
+Do all your drawing to an off screen DC, then BitBlt the results to the
+screen DC.
+
+There is a good article describing this on the MSDN under Technical
+Articles/Windows Articles/GDI and OpenGL Articles/Flicker Free Displays using
+an Off-screen DC.
+
+
+Don Irvine
+
+-----From: "David W. Gillett" <DGILLETT@expertedge.com>
+
+> InvalidateRect(RectAff,FALSE);
+> 
+> First, there is lot of screen flicking on the redraw of the string via
+> InvalidateRect(). Yup, the screen refresh is not clean at all. 
+> 
+> Second, my small app seem to take 100% cpu. :) And I can't find out
+> why. While system monitor is running, I can see that the processor
+> utilization jump to 100 when I start my app...  Any idea as why do I
+> get this behavior, and what is needed to correct this ? It seem to me
+> that the app is not doing much in each call to the onpaint(), so
+> what's causing this ?
+
+  BeginPaint(), called by the framework to set up the DC for your 
+OnPaint method, validates the entire client area.  When you then 
+InvalidateRect, you immediately give your app a new invalid region, 
+which will cause the system to send you a WM_PAINT as soon as it has 
+nothing else to do.  And when each time you handle a WM_PAINT, you 
+generate one, you wind up with an app that is busy painting whenever 
+there's a spare cycle.
+
+  Try calling InvalidateRect from your timer callback or WM_TIMER 
+handler, and let *that* trigger the WM_PAINT, rather than calling 
+OnPaint() yourself.  If other processing is delaying updates of the 
+displayed time -- probably not, since you're surprised to be using 
+100% of the CPU -- then follow this InvalidateRect with a call to 
+UpdateWindow ("send WM_PAINT right NOW").
+
+Dave
+
+-----From: darius@world.std.com (Darius Thabit)
+
+> In the application I set up a timer of 1 sec on which I call OnPaint()
+> And in Onpaint I put the following code.
+> 
+> CMyDlg::OnPaint() {	
+> 
+> CTime TmeNow 	= CTime::GetCurrentTime();
+> CString TxtAff 	= TmeNow.Format("%H:%M:%S");
+> CRect RectAff;	GetClientRect(RectAff);
+> 
+> CPaintDC dc(this);
+> 
+> dc.SetTextAlign(TA_BASELINE|TA_CENTER);
+> dc.SetBkMode(OPAQUE /*TRANSPARENT*/);
+> dc.TextOut(	RectAff.Width() / 2, 	RectAff.Height() / 2, 
+>    TxtAff, 		TxtAff.GetLength());
+> InvalidateRect(RectAff,FALSE);
+> }
+
+   I also have problems with flicker in my app using a timer to update a 
+time value.  But I think first of all I don't think you want to call 
+Invalidate Rect from inside OnPaint, because that will cause OnPaint to be 
+called again - which will call InvalidaeRect again, and so on ... :-)  This 
+may explain your 100% cpu usage and part of your flicker.  You might try 
+calling InvalidateRect from OnTimer; I use an edit control, and I'm just 
+calling pEditCtrl->SetWindowText(formatted_time) from OnTimer.
+
+-----From: David Stidolph <stidolph@magnet.com>
+
+When you Invalidate a rectangle you are asking the system to cause a =
+WM_PAINT message to be sent (and thus call OnPaint).  Get rid of your =
+InvalidateRect call.  You might also want to override the =
+OnEraseBackground message (or whatever it is called).  That clears the =
+background before you begin painting it - thus the flicker.
+
+-----From: Brad Wilson <bradw@netnet.net>
+
+>> In the application I set up a timer of 1 sec on which I call OnPaint()
+
+You shouldn't call OnPaint() directly to make a paint happen.  You
+should instead call InvalidateRect() from OnTimer() to cause the
+OnPaint() to happen.
+
+>> And in Onpaint I put the following code.
+
+>> InvalidateRect(RectAff,FALSE);
+
+InvalidateRect() causes a repaint.  In your paint function you call
+InvalidateRecT().  This would probably cause circular paint
+messages to keep showing up all the time (although I'm not sure of
+the effect of the implicit EndPaint(), which may end up validating
+the rectangle).
+
+So, you should
+
+   1. Call InvalidateRect() from OnTimer() (don't call OnPaint())
+   2. Don't call InvalidateRect() from OnPaint()
+
+>> Second, my small app seem to take 100% cpu. :)
+
+That's the circular paint thing I mentioned above.  The system is under
+the impression that your screen is never painted, so your app eats the
+system for lunch constantly repainting.
+
+I would recommend that you pick up some books on beginning Windows
+programming (even if they're not related to MFC).  Such as:
+
+   Programming Windows
+   Charles Petzold
+   Microsoft Press
+   ISBN 1-55615-264-7
+
+The last version I saw was for Windows 3.1, but the techniques you
+learn can be easily applied to Win32.  He is supposed to have a book
+out on Win95, but every time I check the date keeps getting pushed
+back for the book.  :-(
+
+There are also some great Microsoft Press books available on using
+MFC for Windows programming.  No definitive titles come to my
+faltering mind :-) ... but I know Mike B. wrote one (which I have
+not yet read).
+
+Good luck!
+Brad
+
+--
+class CBradWilson : public CWorldWatchProgrammingTeam {
+  public:
+    CString GetInetAddr()   { return CString("bradw@exptech.com");      }
+    CString GetPhone()      { return CString("+1 (810) 620-9803");      }
+    CString GetURL()        { return CString("http://www.exptech.com"); }
+    CString GetDisclaimer() { return CString("All I say is fact :-p");  }
+};
+
+"Money is the living power that dies without its root. Money will not serve
+ the mind that cannot match it. Is this the reason why you call it evil?"
+
+-----From: "Aravind Balakrishnan(abalakri@us.oracle.com)" <ABALAKRI@us.oracle.com>
+
+The InvalidateRect() in your OnPaint() handler is the culprit!! When you use 
+the CPaintDC() in OnPaint(), it ensures that all invalidated areas are 
+validated.  You create a brand new invalidated region by callind 
+InvalidateRect() in your OnPaint(), which causes a WM_PAINT, and hence your 
+app is getting a whole lotta WM_PAINTS! 
+ 
+One way of doing what you are doing: 
+ 
+Move the InvalidateRect() from OnPaint() to OnTimer().  
+ 
+Now, WM_PAINT is called once every second, which is not so bad.. 
+ 
+Hope this helps! 
+ 
+Cheers,   
+Aravind.   
+===   
+ 
+Aravind Balakrishnan  
+Systems Management Products, Oracle Corp. 
+(415)506-0432 
+ 
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

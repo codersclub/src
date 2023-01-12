@@ -1,0 +1,500 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Owner Drawn CListCtrl derived class in a CListView
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Colin Angus Mackay -- <A HREF="mailto:colin.angus.mackay@dial.pipex.com">colin.angus.mackay@dial.pipex.com</A>
+Friday, August 09, 1996
+</B>
+Environment: Win95 NT 3.51 VC++ 4.0
+
+ Hi,
+
+I want to create a derived CListCtrl class and put it into a CListView 
+derived class that I have. However I am not sure how this can be achieved.
+
+I have looked at my problem and the only thing it appears I can't do, that 
+I want to do, in the CListView derived class is overload DrawItems so that 
+I can highlight the entire row, not just the first column.
+
+Any help would be appreciated,
+
+Thanks,
+Colin.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Alix -- <A HREF="mailto:AARGUELL@sys1.com">AARGUELL@sys1.com</A>
+Monday, August 12, 1996
+</B>
+[Mini-digest: 2 responses]
+[Moderator's note: Sorry folks.  I got busy and didn't read this
+carefully.]
+
+Microsoft has an example that implements highlighting the entire row.   
+ You can get it at
+
+FTP://FTP.MICROSOFT.COM/SOFTLIB/MSLFILES
+The file name is ODLISTVW.EXE
+
+Good Luck!
+
+Alix Arguelles
+AARGUELL@SYS1.COM
+
+ ----------
+From:  owner-mfc-l[SMTP:owner-mfc-l@netcom.com]
+Sent:  Friday, August 09, 1996 11:54 PM
+To:  'MFC Mailing List'
+Subject:  Owner Drawn CListCtrl derived class in a CListView
+
+Environment: Win95 NT 3.51 VC++ 4.0
+
+ Hi,
+
+I want to create a derived CListCtrl class and put it into a CListView
+derived class that I have. However I am not sure how this can be   
+achieved.
+
+I have looked at my problem and the only thing it appears I can't do,   
+that
+I want to do, in the CListView derived class is overload DrawItems so   
+that
+I can highlight the entire row, not just the first column.
+
+Any help would be appreciated,
+
+Thanks,
+Colin.
+-----From: glachape@spherenet.com
+
+You will find how to select the entire row in the July MSDN CD-ROM (Visual
+C++ knowledge base). This is exactly what you are searching for...
+
+Ghis
+////////////////////////////////////////////////////
+Ghislain Lachapelle         (glachape@spherenet.com)
+          .                            .                      .
+  .                  .             -)------+====+       .
+                           -)----====    ,'   ,'   .                 .
+              .                  `.  `.,;___,'                .
+                                   `, |____l_\
+                    _,.....------c==]""______ |,,,,,,.....____ _
+    .      .       "-:______________  |____l_|]'''''''''''       .     .
+                                  ,'"",'.   `.
+         .                 -)-----====   `.   `.              LS
+                     .            -)-------+====+       .            .
+             .                               .
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Sajith Kumar -- <A HREF="mailto:sajith@wallop.com">sajith@wallop.com</A>
+Wednesday, August 14, 1996
+</B>
+[Mini-digest: 2 responses]
+
+I implemeted the same sort of customized CListCtrl to highlight
+selection line. Basically to override the DrawItem method and so some
+thing like this. Since the CListCtrl doent have any member/method to
+givve the number of columns int he list control, you have to maintain a
+column count and to manage it you have to overide all InsertColumn and
+DeleteColmun methods.  Try this.
+
+void CNBIListCtrl::DrawItem( LPDRAWITEMSTRUCT lpDrawItemStruct )
+{
+	if (m_on_item == FALSE)
+		return;
+
+	int i = lpDrawItemStruct->itemID;
+
+	// get all rectangles
+	CRect item_rect,label_rect,image_rect,full_rect;
+	
+	GetItemRect(i, item_rect,LVIR_BOUNDS);
+	GetItemRect(i,label_rect,LVIR_LABEL);
+	GetItemRect(i,image_rect,LVIR_ICON);
+
+	full_rect = item_rect; // save
+	
+
+	// starting point for the image
+	CPoint image_point(image_rect.left,image_rect.top);
+
+	// format the dc 
+	CDC* cdc = CDC::FromHandle(lpDrawItemStruct->hDC);
+	int	sysDC	= cdc->SaveDC();
+	
+	// get the imagelist if any
+	CImageList*p_image_list = GetImageList(LVSIL_SMALL);
+	
+	int image_index;
+	if(p_image_list){
+		// get the image index
+
+		LV_ITEM		lvitem;
+		/// Set the first column
+		lvitem.mask = LVIF_IMAGE;
+		lvitem.iItem = i;
+		lvitem.iSubItem = 0;
+
+		GetItem(&lvitem);
+		image_index = lvitem.iImage;
+		// get the bitmap details
+	}
+
+	COLORREF back_color,for_color;
+	UINT image_style;
+
+	// find out the fore ground, back ground colors and image draw mode
+	if(lpDrawItemStruct->itemState&ODS_SELECTED){
+		// Selected
+		back_color =  ::GetSysColor(COLOR_HIGHLIGHT);
+		for_color =  ::GetSysColor(COLOR_HIGHLIGHTTEXT);
+		image_style = ILD_BLEND25;
+	}
+	else
+	{
+		back_color= ::GetSysColor(COLOR_WINDOW);
+		for_color =  ::GetSysColor(COLOR_WINDOWTEXT);
+		image_style = ILD_NORMAL;
+	}
+	
+	CBrush brush;
+		
+	brush.CreateSolidBrush(back_color);
+
+	cdc->FillRect(item_rect,&brush);
+	cdc->SetBkColor(back_color);
+	cdc->SetTextColor(for_color);
+
+	if(p_image_list)
+		p_image_list->Draw(cdc,image_index,image_point,image_style);
+
+		
+	// out the first colum
+	
+
+	if(m_column_count) {
+	
+		// write th first colume sperate
+		CString text = GetItemText(i,0);
+		cdc->ExtTextOut(label_rect.left,label_rect.top,ETO_CLIPPED,&label_rect,
+text,NULL);
+
+		CRect rect = item_rect;
+		int left = item_rect.left+GetColumnWidth(0);
+
+		for(int j=1;j<m_column_count;j++){
+
+			rect = item_rect;
+			rect.left = left;
+			rect.right = rect.left+GetColumnWidth(j);
+			left +=GetColumnWidth(j);
+
+			text = GetItemText(i,j);
+		
+			cdc->ExtTextOut(rect.left,rect.top,ETO_CLIPPED,&rect,GetItemText(i,j),
+NULL);
+		}
+	}
+
+	if(lpDrawItemStruct->itemState&ODS_FOCUS)
+		cdc->DrawFocusRect(full_rect);
+
+	cdc->RestoreDC(sysDC);	
+
+}
+
+
+Sajith Kumar
+sajith@wallop.com
+1155 Triton Drive, Suite E
+Foster City, CA 94404
+(415) 341 1177x227
+
+>----------
+>From: 	Arguelles, Alix[SMTP:AARGUELL@sys1.com]
+>Sent: 	Monday, August 12, 1996 10:44 AM
+>To: 	'MFC'
+>Subject: 	RE: Owner Drawn CListCtrl derived class in a CListView
+>
+>[Mini-digest: 2 responses]
+>[Moderator's note: Sorry folks.  I got busy and didn't read this
+>carefully.]
+>
+>Microsoft has an example that implements highlighting the entire row.  
+>
+> You can get it at
+>
+>FTP://FTP.MICROSOFT.COM/SOFTLIB/MSLFILES
+>The file name is ODLISTVW.EXE
+>
+>Good Luck!
+>
+>Alix Arguelles
+>AARGUELL@SYS1.COM
+>
+> ----------
+>From:  owner-mfc-l[SMTP:owner-mfc-l@netcom.com]
+>Sent:  Friday, August 09, 1996 11:54 PM
+>To:  'MFC Mailing List'
+>Subject:  Owner Drawn CListCtrl derived class in a CListView
+>
+>Environment: Win95 NT 3.51 VC++ 4.0
+>
+> Hi,
+>
+>I want to create a derived CListCtrl class and put it into a CListView
+>derived class that I have. However I am not sure how this can be   
+>achieved.
+>
+>I have looked at my problem and the only thing it appears I can't do,  
+>
+>that
+>I want to do, in the CListView derived class is overload DrawItems so  
+>
+>that
+>I can highlight the entire row, not just the first column.
+>
+>Any help would be appreciated,
+>
+>Thanks,
+>Colin.
+>-----From: glachape@spherenet.com
+>
+>You will find how to select the entire row in the July MSDN CD-ROM
+>(Visual
+>C++ knowledge base). This is exactly what you are searching for...
+>
+>Ghis
+>////////////////////////////////////////////////////
+>Ghislain Lachapelle         (glachape@spherenet.com)
+>          .                            .                      .
+>  .                  .             -)------+====+       .
+>                           -)----====    ,'   ,'   .                 .
+>              .                  `.  `.,;___,'                .
+>                                   `, |____l_\
+>                    _,.....------c==]""______ |,,,,,,.....____ _
+>    .      .       "-:______________  |____l_|]'''''''''''       .    
+>.
+>                                  ,'"",'.   `.
+>         .                 -)-----====   `.   `.              LS
+>                     .            -)-------+====+       .            .
+>             .                               .
+>
+>
+-----From: Sajith Kumar <sajith@wallop.com>
+
+I implemeted the same sort of customized CListCtrl to highlight
+selection line. Basically to override the DrawItem method and so some
+thing like this. Since the CListCtrl doent have any member/method to
+givve the number of columns int he list control, you have to maintain a
+column count and to manage it you have to overide all InsertColumn and
+DeleteColmun methods.  Try this.
+
+void CNBIListCtrl::DrawItem( LPDRAWITEMSTRUCT lpDrawItemStruct )
+{
+	if (m_on_item == FALSE)
+		return;
+
+	int i = lpDrawItemStruct->itemID;
+
+	// get all rectangles
+	CRect item_rect,label_rect,image_rect,full_rect;
+	
+	GetItemRect(i, item_rect,LVIR_BOUNDS);
+	GetItemRect(i,label_rect,LVIR_LABEL);
+	GetItemRect(i,image_rect,LVIR_ICON);
+
+	full_rect = item_rect; // save
+	
+
+	// starting point for the image
+	CPoint image_point(image_rect.left,image_rect.top);
+
+	// format the dc 
+	CDC* cdc = CDC::FromHandle(lpDrawItemStruct->hDC);
+	int	sysDC	= cdc->SaveDC();
+	
+	// get the imagelist if any
+	CImageList*p_image_list = GetImageList(LVSIL_SMALL);
+	
+	int image_index;
+	if(p_image_list){
+		// get the image index
+
+		LV_ITEM		lvitem;
+		/// Set the first column
+		lvitem.mask = LVIF_IMAGE;
+		lvitem.iItem = i;
+		lvitem.iSubItem = 0;
+
+		GetItem(&lvitem);
+		image_index = lvitem.iImage;
+		// get the bitmap details
+	}
+
+	COLORREF back_color,for_color;
+	UINT image_style;
+
+	// find out the fore ground, back ground colors and image draw mode
+	if(lpDrawItemStruct->itemState&ODS_SELECTED){
+		// Selected
+		back_color =  ::GetSysColor(COLOR_HIGHLIGHT);
+		for_color =  ::GetSysColor(COLOR_HIGHLIGHTTEXT);
+		image_style = ILD_BLEND25;
+	}
+	else
+	{
+		back_color= ::GetSysColor(COLOR_WINDOW);
+		for_color =  ::GetSysColor(COLOR_WINDOWTEXT);
+		image_style = ILD_NORMAL;
+	}
+	
+	CBrush brush;
+		
+	brush.CreateSolidBrush(back_color);
+
+	cdc->FillRect(item_rect,&brush);
+	cdc->SetBkColor(back_color);
+	cdc->SetTextColor(for_color);
+
+	if(p_image_list)
+		p_image_list->Draw(cdc,image_index,image_point,image_style);
+
+		
+	// out the first colum
+	
+
+	if(m_column_count) {
+	
+		// write th first colume sperate
+		CString text = GetItemText(i,0);
+		cdc->ExtTextOut(label_rect.left,label_rect.top,ETO_CLIPPED,&label_rect,
+text,NULL);
+
+		CRect rect = item_rect;
+		int left = item_rect.left+GetColumnWidth(0);
+
+		for(int j=1;j<m_column_count;j++){
+
+			rect = item_rect;
+			rect.left = left;
+			rect.right = rect.left+GetColumnWidth(j);
+			left +=GetColumnWidth(j);
+
+			text = GetItemText(i,j);
+		
+			cdc->ExtTextOut(rect.left,rect.top,ETO_CLIPPED,&rect,GetItemText(i,j),
+NULL);
+		}
+	}
+
+	if(lpDrawItemStruct->itemState&ODS_FOCUS)
+		cdc->DrawFocusRect(full_rect);
+
+	cdc->RestoreDC(sysDC);	
+
+}
+
+
+Sajith Kumar
+sajith@wallop.com
+1155 Triton Drive, Suite E
+Foster City, CA 94404
+(415) 341 1177x227
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Friday, August 16, 1996
+</B>
+At 09:02 AM 8/14/96 -0700, you wrote:
+
+>Since the CListCtrl doent have any member/method to
+>givve the number of columns int he list control,
+
+It doesn't have one only because the list control doesn't directly
+offer one.
+
+>you have to maintain a
+>column count and to manage it you have to overide all InsertColumn and
+>DeleteColmun methods. 
+
+Actually you don't need to do that.  If the list control has columns,
+you know the list control is in report mode.  If the list control is
+in report mode, you can get the header control by calling GetDlgItem(0)
+on the list control.  The header control will happily tell you the
+number of columns it has.
+
+That all might look something like:
+
+        CListCtrl* pLister = (CListCtrl*) GetDlgItem(IDC_YOURLIST);
+        ASSERT(pLister != NULL);
+        CHeaderCtrl* pHeader = pLister->GetDlgItem(0);
+        ASSERT(pHeader != NULL);
+        int nColumnCount = pHeader->GetItemCount();
+
+> you have to maintain a column count and to manage it
+> you have to overide all InsertColumn and DeleteColmun methods.
+
+Goodness, no.  You can just use the above code to get the count wherever
+you need it and avoid managing your own count.
+
+.B ekiM
+http://www.nwlink.com/~mikeblas/
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

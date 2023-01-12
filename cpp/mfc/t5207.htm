@@ -1,0 +1,283 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Selecting all text when an edit control gets focus
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Niels Ull Jacobsen -- <A HREF="mailto:nuj@kruger.dk">nuj@kruger.dk</A>
+Thursday, May 16, 1996
+</B>
+MSVC 4.0, MFC 4.1, Win95
+
+We have a multi-line edit control in a CFormView. We would like that
+whenever the control receives focus, all current text is selected so that
+it will be overwritten whenever something new is typed.
+Like the "search" toolbar field in Visual C++.
+
+We added a handler for EN_SETFOCUS and tried doing a SetSel(0,-1)
+there. This worked fine when the user tabbed to the edit field, but
+when he clicked on it, the focus wouldn't get set properly.
+After some work with Spy++, we found out that the EN_SETFOCUS
+was sent when the edit control recieved a WM_LBUTTONDOWN, but
+the WM_LBUTTONUP would change the (end of) the selection,
+so that if the user clicked in the middle of the text, only=20
+the first half of the text would be selected.
+
+We tried posting the EM_SETSEL, hoping that it wouldn't appear=20
+until after the WM_LBUTTONUP. No luck - the user can wait a long=20
+time before letting go of that button.
+
+The only solution we could think of was to subclass the edit control,
+intercepting WM_LBUTTONDOWN to set a flag if the control didn't currently=
+=20
+have focus and selecting all text after a WM_LBUTTONUP, if the flag was s=
+et.
+This is still not good enough if the user moves the mouse after pressing =
+the
+button down, though - we won't see the WM_LBUTTONUP.=20
+
+Before we continue down this road, I would like to know if anybody else
+has implemented this? Or have any tips on how to do it correctly?
+
+I don't know if it's significant that the control is really a=20
+"single-line" multi-line control (in order to use ES_RIGHT to
+get right-aligned text)?
+
+Niels Ull Jacobsen, Kr=FCger A/S (nuj@kruger.dk)
+Everything stated herein is THE OFFICIAL POLICY of the entire Kruger grou=
+p
+and should be taken as legally binding in every respect. Pigs will grow
+wings and fly.
+
+
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:MICHAEL@datatree.com">MICHAEL@datatree.com</A>
+Monday, May 20, 1996
+</B>
+>MSVC 4.0, MFC 4.1, Win95
+>
+>Niels Ull Jacobsen, Kr=FCger A/S (nuj@kruger.dk) wrote...
+>
+>We have a multi-line edit control in a CFormView. We would like that
+>whenever the control receives focus, all current text is selected so that
+>it will be overwritten whenever something new is typed.
+>Like the "search" toolbar field in Visual C++.
+
+Michael says...
+
+I  subclassed a single-line edit control to achieve the same goal.
+The key was adding DLGC_HASSETSEL to my OnGetDlgCode()
+override.
+
+Here is how I subclassed a single line
+edit control:
+
+BOOL CMyDialog::OnInitDialog()=20
+{
+    m_cpyEdt.SubclassDlgItem(IDC_COPIES, this);
+
+    // Update from member variables to controls
+    CDialog::OnInitDialog();
+
+    return TRUE;
+}
+
+
+////////////////////////////////////////////////////
+// CCPYEdt Subclass for trapping tab and enter keys=20
+
+CCPYEdt::CCPYEdt()
+{
+}
+
+BEGIN_MESSAGE_MAP(CCPYEdt, CEdit)
+    //{{AFX_MSG_MAP(CCPYEdt)
+    ON_WM_GETDLGCODE()
+    ON_WM_KEYDOWN()
+    //}}AFX_MSG_MAP
+END_MESSAGE_MAP()
+
+////////////////////////////////////////////////////////////////////////////=
+/
+// CCPYEdt message handlers
+
+UINT CCPYEdt::OnGetDlgCode()=20
+{
+    return DLGC_WANTALLKEYS | DLGC_HASSETSEL;
+}
+
+void CCPYEdt::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)=20
+{
+    if (nChar =3D=3D VK_TAB && GetKeyState(VK_SHIFT) & KF_UP)
+    {
+        // Process Shift+Tab keys
+        MessageBeep(0);            //  Do nothing  - sample  code
+    }
+    else if (nChar =3D=3D VK_RETURN)
+    {      =20
+        // Process Enter key
+        MessageBeep(0);            //  Do nothing  - sample  code
+    }
+    else if (nChar =3D=3D VK_TAB)
+    {
+        // Process Tab key
+        MessageBeep(0);            //  Do nothing  - sample  code
+    }       =20
+   =20
+    CEdit::OnKeyDown(nChar, nRepCnt, nFlags);
+}
+------------------------------
+Michael L. Thal
+Data Tree Corporation
+voice: (619) 231-3300
+fax:   (619) 231-3301
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Munene Kiruja -- <A HREF="mailto:mun@mordor.com">mun@mordor.com</A>
+Sunday, May 19, 1996
+</B>
+[Mini-digest: 3 responses]
+
+Niels Ull Jacobsen wrote:
+<snip> 
+> We added a handler for EN_SETFOCUS and tried doing a SetSel(0,-1)
+> there. This worked fine when the user tabbed to the edit field, but
+> when he clicked on it, the focus wouldn't get set properly.
+> After some work with Spy++, we found out that the EN_SETFOCUS<snip>
+
+my general solution to this problem is to handle OnMouseActivate message.
+Look it up under help. Hope it helps, I just saw a pig fly by.
+-----From: "David W. Gillett" <DGILLETT@expertedge.com>
+
+> I  subclassed a single-line edit control to achieve the same goal.
+> The key was adding DLGC_HASSETSEL to my OnGetDlgCode() override.
+
+  I'm not 100% positive, but my impression was that DLGC_HASSETSEL is 
+a default for edit controls -- that it was necessary to add it only 
+because overriding OnGetDlgCode() to return only DLGC_WANTALLKEYS had 
+the side effect of turning off this default.  If Niels is not already 
+overriding this method, I don't think adding this will help him -- if 
+he is, then that may be the problem and this will solve it.
+
+Dave
+
+-----From: Niels Ull Jacobsen <nuj@kruger.dk>
+
+Currently I'm not overriding the WM_GETDLGCODE handling. According to the=
+ docs,
+an edit control by default return  DLGC_WANTCHARS | DLGC_HASSETSEL |
+DLGC_WANTARROWS. Multiline edit controls also return DLGC_WANTALLKEYS.=20
+>
+>Here is how I subclassed a single line
+>edit control:
+
+[...]=20
+Code with overridden WM_GETDLGCODE and WM_KEYDOWN handlers removed.
+
+I haven't tried this yet, but I don't really see how it will solve my pro=
+blem.
+My problem has nothing to do with key processing. In fact, if the user on=
+ly
+uses the keys, everything works fine.
+But when the edit control gains focus due to a mouse click, I can't just =
+do
+a SetSel(0,-1) in my OnSetFocus, as the WM_LBUTTONUP will change the sele=
+ction.
+
+If anyone has a solution, I'd love to hear about it.=20
+
+Niels Ull Jacobsen, Kr=FCger A/S (nuj@kruger.dk)
+Everything stated herein is THE OFFICIAL POLICY of the entire Kruger grou=
+p
+and should be taken as legally binding in every respect. Pigs will grow
+wings and fly.
+
+
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+David W. Gillett -- <A HREF="mailto:DGILLETT@expertedge.com">DGILLETT@expertedge.com</A>
+Thursday, May 23, 1996
+</B>
+[Mini-digest: 2 responses]
+
+> But when the edit control gains focus due to a mouse click, I
+> can't just do a SetSel(0,-1) in my OnSetFocus, as the WM_LBUTTONUP
+> will change the selection.
+
+  How about this:
+
+  Associate a flag with the control.  Set it TRUE in WM_GETFOCUS, and 
+FALSE in WM_LBUTTONDOWN.  In WM_LBUTTONUP, pass the message along to 
+the base class, but if the flag is set then reset the selection 
+before returning (and, if you want, clear the flag).
+
+  You *might* see a brief flash, if somebody calls UpdateWindow 
+inside the base class handling of WM_LBUTTONUP, but I don't think 
+it's very likely.  You might need to post the EM_SETSEL rather than 
+send it, but again I wouldn't expect so.  [Or you could avoid both of 
+these by checking the flag in a handler for EM_SETSEL, forcing it to 
+select all if the flag is set.  But that makes it harder to ensure 
+that the flag gets reset properly, since this message might not only 
+come from the WM_LBUTTONUP handler.]
+
+Dave
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

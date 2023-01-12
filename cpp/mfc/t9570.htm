@@ -1,0 +1,219 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Handling resizing of embedded OLE object.
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Karl Krasnowsky -- <A HREF="mailto:KKrasnow@excell.com">KKrasnow@excell.com</A>
+Wednesday, February 12, 1997
+</B>
+Environment: VC 4.1, NT 4.0
+
+Hello,
+Using the sample OClient as the base application, I'm attempting to add
+COleObjectItem resizing support which will check for the
+OLEMISC_RECOMPOSEONRESIZE status bit on the object and take the
+appropriate action if it is set, but am having absolutely no luck in
+getting this to work. If you're familiar with this sample, there is a
+Move() method in the class CRectItem which I'm assuming would make most
+sense implementing the necessary code to handle this condition. All
+examples I've found are raw OLE and not MFC Framework bound, so it's not
+very clear on what or where modifications are necessary.
+
+Also, in the same vein, I'm looking for some information on implementing
+schemes for enhancing object server performance (from the container
+side) by manipulating the startup an shutdown events. The object server
+that I'm working with is huge and each time the application is started
+to service an object the container can often experience waits of up to
+20 seconds while the server initiates itself, a very expensive process.
+At the same time, I also want to be careful not to load too many of
+these servers and hog memory so I'm thinking that I might want to
+maintain a limited list of running servers that would free themselves if
+some magical limit is reached.
+
+I would appreciate any information.
+Thank you,
+Karl.
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Karl Krasnowsky -- <A HREF="mailto:KKrasnow@excell.com">KKrasnow@excell.com</A>
+Friday, February 14, 1997
+</B>
+[Mini-digest: 2 responses]
+
+Well, I've worked out the first section of my question myself, and of
+course it was pretty simple.
+It was simply a matter of adding a few lines of code:
+
+    if ( !IsInPlaceActive() && ( dwStatus & OLEMISC_RECOMPOSEONRESIZE ))
+    {
+        // if the object isn't running, start the object and remember.
+        if (!IsRunning())
+        {
+            Run();
+            fShutdown = TRUE;
+        }
+
+        // Map from Document Coordinates to HIMETRIC
+   	  CSize sizeNew(MulDiv(rc.Width(),254, 10), - MulDiv(rc.Height(),
+254,10));
+
+        // Handle False conditions.  Just scale.
+        hRet = m_lpObject->SetExtent(GetDrawAspect(),&sizeNew);
+
+        // go back to the loaded state only if the object was in the
+        // loaded state upon entry to this function.
+        if (fShutdown)                    
+            Close(OLECLOSE_SAVEIFDIRTY);
+	
+in the Move() method of the CEditRectItem class. The mapping from
+document to HIMETRIC coordinates was fouling me up. Another question
+that came up was why the member function SetExtent() for COleClientItem
+returns a void? Are all servers expected to not return anything other
+then S_OK under all conditions? This made it necessary for me to call
+the SetExtent method from the base m_lpObject member in order to trap
+error conditions. Is this unnecessary? 
+
+
+>----------
+>From: 	Karl Krasnowsky
+>Sent: 	Wednesday, February 12, 1997 9:27 PM
+>To: 	'MFC List'
+>Subject: 	Handling resizing of embedded OLE object.
+>
+>Environment: VC 4.1, NT 4.0
+>
+>Hello,
+>Using the sample OClient as the base application, I'm attempting to add
+>COleObjectItem resizing support which will check for the
+>OLEMISC_RECOMPOSEONRESIZE status bit on the object and take the
+>appropriate action if it is set, but am having absolutely no luck in
+>getting this to work. If you're familiar with this sample, there is a
+>Move() method in the class CRectItem which I'm assuming would make most
+>sense implementing the necessary code to handle this condition. All
+>examples I've found are raw OLE and not MFC Framework bound, so it's not
+>very clear on what or where modifications are necessary.
+>
+>Also, in the same vein, I'm looking for some information on implementing
+>schemes for enhancing object server performance (from the container
+>side) by manipulating the startup an shutdown events. The object server
+>that I'm working with is huge and each time the application is started
+>to service an object the container can often experience waits of up to
+>20 seconds while the server initiates itself, a very expensive process.
+>At the same time, I also want to be careful not to load too many of
+>these servers and hog memory so I'm thinking that I might want to
+>maintain a limited list of running servers that would free themselves if
+>some magical limit is reached.
+>
+>I would appreciate any information.
+>Thank you,
+>Karl.
+>
+-----From: hou@tfn.com (Bing Hou)
+
+
+MSDN says this about OLEMISC_RECOMPOSEONRESIZE:
+
+"When the container resizes the space allocated to displaying one of the 
+object's presentations, the object wants to recompose the presentation - This 
+means that on resize, the object wants to do more than scale its picture. If 
+this bit is set, the container should force the object to the running state and 
+call IOleObject::SetExtent with the new size."
+
+This means in your Move function, if you detected a size change and the selected
+item is not active, you should at least make the following two calls.
+
+        pSelectedItem->DoVerb(OLEIVERB_PRIMARY...); // to make it active
+        SetExtent(newSize...);                     // set the new size
+
+I have no comments on your second question.
+
+
+Bing Hou
+hou@tfn.com
+------------------------------------------------------------------------
+  "The saints are the sinners who keep on trying."
+
+
+
+
+
+______________________________ Reply Separator _________________________________
+Subject: Handling resizing of embedded OLE object.
+Author:  Karl Krasnowsky <KKrasnow@excell.com> at Internet
+Date:    2/12/97 1:27 PM
+
+
+Environment: VC 4.1, NT 4.0
+     
+Hello,
+Using the sample OClient as the base application, I'm attempting to add 
+COleObjectItem resizing support which will check for the 
+OLEMISC_RECOMPOSEONRESIZE status bit on the object and take the 
+appropriate action if it is set, but am having absolutely no luck in 
+getting this to work. If you're familiar with this sample, there is a 
+Move() method in the class CRectItem which I'm assuming would make most 
+sense implementing the necessary code to handle this condition. All 
+examples I've found are raw OLE and not MFC Framework bound, so it's not 
+very clear on what or where modifications are necessary.
+     
+Also, in the same vein, I'm looking for some information on implementing 
+schemes for enhancing object server performance (from the container 
+side) by manipulating the startup an shutdown events. The object server 
+that I'm working with is huge and each time the application is started 
+to service an object the container can often experience waits of up to 
+20 seconds while the server initiates itself, a very expensive process. 
+At the same time, I also want to be careful not to load too many of 
+these servers and hog memory so I'm thinking that I might want to 
+maintain a limited list of running servers that would free themselves if 
+some magical limit is reached.
+     
+I would appreciate any information.
+Thank you,
+Karl.
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+    <A HREF="http://www.digiday.com/mfcpro/joinmfcl.htm">Become an MFC-L member</A>
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,470 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Failure to locate DLL Entry Points
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Ray Davis -- <A HREF="mailto:WRD2@ix.netcom.com">WRD2@ix.netcom.com</A>
+Friday, December 13, 1996
+</B>
+Environment: VC++ 4.2-flat, Win 95
+
+I have created several a document classes in a DLL which are designed to
+be allocated, deleted, and used dynamically.
+
+When attempting to run my Release mode App I recieve an error, (from the
+loader?) entry point for
+classCProjectDocument@CProjectDocument@@2UCRuntime@@A could not
+be located in the Dynamic Link Library MyDll.Dll.
+
+In Debug mode everything runs fine, and behaves as expected, only when
+running code which has been compiled in Release mode has this problem
+been seen.
+
+My Release mode and debug mode Dll's, Lib's and Exe's are named
+differently.
+
+I have triple checked all make files for mistakes and found none and I
+am linking the proper library's to MyApp.
+
+I have double checked the exported functions via Dumpbin to see what has
+been exported from MyDll.Dll
+
+I have double checked the imported functions via Dumpbin to see what has
+been imported into MyApp.Exe
+
+In all cases this constructor has been exported and imported as
+classCProjectDocument@CProjectDocument@@2UCRuntime@@B which is different
+(from what the loader is looking for?) only in the last letter.
+
+My question is where is the A on the first mangled name generated, and
+where should I look to try to find a solution.
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Sunday, December 15, 1996
+</B>
+At 09:40 12/13/96 -0600, Ray Davis wrote:
+>Environment: VC++ 4.2-flat, Win 95
+
+While this problem is caused by pilot error, the 4.2-flat package
+is dangerous and unsupported. You must upgrade by installing the
+4.2B patch if you expect to smoothly get work done.
+
+>I have created several a document classes in a DLL which are designed to
+>be allocated, deleted, and used dynamically.
+
+>When attempting to run my Release mode App I recieve an error, (from the
+>loader?) entry point for
+>classCProjectDocument@CProjectDocument@@2UCRuntime@@A could not
+>be located in the Dynamic Link Library MyDll.Dll.
+
+This is a very bogus decorated name.  It should begin with a question
+mark. The name you've provided:
+
+  classCProjectDocument@CProjectDocument@@2UCRuntime@@A
+
+is bogus.  With a preceeding questionmark, the name is:
+
+ ?classCProjectDocument@CProjectDocument@@2UCRuntime@@A
+
+and UNDNAME.EXE says it means:
+
+ public:static struct CRuntime CProjectDocument::classCProjectDocument
+
+but even this name is questionable because there is no class in MFC
+named CRuntime, and the "classCProjetcDocument" member function name
+implies that you got this function name from the _IMPLEMENT_RUNTIMECLASS()
+macro in AFX.H.  _IMPLEMENT_RUNTIMECLASS() isn't public; it is invoked
+by the other documented CObject implementation macros, like
+IMPLEMENT_SERIAL().
+
+The other version of your function is 
+
+ classCProjectDocument@CProjectDocument@@2UCRuntime@@B
+
+which is, also, a completly bogus name.  Again, there's no such class
+as CRuntime and the name is totally invalid without a leading
+question mark.  If you give it a leading question mark, then
+UNDNAME translates it to:
+
+ public:static struct const CRuntime CProjectDocument::classCProjectDocument
+
+but, agian, there's no such duck as "CRuntime"... so it must be
+something you've invented yourself.
+
+If you were actually using CRuntimeClass, I'd say that you
+used IMPLEMENT_DYNAMIC or IMPLEMENT_DYNCREATE where you menat to use
+IMPLEMENT_SERIAL, or visa versa. Maybe the problem is that you invoked
+IMPLEMENT_RUNTIMECLASS() or _IMPLEMENT_RUNTIMECLASS() directly, though
+you shouldn't because it isn't a documented function.  Maybe you copied
+them from the header and incorrectly hacked them: that seems like the
+most likely explanation, since, again, there's no CRuntime class in MFC.
+
+>In all cases this constructor has been exported and imported as
+>classCProjectDocument@CProjectDocument@@2UCRuntime@@B which is different
+>(from what the loader is looking for?) only in the last letter.
+
+The loader is only looking for it because your exectuable is looking for
+it. This means that the header file your main module is looking for is
+bogus or confused. The missing question mark suggests that your executable
+modules are completely corrupt.  The CRuntime class name means that you're
+not using MFC, so it is very odd that you have a member name which so
+closely resembles an MFC-supplied name.
+
+>My question is where is the A on the first mangled name generated, and
+>where should I look to try to find a solution.
+
+Decorated names are very internal to the compiler.  The linker and
+debugger know about them, too, but the only thing that causes them are
+changes to the declaration of the function. The requirement for the symbol
+is made based on code that you complile, and the provision of the
+symbol is contingent on code that you link to.
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+I'm afraid I've become some sort of speed freak.
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+David Little -- <A HREF="mailto:dlittle@equinoxcorp.com">dlittle@equinoxcorp.com</A>
+Tuesday, December 17, 1996
+</B>
+[Mini-digest: 3 responses]
+
+Where do you find UNDNAME.EXE?  I didn't see it on MSDN, or the CD...
+
+----------
+From: 	Mike Blaszczak[SMTP:mikeblas@nwlink.com]
+Sent: 	Sunday, December 15, 1996 11:00 PM
+To: 	mfc-l@netcom.com
+Subject: 	Re: Failure to locate DLL Entry Points
+
+At 09:40 12/13/96 -0600, Ray Davis wrote:
+>Environment: VC++ 4.2-flat, Win 95
+
+While this problem is caused by pilot error, the 4.2-flat package
+is dangerous and unsupported. You must upgrade by installing the
+4.2B patch if you expect to smoothly get work done.
+
+>I have created several a document classes in a DLL which are designed to
+>be allocated, deleted, and used dynamically.
+
+>When attempting to run my Release mode App I recieve an error, (from the
+>loader?) entry point for
+>classCProjectDocument@CProjectDocument@@2UCRuntime@@A could not
+>be located in the Dynamic Link Library MyDll.Dll.
+
+This is a very bogus decorated name.  It should begin with a question
+mark. The name you've provided:
+
+  classCProjectDocument@CProjectDocument@@2UCRuntime@@A
+
+is bogus.  With a preceeding questionmark, the name is:
+
+ ?classCProjectDocument@CProjectDocument@@2UCRuntime@@A
+
+and UNDNAME.EXE says it means:
+
+ public:static struct CRuntime CProjectDocument::classCProjectDocument
+
+but even this name is questionable because there is no class in MFC
+named CRuntime, and the "classCProjetcDocument" member function name
+implies that you got this function name from the _IMPLEMENT_RUNTIMECLASS()
+macro in AFX.H.  _IMPLEMENT_RUNTIMECLASS() isn't public; it is invoked
+by the other documented CObject implementation macros, like
+IMPLEMENT_SERIAL().
+
+The other version of your function is 
+
+ classCProjectDocument@CProjectDocument@@2UCRuntime@@B
+
+which is, also, a completly bogus name.  Again, there's no such class
+as CRuntime and the name is totally invalid without a leading
+question mark.  If you give it a leading question mark, then
+UNDNAME translates it to:
+
+ public:static struct const CRuntime CProjectDocument::classCProjectDocument
+
+but, agian, there's no such duck as "CRuntime"... so it must be
+something you've invented yourself.
+
+If you were actually using CRuntimeClass, I'd say that you
+used IMPLEMENT_DYNAMIC or IMPLEMENT_DYNCREATE where you menat to use
+IMPLEMENT_SERIAL, or visa versa. Maybe the problem is that you invoked
+IMPLEMENT_RUNTIMECLASS() or _IMPLEMENT_RUNTIMECLASS() directly, though
+you shouldn't because it isn't a documented function.  Maybe you copied
+them from the header and incorrectly hacked them: that seems like the
+most likely explanation, since, again, there's no CRuntime class in MFC.
+
+>In all cases this constructor has been exported and imported as
+>classCProjectDocument@CProjectDocument@@2UCRuntime@@B which is different
+>(from what the loader is looking for?) only in the last letter.
+
+The loader is only looking for it because your exectuable is looking for
+it. This means that the header file your main module is looking for is
+bogus or confused. The missing question mark suggests that your executable
+modules are completely corrupt.  The CRuntime class name means that you're
+not using MFC, so it is very odd that you have a member name which so
+closely resembles an MFC-supplied name.
+
+>My question is where is the A on the first mangled name generated, and
+>where should I look to try to find a solution.
+
+Decorated names are very internal to the compiler.  The linker and
+debugger know about them, too, but the only thing that causes them are
+changes to the declaration of the function. The requirement for the symbol
+is made based on code that you complile, and the provision of the
+symbol is contingent on code that you link to.
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+I'm afraid I've become some sort of speed freak.
+These words are my own. I do not speak on behalf of Microsoft.
+-----From: Ted <Ted@www.Ibex.com>
+
+Mike, you talk about using the UNDNAME.EXE utility; where can that be 
+obtained? (I don't find it in my MSDEV\BIN directory, so I assume it's 
+out on the Net somewhere...)
+
+----------
+From:  Mike Blaszczak[SMTP:mikeblas@nwlink.com]
+Sent:  Sunday, December 15, 1996 9:00 PM
+To:  mfc-l@netcom.com
+Subject:  Re: Failure to locate DLL Entry Points
+
+At 09:40 12/13/96 -0600, Ray Davis wrote:
+>Environment: VC++ 4.2-flat, Win 95
+
+While this problem is caused by pilot error, the 4.2-flat package
+is dangerous and unsupported. You must upgrade by installing the
+4.2B patch if you expect to smoothly get work done.
+
+>I have created several a document classes in a DLL which are designed 
+to
+>be allocated, deleted, and used dynamically.
+
+>When attempting to run my Release mode App I recieve an error, (from 
+the
+>loader?) entry point for
+>classCProjectDocument@CProjectDocument@@2UCRuntime@@A could not
+>be located in the Dynamic Link Library MyDll.Dll.
+
+This is a very bogus decorated name.  It should begin with a question
+mark. The name you've provided:
+
+  classCProjectDocument@CProjectDocument@@2UCRuntime@@A
+
+is bogus.  With a preceeding questionmark, the name is:
+
+ ?classCProjectDocument@CProjectDocument@@2UCRuntime@@A
+
+and UNDNAME.EXE says it means:
+
+ public:static struct CRuntime CProjectDocument::classCProjectDocument
+
+but even this name is questionable because there is no class in MFC
+named CRuntime, and the "classCProjetcDocument" member function name
+implies that you got this function name from the 
+_IMPLEMENT_RUNTIMECLASS()
+macro in AFX.H.  _IMPLEMENT_RUNTIMECLASS() isn't public; it is invoked
+by the other documented CObject implementation macros, like
+IMPLEMENT_SERIAL().
+
+The other version of your function is 
+
+ classCProjectDocument@CProjectDocument@@2UCRuntime@@B
+
+which is, also, a completly bogus name.  Again, there's no such class
+as CRuntime and the name is totally invalid without a leading
+question mark.  If you give it a leading question mark, then
+UNDNAME translates it to:
+
+ public:static struct const CRuntime 
+CProjectDocument::classCProjectDocument
+
+but, agian, there's no such duck as "CRuntime"... so it must be
+something you've invented yourself.
+
+If you were actually using CRuntimeClass, I'd say that you
+used IMPLEMENT_DYNAMIC or IMPLEMENT_DYNCREATE where you menat to use
+IMPLEMENT_SERIAL, or visa versa. Maybe the problem is that you invoked
+IMPLEMENT_RUNTIMECLASS() or _IMPLEMENT_RUNTIMECLASS() directly, though
+you shouldn't because it isn't a documented function.  Maybe you copied
+them from the header and incorrectly hacked them: that seems like the
+most likely explanation, since, again, there's no CRuntime class in 
+MFC.
+
+>In all cases this constructor has been exported and imported as
+>classCProjectDocument@CProjectDocument@@2UCRuntime@@B which is 
+different
+>(from what the loader is looking for?) only in the last letter.
+
+The loader is only looking for it because your exectuable is looking 
+for
+it. This means that the header file your main module is looking for is
+bogus or confused. The missing question mark suggests that your 
+executable
+modules are completely corrupt.  The CRuntime class name means that 
+you're
+not using MFC, so it is very odd that you have a member name which so
+closely resembles an MFC-supplied name.
+
+>My question is where is the A on the first mangled name generated, and
+>where should I look to try to find a solution.
+
+Decorated names are very internal to the compiler.  The linker and
+debugger know about them, too, but the only thing that causes them are
+changes to the declaration of the function. The requirement for the 
+symbol
+is made based on code that you complile, and the provision of the
+symbol is contingent on code that you link to.
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+I'm afraid I've become some sort of speed freak.
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+-----From: Mike Blaszczak <mikeblas@nwlink.com>
+
+At 10:42 12/17/96 -0800, Ted wrote:
+>Mike, you talk about using the UNDNAME.EXE utility; where can that be 
+>obtained? (I don't find it in my MSDEV\BIN directory, so I assume it's 
+>out on the Net somewhere...)
+
+For a long time, I thought it was an internal-only tool. I started
+whining to people about getting it put into the product, but it
+turns out that it comes with the Win32 SDK. If you install the Win32 SDK,
+it'll be in your MSTOOLS\BIN directory.
+
+Unfortunately, since it is a part of the Win32 SDK, it'll not necessarily
+be in lock-step with the compiler.  I'm not sure that the verison in the
+Win32 SDK knows how to decorate and undecorate declarations involving "bool",
+for example.
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+I'm afraid I've become some sort of speed freak.
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:ktm@ormec.com">ktm@ormec.com</A>
+Thursday, December 19, 1996
+</B>
+[Mini-digest: 2 responses]
+
+On mfc-l, Mike Blaszczak wrote:
+> For a long time, I thought it was an internal-only tool. I started 
+> whining to people about getting it put into the product, but it turns 
+> out that it comes with the Win32 SDK. If you install the Win32 SDK, 
+> it'll be in your MSTOOLS\BIN directory.
+> 
+> Unfortunately, since it is a part of the Win32 SDK, it'll not 
+> necessarily be in lock-step with the compiler.  I'm not sure that 
+> the verison in the Win32 SDK knows how to decorate and undecorate 
+> declarations involving "bool", for example.
+
+The Visual C++ User's Guide points out that you can generate a listing 
+file or use DUMPBIN /SYMBOLS to generate output that contains both 
+decorated and undecorated names. These will, of course, be in step 
+with the compiler.
+
+Katy
+-- 
+Katy Mulvey                            ktm@ormec.com
+Software Development Engineer
+ORMEC Systems                          <A HREF="http://www.ormec.com">http://www.ormec.com</A>
+
+
+-----From: Stephen Keeler <skeeler@delab.com>
+
+UNDNAME.EXE would be in the Platform SDK.  Check <A HREF="http://www.microsoft.com/platformsdk">http://www.microsoft.com/platformsdk</A> for more info.
+
+Regards,
+Stephen Keeler
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Saturday, December 21, 1996
+</B>
+At 17:32 12/19/96 -0500, ktm@ormec.com wrote:
+
+>The Visual C++ User's Guide points out that you can generate a listing 
+>file or use DUMPBIN /SYMBOLS to generate output that contains both 
+>decorated and undecorated names. These will, of course, be in step 
+>with the compiler.
+
+That's true, but it turns out not to matter.  UNDNAME.EXE uses the
+UnDecorateSymbolName() API from IMAGEHLP.DLL, which is updated with
+each version of the compiler. The compiler and the linker and the
+debugger all use IMAGEHLP to party on executable images.
+
+My initial statement was a little too conservative.
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>      <-- trip report central!
+95 Honda VFR-750F / 88 Yamaha FZ-700 (damaged) / 94 Mazda RX-7
+Serial #00050!    /      AMA - HRC - VFROC     / Wang Dang Wankel
+         I am bored of this talk. It is time now for the dancing!
+These words are my own - I do not speak on behalf of Microsoft.
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

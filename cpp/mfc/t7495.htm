@@ -1,0 +1,191 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Q: CriticalSection in CHttpFilter class crashes W3Svc
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Felix Burkhard -- <A HREF="mailto:fburkhar@metz.une.edu.au">fburkhar@metz.une.edu.au</A>
+Thursday, October 31, 1996
+</B>
+Environment: VC++4.2b, NT 4.0
+
+I am in the process of developing my own little Web counter. I am
+using the ISAPI MFC extensions to write a filter. The filter processes
+OnLog requests and updates a INI file variable. To avoid conflicts
+with the app that inserts the counter into the html page, I want to
+protect the access to the INI file with a Crtical Section. If I
+comment out the CrtSect it works, if I leave it in, it crashes the
+WebServer in the call to the BaseClass OnLog, (actially somewhere deep
+down in NTOSKERNEL).
+
+Anyone any hints?? Thanks in advance!
+
+Code in .h:
+class CIislogFilter : public CHttpFilter
+   {
+   void UpdateSiteHits(const char* pszUrl);
+
+public:
+   CIislogFilter();
+   ~CIislogFilter();
+
+   static CRITICAL_SECTION m_csIniLock;
+
+   virtual BOOL GetFilterVersion(PHTTP_FILTER_VERSION pVer);
+   virtual DWORD OnLog(CHttpFilterContext* pCtxt, PHTTP_FILTER_LOG
+   pLog); };
+
+in .cpp (code created by appwiz deleted):
+// Critical section to protect access to Ini file
+CRITICAL_SECTION CIislogFilter::m_csIniLock;
+
+DWORD CIislogFilter::OnLog (CHttpFilterContext* pCtxt,
+PHTTP_FILTER_LOG pLog) 
+   {
+   UpdateSiteHits(pLog->pszTarget);
+
+   // Crashes in here if Enter/Leave CrtitcalSection is used
+   return CHttpFilter::OnLog(pCtxt, pLog);
+   }// OnLog
+
+
+void CIislogFilter::UpdateSiteHits (const char* pszUrl)
+   {
+   char  szCounter[8];
+   char  szUrl[256];
+   UINT  uCounter = 0;
+
+   // Skip if URL is to long
+   if (strlen(pszUrl) > sizeof(szUrl))
+      return;
+
+   // Create a local copy of the URL
+   strcpy(szUrl, pszUrl);
+
+   // Obtain current counter
+   uCounter = GetPrivateProfileInt(c_szSiteHitsKey, szUrl, 0,
+      c_szSiteHitsIni); 
+
+   // Just increment the counter
+   EnterCriticalSection(&CIislogFilter::m_csIniLock);
+   wsprintf(szCounter, "%d", ++uCounter);
+   WritePrivateProfileString(c_szSiteHitsKey, szUrl, szCounter,
+      c_szSiteHitsIni);
+   LeaveCriticalSection(&CIislogFilter::m_csIniLock);
+   }// UpdateSiteHits
+
+Felix Burkhard
+Software Development Group                          phone: +61 67 73-3191
+Geophysical Technology Ltd                            fax: +61 67 73-3307
+UNE Campus                                   email: felixb@gri.une.edu.au
+Armidale NSW 2351, AUSTRALIA                 <A HREF="http://gri.une.edu.au/felixb">http://gri.une.edu.au/felixb</A>
+-------------------------------------------------------------------------
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Friday, November 01, 1996
+</B>
+[Mini-digest: 4 responses]
+
+At 09:17 10/31/96 +10, you wrote:
+>Environment: VC++4.2b, NT 4.0
+>Anyone any hints??
+
+Sure.  Here's the biggest hint I can think of: READ THE DOCUMENTATION.
+
+The Win32 SDK says, in two or three different places, that you need to
+call InitCriticalSection() on a CRITICAL_SECTION structure before you
+ever use it.  In other words, the reason you're crashing is that you
+call EnterCriticalSection() on critical section that nobody knows anything
+about.
+
+What you've coded is just as bad as:
+
+  char *pstr;
+  strcpy(pstr, "Hockey is best.");
+
+That is, you're just stuffing your needs into memory that doesn't belong
+to you.
+
+If you read some different documentation, you would see that
+CCriticalSection would come to your rescue: you'd end up constructing the
+object implicitly and you'd not have to worry about calling
+InitCriticalSection().
+
+>If I comment out the CrtSect it works, if I leave it in, it crashes the
+>WebServer in the call to the BaseClass OnLog, (actially somewhere deep
+>down in NTOSKERNEL).
+
+In other words: "If you comment out your totally bogus code, you'll be
+okay.  Otherwise, if you leave your totally bogus code in there, you'll
+die in a firey crash."
+
+>Thanks in advance!
+
+Will you buy me _two_ hockey teams??   Thanks in advance!
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+I'm afraid I've become some sort of speed freak.
+These words are my own. I do not speak on behalf of Microsoft.
+
+-----From: "Alan J. Livingston" <livingst@villagenet.com>
+
+I didn't see your constructor, but do you call InitializeCriticalSection?
+
+-----From: Ernesto Perales Soto <eperales@infosel.com.mx>
+
+Maybe "InitializeCriticalSection" and "DestroyCriticalSection" are
+missing?
+
+--
+
+Ernesto Perales Soto
+eperales@infosel.com.mx
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

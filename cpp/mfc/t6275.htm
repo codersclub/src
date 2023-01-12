@@ -1,0 +1,202 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Weirdness retrieving object from CTypedPtrMap
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Ted -- <A HREF="mailto:tward@geographix.com">tward@geographix.com</A>
+Wednesday, August 14, 1996
+</B>
+Enviroment: VC++ 4.1 and Windows NT 4.0 beta 2
+
+I have a CTypedPtrMap which I am using to store CMapStringToString 
+objects.
+The weird thing is that to retrieve a stored CMapStringToString object, I 
+have to pass in a pointer after casting it to a reference.
+If I pass in a reference, the members don't get initialized.  Trying to 
+pass in a pointer, or reference to a pointer gives me an error.
+Is this code safe?  Am I doing something wrong?
+
+class MyClass
+{
+	...
+	MyFunc(const CString&, const CString&);
+	// Shared array of map tables.
+	CTypedPtrMap <CMapStringToPtr, CString, CMapStringToString> mMaps;
+	...
+}
+
+BOOL MyClass::MyFunc(const CString& TableName, const CString& Key)
+{
+	BOOL b;
+
+	CMapStringToString* Map;	// DECLARE A POINTER
+
+	// Get the map object if it has already been loaded and stored.
+	b = mMaps.Lookup(TableName, (CMapStringToString&)Map);	// CAST IT TO A 
+REFERENCE
+
+	// Load the map if it is not already present.
+	if (b == FALSE)
+	{
+		// Create a map object.
+		Map = new CMapStringToString;
+
+		// Fill in the map.
+		LoadMap(TableName, Map);
+
+		// Store our map into our map collection.
+		mMaps.SetAt( TableName, Map );
+	}
+
+	CString OutputValue;
+	b = Map->Lookup( Key, OutputValue );
+
+	return b;
+}
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Saturday, August 17, 1996
+</B>
+At 08:28 AM 8/14/96 -0600, you wrote:
+>Enviroment: VC++ 4.1 and Windows NT 4.0 beta 2
+
+>I have a CTypedPtrMap which I am using to store CMapStringToString 
+>objects.
+
+> CTypedPtrMap <CMapStringToPtr, CString, CMapStringToString> mMaps;
+
+You can't do that.  Your code isn't safe. It won't compile under MFC 4.2
+because we put the screws down on the CTypedPtr classes and now they
+won't anymore take bogus arguments.
+
+Your declaration is wrong because CMapStringToPtr maps between a valued
+class and a pointer to some CObject-derived thing. But you've provided a
+non-pointer data type for your VALUE parameter, and the underlying
+CMapStringToPtr donesn't know how to store or copy or recreate a complete
+object--it only knows how to manage pointers to complete object.  (Hence
+the name CMapStringTo_Ptr_!)
+
+>The weird thing is that to retrieve a stored CMapStringToString object, I 
+>have to pass in a pointer after casting it to a reference.
+
+Whoa.  You've hacked in there a cast that's dangerous and not very good.
+
+I think you should consider using something more along the lines of this:
+
+  CTypedPtrMap <CMapStringToPtr, CString, CMapStringToString*> mMaps;
+
+You'll have to do some memory management yourself (eg, call new to get
+a CMapStringToString object before you SetAt(), and call delete after
+you call RemoveKey()).  
+
+and the prototype for CTypedMapPtr::Lookup() looks like this:
+
+   BOOL Lookup(BASE_CLASS::BASE_ARG_KEY key, VALUE& rValue) const;
+
+which means that, for your declaration, mMaps will need to take
+a reference to a CMapStringToString object.
+
+>If I pass in a reference, the members don't get initialized. 
+
+Right--because the CMapStringtoPtr class that's doing all the work only
+knows how to handle pointers, not whole complete objects.
+
+Strictly, the way you declared mMaps, means that you wanted to do this:
+
+>BOOL MyClass::MyFunc(const CString& TableName, const CString& Key)
+>{      BOOL b;
+>	CMapStringToString Map;	// DECLARE A POINTER
+>	b = mMaps.Lookup(TableName, Map);
+
+and that's just a fantastic waste of time. You'd be copying a whole
+map --all of its elements, all of the structure that lives inside of
+it, just to do one little lookup!  Your MyFunc() function would be
+incredibly slow. (When I play my bass, my funk gets faster the
+more I practice.)
+
+So, I think you should rewrite your declaration like this:
+
+class MyClass
+{       // ... other stuff ...
+	MyFunc(const CString&, const CString&);
+	CTypedPtrMap <CMapStringToPtr, CString, CMapStringToString*> mMaps;
+};
+
+and I think you should rewrite MyClass::MyFunc() like this:
+
+BOOL MyClass::MyFunc(const CString& TableName, const CString& Key)
+{
+	BOOL b;
+	CMapStringToString* pMap;
+	b = mMaps.Lookup(TableName, pMap);
+	if (b == FALSE)
+	{
+		pMap = new CMapStringToString;
+		LoadMap(TableName, pMap);
+		mMaps.SetAt(TableName, Map);
+	}
+	CString OutputValue;
+	b = pMap->Lookup( Key, OutputValue );
+	return b;
+}
+
+and you'll have better luck.  You'll need to change other parts of your
+code, though: make sure you review how LoadMap() is prototyped, and figure
+out how you'll destroy maps without leaking any memory.
+
+
+
+.B ekiM
+http://www.nwlink.com/~mikeblas   <--- trip report central
+1995 Honda VFR750F (Serial number 00050!)  4 Corners 1996!
+1987 Yamaha FZ700 (damaged)                AMA, HRC, VFROC
+     These words are my own: I do not speak for Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

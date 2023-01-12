@@ -1,0 +1,569 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Getting a pointer to doc class from within CMainFrame ?
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Patrick Davis -- <A HREF="mailto:flowenol@erols.com">flowenol@erols.com</A>
+Thursday, March 20, 1997
+</B>
+Environment: Win95 MSVC++4.0
+
+Can anyone help me in getting a pointer to my document class
+data from within the CMainFrame class ?
+I am able to get a pointer to CDocument but I'm not
+able to cast it into a pointer to my document that I can use.
+
+I need to do this because i would like to save data in my document
+class when a user exits using the "x" button in the System Menu
+in the upper right corner of the app.
+
+Thanks
+Patrick Davis
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mihir Dalal -- <A HREF="mailto:m_dalal@ECE.concordia.CA">m_dalal@ECE.concordia.CA</A>
+Saturday, March 22, 1997
+</B>
+[Mini-digest: 6 responses]
+
+
+On Thu, 20 Mar 1997, Patrick Davis wrote:
+
+> Environment: Win95 MSVC++4.0
+> 
+> Can anyone help me in getting a pointer to my document class
+> data from within the CMainFrame class ?
+> I am able to get a pointer to CDocument but I'm not
+> able to cast it into a pointer to my document that I can use.
+> 
+> I need to do this because i would like to save data in my document
+> class when a user exits using the "x" button in the System Menu
+> in the upper right corner of the app.
+> 
+> Thanks
+> Patrick Davis
+
+For such questions on documents most important, you first need to 
+clarify, whether you are working on a MDI or SDI complaint application.
+Depending on that, the answers will vary.  
+
+Presuming that you are on a SDI, this question brings several possible 
+answers to my mind. I haven't tried them, but anyway...
+
+1. Use GetActiveView() in the mainframe to _send_ (not post) the view a 
+   message/command. Write a message/command handler in your view for the 
+   this message/command and use GetDocument() in the view to save your 
+   data. 
+
+2. I think, instead of going by the above indirect way, you can directly
+   cast the pointer to your docuemnt using something like this:
+
+   CWnd* m_pView = GetActiveView();
+   CDocument* m_pDoc = m_pView->GetDocument();
+   m_pdoc-> // Save your data
+
+3. Finally, what you are trying to do (i.e. saving the data when the user 
+   quits from the system menu) is normally not handled this way. When the 
+   user quits the application, no matter from where and by what means, your 
+   CYourDocument is gonna get a WM_CLOSE anyway. so just trap that in 
+   your CYourDocument and write the code to save data. 
+ 
+
+ _________________________________________________________________________
+     Mihir Dalal <m_dalal@ECE.Concordia.CA>, M.Engg. (Electrical) Student
+              Department of Electrical and Computer Engineering
+                   Concordia University, Montreal, Canada
+                <A HREF="http://www.ECE.Concordia.CA/~m_dalal/addr.html">http://www.ECE.Concordia.CA/~m_dalal/addr.html</A>
+
+-----From: Ben Burnett <benner@supernet.ab.ca>
+
+Patrick Davis wrote:
+> 
+> Environment: Win95 MSVC++4.0
+> 
+> Can anyone help me in getting a pointer to my document class
+> data from within the CMainFrame class ?
+> I am able to get a pointer to CDocument but I'm not
+> able to cast it into a pointer to my document that I can use.
+> 
+> I need to do this because i would like to save data in my document
+> class when a user exits using the "x" button in the System Menu
+> in the upper right corner of the app.
+> 
+> Thanks
+> Patrick Davis
+
+Try overiding the "on app exit" msg ( make the overide in the doc or
+view ), it should do the trick.
+-----From: "David Ellis" <dellis@workflowint.com>
+
+I'm not able to answer your main question because of lack of information.
+
+However, from what you describe I can suggest an easier way. Whenever data
+is changed in your document call the SetModifiedFlag member function of the
+CDocument class. This will cause the SaveModified overridable in your
+CDocument derived class to be called whenever the view/frame/mainframe
+closes.
+
+Hope it helps
+
+David
+
+----------
+> From: Patrick Davis <flowenol@erols.com>
+> To: mfc-l@netcom.com
+> Subject: Getting a pointer to doc class from within CMainFrame ?
+> Date: Thursday, March 20, 1997 2:16 AM
+> 
+> Environment: Win95 MSVC++4.0
+> 
+> Can anyone help me in getting a pointer to my document class
+> data from within the CMainFrame class ?
+> I am able to get a pointer to CDocument but I'm not
+> able to cast it into a pointer to my document that I can use.
+> 
+> I need to do this because i would like to save data in my document
+> class when a user exits using the "x" button in the System Menu
+> in the upper right corner of the app.
+> 
+> Thanks
+> Patrick Davis
+> 
+-----From: Jim Lawson Williams <jimlw@mail.ccur.com.au>
+
+At 02:16 20-03-97 -0500, you wrote:
+>Environment: Win95 MSVC++4.0
+>
+>Can anyone help me in getting a pointer to my document class
+>data from within the CMainFrame class ?
+>I am able to get a pointer to CDocument but I'm not
+>able to cast it into a pointer to my document that I can use.
+>
+>I need to do this because i would like to save data in my document
+>class when a user exits using the "x" button in the System Menu
+>in the upper right corner of the app.
+>
+>Thanks
+>Patrick Davis
+>
+G'day!
+>From anywhere within your program you can find your CWinApp-derived object
+by means of AfxGetApp().  In a wizard-generated MDI program, it's obvious
+your app. knows about the mainframe through m_pMainWnd.  In SDI, this is
+less obvious because the set-up is done (in \Msdev\mfc\src\DOCSINGL.CPP) by:
+
+	CWinThread* pThread = AfxGetThread();
+	if (bCreated && pThread->m_pMainWnd == NULL)
+	{
+		// set as main frame (InitialUpdateFrame will show the window)
+		pThread->m_pMainWnd = pFrame;
+	}
+	InitialUpdateFrame(pFrame, pDocument, bMakeVisible);
+
+With the necessary pointers you can do the saving, either as changes occur,
+or by catching OnCloseDocument().
+
+Regards,
+Jim LW
+
+
+
+>From the BBC's "Barchester Chronicles":
+
+    "I know that ultimately we are not supposed to understand.
+    But I also know that we must try."
+
+       -- the Reverend Septimus Harding, 
+          crypt-analyst, art-critic, tax-consultant, C++ programmer
+-----From: Olivier PLANCHON <Olivier.Planchon@orstom.sn>
+
+if you work with a SDI application, this function will make what you want :
+
+inline my_Doc* get_Doc() { return (my_Doc*)(((CFrameWnd*)
+AfxGetApp()->m_pMainWnd)->GetActiveDocument()) ; } ;
+
+hope it will help...
+---------------------------------------
+Olivier PLANCHON, ORSTOM, BP 1386 Dakar
+tel(221) 32 34 80    fax (221) 32 43 07
+e-mail Olivier.Planchon@orstom.sn
+
+-----From: DFPav@aol.com
+
+Patrick:
+1.  The framework should prompt you to save your document when you close the
+main frame window, if the document has been changed. Mark the document as
+changed by using CDocument::SetModifiedFlag().
+
+2.  If you really have to get to the document, try using a macro like this
+#define P_DOC (((CMyView *) GetActiveView())->GetDocument())
+
+Dan
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Sreekant Sreedharan -- <A HREF="mailto:sreekant@india.deneb.com">sreekant@india.deneb.com</A>
+Tuesday, March 25, 1997
+</B>
+Hi Patrick,
+
+Patrick Davis wrote:
+> 
+> Environment: Win95 MSVC++4.0
+> 
+> Can anyone help me in getting a pointer to my document class
+> data from within the CMainFrame class ?
+> I am able to get a pointer to CDocument but I'm not
+> able to cast it into a pointer to my document that I can use.
+> 
+> I need to do this because i would like to save data in my document
+> class when a user exits using the "x" button in the System Menu
+> in the upper right corner of the app.
+> 
+> Thanks
+> Patrick Davis
+
+	CMyView	pView = GetActiveView();
+	CMyDoc  pDoc  = pView->GetDocument();
+		You should then have a pointer to the document. But why  don't you
+write an override for WM_CLOSE( CMyView::OnClose()) ?
+
+-- 
+- From Sreekant Sreedharan
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Patrick Davis -- <A HREF="mailto:flowenol@erols.com">flowenol@erols.com</A>
+Thursday, March 27, 1997
+</B>
+That won't work because CMainFrm.cpp doesn't recognize
+that CMyView exists, and if you try to use an include
+statement so it does it will trigger a "Class redefinition"
+error.
+
+----------
+> From: Sreekant Sreedharan <sreekant@india.deneb.com>
+> To: mfc-l@netcom.com
+> Subject: Re: Getting a pointer to doc class from within CMainFrame ?
+> Date: Tuesday, March 25, 1997 9:00 AM
+> 
+> Hi Patrick,
+> 
+> Patrick Davis wrote:
+> > 
+> > Environment: Win95 MSVC++4.0
+> > 
+> > Can anyone help me in getting a pointer to my document class
+> > data from within the CMainFrame class ?
+> > I am able to get a pointer to CDocument but I'm not
+> > able to cast it into a pointer to my document that I can use.
+> > 
+> > I need to do this because i would like to save data in my document
+> > class when a user exits using the "x" button in the System Menu
+> > in the upper right corner of the app.
+> > 
+> > Thanks
+> > Patrick Davis
+> 
+> 	CMyView	pView = GetActiveView();
+> 	CMyDoc  pDoc  = pView->GetDocument();
+> 		You should then have a pointer to the document. But why  don't you
+> write an override for WM_CLOSE( CMyView::OnClose()) ?
+> 
+> -- 
+> - From Sreekant Sreedharan
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Sam Gentile -- <A HREF="mailto:sgentile@gensym.com">sgentile@gensym.com</A>
+Friday, March 28, 1997
+</B>
+[Mini-digest: 2 responses]
+
+> > Environment: NT 4.0 MSVC5.0
+
+>
+>I am trying to code a Visual C++ 5.0 program to use an ActiveX control
+>which of course uses VARIANTs. I understand how to use the constructor for
+>COleVariant in the case of single variants. I have some OCX calls that
+>require an array of VARIANTs (VARIANT FAR *). How do you do that? Could someone give me an
+>example?
+>
+>To pass one long with a value=2, I do:
+>m_pActiveXControl.GsiRpcCall((short)1, COleVariant((long)2), m_lContext);
+
+Sam Gentile
+Senior Software Engineer
+Gensym Corporation
+125 CambridgePark Drive
+Cambridge, Mass. 02140
+sgentile@gensym.com
+<A HREF="http://www.gensym.com">http://www.gensym.com</A>
+sgentile@msn.com
+<A HREF="http://www.well.com/user/owlmed">http://www.well.com/user/owlmed</A>
+-----From: Mike Blaszczak <mikeblas@nwlink.com>
+
+At 14:19 3/27/97 -0500, Patrick Davis wrote:
+
+>> From: Sreekant Sreedharan <sreekant@india.deneb.com>
+>> To: mfc-l@netcom.com
+>> Subject: Re: Getting a pointer to doc class from within CMainFrame ?
+>> Date: Tuesday, March 25, 1997 9:00 AM
+>> 
+>> Hi Patrick,
+>> 
+>> Patrick Davis wrote:
+>> > 
+>> > Environment: Win95 MSVC++4.0
+>> > 
+>> > Can anyone help me in getting a pointer to my document class
+>> > data from within the CMainFrame class ?
+>> > I am able to get a pointer to CDocument but I'm not
+>> > able to cast it into a pointer to my document that I can use.
+>> > 
+>> > I need to do this because i would like to save data in my document
+>> > class when a user exits using the "x" button in the System Menu
+>> > in the upper right corner of the app.
+>> > 
+>> > Thanks
+>> > Patrick Davis
+>> 
+>> 	CMyView	pView = GetActiveView();
+>> 	CMyDoc  pDoc  = pView->GetDocument();
+>> 		You should then have a pointer to the document. But why  don't you
+>> write an override for WM_CLOSE( CMyView::OnClose()) ?
+
+>That won't work because CMainFrm.cpp doesn't recognize
+>that CMyView exists, and if you try to use an include
+>statement so it does it will trigger a "Class redefinition"
+>error.
+
+While the code that Sreekant wrote has a couple of typos, it'll work just
+fine if you don't make mistakes with the include files.  Add your #include
+of myview.h and mydoc.h to the mainfrm.cpp file instead of to your stdafx.h
+file.  So, the first few lines of your mainfrm.cpp file look like
+this when you're done changing them:
+
+-- snip -- snip -- snip --
+
+// MainFrm.cpp : implementation of the CMainFrame class
+//
+
+#include "stdafx.h"
+#include "my.h"
+
+#include "MainFrm.h"
+
+#include "mydoc.h"		// mikeblas added this line
+#include "myview.h"		// mikeblas added this line
+
+#ifdef _DEBUG
+#define new DEBUG_NEW
+#undef THIS_FILE
+static char THIS_FILE[] = __FILE__;
+#endif
+
+-- snip -- snip -- snip --
+
+Then, later, you can use the code that Sreekant coded if you fix the
+typos:
+
+ 	CMyView* pView = (CMyView*) GetActiveView();
+ 	CMyDoc* pDoc = pView->GetDocument();
+
+'Course, this gets the active view--which may or may not be the view
+you want.
+
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+These words are my own. I do not speak on behalf of Microsoft.
+       One is too many and a million is not enough.
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mihir Dalal -- <A HREF="mailto:m_dalal@ECE.concordia.CA">m_dalal@ECE.concordia.CA</A>
+Sunday, March 30, 1997
+</B>
+On Fri, 28 Mar 1997, Sam Gentile wrote:
+
+> [Mini-digest: 2 responses]
+> 
+> >> From: Sreekant Sreedharan <sreekant@india.deneb.com>
+> >> To: mfc-l@netcom.com
+> >> Subject: Re: Getting a pointer to doc class from within CMainFrame ?
+> >> Date: Tuesday, March 25, 1997 9:00 AM
+> >> 
+> >> Hi Patrick,
+> >> 
+> >> Patrick Davis wrote:
+> >> > 
+> >> > Environment: Win95 MSVC++4.0
+> >> > 
+> >> > Can anyone help me in getting a pointer to my document class
+> >> > data from within the CMainFrame class ?
+> >> > I am able to get a pointer to CDocument but I'm not
+> >> > able to cast it into a pointer to my document that I can use.
+> >> > 
+> >> > I need to do this because i would like to save data in my document
+> >> > class when a user exits using the "x" button in the System Menu
+> >> > in the upper right corner of the app.
+> >> > 
+> >> > Thanks
+> >> > Patrick Davis
+> >> 
+> >> 	CMyView	pView = GetActiveView();
+> >> 	CMyDoc  pDoc  = pView->GetDocument();
+> >> 		You should then have a pointer to the document. But why  don't you
+> >> write an override for WM_CLOSE( CMyView::OnClose()) ?
+> 
+> >That won't work because CMainFrm.cpp doesn't recognize
+> >that CMyView exists, and if you try to use an include
+> >statement so it does it will trigger a "Class redefinition"
+> >error.
+
+That is incorrect. Look at the code that mikeblas has written below. It 
+does allow the inclusion of the view header in the mainframe.
+
+> While the code that Sreekant wrote has a couple of typos, it'll work just
+> fine if you don't make mistakes with the include files.  Add your #include
+> of myview.h and mydoc.h to the mainfrm.cpp file instead of to your stdafx.h
+> file.  So, the first few lines of your mainfrm.cpp file look like
+> this when you're done changing them:
+> 
+> -- snip -- snip -- snip --
+> 
+> // MainFrm.cpp : implementation of the CMainFrame class
+> //
+> 
+> #include "stdafx.h"
+> #include "my.h"
+> 
+> #include "MainFrm.h"
+> 
+> #include "mydoc.h"		// mikeblas added this line
+> #include "myview.h"		// mikeblas added this line
+> 
+> #ifdef _DEBUG
+> #define new DEBUG_NEW
+> #undef THIS_FILE
+> static char THIS_FILE[] = __FILE__;
+> #endif
+> 
+> -- snip -- snip -- snip --
+> 
+> Then, later, you can use the code that Sreekant coded if you fix the
+> typos:
+> 
+>  	CMyView* pView = (CMyView*) GetActiveView();
+>  	CMyDoc* pDoc = pView->GetDocument();
+> 
+> 'Course, this gets the active view--which may or may not be the view
+> you want.
+> 
+> 
+> .B ekiM
+> <A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+> These words are my own. I do not speak on behalf of Microsoft.
+>        One is too many and a million is not enough.
+
+
+I think, this is not the way, this particular problem is handled. We 
+all seem to be banging our heads for *nothing*. The original poster simply 
+needs to override his CHisDoc::OnClose() to solve his problem. 
+
+I had suggested this before on this thread, but by mistake I adviced him 
+to trap the WM_CLOSE in his document class (which infact is incorrect, 
+since the document class doesn't have a message map normally).
+
+Mihir. 
+ _________________________________________________________________________
+     Mihir Dalal <m_dalal@ECE.Concordia.CA>, M.Engg. (Electrical) Student
+              Department of Electrical and Computer Engineering
+                   Concordia University, Montreal, Canada
+                <A HREF="http://www.ECE.Concordia.CA/~m_dalal/addr.html">http://www.ECE.Concordia.CA/~m_dalal/addr.html</A>
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Sreekant Sreedharan -- <A HREF="mailto:sreekant@india.deneb.com">sreekant@india.deneb.com</A>
+Monday, March 31, 1997
+</B>
+Patrick Davis wrote:
+> 
+> That won't work because CMainFrm.cpp doesn't recognize
+> that CMyView exists, and if you try to use an include
+> statement so it does it will trigger a "Class redefinition"
+> error.
+
+	Please note that you should `#include "CMyView.h"' in your MainFrm.cpp.
+Once you have done this, you should be able to do this.
+
+       CMyView* pView = GetActiveView();
+       CMyDoc*  pDoc  = pView->GetDocument();
+
+	Anyway, your problem with "Class redefinition" can always be solved The
+easiest way to avoid multiple includes of files is by using an
+#ifndef/#define block in the beginning of the file and an #endif at the
+end of the file. 
+
+-- 
+- From Sreekant Sreedharan
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+    <A HREF="http://www.digiday.com/mfcpro/joinmfcl.htm">Become an MFC-L member</A>
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

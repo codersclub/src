@@ -1,0 +1,225 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+reflecting message for CDialog
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Sean Donohue -- <A HREF="mailto:sgd@mwc.gtnet.gov.uk">sgd@mwc.gtnet.gov.uk</A>
+Friday, November 29, 1996
+</B>
+Environment: VC++4.0,NT 3.51
+
+I've been using a CDialog created from a MainFrame and would like to
+have a sort of 'status bar' displayed in it, just a string like
+'running' or 'stopped' on a coloured backgroud. I'm trying to use a
+CStatic string while changing the text and background colours. However,
+I'm currently getting all CStatic areas in the dialog box being changed
+and I'm having trouble specifying each area.
+
+The area is called IDC_status and I have a 
+class CPanel : public CDialog. I also have created a 
+class mystatic : public CStatic which contains an integer member status
+and a function 
+void update_status(int temp) {status=temp};
+
+I just want to be able to call m_status.update_status() passing a number
+to it, and have the mystatic OnCtlColor method set the background colour
+and text color according to the number passed, but this requires
+something called message reflection which confuses me with its
+references to OLE. Here's my current OnCtlColor:
+
+HBRUSH mystatic::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
+{
+    HBRUSH hbr=CStatic::OnCtlColor(pDC,pWnd,nCtlColor);
+
+    switch (status)
+    {
+    case (1):
+        pDC->SetTextColor(RGB(0,0,0));
+        pDC->SetBkColor(RGB(255,0,0));
+    case (2):
+        pDC->SetTextColor(RGB(0,0,0));
+        pDC->SetBkColor(RGB(0,255,0));
+    }
+    return hbr;
+}
+
+Could someone please explain the neccessary message reflection to the
+dialog box? Thanks,
+
+-- 
+Sean Donohue
+
+sgd@mwc.gtnet.gov.uk
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mario Contestabile -- <A HREF="mailto:Mario_Contestabile.UOS__MTL@UOSMTL2.universal.com">Mario_Contestabile.UOS__MTL@UOSMTL2.universal.com</A>
+Monday, December 02, 1996
+</B>
+>HBRUSH mystatic::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
+>{
+ >   HBRUSH hbr=CStatic::OnCtlColor(pDC,pWnd,nCtlColor);
+>
+>    switch (status)
+>    {
+>    case (1):
+>        pDC->SetTextColor(RGB(0,0,0));
+>        pDC->SetBkColor(RGB(255,0,0));
+>    case (2):
+>        pDC->SetTextColor(RGB(0,0,0));
+>        pDC->SetBkColor(RGB(0,255,0));
+>    }
+>    return hbr;
+>}
+>
+
+Create two brushes in OnInitDialog(), a red and a green one, return them in 
+OnCtlColor
+when the pWnd is the one you want.
+
+mcontest@universal.com
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Rajesh Babu T -- <A HREF="mailto:rbabu@hotmail.com">rbabu@hotmail.com</A>
+Tuesday, December 03, 1996
+</B>
+>Environment: VC++4.0,NT 3.51
+>
+>I've been using a CDialog created from a MainFrame and would like to
+>have a sort of 'status bar' displayed in it, just a string like
+>'running' or 'stopped' on a coloured backgroud. I'm trying to use a
+>CStatic string while changing the text and background colours. However,
+>I'm currently getting all CStatic areas in the dialog box being changed
+>and I'm having trouble specifying each area.
+>
+>The area is called IDC_status and I have a 
+>class CPanel : public CDialog. I also have created a 
+>class mystatic : public CStatic which contains an integer member status
+>and a function 
+>void update_status(int temp) {status=temp};
+>
+>I just want to be able to call m_status.update_status() passing a number
+>to it, and have the mystatic OnCtlColor method set the background colour
+>and text color according to the number passed, but this requires
+>something called message reflection which confuses me with its
+>references to OLE. Here's my current OnCtlColor:
+>
+>HBRUSH mystatic::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
+>{
+>    HBRUSH hbr=CStatic::OnCtlColor(pDC,pWnd,nCtlColor);
+>
+>    switch (status)
+>    {
+>    case (1):
+>        pDC->SetTextColor(RGB(0,0,0));
+>        pDC->SetBkColor(RGB(255,0,0));
+>    case (2):
+>        pDC->SetTextColor(RGB(0,0,0));
+>        pDC->SetBkColor(RGB(0,255,0));
+>    }
+>    return hbr;
+>}
+>
+>Could someone please explain the neccessary message reflection to the
+>dialog box? Thanks,
+>
+>-- 
+>Sean Donohue
+>
+>sgd@mwc.gtnet.gov.uk
+>
+
+Hi Sean,
+
+MFC 4.0 provides a feature called “message reflection” that allows these
+notification messages to be handled in either the child control window or the
+parent window, or in both. So You can now write a control class that sets its
+own background color by handling the reflected WM_CTLCOLOR message—all without
+relying on the parent. Note that since message reflection is implemented by
+MFC, not by Windows, the parent window class must be derived from CWnd for
+message reflection to work.
+
+So use -
+ON_WM_CTLCOLOR_REFLECT( )afx_msg HBRUSH CtlColor ( CDC* pDC, UINT nCtlColor );
+handler in the 'class mystatic'.
+
+ON_WM_CTLCOLOR_REFLECT()
+// Note: other code will be in between....
+
+HBRUSH mystatic::CtlColor(CDC* pDC, UINT nCtlColor) 
+{
+// TODO: Change any attributes of the DC here
+
+// TODO: Return a non-NULL brush if the
+//parent's handler should not be called
+return NULL;
+}
+
+I think it solves the problem.
+Bye,
+
+Rajesh Babu
+KL,Malaysia
+                                  
+                                    _/_/_/     _/_/_/  _/_/_/_/_/ 
+                                   _/    _/   _/    _/    _/
+                                  _/    _/   _/    _/    _/
+                                 _/_/_/     _/_/_/      _/
+                                _/    _/   _/    _/    _/
+                               _/    _/   _/    _/    _/
+                              _/    _/   _/_/_/_/    _/
+
+
+---------------------------------------------------------
+Get Your *Web-Based* Free Email at <A HREF="http://www.hotmail.com">http://www.hotmail.com</A>
+---------------------------------------------------------
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Âåðíóòüñÿ â êîðåíü Àðõèâà</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

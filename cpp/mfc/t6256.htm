@@ -1,0 +1,705 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CString::LoadString and Console Application
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Gerry Sweeney -- <A HREF="mailto:gerry@hornbill.com">gerry@hornbill.com</A>
+Tuesday, August 13, 1996
+</B>
+
+Environment: VC++ 4.1, Win NT3.51, 95
+
+Dear listers,
+
+I have a Win32 console application that I would like to use the 
+CString::LoadString member to get my strings from the string table resource. 
+It works fine but I get an from the MFC library. I believe this is because I 
+am not using a CWinApp derived class I have no instance handle that MFC can 
+find.
+
+The asset is in AFXWIN1.INL at line 19
+ASSERT(afxCurrentInstanceHandle != NULL)
+
+Because this is a console application I do not have a WinMain(or do I?) so I 
+can't get the instance handle from there. The only other idea I had was to 
+have my string table in a resource only DLL and use the HINSTANCE from the 
+LoadLibrary call, but this seems to be a bit long winded.
+
+
+Questions?
+
+Am I on the right track?
+How do you get a HINSTANCE for a Win32 console application?
+
+
+Any help would be much appreciated.
+
+
+Gerry Sweeney
+Hornbill Systems Ltd.
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Pete Chestna -- <A HREF="mailto:pchestna@highground.com">pchestna@highground.com</A>
+Thursday, August 15, 1996
+</B>
+[Mini-digest: 7 responses]
+
+If I understand your question, you have resources in your local DLL and you
+want to load them from there.  One quick solution is to set the
+afxCurrentInstanceHandle to the hInstance passed to you in DLLMain.  Since
+you have no application, this should work.
+
+Pete
+
+At 07:09 PM 8/13/96 G, you wrote:
+>
+>Environment: VC++ 4.1, Win NT3.51, 95
+>
+>Dear listers,
+>
+>I have a Win32 console application that I would like to use the 
+>CString::LoadString member to get my strings from the string table resource. 
+>It works fine but I get an from the MFC library. I believe this is because I 
+>am not using a CWinApp derived class I have no instance handle that MFC can 
+>find.
+>
+>The asset is in AFXWIN1.INL at line 19
+>ASSERT(afxCurrentInstanceHandle != NULL)
+>
+>Because this is a console application I do not have a WinMain(or do I?) so I 
+>can't get the instance handle from there. The only other idea I had was to 
+>have my string table in a resource only DLL and use the HINSTANCE from the 
+>LoadLibrary call, but this seems to be a bit long winded.
+>
+>
+>Questions?
+>
+>Am I on the right track?
+>How do you get a HINSTANCE for a Win32 console application?
+>
+>
+>Any help would be much appreciated.
+>
+>
+>Gerry Sweeney
+>Hornbill Systems Ltd.
+>
+---
+"To you -- is it movement or is it action?       Peter J. Chestna
+ It is contact or just reaction?                 HighGround Systems
+ And you -- revolution or just resistance?       PChestna@highground.com
+ Is it living, or just existence?" - RUSH        (508) 263-5588 x.125
+
+-----From: Ian Brown <Ian.Brown@ait.co.uk>
+
+
+
+Hi.
+
+You are quite right to suspect that you do not have a WinMain etc. or 
+indeed an HInstance (I believe).
+
+A Console app is just that, not a Windows app - it would probably run very 
+happily under a non-GUI/full-screen-only version of NT is such a beastie 
+existed. Perhaps it should, and then we could call it DOS-32 :-)
+
+Your idea of a resource DLL sounds promising, although I cannot claim to have 
+tried it personally. The other option may be to create your own CWinApp instance
+and use that (oh yes you can...).
+
+I do recommend a look at 'The Revolutionary Guide to MFC 4 Programming' (Wrox 
+Press, Mike Blaszczak). It has a good appendix on Console apps and is the source
+for my reply.
+
+Good luck...
+
+Ian
+
+-----From: Mike Blaszczak <mikeblas@nwlink.com>
+
+At 07:09 PM 8/13/96 G, Gerry Sweeney wrote:
+>Environment: VC++ 4.1, Win NT3.51, 95
+
+>I have a Win32 console application that I would like to use the 
+>CString::LoadString member to get my strings from the string table resource. 
+>It works fine but I get an from the MFC library. I believe this is because I 
+>am not using a CWinApp derived class I have no instance handle that MFC can 
+>find.
+
+Yes, that's the problem. In other words, you're trying to use MFC without
+properly initializing it first.
+
+>Because this is a console application I do not have a WinMain(or do I?) so I 
+>can't get the instance handle from there.
+
+Console applications have main(), not WinMain().  You're right, you can't
+get the instance handle of your own self from main()--but there are other
+ways.
+
+>The only other idea I had was to 
+>have my string table in a resource only DLL and use the HINSTANCE from the 
+>LoadLibrary call, but this seems to be a bit long winded.
+
+You just need to load MFC properly.  This is covered in my book.  It
+is also covered in article number  Q150764, which I found by searching
+for "MFC Console" in the "Visual C++" Knowledge Base at
+http://www.microsoft.com/kb.
+
+You can do this:
+
+#include <afx.h>
+#include <afxwin.h>
+
+CWinApp theApp; // you don't even have to derive your own
+
+int main()
+{
+   if (!AfxWinInit(::GetModuleHandle(NULL), NULL, ::GetCommandLine(), 0))
+      return -1; // you're in serious trouble
+
+   // now, everything works, including:
+
+   CString str;
+   str.LoadResource(37);
+   printf("String number thirty seven is: %s\n", (LPCTSTR) str);
+   return 0;
+}
+
+>How do you get a HINSTANCE for a Win32 console application?
+
+By calling ::GetModuleHandle(NULL).
+
+
+.B ekiM
+http://www.nwlink.com/~mikeblas   <--- trip report central
+1995 Honda VFR750F (Serial number 00050!)
+1987 Yamaha FZ700 (damaged)                AMA, HRC, VFROC
+These words are my own: I do not speak for Microsoft.
+
+-----From: "Peter Jones" <peter.jones@autodesk.com>
+
+     There are some interesting MSDN hits on this issue:
+     
+     One article appears to be by calling GetModuleHandle which should be 
+     the same an the instance handle. 
+     
+     The other, more kludgy way, is to obtain the window handle of the 
+     console app and then get module handle from there.
+     
+     Hope this helps.
+     
+     Pj.
+     
+     Articles are included below:
+     
+  
+PSS ID Number: Q150764
+Article last modified on 05-16-1996
+ 
+2.00 2.10 2.20 4.00 4.10
+ 
+WINDOWS NT
+ 
+
+--------------------------------------------------------------------------
+The information in this article applies to:
+ 
+ - The Microsoft Foundation Classes (MFC), included with:
+   Microsoft Visual C++, 32-bit Edition, versions 2.0, 2.1, 2.2, 4.0, 4.1
+--------------------------------------------------------------------------
+ 
+SYMPTOMS
+========
+ 
+CString::LoadString() generates an MFC assert in debug mode console
+applications or fails in release mode console applications.
+ 
+CAUSE
+=====
+ 
+CString::LoadString() relies on MFC global resource handles that are
+initialized in AfxWinMain(), which is only called in MFC GUI-based
+applications.
+ 
+RESOLUTION
+==========
+ 
+The resource string is loaded using the Win32 API ::LoadString() function.
+This method does not require any extra MFC initialization.
+ 
+Example #1 below uses this method.
+ 
+It is possible to initialize the MFC global resource handles by calling the
+undocumented AfxWinInit() function. In this case, it is advisable to
+declare an instance of a CWinApp class.
+ 
+Example #2 below demonstrates this method.
+ 
+STATUS
+======
+ 
+This behavior is by design.
+ 
+WORKAROUND
+==========
+ 
+Sample Code - Example #1
+------------------------
+ 
+   /* Compile options needed: /MT
+   */
+   #include <afx.h>
+   #include <stdio.h>
+   #include <conio.h>
+ 
+   #define IDS_HELLO 1
+ 
+   BOOL LoadStringResource(CString &cszString, UINT nID)
+   {
+       int nSize = 0;
+       int nLen = -1;
+ 
+       cszString.Empty();
+ 
+       //Keep looping until we have the whole string
+       while ((nLen != 0) && (nLen == nSize - 1))
+       {
+           //Grow buffer by 256 bytes
+           nSize += 256;
+ 
+           //Load String Resource
+           nLen = ::LoadString( GetModuleHandle(NULL), nID,
+                                cszString.GetBuffer(nSize-1), nSize);
+       }
+       cszString.ReleaseBuffer();
+ 
+       return (BOOL) nLen;
+   }
+ 
+   void main(void)
+   {
+       AfxInitialize();
+ 
+       CString cszString;
+ 
+       // IDS_HELLO is a string resource attached to the console
+   application
+       if (LoadStringResource(cszString, IDS_HELLO))
+           printf("The string was loaded\n%s\n", (LPCTSTR) cszString);
+       else
+           printf("Error loading string");
+ 
+       getch();
+   }
+ 
+Sample Code - Example #2
+------------------------
+ 
+   /* Compile options needed: /MT
+   */
+   #include <afx.h>
+   #include <afxwin.h>
+   #include <conio.h>
+ 
+   #define IDS_HELLO 1
+ 
+   CWinApp theApp;
+ 
+   void main()
+   {
+       if (!AfxWinInit(GetModuleHandle(NULL), NULL,
+           ::GetCommandLine(), 0))
+       {
+           printf("Couldn't initialize MFC!\n");
+           return;
+       }
+ 
+       CString cszString;
+ 
+       // IDS_HELLO is a string resource attached to the console
+   application
+       if (cszString.LoadString(IDS_HELLO))
+           printf("The string was loaded\n%s\n", (LPCTSTR) cszString);
+       else
+           printf("Error loading string");
+ 
+       getch();
+   }
+ 
+Additional reference words: 2.00 2.10 2.20 4.00 4.10
+KBCategory: kbprg kbprb
+KBSubcategory: MfcMisc
+ 
+=============================================================================
+Copyright Microsoft Corporation 1996.
+
+----------------------------------------------------------------------------
+
+  
+PSS ID Number: Q124103
+Article last modified on 09-29-1995
+ 
+3.10 3.50  | 4.00
+ 
+WINDOWS NT | WINDOWS
+ 
+
+-------------------------------------------------------------------------
+The information in this article applies to:
+ 
+ - Microsoft Win32 Application Programming Interface (API) included with:
+ 
+    - Microsoft Windows NT versions 3.1 and 3.5
+    - Microsoft Windows 95 version 4.0
+-------------------------------------------------------------------------
+ 
+SUMMARY
+=======
+ 
+It may be useful to manipulate a window associated with a console
+application. The Win32 API provides no direct method for obtaining the
+window handle associated with a console application. However, you can
+obtain the window handle by calling FindWindow(). This function retrieves a
+window handle based on a class name or window name.
+ 
+Call GetConsoleTitle() to determine the current console title. Then supply
+the current console title to FindWindow().
+ 
+MORE INFORMATION
+================
+ 
+Because multiple windows may have the same title, you should change the
+current console window title to a unique title. This will help prevent the
+wrong window handle from being returned. Use SetConsoleTitle() to change
+the current console window title. Here is the process:
+ 
+1. Call GetConsoleTitle() to save the current console window title.
+ 
+2. Call SetConsoleTitle() to change the console title to a unique title.
+ 
+3. Call Sleep(40) to ensure the window title was updated.
+ 
+4. Call FindWindow(NULL, uniquetitle), to obtain the HWND
+   this call returns the HWND -- or NULL if the operation failed.
+ 
+5. Call SetConsoleTitle() with the value retrieved from step 1, to
+   restore the original window title.
+ 
+You should test the resulting HWND. For example, you can test to see if the
+returned HWND corresponds with the current process by calling
+GetWindowText() on the HWND and comparing the result with
+GetConsoleTitle().
+ 
+The resulting HWND is not guaranteed to be suitable for all window handle
+operations.
+ 
+Sample Code
+-----------
+ 
+The following function retrieves the current console application window
+handle (HWND). If the function succeeds, the return value is the handle of
+the console window. If the function fails, the return value is NULL. Some
+error checking is omitted, for brevity.
+ 
+HWND GetConsoleHwnd(void)
+{
+    #define MY_BUFSIZE 1024 // buffer size for console window titles
+    HWND hwndFound;         // this is what is returned to the caller
+    char pszNewWindowTitle[MY_BUFSIZE]; // contains fabricated WindowTitle
+    char pszOldWindowTitle[MY_BUFSIZE]; // contains original WindowTitle
+ 
+    // fetch current window title
+ 
+    GetConsoleTitle(pszOldWindowTitle, MY_BUFSIZE);
+ 
+    // format a "unique" NewWindowTitle
+ 
+    wsprintf(pszNewWindowTitle,"%d/%d",
+                GetTickCount(),
+                GetCurrentProcessId());
+ 
+    // change current window title
+ 
+    SetConsoleTitle(pszNewWindowTitle);
+ 
+    // ensure window title has been updated
+ 
+    Sleep(40);
+ 
+    // look for NewWindowTitle
+ 
+    hwndFound=FindWindow(NULL, pszNewWindowTitle);
+ 
+    // restore original window title
+ 
+    SetConsoleTitle(pszOldWindowTitle);
+ 
+    return(hwndFound);
+}
+ 
+Additional reference words: 3.10 3.50 4.00 95
+KBCategory: kbui kbcode
+KBSubcategory: BseCon UsrWndw
+=============================================================================
+Copyright Microsoft Corporation 1995.
+
+
+ 
+
+ 
+-----From: Tim Peacock <Tim.Peacock@isltd.insignia.com>
+
+
+Have you tried ::GetModuleHandle()?  May be used same as handle returned by 
+::LoadLibrary().
+
+								tim.
+-----From: "Eric Kenslow" <webmaster@digilight.com>
+
+Here's how I solved this problem.  Place this either in your main() or
+somewhere else very near the beginning of your program:
+
+    // Set our resource handle
+    ::AfxSetResourceHandle( HINSTANCE( ::GetModuleHandle( NULL ) ) );
+    afxCurrentInstanceHandle = HINSTANCE( ::GetCurrentProcess() );
+
+Happily, after this your console app can use pretty much all of MFC's
+services.
+
+/* Eric Kenslow - Digital Lighthouse Inc.
+ * webmaster@digilight.com
+ * http://www.digilight.com
+ */
+-----From: Tim Hagemann <Tim@way2.net>
+
+MFC handles "global" variables such as the hInstance of the current =
+module in special structures called module states, which are initialized =
+in CWinApp - so bad luck for LoadString...
+
+You should write your own version of LoadString:
+
+int AFXAPI AfxLoadStringEx(HINSTANCE hI,UINT nID, LPTSTR lpszBuf, UINT =
+nMaxBuf)
+{
+	ASSERT(AfxIsValidAddress(lpszBuf, nMaxBuf*sizeof(TCHAR)));
+#ifdef _DEBUG
+	// LoadString without annoying warning from the Debug kernel if the
+	//  segment containing the string is not present
+	if (::FindResource(hI,
+	   MAKEINTRESOURCE((nID>>4)+1), RT_STRING) =3D=3D NULL)
+	{
+		lpszBuf[0] =3D '\0';
+		return 0; // not found
+	}
+#endif //_DEBUG
+	int nLen =3D ::LoadString(hI, nID, lpszBuf, nMaxBuf);
+	if (nLen =3D=3D 0)
+		lpszBuf[0] =3D '\0';
+	return nLen;
+}
+
+BOOL CStringEx::LoadString(HINSTANCE hI,UINT nID)
+{
+	// try fixed buffer first (to avoid wasting space in the heap)
+	TCHAR szTemp[256];
+	int nLen =3D AfxLoadStringEx(hI,nID, szTemp, _countof(szTemp));
+	if (_countof(szTemp) - nLen > CHAR_FUDGE)
+	{
+		*this =3D szTemp;
+		return nLen > 0;
+	}
+
+	// try buffer size of 512, then larger size until entire string is =
+retrieved
+	int nSize =3D 256;
+	do
+	{
+		nSize +=3D 256;
+		nLen =3D AfxLoadStringEx(hI,nID, GetBuffer(nSize-1), nSize);
+	} while (nSize - nLen <=3D CHAR_FUDGE);
+	ReleaseBuffer();
+
+	return nLen > 0;
+}
+
+Note that the code above has not been tested, I grabbed it from the =
+MFC-sources and modified it on the fly.
+
+Tim Hagemann
+ifa informationssysteme
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Friday, August 16, 1996
+</B>
+At 08:53 AM 8/15/96 -0400, you wrote:
+>-----From: Ian Brown <Ian.Brown@ait.co.uk>
+
+>You are quite right to suspect that you do not have a WinMain etc. or 
+>indeed an HInstance (I believe).
+
+>A Console app is just that, not a Windows app - it would probably run very 
+>happily under a non-GUI/full-screen-only version of NT is such a beastie 
+>existed. Perhaps it should, and then we could call it DOS-32 :-)
+
+Actually, both a console app and a GUI app are Windows applications.  They
+can make full use of the Win32 API.  Console applications have some special
+considrations because theire architecture isn't always event-driven: depending
+on what you want to do with your console application, you might need to 
+write a message loop, for example.
+
+The difference between a GUI app and a Console app is the subsystem it runs
+under: read up on the /SUBSYSTEM option in the linker to see what this is
+about.
+
+To be successful at console app programming in Windows, you have to drop lots
+of preconceptions (eg, "everything I need to run I get from parameters
+to main()") and think carefully about the Windows architecture.
+
+>The other option may be to create your own CWinApp instance
+>and use that (oh yes you can...).
+
+I think this is the most appropriate solution.  Since you're using MFC,
+you should have a CWinApp.
+
+>I do recommend a look at 'The Revolutionary Guide to MFC 4 Programming'
+>(Wrox Press, Mike Blaszczak).
+
+That guy is nothing but a loud-mouth drunk who has too big of a monitor
+for his own good.
+
+-----From: "Peter Jones" <peter.jones@autodesk.com>
+
+>     The other, more kludgy way, is to obtain the window handle of the 
+>     console app and then get module handle from there.
+
+You can't do this. Not reliably or easily, anyway--and if you invent
+a hack to get your console window handle, and it'll probably break in
+some later version of Windows.
+
+It's far more reliable to call ::GetModuleHandle() 
+
+>     Articles are included below:
+
+Maybe it's better to just quote Q numbers--people can get them from
+three or four different places... _if_ they want them.
+ 
+>-----From: "Eric Kenslow" <webmaster@digilight.com>
+>
+>Here's how I solved this problem.  Place this either in your main() or
+>somewhere else very near the beginning of your program:
+
+>    // Set our resource handle
+>    ::AfxSetResourceHandle( HINSTANCE( ::GetModuleHandle( NULL ) ) );
+>    afxCurrentInstanceHandle = HINSTANCE( ::GetCurrentProcess() );
+
+>Happily, after this your console app can use pretty much all of MFC's
+>services.
+
+Actually, you'll likely break--depending on which "services" of MFC
+you use. There are _lots_ of other things that CWinApp initializes for
+MFC that you've not initialized in this one call.  If you run off and
+try to control some OLE automation server, or create a CDatabase object,
+you'll probably start tossing ASSERTs.
+
+>-----From: Tim Hagemann <Tim@way2.net>
+
+>MFC handles "global" variables such as the hInstance of the current 
+>module in special structures called module states, which are initialized 
+>in CWinApp - so bad luck for LoadString...
+
+>You should write your own version of LoadString:
+
+It's far easier and safer to create a CWinApp instance and get it
+initialized appropriately.
+
+.B ekiM
+http://www.nwlink.com/~mikeblas/
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Gerry Sweeney -- <A HREF="mailto:gerry@hornbill.com">gerry@hornbill.com</A>
+Monday, August 19, 1996
+</B>
+
+Environment: VC++ 4.1, Win NT3.51, 95
+
+Dear listers,
+
+I recently asked a question about CString::LoadString inside a Win32 console 
+application. Just in summary, I was unable to use CString::LoadString. The 
+MFC was asserting. I tried making a call to 
+AfxSetResourceHandle(GetModuleHandle(NULL)) but this its self would assert. 
+and CString::LoadString would still not work. To make this work I have 
+implemented my own 'LoadString' function as follows:-
+
+extern "C" void ServerLoadString(UINT nID, CString& szString)
+{
+     char strBuff[256];
+     strBuff[0] = 0;
+     ::LoadString(NULL, nID, strBuff, 256);
+     szString = strBuff;
+}
+
+It seems that passing null as the first parameter to 'LoadString' uses the 
+resources found in the default module, The same as 'GetModuleHandle'. This 
+now works fine for both the Service and the GUI build.
+
+I hope this will be usefull to some one else in the future
+
+Gerry Sweeney
+Hornbill Systems Ltd.
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

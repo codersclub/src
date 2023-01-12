@@ -1,0 +1,448 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Problem with SetParent() function
+</B></FONT>
+<BR>
+<PRE>
+<B>
+K. V. Rammohan Rao -- <A HREF="mailto:kvrmrao@SierraOpt.com">kvrmrao@SierraOpt.com</A>
+Wednesday, November 06, 1996
+</B>
+Environment: VC++ 4.0, Windows 95, SDI and Multithreaded application.
+
+Background: I have an application in which 20-30 tree controls are used
+to hold huge amounts of data. Each of these tree controls is CREATED BY
+A DIFFERENT USER INTERFACE THREAD. Since a parent window is needed to
+create tree control i am passing m_hWnd of the FrameWnd from the main
+thread as a parameter in the constructor of CWinThread derived User
+Interface thread. This is used as a parent.
+
+I need to present the same tree controls for user editing when ever
+ID_EDIT_TREE menu item is clicked. To acheive this I am doing the
+following.
+
+1) Instantiate CEditTreeDialog class which has a dummy control in dialog
+template in place of tree. This is to facilitate layout during design.
+Pass the pointer to CTreeCtrl derived class in the constructor of
+CEditTreeDialog.
+
+CEditTreeDialog::CEditMibDialog(CWnd *pTr, CWnd* pParent = NULL)
+{
+	m_pTr = pTr;
+}
+
+2) In the OnInitDialog store the original parent of the tree. Change the
+parent to CEditTreeDialog. And size tree control.
+
+BOOL CEditTreeDialog::OnInitDialog() 
+{
+	CDialog::OnInitDialog();
+	
+	CWnd *pTrDummy = GetDlgItem(IDC_TREEDUMMY);
+	CRect rect;
+	pTrDummy->GetWindowRect(&rect);
+	ScreenToClient(&rect);
+	CRect rect1(0,0,0,0);
+	pTrDummy->MoveWindow(&rect1, TRUE);
+	
+	//Change parent of the TreeCtrl passed in the constructor
+	m_hWndParent = ::GetParent(m_pTr->m_hWnd);
+	::SetParent(m_pTr->m_hWnd, m_hWnd);
+
+	::MoveWindow(m_pTr->m_hWnd, rect.left, rect.top, rect.Width(),
+rect.Height(), TRUE);
+	::ShowWindow(m_pTr->m_hWnd, SW_SHOW);
+	
+	return TRUE;  // return TRUE unless you set the focus to a control
+	              // EXCEPTION: OCX Property Pages should return FALSE
+}
+
+3) Display the dialog.
+
+4) In OnOK() and in OnCancel() restore the original parent of the tree
+before calling base class version.
+
+void CEditTreeDialog::OnOK()
+{
+	::SetParent(m_pTr->m_hWnd, m_hWndParent);
+	::MoveWindow(m_pTr->m_hWnd, 0, 0, 0, 0, TRUE);
+	::ShowWindow(m_pTr->m_hWnd, SW_HIDE);
+	
+	CDialog::OnOK();
+}
+
+void CEditTreeDialog::OnCancel()
+{
+	::SetParent(m_pTr->m_hWnd, m_hWndParent);
+	::MoveWindow(m_pTr->m_hWnd, 0, 0, 0, 0, TRUE);
+	::ShowWindow(m_pTr->m_hWnd, SW_HIDE);
+	
+	CDialog::OnCancel();
+
+}
+
+
+Problem: When application exits an "Access violation in COMCTRL32.DLL"
+error is displayed and program is crashing.
+
+By putting break points I am able to find that each tree control is
+destroyed two times and second time it is giving error. Naturally a
+control can not be destroyed twice. What i am not able to pin point is
+which part of code is triggering second time destruction. The nearest I
+can go is some code connected with temp & permanent handle maps is
+causing these problems.
+
+Has any of you faced such problem? I would appreciate if any one can
+throw some light on it.
+
+Regards,
+Rammohan
+_____________________________________________________________________
+K.V.Rama Mohana Rao
+Project Leader
+Sierra Optima Ltd
+# 503, Software Technology Park
+Maitrivanam, HUDA Complex
+Ameerpet, Hyderabad - 5000 038
+AP,   INDIA
+Work : (91)-40-292771, 290321
+Fax  : (91)-40-294810
+_____________________________________________________________________
+
+
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dean Wiles -- <A HREF="mailto:deanw@isc-br.isc-br.com">deanw@isc-br.isc-br.com</A>
+Thursday, November 07, 1996
+</B>
+[Mini-digest: 2 responses]
+
+> From: K. V. Rammohan Rao <kvrmrao@SierraOpt.com>
+> To: 'mfc-l@netcom.com'
+> Subject: Problem with SetParent() function
+> Date: Tuesday, November 05, 1996 11:48 PM
+> 
+> Environment: VC++ 4.0, Windows 95, SDI and Multithreaded application.
+> 
+> Background: I have an application in which 20-30 tree controls are used
+> to hold huge amounts of data. Each of these tree controls is CREATED BY
+> A DIFFERENT USER INTERFACE THREAD. Since a parent window is needed to
+> create tree control i am passing m_hWnd of the FrameWnd from the main
+> thread as a parameter in the constructor of CWinThread derived User
+> Interface thread. This is used as a parent.
+> 
+> ...
+>
+> Problem: When application exits an "Access violation in COMCTRL32.DLL"
+> error is displayed and program is crashing.
+> 
+> By putting break points I am able to find that each tree control is
+> destroyed two times and second time it is giving error. Naturally a
+> control can not be destroyed twice. What i am not able to pin point is
+> which part of code is triggering second time destruction. The nearest I
+> can go is some code connected with temp & permanent handle maps is
+> causing these problems.
+> 
+> Has any of you faced such problem? I would appreciate if any one can
+> throw some light on it.
+> 
+> Regards,
+> Rammohan
+
+This might not be the problem, but the help for ::DestroyWindow says:
+
+A thread cannot use DestroyWindow to destroy a window created by a
+different thread.
+
+There may be some problem if the window is being closed by a different
+thread than that which created it.
+
+I have also had problems if I didn't specify a parent when a dialog was
+created (by default pParentWnd = NULL) - it then finds a parent to attach
+itself to.  If the parent it found goes away, MFC will crash in the message
+pump.  This occurs with the CSplashWnd add-on.
+
+Hope this is of some help.
+
+--------------------------------------------------------------------------
+Dean Wiles (deanw@mail.isc-br.com)          Olivetti North America
+Phone:  (509)927-7037                       22425 East Appleway Ave
+Fax:    (509)927-2499                       Liberty Lake, WA 99019-9534
+If the Son sets you free, you will be free indeed.  (John 8:36)
+
+-----From: Jim Lawson Williams <jimlw@mail.ccur.com.au>
+
+G'day!
+
+At 01:18 PM 06-11-96 +0530, you wrote:
+>Environment: VC++ 4.0, Windows 95, SDI and Multithreaded application.
+>
+Try patching out the base-class CDialog::OnOK() and ::OnCancel().
+
+Regards,
+Jim LW
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Saturday, November 09, 1996
+</B>
+At 13:18 11/6/96 +0530, "K. V. Rammohan Rao" <kvrmrao@SierraOpt.com> wrote:
+>Environment: VC++ 4.0, Windows 95, SDI and Multithreaded application.
+
+>Background: I have an application in which 20-30 tree controls are used
+>to hold huge amounts of data. Each of these tree controls is CREATED BY
+>A DIFFERENT USER INTERFACE THREAD.
+
+Why?  That, to me, seems like an unjustifiably bad design compromise.
+Control windows interact very closely with their parent window.  They
+_send_ notification messages, and the parent _sends_ command messages
+to them.
+
+The documentation explains how sending a message from one thread to
+a window owned by another thread causes a task switch, which means that
+the sending thread is blocking while wwaiting for the receiving thread to
+process the message.
+
+In light of this fact, why did you decide to create a different thread
+for every single control in your window when sending messages to the
+controls (and having the controls send messages back) will cause your
+involved threads to block, anyway?
+
+>By putting break points I am able to find that each tree control is
+>destroyed two times and second time it is giving error.
+
+I'm confused--your description isn't very clear. Are you saying that the
+tree controls themselves are being destroyed twice?
+
+>The nearest I
+>can go is some code connected with temp & permanent handle maps is
+>causing these problems.
+
+Tree controls don't show up in any MFC maps. CTreeCtrl objects do, though.
+Are you saying that you're destroying the same CTreeCtrl twice, or
+are you saying that you're destroying the same Windows tree control twice?
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+I'm afraid I've become some sort of speed freak.
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+K. V. Rammohan Rao -- <A HREF="mailto:kvrmrao@SierraOpt.com">kvrmrao@SierraOpt.com</A>
+Tuesday, November 12, 1996
+</B>
+Let me thank you all who responded, especially, Dean Wiles and Mike
+Blaszczak. 
+
+>>Background: I have an application in which 20-30 tree controls are used
+>>to hold huge amounts of data. Each of these tree controls is CREATED BY
+>>A DIFFERENT USER INTERFACE THREAD.
+>
+>Why?  That, to me, seems like an unjustifiably bad design compromise.
+>Control windows interact very closely with their parent window.  They
+>_send_ notification messages, and the parent _sends_ command messages
+>to them.
+>
+>The documentation explains how sending a message from one thread to
+>a window owned by another thread causes a task switch, which means that
+>the sending thread is blocking while wwaiting for the receiving thread
+>to
+>process the message.
+>
+>In light of this fact, why did you decide to create a different thread
+>for every single control in your window when sending messages to the
+>controls (and having the controls send messages back) will cause your
+>involved threads to block, anyway?
+>
+This design is carried from earlier single threaded design. These tree
+controls are never visible in the parent window. They are just storing
+ordered data and I am using their window handles to post user defined
+messages. These messages originate from network. I disabled parent
+notify style while creating these controls. Whenever any of these
+controls is made visible in a dialog I first switch parent and show it.
+I did not notice any performance loss because of thread blocking. Now I
+am creating a hidden Frame window in each thread and it is working okay.
+
+>>By putting break points I am able to find that each tree control is
+>>destroyed two times and second time it is giving error.
+>
+>I'm confused--your description isn't very clear. Are you saying that
+>the
+>tree controls themselves are being destroyed twice?
+>
+>>The nearest I
+>>can go is some code connected with temp & permanent handle maps is
+>>causing these problems.
+>
+>Tree controls don't show up in any MFC maps. CTreeCtrl objects do,
+>though.
+>Are you saying that you're destroying the same CTreeCtrl twice, or
+>are you saying that you're destroying the same Windows tree control
+>twice?
+
+When destructors are called for CTreeCtrl derived objects Windows'
+windows are not existing. Even after creating hidden frame window in
+each thread I had this problem. This is a thread synchronisation
+problem. I was posting WM_QUIT messages to each of the secondary
+threads. But I was not waiting for each thread to terminate. Since
+secondary threads have much more clean up to do they are taking much
+longer time than the primary thread. When primary thread is terminted
+all windows belonging to the process, including those of secondary
+threads, are destroyed before secondary threads completed cleaning.
+After inserting a WaitForSingleObject() call after PostMessage() it is
+working alright.
+
+Rammohan
+
+_____________________________________________________________________
+K.V.Rama Mohana Rao
+Project Leader
+Sierra Optima Ltd
+# 503, Software Technology Park
+Maitrivanam, HUDA Complex
+Ameerpet, Hyderabad - 5000 038
+AP,   INDIA
+Work : (91)-40-292771, 290321
+Fax  : (91)-40-294810
+_____________________________________________________________________
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+K. V. Rammohan Rao -- <A HREF="mailto:kvrmrao@SierraOpt.com">kvrmrao@SierraOpt.com</A>
+Wednesday, November 13, 1996
+</B>
+Let me thank you all who responded, especially, Dean Wiles and Mike
+Blaszczak. 
+
+>>Background: I have an application in which 20-30 tree controls are used
+>>to hold huge amounts of data. Each of these tree controls is CREATED BY
+>>A DIFFERENT USER INTERFACE THREAD.
+>
+>Why?  That, to me, seems like an unjustifiably bad design compromise.
+>Control windows interact very closely with their parent window.  They
+>_send_ notification messages, and the parent _sends_ command messages
+>to them.
+>
+>The documentation explains how sending a message from one thread to
+>a window owned by another thread causes a task switch, which means that
+>the sending thread is blocking while wwaiting for the receiving thread
+>to
+>process the message.
+>
+>In light of this fact, why did you decide to create a different thread
+>for every single control in your window when sending messages to the
+>controls (and having the controls send messages back) will cause your
+>involved threads to block, anyway?
+>
+This design is carried from earlier single threaded design. These tree
+controls are never visible in the parent window. They are just storing
+ordered data and I am using their window handles to post user defined
+messages. These messages originate from network. I disabled parent
+notify style while creating these controls. Whenever any of these
+controls is made visible in a dialog I first switch parent and show it.
+I did not notice any performance loss because of thread blocking. Now I
+am creating a hidden Frame window in each thread and it is working okay.
+
+>>By putting break points I am able to find that each tree control is
+>>destroyed two times and second time it is giving error.
+>
+>I'm confused--your description isn't very clear. Are you saying that
+>the
+>tree controls themselves are being destroyed twice?
+>
+>>The nearest I
+>>can go is some code connected with temp & permanent handle maps is
+>>causing these problems.
+>
+>Tree controls don't show up in any MFC maps. CTreeCtrl objects do,
+>though.
+>Are you saying that you're destroying the same CTreeCtrl twice, or
+>are you saying that you're destroying the same Windows tree control
+>twice?
+
+When OnDestroy() is called for CTreeCtrl derived objects Windows'
+windows are not existing. Even after creating hidden frame window in
+each thread I had this problem. This is a thread synchronisation
+problem. I was posting WM_QUIT messages to each of the secondary
+threads. But I was not waiting for each thread to terminate. Since
+secondary threads have much more clean up to do they are taking much
+longer time than the primary thread. When primary thread is terminted
+all windows belonging to the process, including those of secondary
+threads, are destroyed before secondary threads completed cleaning.
+After inserting a WaitForSingleObject() call after PostMessage() it is
+working alright.
+
+Rammohan
+
+_____________________________________________________________________
+K.V.Rama Mohana Rao
+Project Leader
+Sierra Optima Ltd
+# 503, Software Technology Park
+Maitrivanam, HUDA Complex
+Ameerpet, Hyderabad - 5000 038
+AP,   INDIA
+Work : (91)-40-292771, 290321
+Fax  : (91)-40-294810
+_____________________________________________________________________
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

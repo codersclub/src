@@ -1,0 +1,158 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CDC::DrawState problem/bug?
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Cliff Strass -- <A HREF="mailto:Cliff_Strass@mbnet.mb.ca">Cliff_Strass@mbnet.mb.ca</A>
+Friday, September 06, 1996
+</B>
+Environment: VC++ 4.0, NT 4.0 (beta2)
+
+I have created my own custom control which, among other things, is supposed
+to draw an icon or a bitmap. For the bitmap I use the CDC::BitBlt function,
+and CDC::DrawIcon function for the icon. I want to be able to draw the
+bitmap or icon in a disabled state, where the icon/bitmap appears to be
+greyed out.
+Using the CDC::DrawState with the nFlags parameter set to DSS_DISABLED
+works, however it creates a first-chance exception, here is the exact
+message I get:
+
+	First-chance exception in myapp.exe (NTDLL.DLL): 0xC0000005: Access
+Violation.
+
+This causes the application to crash at other locations in the code. When I
+remove the DrawState call, everything is working fine.
+
+Has anyone been able to use this function without problems or is this a
+bug. Note that this problem also occurs when I use the raw API function
+::DrawState(...).
+
+	CPoint picpt(x,y);
+	CSize picsize(picWidth,picHeight);
+	HBRUSH hBrush=NULL;
+	// m_Bmp is a CBitmap with the coloured bitmap to draw in disabled mode
+	BOOL check=pDC>DrawState(picpt, picsize, &m_hBmp, DSS_DISABLED, hBrush);
+
+I would appreciate if anyone could help solve this function or if you know
+of any other way of 'disabling' an icon or bitmap.
+
+Regards, Cliff.
+
+Cliff Strass
+strass@mbnet.mb.ca
+Winnipeg, Canada.
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Sunday, September 08, 1996
+</B>
+At 02:06 PM 9/6/96 -0500, you wrote:
+>Environment: VC++ 4.0, NT 4.0 (beta2)
+
+Windows NT 4.0 final has been shipping for three or four weeks.  Betas
+are for testing purposes only--you should upgrade as soon as possible to
+the released version of the operating system.
+
+>Has anyone been able to use this function without problems or is this a
+>bug. Note that this problem also occurs when I use the raw API function
+>::DrawState(...).
+
+I guess that means this isn't really an MFC question.  Since you're having
+the problem with a beta operating system, and you've found that the
+problem is not with MFC, maybe it would be far more appropriate for you to 
+contact the beta suppotr folks identified in the beta kit.
+
+>	CPoint picpt(x,y);
+>	CSize picsize(picWidth,picHeight);
+>	HBRUSH hBrush=NULL;
+>	// m_Bmp is a CBitmap with the coloured bitmap to draw in disabled mode
+>	BOOL check=pDC>DrawState(picpt, picsize, &m_hBmp, DSS_DISABLED, hBrush);
+
+Why are you passing only DSS_DISABLED?  Shouldn't you be passing DST_ICON or
+DST_PREFIX or'ed in there, as well?  Since DST_COMPLEX is defnied as 0, and
+since you're not or'ing in any DST_* bits, the function thinks you mean
+DST_COMPLEX.
+
+Since you specify DST_COMPLEX, the function wants to call back the callback
+you pass it via the lpOutputFunc you pass in.  Since you use this override in
+MFC, the lpOutputFunc is passed by MFC as NULL.  Since you pass DSS_DISABLED
+and a NULL lpOutputFunc, it seems like you're making an invalid call to the
+function--and a first-chance exception in such a circumstance seems
+understandable.
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Roger Onslow/Newcastle/Computer Systems Australia/
+Tuesday, September 10, 1996
+</B>
+>Using the CDC::DrawState with the nFlags parameter set to DSS_DISABLED
+
+You should use DSS_DISABLED | DSS_ICON (or whatever)
+You have to set both the image type and the state in the flag
+
+> CPoint picpt(x,y);
+> CSize picsize(picWidth,picHeight);
+> HBRUSH hBrush=NULL;
+> // m_Bmp is a CBitmap with the coloured bitmap to draw in disabled mode
+> BOOL check=pDC>DrawState(picpt, picsize, &m_hBmp, DSS_DISABLED, hBrush);
+
+Why "&m_hBmp" ??? I assume m_hBmp is a HBITMAP.
+DrawState takes either "HBITMAP" or "CBitmap*", and "&m_hBmp" is neither of 
+these, so MFC is having to do some conversion/casting here.
+So try using just "m_hBmp" instead.
+
+Roger Onslow
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

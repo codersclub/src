@@ -1,0 +1,956 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+LPMETAFILEPICT to CBitmap???
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Hany Nabil Morcos -- <A HREF="mailto:hnm@sakhr.rite.com">hnm@sakhr.rite.com</A>
+Tuesday, March 04, 1997
+</B>
+[Mini-digest: 2 responses]
+
+Roma wrote:
+> 
+> Hany Nabil Morcos wrote:
+> >
+> > Environment: VC++ 4.1, Win95
+> >
+> > Hi all;
+> >
+> > Could anyone advise how to construct CBitmap from LPMETAFILEPICT (mm,
+> > xExt, yExt, hMF).
+> >
+> > I have tryed to play the metafile on a memory dc, with its mapping mode,
+> > but I failed to create a CBitmap object.
+> >
+> > Thank you in advance.
+> >
+> > P.S. Please reply to me beside the mailing list. (hnm@sakhr.rite.com)
+> If I remember correctly, you have to do the following:
+> 
+>  CBitmap     bmp;
+>  CDC         MemDCOne;
+>  CDC         MemDCTwo;
+> 
+>  MemDCOne.CreateCompatibleDC(<some device's DC>);
+>  MemDCTwo.CreateCompatibleDC(<same device's DC>);
+> 
+>  [play your metafile into MemDCOne here]
+> 
+>  bmp.CreateCompatibleBitmap(&MemDCTwo, ...< size of you picture> );
+> 
+>  CBitmap* pOldBitmap = MemDCTwo.SelectObject(&bmp);
+> 
+>  //This is actual copying
+>  MemDCTwo.BitBlt(0, 0, <size of your picture>, &MemDCOne, 0, 0,SRCCOPY);
+> 
+>  MemDCTwo.SelectObject(pOldBitmap);
+> 
+>  //at this point you have your picture in the bmp object (most
+> likely..:)
+> 
+> HTH,
+> -Roma
+
+Thank you,
+I have tried this solution which seems quite reasonable but with no
+success. For testing, I got my LPMETAFILEPICT from pasting from "Paint".
+I used NULL CClientDC in both <some device's DC> in the upper code, and
+in display of the CBitmap afterwords. I even tried to select first a
+colored bitmap in the memory DC, as well as setting the mapping mode
+from LPMETAFILEPICT. All gave rubbish on the whole screen although I am
+using the dimensions in LPMETAFILEPICT in <size of your picture> in the
+upper code.
+Any clues????? Is it OK to play metafiles on a memory DC?????
+						Regards..
+						Hany Morcos
+-----From: Roma <roma@neonet.lv>
+
+Hi!
+
+Hany Nabil Morcos wrote:
+>Thank you,
+>I have tried this solution which seems quite reasonable but with no
+>success. For testing, I got my LPMETAFILEPICT from pasting from "Paint".
+>I used NULL CClientDC in both <some device's DC> in the upper code, and
+>in display of the CBitmap afterwords. I even tried to select first a
+>colored bitmap in the memory DC, as well as setting the mapping mode
+>from LPMETAFILEPICT. All gave rubbish on the whole screen although I am
+>using the dimensions in LPMETAFILEPICT in <size of your picture> in the
+>upper code.
+>Any clues????? Is it OK to play metafiles on a memory DC?????
+>                                                Regards..
+>                                                Hany Morcos
+
+Yes, I'm sorry, I was wrong.
+My previous expirience in these bitmaps/memory dcs was related
+to direct drawing on the screen. My first example code works fine
+if the firstMemDC is client dc of the view.
+
+I've played a bit with these things (well, not a bit - a few hours) and
+here is working example:
+
+The heart of the code is KeepMetafile() function.
+The main idea of the solution is that you have to create and select
+bitmaps in BOTH memDCs.
+
+
+void CSomeView::KeepMetafile(HGLOBAL mem)
+{
+  CBitmap     bmp;
+  CBitmap     *pOB, *pOldBitmap;
+
+  CDC         MemDCOne;
+  CDC         MemDCTwo;
+  
+  METAFILEPICT pic;
+  
+  METAFILEPICT *pPict = (METAFILEPICT *)::GlobalLock(mem);
+  memcpy(&pic, pPict, sizeof(METAFILEPICT));
+  GlobalUnlock(mem);
+  
+  CClientDC dc(this);
+  MemDCOne.CreateCompatibleDC(&dc);
+  MemDCTwo.CreateCompatibleDC(&dc);
+
+  //when METAFILEPICT.mm member is MM_ANYSOTRPIC
+  //contains suggested size in the HI_METRIC units
+  // (and it is when pasting from paintbrush)
+  //The following is here only to calculate approximate size of the
+bitmap
+  MemDCOne.SetMapMode(MM_HIMETRIC);
+  CPoint pt(pic.xExt, pic.yExt);
+  MemDCOne.LPtoDP(&pt, 1);
+  MemDCOne.SetMapMode(MM_TEXT); //Leave map mode MM_TEXT
+
+  //note: pt may contain negative values due to the MM_HIMETRIC mode
+
+  //Create TWO bitmaps
+  bmp.CreateCompatibleBitmap(&MemDCOne, abs(pt.x), abs(pt.y));
+  m_bmp.CreateCompatibleBitmap(&MemDCTwo, abs(pt.x), abs(pt.y));
+  
+  //select BOTH bitmaps
+  pOB = MemDCOne.SelectObject(&bmp);
+  pOldBitmap = MemDCTwo.SelectObject(&m_bmp);
+  
+  //do our job
+  MemDCOne.PlayMetaFile(pic.hMF);
+ 
+  //This is actual copying
+  MemDCTwo.BitBlt(0, 0,  abs(pt.x), abs(pt.y),  &MemDCOne, 0,
+0,SRCCOPY);
+
+  //restore bitmaps
+  MemDCOne.SelectObject(&pOB);
+  MemDCTwo.SelectObject(pOldBitmap);
+
+  bmp.DeleteObject();
+
+  Invalidate();
+  UpdateWindow();
+}
+
+
+void CSomeView:public CView
+{
+    ...
+    
+    CBitmap m_bmp;
+    
+    ....
+};
+
+
+void CSomeView::OnDraw(CDC* pDC)
+{
+    //Just put m_bmp on the screen:
+    CRect ScreenArea;
+    GetClientRect(ScreenArea);
+    CDC  dc;
+    dc.CreateCompatibleDC(NULL);
+
+    CBitmap* pOld = dc.SelectObject(&m_bmp);
+    pDC->BitBlt(0,0, ScreenArea.Width(), ScreenArea.Height(), &dc, 0,0,
+SRCCOPY);
+    dc.SelectObject(pOld);
+}
+
+void CSomeView::OnEditPaste() 
+{
+  FORMATETC fmt;
+
+  COleDataObject *pDataObject = new COleDataObject();
+  if(!pDataObject) return;
+  
+  pDataObject->AttachClipboard();
+  pDataObject->BeginEnumFormats();
+  while(pDataObject->GetNextFormat(&fmt))
+  {
+    if(fmt.cfFormat==CF_METAFILEPICT)
+    {
+       HGLOBAL hMf = pDataObject->GetGlobalData(CF_METAFILEPICT);
+       if(hMf!=NULL) 
+       {
+          //in case we are pasting second time
+          m_bmp.DeleteObject();
+          KeepMetafile(hMf);
+       }
+    }
+  }
+  delete pDataObject;
+  
+}
+
+
+HTH, 
+Roma
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dulepov Dmitry -- <A HREF="mailto:dima@ssm6000.samsung.ru">dima@ssm6000.samsung.ru</A>
+Wednesday, March 05, 1997
+</B>
+        [Mailer: "Groupware E-Mail". Version 1.03.000]
+
+>        [From: Roma
+>
+>Hany Nabil Morcos wrote:
+>> 
+>> Environment: VC++ 4.1, Win95
+>> 
+>> Hi all;
+>> 
+>> Could anyone advise how to construct CBitmap from LPMETAFILEPICT (mm,
+>> xExt, yExt, hMF).
+>> 
+>> I have tryed to play the metafile on a memory dc, with its mapping mode,
+>> but I failed to create a CBitmap object.
+>> 
+>> Thank you in advance.
+>> 
+>> P.S. Please reply to me beside the mailing list. (hnm@sakhr.rite.com)
+>If I remember correctly, you have to do the following:
+>
+> CBitmap     bmp;
+> CDC         MemDCOne;  
+> CDC         MemDCTwo;  
+> 
+> MemDCOne.CreateCompatibleDC(<some device's DC>);
+> MemDCTwo.CreateCompatibleDC(<same device's DC>);
+> 
+> [play your metafile into MemDCOne here]
+> 
+> bmp.CreateCompatibleBitmap(&MemDCTwo, ...< size of you picture> );
+>
+> CBitmap* pOldBitmap = MemDCTwo.SelectObject(&bmp);
+>
+> //This is actual copying
+> MemDCTwo.BitBlt(0, 0, <size of your picture>, &MemDCOne, 0, 0,SRCCOPY);
+>
+> MemDCTwo.SelectObject(pOldBitmap);
+>
+> //at this point you have your picture in the bmp object (most
+       >likely..:)
+>
+>
+>HTH,
+>-Roma
+
+This is slightly incorrect. [Don't resent, I just tring to help!]
+
+Initially device context created with 'CreateCompatibleDC()' contains 1x1 pixel monochrome bitmap (read classics -> Petzold). So you won't be able to 'BitBlt()' anything useful from 'MemDCOne'. You need to create a bitmap compatibe with *original* DC (this is important!), select it to 'MemDCOne' and then play your metafile. Then select default bitmap back to 'MemDCOne' and use your bitmap as you want...
+
+Good Luck!
+
+
+Dmitry A. Dulepov
+Software Design Engineer
+Samsung Electronics Co., Ltd.
+Russian Research Center
+E-mail: dima@src.samsung.ru
+*** WWW page is coming soon! ***
+====================================
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Hany Nabil Morcos -- <A HREF="mailto:hnmr@sakhr.rite.com">hnmr@sakhr.rite.com</A>
+Thursday, March 06, 1997
+</B>
+[Mini-digest: 2 responses]
+
+Roma wrote:
+> 
+> Hany Nabil Morcos wrote:
+> >
+> > Environment: VC++ 4.1, Win95
+> >
+> > Hi all;
+> >
+> > Could anyone advise how to construct CBitmap from LPMETAFILEPICT (mm,
+> > xExt, yExt, hMF).
+> >
+> > I have tryed to play the metafile on a memory dc, with its mapping mode,
+> > but I failed to create a CBitmap object.
+> >
+> > Thank you in advance.
+> >
+> > P.S. Please reply to me beside the mailing list. (hnm@sakhr.rite.com)
+> If I remember correctly, you have to do the following:
+> 
+> CBitmap bmp;
+> CDC MemDCOne;
+> CDC MemDCTwo;
+> 
+> MemDCOne.CreateCompatibleDC(<some device's DC>);
+> MemDCTwo.CreateCompatibleDC(<same device's DC>);
+> 
+> [play your metafile into MemDCOne here]
+> 
+> bmp.CreateCompatibleBitmap(&MemDCTwo, ...< size of you picture> );
+> 
+> CBitmap* pOldBitmap = MemDCTwo.SelectObject(&bmp);
+> 
+> //This is actual copying
+> MemDCTwo.BitBlt(0, 0, <size of your picture>, &MemDCOne, 0, 0,SRCCOPY);
+> 
+> MemDCTwo.SelectObject(pOldBitmap);
+> 
+> //at this point you have your picture in the bmp object (most
+> likely..:)
+> 
+> HTH,
+> -Roma
+
+Thank you,
+I have tried this solution which seems quite reasonable but with no
+success. For testing, I got my LPMETAFILEPICT from pasting from "Paint".
+I used NULL CClientDC in both <some device's DC> in the upper code, and
+in display of the CBitmap afterwords. I even tried to select first a
+colored bitmap in the memory DC, as well as setting the mapping mode
+from LPMETAFILEPICT. All gave rubbish on the whole screen although I am
+using the dimensions in LPMETAFILEPICT in <size of your picture> in the
+upper code.
+Any clues????? Is it OK to play metafiles on a memory DC?????
+Regards..
+Hany Morcos
+-----From: Roma <roma@neonet.lv>
+
+Hi!
+
+Hany Nabil Morcos wrote:
+>Thank you,
+>I have tried this solution which seems quite reasonable but with no
+>success. For testing, I got my LPMETAFILEPICT from pasting from "Paint".
+>I used NULL CClientDC in both <some device's DC> in the upper code, and
+>in display of the CBitmap afterwords. I even tried to select first a
+>colored bitmap in the memory DC, as well as setting the mapping mode
+>from LPMETAFILEPICT. All gave rubbish on the whole screen although I am
+>using the dimensions in LPMETAFILEPICT in <size of your picture> in the
+>upper code.
+>Any clues????? Is it OK to play metafiles on a memory DC?????
+> Regards..
+> Hany Morcos
+
+Yes, I'm sorry, I was wrong.
+My previous expirience in these bitmaps/memory dcs was related
+to direct drawing on the screen. My first example code works fine
+if the firstMemDC is client dc of the view.
+
+I've played a bit with these things (well, not a bit - a few hours) and
+here is working example:
+
+The heart of the code is KeepMetafile() function.
+The main idea of the solution is that you have to create and select
+bitmaps in BOTH memDCs.
+
+void CSomeView::KeepMetafile(HGLOBAL mem)
+{
+CBitmap bmp;
+CBitmap *pOB, *pOldBitmap;
+
+CDC MemDCOne;
+CDC MemDCTwo;
+
+METAFILEPICT pic;
+
+METAFILEPICT *pPict = (METAFILEPICT *)::GlobalLock(mem);
+memcpy(&pic, pPict, sizeof(METAFILEPICT));
+GlobalUnlock(mem);
+
+CClientDC dc(this);
+MemDCOne.CreateCompatibleDC(&dc);
+MemDCTwo.CreateCompatibleDC(&dc);
+
+//when METAFILEPICT.mm member is MM_ANYSOTRPIC
+//contains suggested size in the HI_METRIC units
+// (and it is when pasting from paintbrush)
+//The following is here only to calculate approximate size of the
+bitmap
+MemDCOne.SetMapMode(MM_HIMETRIC);
+CPoint pt(pic.xExt, pic.yExt);
+MemDCOne.LPtoDP(&pt, 1);
+MemDCOne.SetMapMode(MM_TEXT); //Leave map mode MM_TEXT
+
+//note: pt may contain negative values due to the MM_HIMETRIC mode
+
+//Create TWO bitmaps
+bmp.CreateCompatibleBitmap(&MemDCOne, abs(pt.x), abs(pt.y));
+m_bmp.CreateCompatibleBitmap(&MemDCTwo, abs(pt.x), abs(pt.y));
+
+//select BOTH bitmaps
+pOB = MemDCOne.SelectObject(&bmp);
+pOldBitmap = MemDCTwo.SelectObject(&m_bmp);
+
+//do our job
+MemDCOne.PlayMetaFile(pic.hMF);
+
+//This is actual copying
+MemDCTwo.BitBlt(0, 0, abs(pt.x), abs(pt.y), &MemDCOne, 0,
+0,SRCCOPY);
+
+//restore bitmaps
+MemDCOne.SelectObject(&pOB);
+MemDCTwo.SelectObject(pOldBitmap);
+
+bmp.DeleteObject();
+
+Invalidate();
+UpdateWindow();
+}
+
+void CSomeView:public CView
+{
+...
+
+CBitmap m_bmp;
+
+....
+};
+
+void CSomeView::OnDraw(CDC* pDC)
+{
+//Just put m_bmp on the screen:
+CRect ScreenArea;
+GetClientRect(ScreenArea);
+CDC dc;
+dc.CreateCompatibleDC(NULL);
+
+CBitmap* pOld = dc.SelectObject(&m_bmp);
+pDC->BitBlt(0,0, ScreenArea.Width(), ScreenArea.Height(), &dc, 0,0,
+SRCCOPY);
+dc.SelectObject(pOld);
+}
+
+void CSomeView::OnEditPaste() 
+{
+FORMATETC fmt;
+
+COleDataObject *pDataObject = new COleDataObject();
+if(!pDataObject) return;
+
+pDataObject->AttachClipboard();
+pDataObject->BeginEnumFormats();
+while(pDataObject->GetNextFormat(&fmt))
+{
+if(fmt.cfFormat==CF_METAFILEPICT)
+{
+HGLOBAL hMf = pDataObject->GetGlobalData(CF_METAFILEPICT);
+if(hMf!=NULL) 
+{
+//in case we are pasting second time
+m_bmp.DeleteObject();
+KeepMetafile(hMf);
+}
+}
+}
+delete pDataObject;
+
+}
+
+HTH, 
+Roma
+
+
+
+
+Well, I have tried this also, I even created an appwizard skeleton, I
+inserted in the View, the Keepmetafile method, and added the CBitmap
+member, as well as the implementation of OnDraw and OnEditPAste. All cut
+and paste from the above code. Finally I tried to paste in the
+application an image from "Paint" but it just gave me a black box of the
+image size.
+What do you think???
+
+Hany Morcos
+-----From: Roma <roma@neonet.lv>
+
+Hany Nabil Morcos wrote:
+[snip]
+> 
+> Well, I have tried this also, I even created an appwizard skeleton, I
+> inserted in the View, the Keepmetafile method, and added the CBitmap
+> member, as well as the implementation of OnDraw and OnEditPAste. All cut
+> and paste from the above code. Finally I tried to paste in the
+> application an image from "Paint" but it just gave me a black box of the
+> image size.
+> What do you think???
+> 
+> Hany Morcos
+
+Hi!
+
+I've found the reason why my example shows you in the Win95 
+just black box - the problem is that the bitmaps I'm using in the 
+code are all monochrome, but the metafile, pasted from the
+Paint/Paintbrush
+is colored. BitBlt converts colored bitmaps to monochrome just
+converting
+all not-white pixels to black and leaving white bits white (see help for
+BitBlt).
+NT's Paintbrush make background really white, but Paint doesn't.
+
+To see that BitBlt for memory DC's works correct, change OnEditPaste in
+my example to this 
+function, which creates metafile with really white background. 
+(I've checked this under Windows95 this time - it works)
+
+Metafile creation code was taken from:
+Creating Metafiles to Use with OLE Applications PSS id#: Q83023
+
+void CSomeView::OnEditPaste() 
+{
+  COleDataObject *pDataObject = new COleDataObject();
+
+  HMETAFILE comp;
+
+  
+  HDC mfdc = CreateMetaFile(NULL);
+  ::SetMapMode(mfdc, MM_ANISOTROPIC);
+
+  //Do some drawing, in which important is filling rect with white brush
+  HBRUSH whiteBrush = CreateSolidBrush(RGB(255, 255, 255));
+  CRect rect(0,0,100,100);
+  
+  ::FillRect(mfdc, &rect, whiteBrush);
+  
+  DeleteObject(whiteBrush);
+
+  //Just to see something on the screen
+  ::MoveToEx(mfdc, 0, 0, NULL);
+  ::LineTo(mfdc, 100, 100);
+
+  comp = CloseMetaFile(mfdc);
+
+  LPMETAFILEPICT lpMFP;
+  POINT pt;
+  HDC hDC;
+  HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE | GMEM_SHARE,
+sizeof(METAFILEPICT));
+ 
+  lpMFP = (LPMETAFILEPICT)GlobalLock(hMem);
+
+  pt.x = 100;
+  pt.y = 100;
+
+  //Convert coordinates in HIMETRIC mode
+  hDC = ::GetDC(this->m_hWnd);
+
+  int oldMapMode = SetMapMode(hDC, MM_HIMETRIC);
+  DPtoLP(hDC, &pt, 1);
+  SetMapMode(hDC, oldMapMode);
+  
+  ::ReleaseDC(this->m_hWnd, hDC);
+ 
+  lpMFP->mm = MM_ANISOTROPIC;
+  lpMFP->xExt = pt.x;
+  lpMFP->yExt = pt.y;
+  lpMFP->hMF = comp;
+ 
+  GlobalUnlock(hMem);
+
+  if(comp==NULL)
+        MessageBeep(0);
+  else
+  {
+     m_bmp.DeleteObject();
+     KeepMetafile(hMem);
+  }
+
+  GlobalFree(hMem);
+  DeleteMetaFile(comp);
+  
+  delete pDataObject;
+}
+
+
+-Roma
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Hany Nabil Morcos -- <A HREF="mailto:hnm@sakhr.rite.com">hnm@sakhr.rite.com</A>
+Tuesday, March 11, 1997
+</B>
+Environment: VC++ 4.1, Win95
+
+Hi all;
+
+Could anyone advise how to construct CBitmap from LPMETAFILEPICT (mm,
+xExt, yExt, hMF).
+
+I have tryed to play the metafile on a memory dc, with its mapping mode,
+but I failed to create a CBitmap object.
+
+Thank you in advance.
+
+P.S. Please reply to me beside the mailing list. (hnm@sakhr.rite.com)
+
+				Hany Morcos
+
+************************************************************
+Roma Wrote:
+If I remember correctly, you have to do the following:
+
+ CBitmap     bmp;
+ CDC         MemDCOne;  
+ CDC         MemDCTwo;  
+ 
+ MemDCOne.CreateCompatibleDC(<some device's DC>);
+ MemDCTwo.CreateCompatibleDC(<same device's DC>);
+ 
+ [play your metafile into MemDCOne here]
+ 
+ bmp.CreateCompatibleBitmap(&MemDCTwo, ...< size of you picture> );
+
+ CBitmap* pOldBitmap = MemDCTwo.SelectObject(&bmp);
+
+ //This is actual copying
+ MemDCTwo.BitBlt(0, 0, <size of your picture>, &MemDCOne, 0, 0,SRCCOPY);
+
+ MemDCTwo.SelectObject(pOldBitmap);
+
+ //at this point you have your picture in the bmp object (most
+likely..:)
+
+
+HTH,
+-Roma
+************************************************************
+Hany Nabil Morcos wrote:
+Hi!
+
+Thank you,
+I have tried this solution which seems quite reasonable but with no
+success. For testing, I got my LPMETAFILEPICT from pasting from "Paint".
+I used NULL CClientDC in both <some device's DC> in the upper code, and
+in display of the CBitmap afterwords. I even tried to select first a
+colored bitmap in the memory DC, as well as setting the mapping mode
+from LPMETAFILEPICT. All gave rubbish on the whole screen although I am
+using the dimensions in LPMETAFILEPICT in <size of your picture> in the
+upper code.
+Any clues????? Is it OK to play metafiles on a memory DC?????
+                                                Regards..
+                                                Hany Morcos
+
+
+************************************************************
+Roma Wrote
+Yes, I'm sorry, I was wrong.
+My previous expirience in these bitmaps/memory dcs was related
+to direct drawing on the screen. My first example code works fine
+if the firstMemDC is client dc of the view.
+
+I've played a bit with these things (well, not a bit - a few hours) and
+here is working example:
+
+The heart of the code is KeepMetafile() function.
+The main idea of the solution is that you have to create and select
+bitmaps in BOTH memDCs.
+
+void CSomeView::KeepMetafile(HGLOBAL mem)
+{
+  CBitmap     bmp;
+  CBitmap     *pOB, *pOldBitmap;
+
+  CDC         MemDCOne;
+  CDC         MemDCTwo;
+
+  METAFILEPICT pic;
+
+  METAFILEPICT *pPict = (METAFILEPICT *)::GlobalLock(mem);
+  memcpy(&pic, pPict, sizeof(METAFILEPICT));
+  GlobalUnlock(mem);
+
+  CClientDC dc(this);
+  MemDCOne.CreateCompatibleDC(&dc);
+  MemDCTwo.CreateCompatibleDC(&dc);
+
+  //when METAFILEPICT.mm member is MM_ANYSOTRPIC
+  //contains suggested size in the HI_METRIC units
+  // (and it is when pasting from paintbrush)
+  //The following is here only to calculate approximate size of the
+bitmap
+  MemDCOne.SetMapMode(MM_HIMETRIC);
+  CPoint pt(pic.xExt, pic.yExt);
+  MemDCOne.LPtoDP(&pt, 1);
+  MemDCOne.SetMapMode(MM_TEXT); //Leave map mode MM_TEXT
+
+  //note: pt may contain negative values due to the MM_HIMETRIC mode
+
+  //Create TWO bitmaps
+  bmp.CreateCompatibleBitmap(&MemDCOne, abs(pt.x), abs(pt.y));
+  m_bmp.CreateCompatibleBitmap(&MemDCTwo, abs(pt.x), abs(pt.y));
+
+  //select BOTH bitmaps
+  pOB = MemDCOne.SelectObject(&bmp);
+  pOldBitmap = MemDCTwo.SelectObject(&m_bmp);
+
+  //do our job
+  MemDCOne.PlayMetaFile(pic.hMF);
+
+  //This is actual copying
+  MemDCTwo.BitBlt(0, 0,  abs(pt.x), abs(pt.y),  &MemDCOne, 0,
+0,SRCCOPY);
+
+  //restore bitmaps
+  MemDCOne.SelectObject(&pOB);
+  MemDCTwo.SelectObject(pOldBitmap);
+
+  bmp.DeleteObject();
+
+  Invalidate();
+  UpdateWindow();
+}
+
+void CSomeView:public CView
+{
+    ...
+
+    CBitmap m_bmp;
+
+    ....
+};
+
+void CSomeView::OnDraw(CDC* pDC)
+{
+    //Just put m_bmp on the screen:
+    CRect ScreenArea;
+    GetClientRect(ScreenArea);
+    CDC  dc;
+    dc.CreateCompatibleDC(NULL);
+
+    CBitmap* pOld = dc.SelectObject(&m_bmp);
+    pDC->BitBlt(0,0, ScreenArea.Width(), ScreenArea.Height(), &dc, 0,0,
+SRCCOPY);
+    dc.SelectObject(pOld);
+}
+
+void CSomeView::OnEditPaste()
+{
+  FORMATETC fmt;
+
+  COleDataObject *pDataObject = new COleDataObject();
+  if(!pDataObject) return;
+
+  pDataObject->AttachClipboard();
+  pDataObject->BeginEnumFormats();
+  while(pDataObject->GetNextFormat(&fmt))
+  {
+    if(fmt.cfFormat==CF_METAFILEPICT)
+    {
+       HGLOBAL hMf = pDataObject->GetGlobalData(CF_METAFILEPICT);
+       if(hMf!=NULL)
+       {
+          //in case we are pasting second time
+          m_bmp.DeleteObject();
+          KeepMetafile(hMf);
+       }
+    }
+  }
+  delete pDataObject;
+
+}
+
+HTH,
+Roma
+
+************************************************************
+Hany Nabil Morcos wrote:
+ 
+ Well, I have tried this also, I even created an appwizard skeleton, I
+ inserted in the View, the Keepmetafile method, and added the CBitmap
+ member, as well as the implementation of OnDraw and OnEditPAste. All
+cut
+ and paste from the above code. Finally I tried to paste in the
+ application an image from "Paint" but it just gave me a black box of
+the
+ image size.
+ What do you think???
+ 
+ Hany Morcos
+ ************************************************************
+ Roma wrote:
+ Ooops. My apologizes again - I forgot you have win95. In my NT 3.51 it
+works fine.
+ I though that code written with MFC should work on all win32 platforms
+(especially
+ things that are present in the Windows from v2.x). 
+ The problem is somewhere in the mapping modes and correct coordinates,
+I think.
+
+-Roma
+
+P.S. I hate Windows95
+
+************************************************************
+Roma Wrote
+Hi!
+
+I've found the reason why my example shows you in the Win95 
+just black box - the problem is that the bitmaps I'm using in the 
+code are all monochrome, but the metafile, pasted from the
+Paint/Paintbrush
+is colored. BitBlt converts colored bitmaps to monochrome just
+converting
+all not-white pixels to black and leaving white bits white (see help for
+BitBlt).
+NT's Paintbrush make background really white, but Paint doesn't.
+
+To see that BitBlt for memory DC's works correct, change OnEditPaste in
+my example to this 
+function, which creates metafile with really white background. 
+(I've checked this under Windows95 this time - it works)
+
+Metafile creation code was taken from:
+Creating Metafiles to Use with OLE Applications PSS id#: Q83023
+
+void CSomeView::OnEditPaste() 
+{
+  COleDataObject *pDataObject = new COleDataObject();
+
+  HMETAFILE comp;
+
+  
+  HDC mfdc = CreateMetaFile(NULL);
+  ::SetMapMode(mfdc, MM_ANISOTROPIC);
+
+  //Do some drawing, in which important is filling rect with white brush
+  HBRUSH whiteBrush = CreateSolidBrush(RGB(255, 255, 255));
+  CRect rect(0,0,100,100);
+  
+  ::FillRect(mfdc, &rect, whiteBrush);
+  
+  DeleteObject(whiteBrush);
+
+  //Just to see something on the screen
+  ::MoveToEx(mfdc, 0, 0, NULL);
+  ::LineTo(mfdc, 100, 100);
+
+  comp = CloseMetaFile(mfdc);
+
+  LPMETAFILEPICT lpMFP;
+  POINT pt;
+  HDC hDC;
+  HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE | GMEM_SHARE,
+sizeof(METAFILEPICT));
+ 
+  lpMFP = (LPMETAFILEPICT)GlobalLock(hMem);
+
+  pt.x = 100;
+  pt.y = 100;
+
+  //Convert coordinates in HIMETRIC mode
+  hDC = ::GetDC(this->m_hWnd);
+
+  int oldMapMode = SetMapMode(hDC, MM_HIMETRIC);
+  DPtoLP(hDC, &pt, 1);
+  SetMapMode(hDC, oldMapMode);
+  
+  ::ReleaseDC(this->m_hWnd, hDC);
+ 
+  lpMFP->mm = MM_ANISOTROPIC;
+  lpMFP->xExt = pt.x;
+  lpMFP->yExt = pt.y;
+  lpMFP->hMF = comp;
+ 
+  GlobalUnlock(hMem);
+
+  if(comp==NULL)
+        MessageBeep(0);
+  else
+  {
+     m_bmp.DeleteObject();
+     KeepMetafile(hMem);
+  }
+
+  GlobalFree(hMem);
+  DeleteMetaFile(comp);
+  
+  delete pDataObject;
+}
+
+
+-Roma
+****************************************************************
+
+
+Well Ladies and Gentelemen;
+
+
+Does this mean I can not convert pasted colored LPMETAFILEPICT from Win
+95 Paint to
+CBitmap???????????????????????????????????????????????????????
+Help!!!!!!!!!!!!
+
+
+
+Hany Morcos
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+    <A HREF="http://www.digiday.com/mfcpro/joinmfcl.htm">Become an MFC-L member</A>
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

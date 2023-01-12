@@ -1,0 +1,384 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Displaying a shared listbox
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Jeff Moss -- <A HREF="mailto:jeff.moss@gtri.gatech.edu">jeff.moss@gtri.gatech.edu</A>
+Wednesday, December 20, 1995
+</B>
+I have a dialog class which contains a listbox. I want all instances and
+derived-class instances of this dialog to share the listbox, so I made the
+listbox a static member variable in my base class.
+
+The variable is being shared; I verified this in the debugger by making sure
+the base class and derived class listbox members were at the same address.
+
+The problem is that I cannot display the entries in the derived class's
+listbox. I've tried the Invalidate(), ShowWindow, and UpdateData() functions
+on the derived class. 
+
+The data is there, because doing GetText(*,*) from the derived class returns
+listbox entries.
+
+Any ideas on what needs to be done to display the entries?
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++ MOSS, JEFFREY N -------------------- Research Scientist +
++ jeff.moss@gtri.gatech.edu                               +
++ Information Technology & Telecommunications Lab         +
++ Georgia Tech Research Institute                         +
++ Georgia Institute of Technology, Atlanta Georgia, 30332 +
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+David W. Gillett -- <A HREF="mailto:DGILLETT@expertedge.com">DGILLETT@expertedge.com</A>
+Friday, December 22, 1995
+</B>
+> I have a dialog class which contains a listbox. I want all instances and
+> derived-class instances of this dialog to share the listbox, so I made the
+> listbox a static member variable in my base class.
+> 
+> The variable is being shared; I verified this in the debugger by making sure
+> the base class and derived class listbox members were at the same address.
+> 
+> The problem is that I cannot display the entries in the derived class's
+> listbox. I've tried the Invalidate(), ShowWindow, and UpdateData() functions
+> on the derived class. 
+> 
+> The data is there, because doing GetText(*,*) from the derived class returns
+> listbox entries.
+> 
+> Any ideas on what needs to be done to display the entries?
+
+  Making the member static means that there is only one *C++* object 
+for this listbox.  But the listbox control *WINDOWS* object that is a 
+child of derived dialog A is a different WINDOWS object from the 
+listbox control that is a child of derived dialog B.  You're trying 
+to have a single C++ object correspond to an arbitrary number of 
+windows objects, and there's no mechanism provided for this.  The C++ 
+"static member" mechanism has no Windows analog.
+
+  There are three pieces of data that could be made static and shared 
+by all derived instances:  the list of strings in the listbox, the 
+current listbox selection, and the listbox's control ID.  Sharing the 
+latter makes setting up the dialog templates a bit tricky, but it 
+will allow them to all inherit the base-class handling of the listbox 
+with the possible exception of the DDX/DDV mechanisms.
+
+Dave
+
+ 
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@msn.com">mikeblas@msn.com</A>
+Monday, December 25, 1995
+</B>
+I don't think you should use static on CWnd-derived members of your classes.
+
+If you're creating instances of the base class and instances of derived 
+classes, you will _certainly_ run into trouble because the different dialog 
+boxes will try to use the same object for two different windows.
+
+If you're creating instances only the derived class, I think you're making it 
+difficult for MFC to initialize and destroy the dialog box.
+
+I'm not sure I'm positive that you have the right code behind the notion of 
+"sharing" the list box. Why do you want to make the list box object static?
+
+.B ekiM
+----------
+From: 	owner-mfc-l@netcom.com on behalf of Jeff Moss
+Sent: 	Wednesday, December 20, 1995 10:32
+To: 	mfc-l@netcom.com
+Subject: 	Displaying a shared listbox
+
+I have a dialog class which contains a listbox. I want all instances and
+derived-class instances of this dialog to share the listbox, so I made the
+listbox a static member variable in my base class.
+
+The variable is being shared; I verified this in the debugger by making sure
+the base class and derived class listbox members were at the same address.
+
+The problem is that I cannot display the entries in the derived class's
+listbox. I've tried the Invalidate(), ShowWindow, and UpdateData() functions
+on the derived class. 
+
+The data is there, because doing GetText(*,*) from the derived class returns
+listbox entries.
+
+Any ideas on what needs to be done to display the entries?
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++ MOSS, JEFFREY N -------------------- Research Scientist +
++ jeff.moss@gtri.gatech.edu                               +
++ Information Technology & Telecommunications Lab         +
++ Georgia Tech Research Institute                         +
++ Georgia Institute of Technology, Atlanta Georgia, 30332 +
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Jeff Moss -- <A HREF="mailto:jeff.moss@gtri.gatech.edu">jeff.moss@gtri.gatech.edu</A>
+Tuesday, January 02, 1996
+</B>
+>> I have a dialog class which contains a listbox. I want all instances and
+>> derived-class instances of this dialog to share the listbox, so I made the
+>> listbox a static member variable in my base class.
+>> 
+>> The variable is being shared; I verified this in the debugger by making sure
+>> the base class and derived class listbox members were at the same address.
+>> 
+>> The problem is that I cannot display the entries in the derived class's
+>> listbox. I've tried the Invalidate(), ShowWindow, and UpdateData() functions
+>> on the derived class. 
+>> 
+>> The data is there, because doing GetText(*,*) from the derived class returns
+>> listbox entries.
+>> 
+>> Any ideas on what needs to be done to display the entries?
+>
+>  Making the member static means that there is only one *C++* object 
+>for this listbox.  But the listbox control *WINDOWS* object that is a 
+>child of derived dialog A is a different WINDOWS object from the 
+>listbox control that is a child of derived dialog B.  You're trying 
+>to have a single C++ object correspond to an arbitrary number of 
+>windows objects, and there's no mechanism provided for this.  The C++ 
+>"static member" mechanism has no Windows analog.
+
+So there is no way to have multiple Dialog object instances (that can only
+be displayed one at a time) reference and display the same Listbox object
+(aside from managing the list entries yourself)?
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++ MOSS, JEFFREY N -------------------- Research Scientist +
++ jeff.moss@gtri.gatech.edu                               +
++ Information Technology & Telecommunications Lab         +
++ Georgia Tech Research Institute                         +
++ Georgia Institute of Technology, Atlanta Georgia, 30332 +
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Kit Kauffmann -- <A HREF="mailto:kitk@mudshark.sunquest.com">kitk@mudshark.sunquest.com</A>
+Wednesday, January 03, 1996
+</B>
+>>> I have a dialog class which contains a listbox. I want all instances and
+>>> derived-class instances of this dialog to share the listbox, so I made the
+>>> listbox a static member variable in my base class.
+>>> 
+>>> The variable is being shared; I verified this in the debugger by making sure
+>>> the base class and derived class listbox members were at the same address.
+>>> 
+>>> The problem is that I cannot display the entries in the derived class's
+>>> listbox. I've tried the Invalidate(), ShowWindow, and UpdateData() functions
+>>> on the derived class. 
+>>> 
+>>> The data is there, because doing GetText(*,*) from the derived class returns
+>>> listbox entries.
+>>> 
+>>> Any ideas on what needs to be done to display the entries?
+>>
+>>  Making the member static means that there is only one *C++* object 
+>>for this listbox.  But the listbox control *WINDOWS* object that is a 
+>>child of derived dialog A is a different WINDOWS object from the 
+>>listbox control that is a child of derived dialog B.  You're trying 
+>>to have a single C++ object correspond to an arbitrary number of 
+>>windows objects, and there's no mechanism provided for this.  The C++ 
+>>"static member" mechanism has no Windows analog.
+>
+>So there is no way to have multiple Dialog object instances (that can only
+>be displayed one at a time) reference and display the same Listbox object
+>(aside from managing the list entries yourself)?
+>
+
+Haven't tried it, but I see no reason why not: I suspect the problem is 
+simply that the parent of the listbox is changing, and you haven't notified 
+the LB.  I think simply calling SetParent on the LB in your OnInitDialog 
+should fix things.
+
+BTW, it sounds to me that (s)he is not trying to "have a single C++ object 
+correspond to an arbitrary number of windows objects", but is trying to 
+reuse a single C++ object and a single Windows object in multiple windows 
+(but not at the same time, I hope, or else you'd need multiple objects, of 
+course).  
+
+If my interpretation is correct, I'm sure this can be done, and the static 
+member seems a fine way to express this concept (what other option is there 
+but a global (ugh)?).
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Andreas Will -- <A HREF="mailto:a.will@T-Online.de">a.will@T-Online.de</A>
+Thursday, January 04, 1996
+</B>
+>>> I have a dialog class which contains a listbox. I want all instances and
+>>> derived-class instances of this dialog to share the listbox, so I made the
+>>> listbox a static member variable in my base class.
+>>> 
+
+>>  Making the member static means that there is only one *C++* object 
+>>for this listbox.  But the listbox control *WINDOWS* object that is a 
+>>child of derived dialog A is a different WINDOWS object from the 
+>>listbox control that is a child of derived dialog B.  You're trying 
+>>to have a single C++ object correspond to an arbitrary number of 
+>>windows objects, and there's no mechanism provided for this.  The C++ 
+>>"static member" mechanism has no Windows analog.
+>
+>So there is no way to have multiple Dialog object instances (that can only
+>be displayed one at a time) reference and display the same Listbox object
+>(aside from managing the list entries yourself)?
+
+Jeff,
+
+of course there is a way to create a listbox that may be used by several dialogboxes (not necessarily derived classes).
+I created the listbox (C++ object) as a member of the application (you may use any class that stays around as long as you want to access the listbox). Next I create the listbox windows object as a child of CMainFrame (listboxes may not be created as stand alone windows).
+
+// mainfrm.cpp
+
+	CTestApp* pApp = (CTestApp*)AfxGetApp();
+	CRect rc(10,10,80,100); // size and position
+
+	pApp->m_AppListBox.Create(WS_CHILD|WS_TABSTOP| // not visible !
+			LBS_STANDARD|LBS_MULTIPLESEL, 
+			rc, this, 0x1000);
+
+
+Whenever a dialogbox is opened, which uses the listbox, the dialog becomes the parent of the listbox and makes the latter one visible.
+To prevent destruction of the listbox windows object the old parent will be reset in the OnDestroy handler.
+
+// host-dialog
+BOOL CAppListDlg::OnInitDialog() 
+{
+  CDialog::OnInitDialog();
+	
+  CTestApp* pApp = (CTestApp*)AfxGetApp();
+	
+  pApp->m_AppListBox.SetParent(this);
+  pApp->m_AppListBox.ShowWindow(SW_SHOW); // make it visible 
+  // the tab order will be set to the last position
+
+  return TRUE;  // return TRUE unless you set the focus to a control
+}
+
+void CAppListDlg::OnDestroy() 
+{
+  CTestApp* pApp = (CTestApp*)AfxGetApp();
+
+  pApp->m_AppListBox.ShowWindow(SW_HIDE);
+  pApp->m_AppListBox.SetParent(pApp->m_pMainWnd); 
+  // must not become an orphan
+	
+  CDialog::OnDestroy();	
+}
+
+The listbox retains any selection, added strings etc.  while it is transferred to different dialogs.
+
+Best regards 
+  Andy
+/////////////////
+Andreas Will
+Jever, Germany
+a.will@t-online.de
+/////////////////
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@msn.com">mikeblas@msn.com</A>
+Saturday, January 06, 1996
+</B>
+> So there is no way to have multiple Dialog object instances (that can only
+> be displayed one at a time) reference and display the same Listbox object
+> (aside from managing the list entries yourself)?
+
+Since there's no way to have the same child window in two different parent 
+windows in Microsoft Windows, there's no way to do this in MFC.
+
+Or do you really mean that you want to use the same CListBox-derived _class_ 
+(that is, not the same _object_) in two different windows?
+
+.B ekiM
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dale Wilson -- <A HREF="mailto:dale@dra.com">dale@dra.com</A>
+Monday, January 08, 1996
+</B>
+
+>>> I have a dialog class which contains a listbox. I want all instances and
+>>> derived-class instances of this dialog to share the listbox, so I made 
+the
+>>> listbox a static member variable in my base class.
+
+The problem here is not an MFC problem, but a Windows problem.  The listbox 
+is a control which is a window which is a child of the dialog window.  In 
+order to share a control between two dialogs, you would have to have a child 
+window with two parents.  Unlike humans, windows breed asexually, so you 
+only get one parent per window.
+
+Solution:  Create a different data structure to hold the list items, then 
+stuff them into the  "real" listbox at InitDialog time, or for nonmodal 
+dialogs, pass around "Update your List Box" messages to all of the dialogs 
+sharing the virtual list box.
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

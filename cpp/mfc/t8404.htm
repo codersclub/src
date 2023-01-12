@@ -1,0 +1,235 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CFileDialog guilty or not guilty
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Philip Beck -- <A HREF="mailto:splinta@cix.compulink.co.uk">splinta@cix.compulink.co.uk</A>
+Tuesday, December 10, 1996
+</B>
+Environment: Win 3.11, VC++ 1.52
+
+Hi,
+
+I'm working on a 16 bit mfc sdi app and it appears that there is either a 
+bug in CFileDialog or I need some advice on my link options.
+
+Attached to one of my toolbar buttons is a call to a dll function. I can 
+click on that button as many times as I like and the dll function works 
+okay.
+
+Another toolbar button brings up the open-file version of CFileDialog and 
+I pass a buffer to it so that I can get multiple selected file names on 
+the return :- 
+
+void CMyView::func()
+{
+        static char BASED_CODE szFilter[] = "Targa (*.tga) | *.tga ||";
+        CFileDialog *GetImages = new CFileDialog(TRUE,NULL,NULL,  
+OFN_FILEMUSTEXIST | OFN_HIDEREADONLY | OFN_ALLOWMULTISELECT,szFilter);
+
+// Create a larger buffer and give it to the dialog
+   LPSTR lpszBuffer = new char[_MAX_PATH*8];
+   if (lpszBuffer != NULL)
+   {
+     GetImages->m_ofn.lpstrFile = lpszBuffer;
+     GetImages->m_ofn.nMaxFile = _MAX_PATH*8;
+     GetImages->m_ofn.lpstrFile[0] = 0;
+   }
+   CString returnedFileNames;
+   if(GetImages->DoModal() == IDOK)
+   {
+     returnedFileNames = GetImages->GetPathName();
+   }
+. 
+. 
+. 
+      delete GetImages; delete lpszBuffer;
+}
+
+If I immediately close the file-open dialog as soon as it appears by 
+clicking on the cancel button, I can still call the dll function okay. 
+But if I do anything else (like change to the root directory and DON'T 
+select any files) and then still hit cancel - my DLL call has problems - 
+the function executes but doesn't get very far. I can go all over my 
+program and calls to my DLL seem to work okay. It only fails after this 
+CFileDialog has been used.
+
+It is a big program and I have expanded the stack and messed around with 
+loads of compile/ link options.
+
+Any suggestions would be much appreciated...
+
+Thanks,
+Phil.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Patrice Buriez -- <A HREF="mailto:patriceb@businessline.tm.fr">patriceb@businessline.tm.fr</A>
+Friday, December 13, 1996
+</B>
+[Mini-digest: 2 responses]
+
+Hi Phil,
+
+>>> LPSTR lpszBuffer = new char[_MAX_PATH*8];
+>>> delete lpszBuffer;
+Is this a real code excerpt ? Or did you retype it to write your message
+?
+May be the problems you experience would not appear if you write (as you
+ought to :-):
+  delete [] lpszBuffer;
+
+>>> I pass a buffer to it so that I can get multiple selected file names
+Two years ago, I have also tried to use a multi-select FileOpen dialog
+box.
+At that time, it was with MSVC 1.51 under WFW 3.11.
+I have had some problems, but MFC was not guilty: the unexpected
+behaviour lied in COMMDLG. I can't remember which version it was,
+though...
+As far as I can remember, I have faced the following problems:
+
+1) To allow any number of selected files, I always started with a 3
+bytes m_ofn.lpstrFile buffer, in order to always make the
+FNERR_BUFFERTOOSMALL error generated. As documented, I then casted the
+m_ofn.lpstrFile to LPWORD to get the expected buffer size. As I
+experienced, this size was accurate if the OFN_ALLOWMULTISELECT flag was
+NOT set (single-select FileOpen dialog box). However, if this flag WAS
+set (actually what I needed), the size was not "truely" accurate. I had
+to add an extra few bytes to this size to avoid getting the
+FNERR_BUFFERTOOSMALL error again. I can't remember exactly how many "few
+bytes" I had to add (1, 2 or 3). I determined it through many tests. I
+guess some of you are smiling: I can tell you it was not an extra nul
+terminating byte allocation problem. By "not truely accurate", I mean
+(a) that the expected buffer size returned in *(LPWORD)m_ofn.lpstrFile
+was the actual buffer size needed to store the filenames and the nul
+terminating byte, and (b) that when I allocated such a buffer and
+specified this size in m_ofn.nMaxFile, I always get the
+FNERR_BUFFERTOOSMALL error again. As I understood, the COMMDLG function
+checked for a buffer larger than needed and requested. Once I solved
+this allocation problem, I discovered that there is a 2K buffer size
+limit, which prevents "any" (though rather high :-) number of selected
+files.
+
+2) I also faced the following path problem: The path for the first file
+is provided as the first space-separated string, the first filename is
+the second space-separated string, and the other filenames follow as
+space-separated strings, prefixed with a relative path if needed. There
+is no problem if the user selects a set of files in the same directory,
+or even on the same drive. However, though not obvious because the user
+had to manually enter filenames in the edit box in this case, there
+could be a problem if the user selects a set of files on more than one
+drive. I can't remember exactly whether the returned string always
+contained the substring "d:foobar.txt" (without path) when I entered
+"d:\test\foobar.txt" in the edit box, or if had to enter "d:foorbar.txt"
+in the edit box while "\test" being the current directory on "d:" in the
+FileOpen dialog box context. But I can remember, when the returned
+string contained the substring "d:foobar.txt" (without path), that there
+was no warranty that the current directory had not changed on "d:".
+Please remember that the other substrings contained relative paths to a
+directory on another drive (eg: "c:\myapp"). At that time, I was using
+BarClock (a titlebar clock application), which regularly changed the
+current directory to its installation directory. This lead me to the
+following problem: the filenames were correctly validated in the
+FileOpen dialog box context, but the filenames later obtained from
+_fullpath() could be wrong. I found no work-around to this problem.
+
+I eventually gave up with multi-select FileOpen dialog boxes. The
+solution I have implemented is as follows:
+I have derived a class from CFileDialog to create a single-select
+FileOpen dialog box.
+In OnInitDialog(), I renamed the "OK" and "Cancel" buttons respectively
+to "Add" and "Close".
+In OnFileNameOK(), I transmitted the selected filename to my doc object
+and I always returned TRUE to prevent the dialog box from closing (as if
+the filename was rejected). By the way, there is an inconsistency in the
+MFC Help file: trust the implementation of CFileDialog::OnFileNameOK(),
+don't call it but return the opposite return value to change the default
+behaviour.
+To actually close the dialog box when the user has selected all the
+files he needed, he simply had to click on the "Close"-renamed Cancel
+button.
+This worked fine for me and was user-friendly for "any number" of
+selected files.
+May be you'll find it useful !
+
+Hope this helps !
+Patrice
+
+>----- =8^) ------------------------------------------------------
+>Patrice BURIEZ
+>Phone:	+33 (1) 30 84 43 16
+>Fax:	+33 (1) 30 84 44 59
+>Email:	patriceb@businessline.tm.fr
+>Visit:	<A HREF="http://www.businessline.tm.fr">http://www.businessline.tm.fr</A>
+>-----------------------------------------------------------------
+>Disclaimer:
+>Opinions expressed are my own and are not those of my employer.
+>-----------------------------------------------------------------
+
+-----From: jeremy@omsys.com (Jeremy H. Griffith)
+
+On Tue, 10 Dec 96 18:27 GMT0, splinta@cix.compulink.co.uk (Philip Beck) wrote:
+
+>void CMyView::func()
+>{
+>.
+>// Create a larger buffer and give it to the dialog
+>   LPSTR lpszBuffer = new char[_MAX_PATH*8];
+>. 
+>      delete GetImages; delete lpszBuffer;
+>}
+
+Looks like you're confusing the allocator by deleting the buffer
+incorrectly.  Use "delete [] lpszBuffer;" and see if the problem
+disappears.  In general, when executing code causes other code
+run afterward to fail that otherwise doesn't, look very closely
+at all your "new" and "delete" references...
+
+--Jeremy
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

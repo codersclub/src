@@ -1,0 +1,349 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+RFX routines
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Sumit Chawla -- <A HREF="mailto:schawla@csci.csc.com">schawla@csci.csc.com</A>
+Wednesday, December 04, 1996
+</B>
+Environment: VC++ 4.2-flat, NT 3.51
+
+We have just attempted to port our application from Visual C++ 4.0
+to Visual C++ 4.2 and have hit this problem.
+
+We use MFC's support for ODBC through the CDatabase and CRecordSet
+classes.
+Our RecordSet uses datatypes from ObjectSpace's Systems<Toolkit>
+library.
+Therefore we have a need to bind our database columns to
+Systems<Toolkit>
+datatypes. This means writing custom Record Field Exchange functions. We
+followed the approach suggested by Technical Note TN043. This is what is
+says:
+"To write your own Custom RFX function, it is suggested that you copy
+an existing RFX function and modify it to your own purposes. Selecting
+the right RFX to copy can make your job much easier.Some RFX functions
+have some unique properties that you should take into account when 
+deciding which to copy."
+
+This worked fine with MFC 4.0. However with MFC 4.2, Microsoft went
+ahead
+and changed their implementation of the way RFX routines work. Technical 
+Note 43 no longer holds true for MFC 4.2. The MFC code for RFX routines
+in 
+4.2 reads a lot better but it does make writing custom RFX routines more 
+difficult. Actually, I still don't know of a clean way to do it.
+
+With the new implementation of RFX routines; when you bind your database
+column ( in the switch case CFieldExchange::BindParam), you set a pair
+of
+void pointers in a Map like this:
+
+pFX->m_prs->m_mapParamIndex.SetAt(&value, (void*)nField);
+
+where 'value' is the variable that will be used for the transfer
+and nField is the sequential number of the field data member.
+
+So far everything is fine. The problem comes when your RecordSet
+(CRecordSet derived class) goes out of scope. The CRecordSet 
+destructor calls 'Close()' on itself which in  turn calls 
+'FreeDataCache()'. Lets look at the implemetation of this function:
+
+
+void CRecordset::FreeDataCache()
+{
+	ASSERT_VALID(this);
+
+	CFieldInfo* pInfo;
+
+	for (DWORD nField = 0; nField < m_nFields; nField++)
+	{
+		pInfo = &m_rgFieldInfos[nField];
+
+		switch(pInfo->m_nDataType)
+		{
+		default:
+			ASSERT(FALSE);
+			// fall through
+
+		// Data not cached
+		case AFX_RFX_NO_TYPE:
+			break;
+
+		// Types cached by value (sizeof(TYPE) <= sizeof(void*))
+		case AFX_RFX_BOOL:
+		case AFX_RFX_BYTE:
+		case AFX_RFX_INT:
+		case AFX_RFX_LONG:
+		case AFX_RFX_SINGLE:
+			pInfo->m_pvDataCache = NULL;
+			break;
+
+		case AFX_RFX_TEXT:
+			delete (CString*)pInfo->m_pvDataCache;
+			pInfo->m_pvDataCache = NULL;
+			break;
+
+		case AFX_RFX_DOUBLE:
+			delete (double*)pInfo->m_pvDataCache;
+			pInfo->m_pvDataCache = NULL;
+			break;
+
+		case AFX_RFX_TIMESTAMP:
+			delete (TIMESTAMP_STRUCT*)pInfo->m_pvDataCache;
+			pInfo->m_pvDataCache = NULL;
+			break;
+
+		case AFX_RFX_DATE:
+			delete (CTime*)pInfo->m_pvDataCache;
+			pInfo->m_pvDataCache = NULL;
+			break;
+
+		case AFX_RFX_BINARY:
+			delete (CByteArray*)pInfo->m_pvDataCache;
+			pInfo->m_pvDataCache = NULL;
+			break;
+		}
+	}
+}
+
+
+This function deletes the object by switching on its type.
+In an Object Oriented system I would expect to be able 
+to say:
+'delete pInfo->m_pvDataCache' without any type casting and let
+the object take care of deleting itself.
+(I understand that this would require a base class for types you
+can bind and since Systems<Toolkit> types are won't derive of
+that base class, I would need an adapter to get it working).
+
+However, here the knowledge of the type of object being deleted is
+external to the object(an element in the map is nothing but a void*).
+
+How am I supposed to extend this function to accept my types?
+
+Say for example I need to support the 'string' type from the
+Systems<Toolkit> library. To do this I will now need to define
+a new type like 'AFX_RFX_MYTYPE' whereas  with version 4.0 I 
+could get away with just providing a new RFX_Text routine with
+a different signature.
+
+Also, FreeDataCache() is not virtual. which means I need to 
+override Close() (which is virtual) and then call my implementation
+of FreeDataCache(). This is not neat.
+
+Does anyone have any suggestions on how to proceed?
+Does Microsoft think that the way RFX works is really cool
+or it could have been designed in a better way?
+
+Thanks,
+Sumit Chawla
+(on behalf of the GUI Team
+@ Computer Sciences Corporation
+Champaign IL 61820)
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Kostya Sebov -- <A HREF="mailto:sebov@is.kiev.ua">sebov@is.kiev.ua</A>
+Tuesday, December 10, 1996
+</B>
+>   Environment: VC++ 4.2-flat, NT 3.51
+>
+>   We have just attempted to port our application from Visual C++ 4.0
+>   to Visual C++ 4.2 and have hit this problem.
+>
+>   We use MFC's support for ODBC through the CDatabase and CRecordSet
+>   classes.
+>   Our RecordSet uses datatypes from ObjectSpace's Systems<Toolkit>
+>   library.
+>   Therefore we have a need to bind our database columns to
+>   Systems<Toolkit>
+>   datatypes. This means writing custom Record Field Exchange functions. We
+>   followed the approach suggested by Technical Note TN043. This is what is
+>   says:
+>   "To write your own Custom RFX function, it is suggested that you copy
+>   an existing RFX function and modify it to your own purposes. Selecting
+>   the right RFX to copy can make your job much easier.Some RFX functions
+>   have some unique properties that you should take into account when
+>   deciding which to copy."
+>
+>   This worked fine with MFC 4.0. However with MFC 4.2, Microsoft went
+>   ahead
+>   and changed their implementation of the way RFX routines work. Technical
+>   Note 43 no longer holds true for MFC 4.2. The MFC code for RFX routines
+>   in
+>   4.2 reads a lot better but it does make writing custom RFX routines more
+>   difficult. Actually, I still don't know of a clean way to do it.
+>
+>   With the new implementation of RFX routines; when you bind your database
+>   column ( in the switch case CFieldExchange::BindParam), you set a pair
+>   of
+>   void pointers in a Map like this:
+>
+>   pFX->m_prs->m_mapParamIndex.SetAt(&value, (void*)nField);
+>
+>   where 'value' is the variable that will be used for the transfer
+>   and nField is the sequential number of the field data member.
+>
+>   So far everything is fine. The problem comes when your RecordSet
+>   (CRecordSet derived class) goes out of scope. The CRecordSet
+>   destructor calls 'Close()' on itself which in  turn calls
+>   'FreeDataCache()'. Lets look at the implemetation of this function:
+>
+>
+>   void CRecordset::FreeDataCache()
+>   {
+>       ASSERT_VALID(this);
+>
+>       CFieldInfo* pInfo;
+>
+>       for (DWORD nField = 0; nField < m_nFields; nField++)
+>       {
+>           pInfo = &m_rgFieldInfos[nField];
+>
+>           switch(pInfo->m_nDataType)
+>           {
+>           default:
+>               ASSERT(FALSE);
+>               // fall through
+>
+>           // Data not cached
+>           case AFX_RFX_NO_TYPE:
+>               break;
+>
+>           // Types cached by value (sizeof(TYPE) <= sizeof(void*))
+>           case AFX_RFX_BOOL:
+>           case AFX_RFX_BYTE:
+>           case AFX_RFX_INT:
+>           case AFX_RFX_LONG:
+>           case AFX_RFX_SINGLE:
+>               pInfo->m_pvDataCache = NULL;
+>               break;
+>
+>           case AFX_RFX_TEXT:
+>               delete (CString*)pInfo->m_pvDataCache;
+>               pInfo->m_pvDataCache = NULL;
+>               break;
+>
+>           case AFX_RFX_DOUBLE:
+>               delete (double*)pInfo->m_pvDataCache;
+>               pInfo->m_pvDataCache = NULL;
+>               break;
+>
+>           case AFX_RFX_TIMESTAMP:
+>               delete (TIMESTAMP_STRUCT*)pInfo->m_pvDataCache;
+>               pInfo->m_pvDataCache = NULL;
+>               break;
+>
+>           case AFX_RFX_DATE:
+>               delete (CTime*)pInfo->m_pvDataCache;
+>               pInfo->m_pvDataCache = NULL;
+>               break;
+>
+>           case AFX_RFX_BINARY:
+>               delete (CByteArray*)pInfo->m_pvDataCache;
+>               pInfo->m_pvDataCache = NULL;
+>               break;
+>           }
+>       }
+>   }
+>
+>
+>   This function deletes the object by switching on its type.
+>   In an Object Oriented system I would expect to be able
+>   to say:
+>   'delete pInfo->m_pvDataCache' without any type casting and let
+>   the object take care of deleting itself.
+>   (I understand that this would require a base class for types you
+>   can bind and since Systems<Toolkit> types are won't derive of
+>   that base class, I would need an adapter to get it working).
+>
+>   However, here the knowledge of the type of object being deleted is
+>   external to the object(an element in the map is nothing but a void*).
+>
+>   How am I supposed to extend this function to accept my types?
+>
+>   Say for example I need to support the 'string' type from the
+>   Systems<Toolkit> library. To do this I will now need to define
+>   a new type like 'AFX_RFX_MYTYPE' whereas  with version 4.0 I
+>   could get away with just providing a new RFX_Text routine with
+>   a different signature.
+>
+>   Also, FreeDataCache() is not virtual. which means I need to
+>   override Close() (which is virtual) and then call my implementation
+>   of FreeDataCache(). This is not neat.
+>
+>   Does anyone have any suggestions on how to proceed?
+>   Does Microsoft think that the way RFX works is really cool
+>   or it could have been designed in a better way?
+>
+>   Thanks,
+>   Sumit Chawla
+>   (on behalf of the GUI Team
+>   @ Computer Sciences Corporation
+>   Champaign IL 61820)
+>
+
+Just an idea...
+
+How about applying your "adapter approcah here", that is implementing a class
+that derives from both your library class and the one having std RFX exchange
+routine _AND_ having virtual destructor.
+
+Based on the code snip you posted CByteArray could be a goog candidate. If you
+manage to make the data cache store the pointer to the CByteArray subobject
+and the AFX_RFX_BINARY type tag, the delete will call just the right
+destructor.
+
+HTH
+
+--- 
+Kostya Sebov. 
+----------------------------------------------------------------------------
+Tel: (38 044) 266-6387 | Fax: (38 044) 266-6195 | E-mail: sebov@is.kiev.ua
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,379 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Ole Automation - passing parameters by reference
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Giles R. Chamberlin -- <A HREF="mailto:GRC@langley.softwright.co.uk">GRC@langley.softwright.co.uk</A>
+Wednesday, October 23, 1996
+</B>
+
+Environment: VC++ 4.1, Win 95
+
+I've successfully created a variety of  automation methods which allow me   
+to pass parameters in to an automation function.  OK so all I did was   
+click Class Wizard buttons, but it made me feel happy.
+
+Now the tricky bit.  I'm trying to implement a function which in a pure   
+C++ world would like:
+BOOL Next(CString& strText);
+
+ie on return strText has something useful in it.  Having CString as the   
+return type is not one of the options I'm after.
+
+So, moving in to OLE, I used ClassWizard to generate my method and hand   
+edited the odl file to add [out] to the parameter definition:
+
+<odl start> 
+[ uuid(AD3901A0-2747-11D0-AB3C-0020AF71E433) ]
+dispinterface ISPageNames
+{
+ properties:
+  // NOTE - ClassWizard will maintain property information here.
+  //    Use extreme caution when editing this section.
+  //{{AFX_ODL_PROP(SPageNames)
+  //}}AFX_ODL_PROP
+  
+ methods:
+  // NOTE - ClassWizard will maintain method information here.
+  //    Use extreme caution when editing this section.
+  //{{AFX_ODL_METHOD(SPageNames)
+  [id(1)] void Reset();
+  [id(2)] boolean Next([out] BSTR* pbstrPageName); // hand editing here
+  //}}AFX_ODL_METHOD
+};
+<odl end>
+
+and coded the function itself as:
+<C++ start>
+BOOL SPageNames::Auto_Next(BSTR* pbstrPageName)
+{
+ if(m_posCurrent == NULL)
+  return FALSE;
+
+ CString strName = m_strlist.GetNext(m_posCurrent);
+ BSTR bstrName = strName.AllocSysString();
+ pbstrPageName = &bstrName;
+ return TRUE;
+}
+<C++ End>
+
+I then call this function from a simple test App (Class wizard generated   
+Class from TypeLib to wrap the IDispatch) and the following code to   
+exercise the function.
+
+<Test code snippet>
+ ASSERT(pDisp != NULL);
+ ISPageNames names;
+ names.AttachDispatch(pDisp);
+ BSTR bstrName;
+ names.Next(&bstrName);
+ CString strName = OLE2T(bstrName);
+ ::SysFreeString(bstrName);
+<Test code ends>
+
+The problem:
+the BSTR returned by names.Next is valid but empty, even though tracing   
+through the code of SPageNames::Auto_Next shows that a valid, non-empty   
+string is being assigned.
+By a valid BSTR, I mean that the assignment to strName passes off without   
+a hitch.  Unfortunately the value of strname is an unhelpful "";
+
+So, how should I go about passing back information in one of the   
+parameters of an automation method?
+
+
+Giles Chamberlin
+Softwright
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Ibsen -- <A HREF="mailto:iramos@geographix.com">iramos@geographix.com</A>
+Thursday, October 24, 1996
+</B>
+[Mini-digest: 5 responses]
+
+Ok Mr. Giles....
+
+This is what I did.....From my main app:
+
+-------------------------------------------------------------------------
+--------
+<Main App>
+
+CString strText;
+
+IMyInterface myOleApp;
+myOleApp.CreateDispatch("CmyOleApp.App");
+myOleApp.myMethod((BSTR*)&strText);
+-------------------------------------------------------------------------
+--------
+
+from my ole app (mine consist of a dialog box that I can input some
+text):
+
+-------------------------------------------------------------------------
+--------
+
+CMyDialog* m_pMyDialog;  // I save the pointer to the dialog in the
+constructor
+CMyDialog* GetMyDialog {return m_pMyDialog;}
+
+CString* m_pMyString;
+void SetMyString(CString* pString) {m_pMyString = pString;}
+
+in the interface
+
+BOOL CMyInterface::myMethod(BSTR FAR* pString)
+{
+	((CmyOleApp*)AfxGetApp())->GetMyDialog()->SetMyString((CString*)pString)
+;
+}
+
+So whenever I set the text using m_pMyString, is always pointing to the
+strText variable in my main app............ I did it this way and it
+works for me, I'm not sure if this is what you're looking for. Let me
+know if it worked......
+
+>----------
+>From: 	Giles R. Chamberlin[SMTP:GRC@langley.softwright.co.uk]
+>Sent: 	Wednesday, October 23, 1996 10:29 AM
+>To: 	mfc-l
+>Subject: 	Ole Automation - passing parameters by reference
+>
+>
+>Environment: VC++ 4.1, Win 95
+>
+>I've successfully created a variety of  automation methods which allow
+>me to pass parameters in to an automation function.  OK so all I did
+>was click Class Wizard buttons, but it made me feel happy.
+>
+>Now the tricky bit.  I'm trying to implement a function which in a pure
+>C++ world would like:
+>BOOL Next(CString& strText);
+>
+>ie on return strText has something useful in it.  Having CString as the
+>return type is not one of the options I'm after.
+>
+>So, moving in to OLE, I used ClassWizard to generate my method and hand
+>edited the odl file to add [out] to the parameter definition:
+>
+><odl start> [ uuid(AD3901A0-2747-11D0-AB3C-0020AF71E433) ]
+>dispinterface ISPageNames
+>{
+> properties:
+>  // NOTE - ClassWizard will maintain property information here.
+>  //    Use extreme caution when editing this section.
+>  //{{AFX_ODL_PROP(SPageNames)
+>  //}}AFX_ODL_PROP
+>   methods:
+>  // NOTE - ClassWizard will maintain method information here.
+>  //    Use extreme caution when editing this section.
+>  //{{AFX_ODL_METHOD(SPageNames)
+>  [id(1)] void Reset();
+>  [id(2)] boolean Next([out] BSTR* pbstrPageName); // hand editing here
+>  //}}AFX_ODL_METHOD
+>};
+><odl end>
+>
+>and coded the function itself as:
+><C++ start>
+>BOOL SPageNames::Auto_Next(BSTR* pbstrPageName)
+>{
+> if(m_posCurrent == NULL)
+>  return FALSE;
+>
+> CString strName = m_strlist.GetNext(m_posCurrent);
+> BSTR bstrName = strName.AllocSysString();
+> pbstrPageName = &bstrName;
+> return TRUE;
+>}
+><C++ End>
+>
+>I then call this function from a simple test App (Class wizard
+>generated Class from TypeLib to wrap the IDispatch) and the following
+>code to exercise the function.
+>
+><Test code snippet>
+> ASSERT(pDisp != NULL);
+> ISPageNames names;
+> names.AttachDispatch(pDisp);
+> BSTR bstrName;
+> names.Next(&bstrName);
+> CString strName = OLE2T(bstrName);
+> ::SysFreeString(bstrName);
+><Test code ends>
+>
+>The problem:
+>the BSTR returned by names.Next is valid but empty, even though tracing
+>through the code of SPageNames::Auto_Next shows that a valid, non-empty
+>string is being assigned.
+>By a valid BSTR, I mean that the assignment to strName passes off
+>without a hitch.  Unfortunately the value of strname is an unhelpful
+>"";
+>
+>So, how should I go about passing back information in one of the
+>parameters of an automation method?
+>
+>
+>Giles Chamberlin
+>Softwright
+>
+-----From: "Siu-Wang Leung" <swl@walker.com>
+
+     Hi:
+     
+        If you code like the following:
+     
+     CString strName = m_strlist.GetNext(m_posCurrent);
+     *pbstrPageName = strName.AllocSysString();
+     
+     the code will work.
+
+Siu-Wang Leung
+-----From: Ian Pepper <Ian@flexicom.ie>
+
+Hi Giles
+
+
+Try the following,
+
+BOOL SPageNames::Auto_Next(BSTR* pbstrPageName)
+{
+ if(m_posCurrent == NULL)
+  return FALSE;
+
+ CString strName = m_strlist.GetNext(m_posCurrent);
+ *pbstrPageName = strName.AllocSysString();
+ 
+return TRUE;
+}
+
+The problem appears to be in the temporary varaiables assignment
+
+Ian
+ian@flexicom.ie
+
+-----From: "Michael J. Morel" <mmorel@mushroomsoft.com>
+
+ClassWizard provides you with an option to make a parameter of type =
+BSTR*.  I'd use that, and not hand-edit anything.  Here is a sample =
+function that passes a string back to VB via a parameter:
+
+#include <afxpriv.h>
+...
+BOOL CTestDoc::GetString(BSTR FAR* pbstr)=20
+{
+	USES_CONVERSION;
+	SysReAllocString(pbstr, T2OLE("Hey!"));
+	return TRUE;
+}
+
+In VB 4.0, my complex processing looks like this:
+
+Dim o As Object
+Dim s As String
+Dim b As Boolean
+Set o =3D CreateObject("Test.Document")
+b =3D o.GetString(s)
+MsgBox (s)
+
+This works for me.  I'm VC 4.2, but that shouldn't matter.
+
+Mike Morel
+Mushroom Software
+Home of MFC For Yourself
+<A HREF="http://www.mushroomsoft.com/mushroom">http://www.mushroomsoft.com/mushroom</A>
+
+-----From: "Doug Brubacher" <Doug_Brubacher@compuware.com>
+
+     I think the problem with Giles' code is he is modifying the pointer 
+     pbstrPageName itself, rather then the address it is pointing at.
+     
+     I've being experimenting with Automation objects and I created a test 
+     method that does almost exactly what he wants, here's my 
+     implementation:
+     
+     STDMETHODIMP CBlamo::get_Item(long Index, BSTR* pbstr)
+     {
+        CString sString;
+     
+        sString.Format( "Index: %i", Index );
+        AfxMessageBox( sString );
+     
+        if (pbstr == NULL)
+                return E_POINTER;
+        *pbstr = sString.AllocSysString();
+     
+        return S_OK;
+     }
+     
+     and the IDL definition:
+     
+     HRESULT Item([in] long Index, [out, retval] BSTR* pbstr);
+     
+     and here's a snippet from the calling function:
+     
+        BSTR bsString;
+     ...
+        hRes = pBlamo->get_Item( iIndex, &bsString );
+        if ( S_OK == hRes ) 
+        {
+                CString sString( bsString );
+                plblString->SetWindowText( sString );
+        }
+     ...
+     
+     I also do not call SysFreeString.  I presume the destructor handles 
+     this automatically when the BSTR goes out of scope, at any rate VC++ 
+     does not report any leaks when I run the program.
+     
+     Regards
+     
+     Doug Brubacher
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

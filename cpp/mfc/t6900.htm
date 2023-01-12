@@ -1,0 +1,240 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CtoolTipCtrl in CDialog on WIN95/VC++ 4.2
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Al Baker -- <A HREF="mailto:abaker@mcs.com">abaker@mcs.com</A>
+Monday, September 23, 1996
+</B>
+Environment: Win 95 VC++ 4.2
+
+I am trying to get tool tips to work with 4 buttons defined as
+CBitmapButton's in a CDialog. (Since CDialog is not based on CFrameWnd, tool
+tips are not automatically available (for design reasons that seem like a
+mistake-- pardon the opinion) so it is roll-your-own time. The code in my
+CDialog derived OnInitDialog is:
+
+  RECT rect;
+
+  assert(cToolTip.Create(this,TTS_ALWAYSTIP));
+  cToolTip.SetDelayTime(100); // delay display for .1 sec
+
+  button1.GetWindowRect(&rect);
+  button1.ScreenToClient(&rect);
+  assert(cToolTip.AddTool(&button1,IDS_PLAY,&rect,IDPLAY));
+
+  button2.GetWindowRect(&rect);
+  button2.ScreenToClient(&rect);
+  assert(cToolTip.AddTool(&button2,IDS_EXIT,&rect,IDEXIT));
+
+  button3.GetWindowRect(&rect);
+  button3.ScreenToClient(&rect);
+  assert(cToolTip.AddTool(&button3,IDS_INSTALL,&rect,IDINSTALL));
+
+  button4.GetWindowRect(&rect);
+  button4.ScreenToClient(&rect);
+  assert(cToolTip.AddTool(&button4,IDS_UNINSTALL,&rect,IDUNINSTALL));
+
+  cToolTip.Activate(TRUE);
+
+and cToolTip is defined in the class definition as:
+
+  CToolTipCtrl cToolTip;
+
+The tool tips are not showing up and I haven't found anything in the
+documentation to explain what is wrong or missing.  It is probably something
+stupidly simple that I am overlooking but I just don't see it.  All the
+IDxxx's above are the button id's and all the IDS_xxx's above are the string
+id's.
+
+Thanks,
+
+Al Baker
+abaker@mcs.com
+<A HREF="http://www.abaker.com">http://www.abaker.com</A> for information on Al Baker and Associates.
+
+(If you would prefer sending attachments to me using an RSA/IDEA
+encryption method, my ViaCrypt PGP public key can be obtained
+via "finger" of abaker@mcs.com)
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Wednesday, September 25, 1996
+</B>
+[Mini-digest: 3 responses]
+
+At 23:50 9/23/96 -0500, abaker@mcs.com wrote:
+>Environment: Win 95 VC++ 4.2
+
+>(Since CDialog is not based on CFrameWnd, tool
+>tips are not automatically available (for design reasons that seem like a
+>mistake-- pardon the opinion) 
+
+A design mistake on who's part? If you want a frame window, why don't you
+use a CFrameWnd-derived object? You're right: choosing the wrong base
+class _is_ a design mistake.
+
+>The code in my CDialog derived OnInitDialog is:
+
+The function you've provided isn't complete.
+
+You say that the buttons are CBitmapButtons, but you don't mention how
+you initialized them.  How did you intialize them?  Is your DoDataExchange()
+function correctly written?  How did you call it in CYourDialog::OnInitDialog()?
+
+>  RECT rect;
+>  assert(cToolTip.Create(this,TTS_ALWAYSTIP));
+>  cToolTip.SetDelayTime(100); // delay display for .1 sec
+
+Remember that assert() goes away if you define NDEBUG.  This code will break
+badly in a default "Retail" build.  You should probably use the VERIFY() macro,
+instead.
+
+>  button1.GetWindowRect(&rect);
+>  button1.ScreenToClient(&rect);
+>  assert(cToolTip.AddTool(&button1,IDS_PLAY,&rect,IDPLAY));
+
+Why are you converting the window rect you get to the client coordinates
+of the button? Shouldn't you be converting it to the client coordinates of the
+dialog?   Why are you saying that the button contains itself?  I think you
+should be coding:
+
+   button1.GetWindowRect(&rect);
+   ScreenToClient(&rect);
+   VERIFY(cToolTip.AddTool(this, IDS_PLAY, &rect, IDPLAY));
+
+for each of the buttons you set up.
+
+>The tool tips are not showing up and I haven't found anything in the
+>documentation to explain what is wrong or missing. 
+
+Have you compared your code to the CMNCTRLS sample?
+
+Did you override WindowProc() for your dialog and pass the mouse messages along
+to CToolTip::RelayEvent()? 
+
+It turns out that buttons end up capturing mouse messages when the mouse is over
+them, so that's also a problem for you.  Since the tool tip needs to see mouse
+messages to know to come up, it won't come up unless you redirect the mouse
+messages
+from the buttons appropriately. I'm pretty sure there's a KB article that covers
+this last point, but I'm not at liberty to research it for you just now.
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+Don't look at my hands: look at my _shoulders_!
+These words are my own. I do not speak on behalf of Microsoft.
+
+-----From: "Jim Schollenberger" <Jim_Schollenberger@msn.com>
+
+Al Baker
+Al,
+You are probably missing the RelayEvent in PreTranslateMessage.  I have shown 
+below some simple code to add bitmap buttons and tooltips in a dialog box.
+
+Hope it helps,
+
+Jim Schollenberger
+
+//////////////////////////////////////////////////////
+// Adding tooltips to bitmap buttons:
+
+MyDlg.H
+    CToolTipCtrl m_tooltip;
+    CBitmapButton m_Button1;
+    CBitmapButton m_Button2;
+
+MyDlg.CPP
+BOOL CMyDlg::OnInitDialog() 
+{
+    CDialog::OnInitDialog();
+    
+    // Load the bitmaps for the buttons.
+    VERIFY(m_Button1.AutoLoad(IDC_BUTTON1, this));
+    VERIFY(m_Button2.AutoLoad(IDC_BUTTON2, this));
+		
+    // Create the ToolTip control.
+    m_tooltip.Create(this);
+    
+m_tooltip.Activate(TRUE);
+
+    // Add tooltips to the controls taken from the string table.
+    m_tooltip.AddTool(GetDlgItem(IDC_BUTTON1), IDS_BUTTONTIP1);
+    m_tooltip.AddTool(GetDlgItem(IDC_BUTTON2), IDS_BUTTONTIP2);
+}
+
+// PreTranslateMessage is required to process tool tip messages.
+BOOL CRouteDlg::PreTranslateMessage(MSG* pMsg)
+{
+    // Let the ToolTip process the message.
+    m_tooltip.RelayEvent(pMsg);
+	
+    return CDialog::PreTranslateMessage(pMsg);
+}
+
+Jim Schollenberger
+
+-----From: ganeshs@nationwide.com
+
+    You    need   to    call   CToolTipCtrl::RelayEvent()    in   either
+PreTranslateMessage()      (for      a     modeless      dialog)      or
+CWinApp::ProcessMessageFilter() (for  a modal dialog, since  it has it's
+own message loop->KB article Q135873 explains this process).
+
+    Since  you're  using  MFC  version   4.2,  you  don't  need  to  use
+ProcessMessageFilter()  anymore!  KB  article  Q141758  (a  revision  to
+Q135873) explains this...
+
+/ ___|    / ___| __ _ _ __   ___  ___| |
+\___ \   | |  _ / _` | '_ \ / _ \/ __| '_ \
+ ___) |  | |_| | (_| | | | |  __/\__ \ | | |
+|____(_)  \____|\__,_|_| |_|\___||___/_| |_|
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

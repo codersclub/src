@@ -1,0 +1,157 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+OLE control in document
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Mark Eastman -- <A HREF="mailto:Mark_Eastman@qsp.co.uk">Mark_Eastman@qsp.co.uk</A>
+Tuesday, August 13, 1996
+</B>
+Environment:  VC++ 4.1, Win95
+
+I have an invisible OLE control which grants access to a remote system and I 
+want to use the control in an SDI application which has a couple of splitter 
+windows. At first I placed the OLE control onto one of the views but found that 
+logically it should be placed in the document as all views need access to it.
+
+I therefore placed a member variable in the document of type OLEControl and then
+called the create method of the control in the OnNewDocument method. This works 
+and I can invoke methods on the OLE control, however how are the events (which 
+may be fired by the control) handled ?
+
+Could I have problems in the future by placing the OLE control in a CDocument 
+derived class ?
+
+Thanks
+
+ ////
+c  oo   Looking forward to a reply !  
+|   >   Mark Eastman ( email marke@qsp.co.uk )
+\  ~
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Giles R. Chamberlin -- <A HREF="mailto:GRC@langley.softwright.co.uk">GRC@langley.softwright.co.uk</A>
+Thursday, August 15, 1996
+</B>
+[Mini-digest: 2 responses]
+
+
+
+> called the create method of the control in the OnNewDocument method.   
+This
+> works and I can invoke methods on the OLE control, however how are the   
+events
+> (which may be fired by the control) handled ?
+
+Events are handled by you providing an appropriate IDispatch interface to   
+the OCX.  To achieve this:
+
+1) Create an event handler.
+Derive an Event Handler class from CCmdTarget with automation enabled.   
+ This gives you an IDispatch derived interface.
+
+Use ClassWizard to add Automation methods to your EventHandler.  Make   
+sure they're added in the order that the
+events are listed in the OCX.  ole2vw32.exe will be useful here.
+
+Change your EventHandler interface IID to match the IID of the OCX's   
+event interface.  ole2vw32 again.  Use "find in files" to make sure you   
+get it all!  Be warned that it also appears in your odl file.
+
+2) Now connect it up
+Get the IUnknown of your OCX  (MFC GetControlUnknown)
+QueryInterface for IID_IConnectionPointContainer
+FindConnectionPoint for the IID of the OCX's events == IID of your event   
+handler.
+And then call Advise on IConnectionPoint with the IDispatch of your   
+EventHandler (found using GetIDispatch);
+
+On the way through the above, call Release on the interfaces as you   
+finish with them and be sure to check return codes as you may get non   
+NULL interface pointers returned by calls that have failed.  Use the   
+macros FAILED() or succeeded to check return codes.
+
+3) Fire it all up and enjoy!
+
+Good luck,
+
+Giles Chamberlin,
+Softwright.
+-----From: Mike Blaszczak <mikeblas@nwlink.com>
+
+At 11:35 AM 8/13/96 +0100, you wrote:
+
+>I have an invisible OLE control which grants access to a remote system and I 
+>want to use the control in an SDI application which has a couple of splitter 
+>windows. At first I placed the OLE control onto one of the views
+>but found that logically it should be placed in the document as
+>all views need access to it.
+
+Is your control windowless, or just invisible?
+
+>I therefore placed a member variable in the document of type
+>OLEControl and then called the create method of the control in the
+>OnNewDocument method. This works and I can invoke methods on the
+>OLE control, however how are the events (which 
+>may be fired by the control) handled ?
+
+They'll be sent to whatever window owns the control.
+
+>Could I have problems in the future by placing the OLE control in a CDocument 
+>derived class ?
+
+The future always brings us new problems. But I don't think what you're
+suggesting is at the root of any forseeable evil.
+
+.B ekiM
+http://www.nwlink.com/~mikeblas/
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

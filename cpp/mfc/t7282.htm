@@ -1,0 +1,318 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Context Sensitive Help
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Reza Razavipour -- <A HREF="mailto:biles.com!reza_r@jabberwock.biles.com">biles.com!reza_r@jabberwock.biles.com</A>
+Thursday, October 17, 1996
+</B>
+Environment: VC 4.1 on NT 3.51
+
+I just started implementing Context Sensitive Help for my app. I got the help 
+file all setup. When I have a Modal Dialog up and I hit F1, I call
+AfxGetApp()->WinHelp(CONTEXT_ID);
+
+I get CONTEXT_IDs from the .hh file which equivalent to resource.hm in ROBOHELP.
+
+I always get the following error message:
+The topic does not exist. Contact your application vendor for a new help file [129].
+
+Any ideas what I am missing? What causes this error to come up? 
+
+I can not step into the WinHelp call. Why?
+
+TIA
+
+Reza
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Michael Patterson -- <A HREF="mailto:patterso@sprynet.com">patterso@sprynet.com</A>
+Friday, October 18, 1996
+</B>
+[Mini-digest: 3 responses]
+
+Hi,
+If I am not mistaken, 'WinHelp' has a DWORD parameter.
+You might need to typecast your 'CONTEXT_ID'
+
+Take care,
+Mike
+
+
+>I just started implementing Context Sensitive Help for my app. I got the help 
+>file all setup. When I have a Modal Dialog up and I hit F1, I call
+>AfxGetApp()->WinHelp(CONTEXT_ID);
+********************
+Michael Patterson
+patterso@sprynet.com
+********************
+Phoenix, Arizona, USA
+
+-----From: WnDBSoft@aol.com
+
+You don't need to call AfxGetApp()->WinHelp(CONTEXT_ID); for a Modal Dialog.
+ The framework provides for that.  To get a HM file (instead of an HH) run
+the MAKEHELP.BAT in your project directory with the line which would normally
+call the Help Compiler deleted or commented out.
+
+Tell RoboHELP that the *.HM file for your project is what you want to use for
+help contexts.  Now, let's say the dialog you want to author help for (or
+connect Help to) has an ID of IDD_APP_DIALOG.  The Context ID you should
+assign to the topic is: HIDD_APP_DIALOG (it's in the *.HM file you just
+created).  Build the Help file and run your application.  Bring up the
+particular dialog and press F1.  Voila!
+
+Good luck!
+
+Brian
+-----From: Tomas Gudmundsson <thg@dhi.dk>
+
+If you turn the help options on when you create a new project MSVC will =
+create a basic help system for that project. What you need to do is take =
+the makehelp.bat file and apply it to your existing projet.
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Niels Ull Jacobsen -- <A HREF="mailto:nuj@kruger.dk">nuj@kruger.dk</A>
+Tuesday, October 22, 1996
+</B>
+[Mini-digest: 3 responses]
+
+
+
+>>> Reza Razavipour <biles.com!reza_r@jabberwock.biles.com> 17-10-96
+21.58 >>>
+>Environment: VC 4.1 on NT 3.51
+
+>I just started implementing Context Sensitive Help for my app. I got the
+help=20
+>file all setup. When I have a Modal Dialog up and I hit F1, I call
+>AfxGetApp()->WinHelp(CONTEXT_ID);
+
+>I get CONTEXT_IDs from the .hh file which equivalent to resource.hm in
+>ROBOHELP.
+
+>I always get the following error message:
+>The topic does not exist. Contact your application vendor for a new help
+>file [129].
+
+>Any ideas what I am missing? What causes this error to come up?=20
+
+Probably, your help file context IDs doesn't match those passed by the
+application. I think there is some option to WinHelp (or a registry setti=
+ng?)
+which will make winhelp display the current context id number in the titl=
+e.
+Also, try setting a breakpoint on the call to WinHelp to check which
+context id you pass to it.
+
+>I can not step into the WinHelp call. Why?
+WinHelp is a Windows API function - you can't step into those, just like =
+you
+can't step into ::CreateWindow etc.
+
+TIA
+
+Reza
+
+
+
+-----From: Mats Manhav <manhav@connectum.skurup.se>
+
+Environment: MSVC 4.2 NT 4.0 Win 95
+
+Hi,
+
+A lot of people have been asking about context help on the list lately.
+I made a solution for this, that I find very convenient and easy to use.
+The solution works if your help file is built with Help ID's from the
+makehelp.bat
+
+The Winhelp calls for context help uses a DWORD array which the
+documentation
+creates for each dialog with all the controls in the dialog.
+I found this a very tedious work for my application and also thought it
+would
+be hard to maintain if the dialogs would change.
+Instead I build this DWORD array on the fly, based on the control.
+To make it even simpler I derive all my dialog boxes from a class called=20
+CBaseDialog which has as its task to make the help for me.
+
+In CBaseDialog I declare three handlers
+
+class CBaseDialog : CDialog
+   afx_msg LONG OnContextHelp(UINT wParam, LONG lParam);
+   afx_msg void OnContextMenu(CWnd* pWnd, CPoint point);
+   afx_msg void OnHelp();
+
+The function bodys look like the following.
+
+void CBaseDialog::OnContextMenu(CWnd* pWnd, CPoint point)=20
+{
+   // only context help for the child controls, not the dialog/page itsel=
+f
+   if (pWnd =3D=3D this)
+      return;
+   static DWORD Array[4] =3D {0, 0, 0, 0};
+   DWORD ID =3D pWnd->GetDlgCtrlID();
+   if (ID < 100)
+   {  // this is for ok, cancel, help and other defined in the windows he=
+lp
+file
+      Array[0] =3D 0;
+      Array[1] =3D 0;
+   }
+   else
+   {
+      Array[0] =3D ID;
+      Array[1] =3D ID + HID_BASE_CONTROL;
+   }
+
+   // call help.
+   ::WinHelp((HWND) pWnd->m_hWnd,=20
+             AfxGetApp()->m_pszHelpFilePath,=20
+             HELP_CONTEXTMENU,
+	          (DWORD) (LPVOID) Array);
+   return;=09
+}
+
+LONG CBaseDialog::OnContextHelp(UINT, LONG lParam)
+{
+   HELPINFO *hi =3D (LPHELPINFO)lParam;
+   CWnd *Wnd =3D CWnd::FromHandle((HWND)hi->hItemHandle);
+   static DWORD Array[4] =3D {0, 0, 0, 0};
+   DWORD ID =3D Wnd->GetDlgCtrlID();
+   if (ID < 100)
+   {
+      Array[0] =3D 0;
+      Array[1] =3D 0;
+   }
+   else
+   {
+      Array[0] =3D ID;
+      Array[1] =3D ID + HID_BASE_CONTROL;
+   }
+
+   // no help for static controls
+   char buf[101];
+   GetClassName((HWND)hi->hItemHandle, buf, 100);
+   CPoint Point(hi->MousePos);
+   if (0 !=3D stricmp("Static", buf))
+   {
+      ::WinHelp((HWND) hi->hItemHandle,
+                AfxGetApp()->m_pszHelpFilePath,=20
+                HELP_WM_HELP,
+                (DWORD) (LPVOID) Array);
+   }
+   return 0;
+}
+
+void CBaseDialog::OnHelp()
+{
+   ::WinHelp((HWND) this->GetSafeHwnd(),
+             AfxGetApp()->m_pszHelpFilePath,=20
+             HELP_CONTEXT,
+	          m_ID + HID_BASE_RESOURCE);
+}
+
+
+This is all there is to it for dialog boxes.
+
+For CPropertySheet I do exactly the same as above and also add the
+OnContextMenu to the CPropertyPage derived class. This takes care of all =
+the
+context help needed for property sheet/pages.
+
+For My CFormView derived classes I add only the OnContextMenu since the
+Framework will handle the rest for me.
+
+After I have implemeted this, I never have to bother about getting any
+context help added to my new dialog boxes, propertysheet/pages or form vi=
+ews
+. I only have to bother about adding the help text to the rtf file.
+I only need to remember to change the base classes from CDialog ->
+CBaseDialog, CPropertySheet -> CBaseSheet and so on.
+
+Hope this will help someone out.
+
+In my opinion the above functions could have been implemented directly in
+CDialog, CPropertySheet, CPropertyPage and CFormView (or CView directly).
+
+Mats
+--
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D
+Mats M=E5nhav (Mats Manhav for 7-bit people)
+email:manhav@connectum.skurup.se   WWW: <A HREF="http://connectum.skurup.se/~manha=">http://connectum.skurup.se/~manha=</A>
+v
+FAX:  (int) 46 (0) 414 243 05      Phone: (int) 46 (0) 414 243 05        =
+=20
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D
+
+-----From: A Prashanth Kumar <PRASH@wipsys.stph.net>
+
+Hi,
+
+The help context_ID in .hm and resource.h wont be the same. They differ b=
+y an=20
+offset value. So try calling your 'Winhelp' function like this..
+
+AfxGetApp()->WinHelp(CONTEXT_ID + 0x10000);
+
+Hope this will solve your problem...
+
+--Prashant Abbagani
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

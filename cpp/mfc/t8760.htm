@@ -1,0 +1,421 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Calling OnIdle() within OnTimer()
+</B></FONT>
+<BR>
+<PRE>
+<B>
+<A HREF="mailto:kvasilak@cyberoptics.com">kvasilak@cyberoptics.com</A>
+Friday, January 03, 1997
+</B>
+     Environment: VC++ 4.1, Win 95
+     
+     I have an app that is doing data analysis and basically is grabbing 
+     data as fast as it can, analyzing it and displaying the results as 
+     fast as possible. 
+     I am using an OnTimer() event which works well for the most part.
+      
+     The problem is that the data analysis needs to happen as fast as 
+     possible. However if the timer period is equal to or less than the 
+     execution time of the OnTimer() function, there is no idle time and 
+     OnIdle() never gets called. This means my toolbars don't update and 
+     messageboxes take a very long time to appear.
+      If the Timer period is too long my customers complain, LOUDLY.
+     Also I need to run this app on machines with different speeds, so I 
+     can't optimize the time-out very well.
+     
+     I added the folowing code in hopes of solving the lack of idle time 
+     processing, unfortunately it causes an exception if a toolbar is 
+     moved. Is there any reason this should not work?
+     
+     
+     The OnIdle Call;
+     
+                LONG lIdle = 0;
+                while (AfxGetApp()->OnIdle(lIdle++));
+     
+     The Error Message;
+     
+     'CDC:DrawDragRect(const tgaRect * 0x0066f678 unhandled exception in 
+     Build.exe (MFC40D.DLL) 0x00000005: Access violation '
+     
+     The function call that caused the exception, from the debugger;
+     
+     CDC::DrawDragRect(
+     const tagRECT * 0x0066f678 {top=33 bottom=62 left=19 right=439}, 
+     tagSIZE {...},
+      const tagRECT * 0x00681a3c {top=33 bottom=62 left=16 right=436}, 
+     tagSIZE {...},
+      CBrush * 0x00683310 {CGdiObject},
+      CBrush * 0x00683310 {CGdiObject}) line 203
+     
+     Keith V
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Tony Headford -- <A HREF="mailto:tony@ktgroup.co.uk">tony@ktgroup.co.uk</A>
+Monday, January 06, 1997
+</B>
+Hi Keith,
+I've always thought that CWinApp::OnIdle was something that you never called
+explicitly (except from inside your own CMyApp::OnIdle), it was just a means
+for you to perform background processing, and for the MFC to do memory
+cleans ups and UI updates (correct me if I'm wrong).
+
+It sounds like perhaps you should be using a separate thread to do your data
+analysis, which then may negate the need to have a timer.
+
+
+Hope this helps,
+
+Tony.
+
+At 13:56 03/01/97 -0600, you wrote:
+>     Environment: VC++ 4.1, Win 95
+>     
+>     I have an app that is doing data analysis and basically is grabbing 
+>     data as fast as it can, analyzing it and displaying the results as 
+>     fast as possible. 
+>     I am using an OnTimer() event which works well for the most part.
+>      
+>     The problem is that the data analysis needs to happen as fast as 
+>     possible. However if the timer period is equal to or less than the 
+>     execution time of the OnTimer() function, there is no idle time and 
+>     OnIdle() never gets called. This means my toolbars don't update and 
+>     messageboxes take a very long time to appear.
+>      If the Timer period is too long my customers complain, LOUDLY.
+>     Also I need to run this app on machines with different speeds, so I 
+>     can't optimize the time-out very well.
+>     
+>     I added the folowing code in hopes of solving the lack of idle time 
+>     processing, unfortunately it causes an exception if a toolbar is 
+>     moved. Is there any reason this should not work?
+>     
+>     
+>     The OnIdle Call;
+>     
+>                LONG lIdle = 0;
+>                while (AfxGetApp()->OnIdle(lIdle++));
+>     
+>     The Error Message;
+>     
+>     'CDC:DrawDragRect(const tgaRect * 0x0066f678 unhandled exception in 
+>     Build.exe (MFC40D.DLL) 0x00000005: Access violation '
+>     
+>     The function call that caused the exception, from the debugger;
+>     
+>     CDC::DrawDragRect(
+>     const tagRECT * 0x0066f678 {top=33 bottom=62 left=19 right=439}, 
+>     tagSIZE {...},
+>      const tagRECT * 0x00681a3c {top=33 bottom=62 left=16 right=436}, 
+>     tagSIZE {...},
+>      CBrush * 0x00683310 {CGdiObject},
+>      CBrush * 0x00683310 {CGdiObject}) line 203
+>     
+>     Keith V
+>
+>
+
+________________________________________
+
+ Tony Headford - Software Developer
+ RMS Services Ltd
+ 
+ email: tony@ktgroup.co.uk
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+David Razzetti -- <A HREF="mailto:raz@jump-jet.demon.co.uk">raz@jump-jet.demon.co.uk</A>
+Monday, January 06, 1997
+</B>
+On Fri, 3 Jan 1997 13:56:15 -0600, you wrote:
+
+>     Environment: VC++ 4.1, Win 95
+>    =20
+>     I have an app that is doing data analysis and basically is grabbing=
+=20
+>     data as fast as it can, analyzing it and displaying the results as=20
+>     fast as possible.=20
+>     I am using an OnTimer() event which works well for the most part.
+>     =20
+>     The problem is that the data analysis needs to happen as fast as=20
+>     possible. However if the timer period is equal to or less than the=20
+>     execution time of the OnTimer() function, there is no idle time and=
+=20
+>     OnIdle() never gets called. This means my toolbars don't update and=
+=20
+>     messageboxes take a very long time to appear.
+>      If the Timer period is too long my customers complain, LOUDLY.
+>     Also I need to run this app on machines with different speeds, so I=
+=20
+>     can't optimize the time-out very well.
+>    =20
+
+....snip
+
+Is all of the above going on within a single thread ?  If it is, then
+surely, your life would be a lot easier if you divided the work
+between two threads.  By creating a separate worker thread to grab and
+display the data, you leave the main thread to handle the user
+interface.  As long as the thread priorities are the same, the
+operating system scheduler should handle the problem of dividing the
+processor's time between data acquisition and the responsiveness of
+the user interface.
+
+I have no idea as to the reason for your problem with the OnIdle call.
+
+Hope the above helps ...
+
+Dave Razzetti
+raz@jump-jet.demon.co.uk
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:kvasilak@cyberoptics.com">kvasilak@cyberoptics.com</A>
+Tuesday, January 07, 1997
+</B>
+     There seems to be a consensus a that I need to create a worker thread. 
+     Unfortunately my attempt at creating a worker thread uncovered a 
+     problem.
+     I have a Graph OCX placed on a dialogbar, the worker thread cannot 
+     send data to that OCX, note that the worker thread CAN send data to an 
+     OCX that is on a FormView and FormView code can send data to the 
+     DialogBar OCX.
+     Go Figure.
+     
+     What I do is this, remember this works from a FormView but not from a 
+     worker thread;
+     
+     This function, a member of my DialogBar class, returns a pointer to 
+     the Graph OCX on the DialogBar.
+     
+     CCSGraph *CBarGraph::GetChart()
+     {
+        CCSGraph *pGraph;
+        pGraph = (CCSGraph *)GetDlgItem(IDC_CSGRAPHCTRL2);
+        return pGraph;
+     }
+     
+     Here part of my thread code
+     UINT MyThread(LPVOID pParam )
+     {
+        VARIANT vtRed;
+     ---snip
+     
+        CDillyApp *pMyApp = ((CDillyApp *)AfxGetApp());
+                
+        CCSGraph *MyGraph = pMyApp->m_pMyDlg->GetChart();
+     
+        MyGraph->SetPlotReadings( vtRed);
+        
+        MyGraph->m_Graph->Refresh();
+     
+     ---snip
+     }
+     
+     During the call to SetPlotReadings I get an assertion in Winocc.cpp. 
+     Again this only happens if the OCX is on a DialogBar and called from a 
+     seperate thread.
+     
+     
+     void AFX_CDECL CWnd::SetProperty(DISPID dwDispID, VARTYPE vtProp, ...)
+     {
+        ASSERT(m_pCtrlSite != NULL);// not an OLE control (not yet, at 
+     least)
+     
+     ----snip
+     
+     What is really weird is during a trace GetChart() has a vaild pointer, 
+     pGraph, until it returns to the worker thread, then pGraph has 
+     changed.
+     
+     Of course I have tried graphing from GetChart() with the same 
+     results...
+     
+     Keith V
+     KVasilak@cyberOptics.com
+     
+
+
+______________________________ Reply Separator _________________________________
+Subject: Re: Calling OnIdle() within OnTimer()
+Author:  David Razzetti <raz@jump-jet.demon.co.uk> at INTERNET
+Date:    1/6/97 9:44 PM
+
+
+On Fri, 3 Jan 1997 13:56:15 -0600, you wrote:
+     
+>     Environment: VC++ 4.1, Win 95
+>     
+>     I have an app that is doing data analysis and basically is grabbing 
+>     data as fast as it can, analyzing it and displaying the results as 
+>     fast as possible. 
+>     I am using an OnTimer() event which works well for the most part. 
+>      
+>     The problem is that the data analysis needs to happen as fast as 
+>     possible. However if the timer period is equal to or less than the 
+>     execution time of the OnTimer() function, there is no idle time and 
+>     OnIdle() never gets called. This means my toolbars don't update and 
+>     messageboxes take a very long time to appear.
+>      If the Timer period is too long my customers complain, LOUDLY.
+>     Also I need to run this app on machines with different speeds, so I 
+>     can't optimize the time-out very well.
+>     
+     
+....snip
+     
+Is all of the above going on within a single thread ?  If it is, then 
+surely, your life would be a lot easier if you divided the work 
+between two threads.  By creating a separate worker thread to grab and 
+display the data, you leave the main thread to handle the user 
+interface.  As long as the thread priorities are the same, the 
+operating system scheduler should handle the problem of dividing the 
+processor's time between data acquisition and the responsiveness of 
+the user interface.
+     
+I have no idea as to the reason for your problem with the OnIdle call.
+     
+Hope the above helps ...
+     
+Dave Razzetti
+raz@jump-jet.demon.co.uk
+     
+     
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Wednesday, January 08, 1997
+</B>
+At 13:56 1/3/97 -0600, kvasilak@cyberoptics.com wrote:
+>     Environment: VC++ 4.1, Win 95
+     
+>     I have an app that is doing data analysis and basically is grabbing 
+>     data as fast as it can, analyzing it and displaying the results as 
+>     fast as possible. 
+>     I am using an OnTimer() event which works well for the most part.
+
+This isn't a very good approach.  If other applications on the system
+become busy, you won't send OnTimer() messages regularly and you'll
+end up not responding to both the messages and the incoming data events
+quickly enough.
+      
+>     The problem is that the data analysis needs to happen as fast as 
+>     possible. However if the timer period is equal to or less than the 
+>     execution time of the OnTimer() function, there is no idle time and 
+>     OnIdle() never gets called.
+
+Yes.
+
+>     This means my toolbars don't update and 
+>     messageboxes take a very long time to appear.
+
+Actually, these problems are more closely related to your saturation of
+the message pump.  If all your application does is porcess WM_TIMER
+messages, you'll find that no other messages of _any_ sort get time
+to run, and that means that they're way behind in the queue.  In Win32,
+you can't overflow the queue so you probably won't actually crash--you'll
+just notice sluggish user-interface response.
+
+You might consider using a spearate thread to do your data acquisition.
+You can adjust the thread priority up a bit and make sure you get enough
+cycles.
+
+>     I added the folowing code in hopes of solving the lack of idle time 
+>     processing, unfortunately it causes an exception if a toolbar is 
+>     moved. Is there any reason this should not work?
+>     The OnIdle Call;
+
+You don't point out where, exactly, you've coded this.
+     
+>     The Error Message;
+>     
+>     'CDC:DrawDragRect(const tgaRect * 0x0066f678 unhandled exception in 
+>     Build.exe (MFC40D.DLL) 0x00000005: Access violation '
+
+But, apparently, you're doing it at a point where your application has,
+or where, on your application's behalf, MFC has created and plans to use
+a temporary object.  Since you call OnIdle(), the temporary object goes
+away and then is referenced and you crash.
+
+If the call to OnIdle() is in response to the WM_TIMER messages, you'll
+certainly crash during almost any user interaction with your application.
+(Your subject implies that this is where you're calling OnIdle(), but
+your message doesn't say anything speicifc about it.)
+     
+>     The function call that caused the exception, from the debugger;
+>     
+>     CDC::DrawDragRect(
+>     const tagRECT * 0x0066f678 {top=33 bottom=62 left=19 right=439}, 
+>     tagSIZE {...},
+>      const tagRECT * 0x00681a3c {top=33 bottom=62 left=16 right=436}, 
+>     tagSIZE {...},
+>      CBrush * 0x00683310 {CGdiObject},
+>      CBrush * 0x00683310 {CGdiObject}) line 203
+
+If you're so busy with data collection, why are you doing all of this
+painting?  A tracking rect uses a lot of CPU.  Or are you doing this
+in response to the user while the acquisition is concurrently
+happening?
+
+Anyway, it sounds like the data collection stuff is a prime candidate
+for a worker thread.
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+Why does the "new" Corvette look like a 1993 RX-7?
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

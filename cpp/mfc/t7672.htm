@@ -1,0 +1,200 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CoFreeUnusedLibraries() hangs on Win 95
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Joshua Cohen -- <A HREF="mailto:Joshua_Cohen@msn.com">Joshua_Cohen@msn.com</A>
+Tuesday, November 12, 1996
+</B>
+Environment : Visual C++ 4.2-flat, Win 95.
+
+My application is hanging inside CoFreeUnusedLibraries(), which is part of 
+OLE32.  This function has been called by MFC's AfxOleTermOrFreeLib(), called 
+by AfxUnlockTempMaps(), called by AfxTermThread(), called by DllMain().  
+DllMain() has been called because a thread created by an OCX has terminated.
+
+I found that there have been a couple of updates to Windows 95's OLE32.DLL, so 
+I got the later one and applied it, which did not help.  It is dated January 
+25, 1996.
+
+These are the main possibilities I can think of: 1) Because the OCX is 
+multi-threaded, it has special responsibilities that it is not fulfilling.  2) 
+The OCX has some other problem, unrelated to threads.  3)  There's an MFC 
+problem.  4) There's a problem with CoFreeUnusedLibraries() itself.
+
+I believe I can work around the symptom by letting the thread live until the 
+end, and simply enabling and disabling its action, rather than by creating and 
+destroying it.  However, I'm concerned that I might simply be masking some 
+underlying problem.
+
+Does anyone have an idea why CoFreeUnusedLibraries() might hang?
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+John -- <A HREF="mailto:John.Weeder@abii.com">John.Weeder@abii.com</A>
+Tuesday, November 12, 1996
+</B>
+[Mini-digest: 2 responses]
+
+First of all, I would suspect a logic flaw in your program (or the COM 
+objects)... not necessarily one of the possibilities you list. 
+
+I suspect that the lock count on one of your COM objects is not being 
+maintained correctly. If the lock count accidently reaches 0, a call to 
+CoFreeUnusedLibraries() may release your DLL and the next access to the 
+object will fail unpredictably. 
+
+Here is how to diagnose this problem:
+
+1) Locate the DllCanUnloadNow() function in each of your in-proc 
+servers. Place a call to OutputDebugString("text...") in each function; 
+similar to the following:
+
+STDAPI DllCanUnloadNow(void)
+{
+   AFX_MANAGE_STATE(AfxGetStaticModuleState());
+   HRESULT hr = AfxDllCanUnloadNow();
+   char szDebug[512];
+   wsprintf(szDebug, "Module: DllCanUnloadNow=%08lX\r\n", hr);
+   OutputDebugString(szDebug);
+   return hr;
+}
+
+OutputDebugString() is a kind of printf() for Windows which will place 
+some text in the output window notifying you when a DLL is going 
+bye-bye.
+
+2) Sprinkle you code liberally with '#ifdef _DEBUG'ed calls to 
+CoFreeUnusedLibraries(). This will causes calls to all the 
+DllCanUnloadNow() functions.  
+
+3) Make sure the none of your DLL's are signalling they can be unloaded 
+when, in fact, you still have active object.
+
+
+
+Also, check all of your DLL entry points and make absolutely sure they 
+are gaurded with either the AFX_MANAGE_STATE macro or the 
+METHOD_PROLOGUE macro.
+
+----------
+From: 	Joshua Cohen
+Sent: 	Monday, November 11, 1996 6:29 PM
+To: 	MFCList
+Subject: 	CoFreeUnusedLibraries() hangs on Win 95
+
+Environment : Visual C++ 4.2-flat, Win 95.
+
+My application is hanging inside CoFreeUnusedLibraries(), which is part 
+of 
+OLE32.  This function has been called by MFC's AfxOleTermOrFreeLib(), 
+called 
+by AfxUnlockTempMaps(), called by AfxTermThread(), called by DllMain(). 
+ 
+DllMain() has been called because a thread created by an OCX has 
+terminated.
+
+I found that there have been a couple of updates to Windows 95's OLE32.  
+DLL, so 
+I got the later one and applied it, which did not help.  It is dated 
+January 
+25, 1996.
+
+These are the main possibilities I can think of: 1) Because the OCX is 
+multi-threaded, it has special responsibilities that it is not 
+fulfilling.  2) 
+The OCX has some other problem, unrelated to threads.  3)  There's an 
+MFC 
+problem.  4) There's a problem with CoFreeUnusedLibraries() itself.
+
+I believe I can work around the symptom by letting the thread live 
+until the 
+end, and simply enabling and disabling its action, rather than by 
+creating and 
+destroying it.  However, I'm concerned that I might simply be masking 
+some 
+underlying problem.
+
+Does anyone have an idea why CoFreeUnusedLibraries() might hang?
+
+-----From: Mike Blaszczak <mikeblas@nwlink.com>
+
+At 00:29 11/12/96 UT, Joshua Cohen wrote:
+>Environment : Visual C++ 4.2-flat, Win 95.
+
+Please upgrade to 4.2b.
+
+>My application is hanging inside CoFreeUnusedLibraries(), which is part of 
+>OLE32.  This function has been called by MFC's AfxOleTermOrFreeLib(), called 
+>by AfxUnlockTempMaps(), called by AfxTermThread(), called by DllMain().  
+>DllMain() has been called because a thread created by an OCX has terminated.
+
+>These are the main possibilities I can think of: 1) Because the OCX is 
+>multi-threaded, it has special responsibilities that it is not fulfilling.  2) 
+>The OCX has some other problem, unrelated to threads.  3)  There's an MFC 
+>problem.  4) There's a problem with CoFreeUnusedLibraries() itself.
+
+It's actually a combination of 3) and 4).  When you call
+CoFreeUnusedLibraries(),
+you might be causing some libraries to unload.  If a library unloads, Windows
+internally gains a critical section to remind itself that it can't do certain
+operations.  In the MFC DLLs, we were previously calling CoFreeUnusedLibraries()
+in DLL_PROCESS_DETACH and DLL_THREAD_DETACH.  That's bad, because at that time
+Windows has the critical section locked because it is unloading and loading
+modules.  If you cause another module to unload at the same time (eg,
+by calling CoFreeUnusedLibraries()) you'll end up causing Windows to deadlock.
+
+MFC's involvement in this problem was addressed in the 4.2b patch.  If you're
+calling these APIs directly yourself, you need to watch out for the same issues.
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+I'm afraid I've become some sort of speed freak.
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

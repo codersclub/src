@@ -1,0 +1,226 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CWnd::OnCreate() and CWnd::GetDlgItem()
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Larry Siden -- <A HREF="mailto:lsiden@jade.bioimage.com">lsiden@jade.bioimage.com</A>
+Tuesday, April 16, 1996
+</B>
+Env: 
+		VC++ 1.5 on Win 3.11
+
+Background:
+		My app's frame window creates a dialog bar, which is
+		represented by the class CColorBar.  CColorBar
+		is derived from CDialogBar.  CColorBar responds to
+		WM_ON_CREATE and initializes its child controls.
+
+
+Problem:
+		CColorBar::OnCreate() invokes this->CWnd::GetDlgItem 
+		to retrieve objects that represent its various child controls.
+		GetDlgItem(), however, is returning NULL.
+
+		I have already confirmed that this->CColorBar::CWnd::m_hWnd is not
+		NULL.  I have also validiated the argument (nID) to GetDlgItem() by
+		checking in the .rc file.
+
+Question:
+		What other tools are at my disposal?  What else do I need to look for?
+
+============================================================================
+
+Larry Siden, Senior Software Engineer   phone: 313-930-9900 x211 (w)
+Bio Image, Inc.                         
+777 E. Eisenhower Pky, Suite 950        email: (w) lsiden@bioimage.com
+Ann Arbor, MI   48108                          (h) 73677.1646@compuserve.com
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+John & Annette Elsbree -- <A HREF="mailto:elsbree@msn.com">elsbree@msn.com</A>
+Thursday, April 18, 1996
+</B>
+[Mini-digest: 5 responses]
+
+Larry -
+
+At the moment the control bar receives the WM_CREATE message, its own window 
+has been created, but its child windows have not yet been created. You should 
+wait to access the child windows until you receive WM_INITDIALOG.
+
+John (not speaking for Microsoft)
+
+-----From: "Frederic Steppe" <FredericS@msn.com>
+
+I guess the controls are not net created at the time the WM_CREATE message is 
+sent.  You may try to implement some 'InitialUpdate' mechanism to initialize 
+your controls.  By the way, I think (not sure) that each control will receive 
+a WM_INITIALUPDATE message after they are all created.
+The easiest way could be to override the Create function to CColorBar::Create, 
+where you call the base class and initialize your controls.
+
+Frederic Steppe (frederics@msn.com)
+-----From: Kuruvilla Mathew  <Kuruvilla_Mathew@countrywide.com>
+
+Hi !
+
+If you are using custom controls and the custom control ( .DLL, .VBX ) is not 
+being loaded prior to the creation of the control then the GetDlgItem() will 
+return a NULL because it cannot find the class registration and all the works 
+associated with the child window class.
+
+If you are using stock controls and getting this problem probably you are out 
+of handles or out of user heap etc.
+
+- Mat
+-----From: craigtt@ccmail.PE-Nelson.COM
+
+Larry,
+
+I can only offer a couple of suggestions to try.  It sounds like you're 
+getting into the creation process after the window has been created but 
+before the dialog template has been loaded and initialized.
+
+1.  Are you calling CDialogBar::OnCreate() in your override before you try  
+    to access the control?
+
+2.  Possibly try overriding CDialogBar::Create instead.  Call the base      
+    class first and if that succeeds, then do the control manipulation.
+
+
+Tim Craig
+PE-Nelson
+
+-----From: lsiden@jade.bioimage.com (Larry Siden)
+
+Thanks!!!
+
+>   The controls don't yet exist when OnCreate is being called. If you look in
+>   dlgbar.cpp, you'll see what's happening. CDialogBar::Create calls
+>   CreateDialog. This will cause WM_INITDIALOG to be sent. I think you can grab
+>   this in your CColorBar.
+
+Since CColorBar is not derived from CDialog, there is no
+OnInitDialog() to override.  However, I can still explicitly
+initialize all the child-controls from the main frame class.  Read on...
+
+Here is my reply to the list-server:
+
+	I figured it out!  CDialogBar::OnCreate() is not the appropriate place
+	to initialize child controls.  Instead, the frame must first invoke
+	pDbar->Create(), and only then initialize the child controls either by
+	itself or by invoking a function in the CDialogBar derived class.  I
+	don't know why this is so, but that's what I had to do to make it
+	work.
+
+	The other headache I had using the CDialogBar is that it does not
+	handle its own messages without over-riding its WindowProc() not to
+	pass the WM_COMMAND type messages to its parent.  (See the C/C++ Q&A
+	column in the July 95 issue of MSJ.)  This is important since my app
+	is a full OLE server and if it had to handle all the WM_COMMAND msgs
+	for the CDialogBar in the main window, I would have to write all the
+	message handlers twice: once for the CFrameWnd and once for the
+	CIPFrameWnd.  It seems much better and intuitive for the dialog bar to
+	handle its own child notifications.
+
+	The other thing I'm having trouble with is
+	CDialogBar::OnUpdateCmdUI().  When it searches for message handlers
+	for each control, it seems to be searching the message map of the
+	frame window, not the message map of the dialog bar!  I haven't been
+	able to verify this or understand why this is so.  Maybe someone can
+	help me out here.  Maybe I just need to override the OnUpdateCmdUI to
+	explicitly update my controls, then call the default, but I want to
+	make sure there's not a better way.  I'll restate the question:
+
+	How do I install ON_UPDATE_COMMAND_UI handlers for non-button controls
+	that are embedded in a dialog bar?
+
+============================================================================
+
+Larry Siden, Senior Software Engineer   phone: 313-930-9900 x211 (w)
+Bio Image, Inc.                         
+777 E. Eisenhower Pky, Suite 950        email: (w) lsiden@bioimage.com
+Ann Arbor, MI   48108                          (h) 73677.1646@compuserve.com
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Larry Siden -- <A HREF="mailto:lsiden@jade.bioimage.com">lsiden@jade.bioimage.com</A>
+Monday, April 22, 1996
+</B>
+Thanks to all for your  many replies.  One final question: Does
+CWnd::Create() wait until WM_INITDIALOG has been handled before
+returning?  If so, then I can safely access all the child-controls
+immediately after CWnd::Create() returns successfully.  If not, then I
+must provide a handler for WM_INITDIALOG so access the controls and
+set up their contents and initial state.
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Crucial Software -- <A HREF="mailto:crucial@ix.netcom.com">crucial@ix.netcom.com</A>
+Wednesday, April 24, 1996
+</B>
+>> Thanks to all for your  many replies.  One final question: Does
+>> CWnd::Create() wait until WM_INITDIALOG has been handled before
+>> returning?
+
+My understanding is that Windows "fabricates" WM_INITDIALOG in the handler
+for WM_CREATE when you're creating a dialog box.  So, once Create() has
+returned, your dialog should be up and running fully.
+
+--
+Brad Wilson, Crucial Software     crucial@ix.netcom.com    +1 (810) 620-9803
+Custom software engineering services for Microsoft Windows NT and Windows 95
+
+  "You wear guilt . Like shackles on your feet . Like a halo in reverse
+   I can feel . The discomfort in your seat . And in your head it's worse"
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

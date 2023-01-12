@@ -1,0 +1,154 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+WINCORE.CPP Assert Message
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Derek F. Groft - UTL -- <A HREF="mailto:groftde@ebs.ac.com">groftde@ebs.ac.com</A>
+Friday, September 27, 1996
+</B>
+
+
+Environment:  VC++ 4.2, NT 3.51, NT 4.0
+
+The code that I use to subclass the Edit box portion of a Combo Box has
+been working fine on NT 3.51 for some time now.  The code below, taken
+from my PreSubclassWindow() handler,  illustrates what I am doing.
+
+	m_pEdit = new CMyEdit;
+
+	POINT p = {1,1};
+	HWND  h = ChildWindowFromPoint(p)->GetSafeHwnd();
+
+	m_pEdit->SubclassWindow( h );
+
+We now have some users on NT 4.0 and the last line causes an ASSERT
+on line 308 of WINCORE.CPP.  The MFC code is as follows:
+	
+BOOL CWnd::Attach( HWND hWndNew )
+{
+	ASSERT( m_hWnd == NULL );  // only attach once.
+	ASSERT( FromHandlePermanent( hWndNew ) == NULL );  
+	    // must not already be in permanent map
+
+	if ( hWndNew == NULL )
+		return FALSE;
+
+	etc.
+}
+
+The second line of this function is line 308.  
+
+Does anyone know what changed in NT4.0 to cause this to happen or what
+I should do about it??
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Sunday, September 29, 1996
+</B>
+At 18:30 9/27/96 -0500, groftde@ebs.ac.com (Derek F. Groft - UTL) wrote:
+
+>Environment:  VC++ 4.2, NT 3.51, NT 4.0
+
+>The code that I use to subclass the Edit box portion of a Combo Box has
+>been working fine on NT 3.51 for some time now.  The code below, taken
+>from my PreSubclassWindow() handler,  illustrates what I am doing.
+>
+>	m_pEdit = new CMyEdit;
+>
+>	POINT p = {1,1};
+>	HWND  h = ChildWindowFromPoint(p)->GetSafeHwnd();
+>
+>	m_pEdit->SubclassWindow( h );
+
+This isn't very good code. (Unfortunately, you probably got the idea from a
+sample shipped or article provided by MS.)
+
+In Windows NT 3.51, you were using the old shell.  In Windows NT 4.0, you're
+using the new shell.  The new shell draws combo boxes that look different than
+they do in old shell.  But, unfortunately, this code is  tightly bound to the
+assumption that combo boxes are drawn a particular way--that there's some edit
+control at point (1,1) relative to the origin of the combo box.
+
+In Windows NT 3.51, that assumption was true-- in Windows NT 4.0, that
+assumption isn't true.
+
+>We now have some users on NT 4.0 and the last line causes an ASSERT
+>on line 308 of WINCORE.CPP.  The MFC code is as follows:
+
+This is why I think it's so much more important to understand _how_ and _why_
+code works than to just paste examples around.
+
+This assert means exactly what the comments say: you can only attach a
+HWND to one permanent CWnd object.  Your call to SubclassWindow() asks
+MFC to attach a CWnd object to a window handle--that is, the implementation
+of SubclassWindow() calls CWnd::Attach().
+
+You're not getting the window you thought you were getting.  The assumption
+that the edit control is at that certain physical position breaks in new
+shell version of Windows. It turns out the window that's really _is_
+at the physical place you've specified has already been attached and
+that means you get the assertion.
+
+>Does anyone know what changed in NT4.0 to cause this to happen or what
+>I should do about it??
+
+You should find a better way to find the edit control window.  You should,
+I think, find a way that isn't based on the physical appearance of the
+Window and, instead, depends on the logical relationship of the windows
+involved in the control.
+
+You could have figured this out yourself by examining the window handle
+returned from your call to ChildWindowFromPoint() call. You're not
+getting a handle to the window you thought you were getting.
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+Don't look at my hands: look at my _shoulders_!
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

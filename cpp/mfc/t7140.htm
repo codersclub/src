@@ -1,0 +1,384 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+How to prevent MDI child close
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Howard Rubin -- <A HREF="mailto:hrubin@nyx.net">hrubin@nyx.net</A>
+Wednesday, October 09, 1996
+</B>
+Environment: VC 4.0, NT 3.51
+
+I'm working on an MDI program which is based on the chkbook sample.
+So I have multiple views of a single document. I need to keep the MDI
+child windows from closing. There are 3 things to catch: (1) double
+click on the top left box of the MDI child (same as win 95's X?), (2)
+control-F4, (3) Select close from the menu. Does anyone know how I
+can do this?
+
+Howard Rubin - hrubin@disc.com hrubin@nyx.net
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+David Easterby -- <A HREF="mailto:davide@dsg.com">davide@dsg.com</A>
+Thursday, October 10, 1996
+</B>
+[Mini-digest: 14 responses]
+
+In your CMDIChildWnd derived class, catch the OnInitMenu (WM_INITMENU) event
+and disable the Close item.  Example:
+
+CMyMDIChild::OnInitMenu(CMenu* pMenu)
+{
+  pMenu->EnableMenuItem(SC_CLOSE, MF_GRAYED | MF_BYCOMMAND);
+
+  CMDIChildWnd::OnInitMenu(pMenu);
+
+}
+
+That will both gray out the menu command and prevent the window from being
+closed (all three cases).
+
+
+
+David Easterby
+DataSystems Group
+-----From: Andrew Dalgleish <andrewd@axonet.com.au>
+
+For asthetics, disable the system menu "Close" and the 'X' button by:
+// Get the MDI child frame's system menu
+CMenu *pSystemMenu = GetSystemMenu(FALSE);
+// Get the text for "Close"
+CString  ItemText;
+pSystemMenu->GetMenuString(SC_CLOSE, ItemText, MF_BYCOMMAND);
+// Gray the "Close" (which also grays the 'X' button)
+pSystemMenu->ModifyMenu(SC_CLOSE, MF_BYCOMMAND|MF_STRING|MF_GRAYED,
+SC_CLOSE, ItemText);
+
+This looks better than having the button do nothing, and prevents the
+user from selecting them
+
+Note that Ctrl+F4 will still call CFrameWnd::OnClose().
+
+You can prevent the window closing by over-riding
+CDocument::CanCloseFrame().
+
+Regards,
+Andrew Dalgleish
+
+-----From: Alaks Sevugan <asevugan@csci.csc.com>
+
+Hi Rubin:
+
+There is a virtual function in CDocument - 
+'SaveModified' which you can override if you want 
+to save changes or there is another virtual 
+function - 'CanCloseFrame' which you can use for 
+for first 2 things you have mentioned (ie) double 
+click on MDI child window and Close from the menu.
+
+Hope this helps.
+
+-alaks
+
+---------------------------------------------------
+--
+  Alaks Sevugan                
+asevugan@csci.csc.com    
+  CSC CIS	  	       (217)-351-8250 x2161 
+  Champaign, IL 61820
+---------------------------------------------------
+--
+-----From: "Manolis Chr.Papadopoulos" <papadop@metal.ntua.gr>
+
+Add a function to your document class and/or your view class for =
+WM_CLOSE message that does nothing.=20
+
+-----From: "Philippe Cluzeaud" <pcluz@club-internet.fr>
+
+Derive your MDI child window class from CMDIChildWnd, and
+override the OnClose member function.
+
+ex : 
+class CYourChildWnd : public CMDIChildWnd
+{
+	...
+	afx_msg void OnClose();
+	...
+}
+
+void CYourChildWnd::OnClose()
+{
+	// Don't close !
+}
+
+and in CYourApp::InitInstance :
+
+pTemplate = new CMultiDocTemplate ( IDR_xxx, 
+		RUNTIME_CLASS(CYourDoc),
+		RUNTIME_CLASS(CYourChildWnd),
+		RUNTIME_CLASS(CYourView));
+      
+Hope it helps.
+
+Philippe Cluzeaud. 	pcluz@club-internet.fr
+
+-----From: csn@dhi.dk (Carsten Schwartz)
+Most of your problems can be solved by implementing a handler 
+for the WM_CLOSE event. Do any necessary checking and return
+before the default OnClose function is call.
+
+Good Luck
+_____________________________________________________
+Carsten Schwartz            Email : csn@dhi.dk
+Software Engineer           www   : <A HREF="http://www.dhi.dk">http://www.dhi.dk</A>
+Danish Hydraulic Institute  Tel.  : +45 45 76 95 55
+Agern Alle 5                Fax.  : +45 45 76 25 67
+2970 Horsholm
+Denmark
+
+And they shall know no fear...
+_____________________________________________________
+
+-----From: muni@aditimx.vsnl.net.in (Muni Raju)
+
+Hi Howard,
+
+  You can put a handler for WM_SYSCOMMAND and do nothing when the id is
+SC_CLOSE, else call the base class implementation of OnSysCommand.
+WM_SYSCOMMAND is not displayed in class wizard. Hence you need to put
+the handler manually.
+
+ In childfrm.h add,
+
+  	afx_msg void OnSysCommand( UINT nID, LPARAM lParam );
+
+ In Childfrm.cpp,
+ 
+ BEGIN_MESSAGE_MAP(CChildFrame, CMDIChildWnd)
+	//{{AFX_MSG_MAP(CChildFrame)
+	ON_WM_SYSCOMMAND() // Add this
+	//}}AFX_MSG_MAP
+ END_MESSAGE_MAP()
+
+
+
+void CChildFrame::OnSysCommand( UINT nID, LPARAM lParam )
+{
+	if(nID == SC_CLOSE)
+		return; // do not call base class
+	CMDIChildWnd::OnSysCommand(nID, lParam );
+}
+
+ Hope this helps you. Please do feel free to get back.
+
+ Regards,
+
+ Muniraju
+ Aditi Corp( Previously known as NetQuest).
+-----From: Si Cruse <scruse@csfp.co.uk>
+
+Override your documents CanCloseFrame member.
+
+-- 
+
+...A closed mouth gathers no foot...
+_____________________________________________________________
+Si Cruse
+Front Office IT Development, Credit Suisse Financial Products
+1 Cabot Square, London E14 4QJ
+Phone: +44 171 516 2948			Fax: +44 171 516 2688
+mailto:scruse@csfp.co.uk	 <A HREF="http://www.cruse.demon.co.uk">http://www.cruse.demon.co.uk</A>
+-----From: pxc@kid01pml.icl.co.uk (Paul Cook)
+
+You could use AfxRegisterWndClass on your MDI Child class and give it the
+CS_NOCLOSE style.  I used it in one situation and I'm fairly sure it handled
+all three of the cases above.   It removes the 'Close Ctrl+F4' menu item.
+
+HTH
+Paul.
+---
+      o o o o o o . . .   ________________________ _________________________
+    o      _____          ||Paul Cook            | ||pxc@kid01pml.icl.co.uk|
+  .][__n_n_|DD[  ====___  ||Process Solutions    | ||+44 (0)1782 794742    |
+ >(________|__|_[_______]_||ICL__________________|_||______________________|_
+ _/oo OOOOO oo`  oo  oo   'o^o                o^o` 'o^o                 o^o`
+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+-----From: Jim Barry <Jim.Barry@ilp.com>
+
+All these actions result in a WM_CLOSE message. The default handler calls   
+DestroyWindow to destroy the window. You can override this by adding an   
+empty OnClose() handler to your CMDIChildWnd-derived class   
+(CCheckBookFrame in the chkbook sample).
+
+Cheers,
+
+ - Jim
+-----From: David.Lowndes@bj.co.uk
+
+Howard
+
+Here's a few tips I've got (from a similar question on the newsgroups)
+that might help...
+
+bFlag is a boolean flag (TRUE = ok to close, FALSE = don't allow close).
+
+1. If you want to Enable/Disable the system menu close item
+(Win95's X button) at some suitable point in your application.
+
+    CMenu * ps = ((CFrameWnd *) AfxGetMainWnd())->GetSystemMenu(FALSE);
+	
+    ps->EnableMenuItem( SC_CLOSE, bFlag ?
+		MF_BYCOMMAND | MF_ENABLED :
+		MF_BYCOMMAND | MF_GRAYED );
+
+2. You might also want to Enable/Disable the File, Exit menu
+in the ID_APP_EXIT command update handler.
+
+void CMyDoc::OnUpdateAppExit(CCmdUI* pCmdUI) 
+{
+	pCmdUI->Enable( bFlag );
+}
+
+3. You can prevent the document frame from closing (by using the
+Alt+F4 keystroke) by handling CanCloseFrame.
+
+CMyDoc::CanCloseFrame()
+{
+	return( bFlag );
+}
+
+4. If the application is MDI, you can also Enable/Disable the File, Close
+menu item
+
+void CMyDoc::OnUpdateFileClose(CCmdUI* pCmdUI) 
+{
+	pCmdUI->Enable( bFlag );
+}
+
+The problem is compounded if you allow multiple views on the document
+as you may want to allow all views except the last one to be closed! In
+that case you can access the document's count of views (m_viewList.GetCount())
+to expand on the logic.
+
+Dave Lowndes
+-----From: Vikas Patel <vjp@wgw.safco.com>
+
+
+Very simple in the Frame window of your Document Template for this view over 
+ride the OnClose method and then comment out the default implementation 
+generated by the Class Wizard as follows:
+
+void CMyFrame::OnClose()
+{
+     // TODO: Add your message handler code here and/or call default
+     //CMDIChildWnd::OnClose();
+}
+ This will do the trick. A user will not be able to close this view any more.
+
+/Vikas Patel
+
+vjp@safco.com
+-----From: Mario Contestabile
+
+You mentionned the environment being NT 3.51. Unless your application will 
+never run
+under 95 or NT 4.0, you will want to do tests on those environments also, 
+considering
+the slight interface differences.
+
+Also, preventing a document from closing is easy. It's when you want to do 
+things like
+preventing the _last_ document from closing that things get complicated.
+
+To disable closing of a CMDIChildWnd, u can use ON_WM_INITMENUPOPUP( )
+menu_ptr->EnableMenuItem(SC_CLOSE, MF_BYCOMMAND | 
+(numW==1)?MF_GRAYED:MF_ENABLED);
+Notice here it checks how many numW there are.
+
+mcontest@universal.com
+
+-----From: Gerry Sweeney <gerry@hornbill.com>
+
+Howard,
+
+This is fairly simple. Derive a new class from CMDIChildWnd and add the 
+following code to it.
+
+// Add this to your class to prevent the window from being closed by the 
+Ctrl-F4 or
+// menu items. This will need a message map entry:-
+
+ON_WM_SYSCOMMAND()
+// Use class wizard to map this message
+
+void <yourclass>::OnSysCommand(UINT nID, LPARAM lParam)
+{
+     if(nID == SC_CLOSE)
+          {
+          PostMessage(WM_SYSCOMMAND, SC_MINIMIZE, 0L);
+          return;
+          }
+     else
+          CMDIChildWnd::OnSysCommand(nID, lParam);
+}
+
+Don't forget to use your new class instead of the CMDIChildWnd class when 
+you create your CMultiDocTemplate class in you main application. This code 
+will prevent the window from being closed with any of the above mentioned 
+methods. If the user attempts to close the window it will be minimised to an 
+icon
+
+
+Hope this helps
+
+Gerry Sweeney
+gerry@hornbill.com
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

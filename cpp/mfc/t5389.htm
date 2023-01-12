@@ -1,0 +1,205 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+MFC opens docs STGM_SHARE_EXCLUSIVE
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Mike Ward -- <A HREF="mailto:mikew@hilgraeve.com">mikew@hilgraeve.com</A>
+Monday, June 03, 1996
+</B>
+Environment: VC++4.1, Win95/NT
+
+SDI app, OLE server, Compound files enabled, Shared MFC DLL
+
+MFC has a habit of opening doc files with the STGM_SHARE_EXCLUSIVE
+flag.  This has proven to be a problem to our app time and time again
+since we usually have many readers but only own writer of the doc. 
+I'ld really like to open like to open the file STGM_SHARE_DENYWRITE. 
+Wading into the MFC code, it appears that everywhere a doc file is
+opened, the first attempt is SHARE_EXCLUSIVE, and if that fails, then 
+its opened SHARE_DENYWRITE.  I'm guessing one solution might be to 
+open the file SHARE_READ, let OpenDocument() do its thing, and then 
+close the SHARE_READ handle.  Does anyone else have a suggestion on 
+how to work around this problem?
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Michael Schuschk -- <A HREF="mailto:michael@rias.COM">michael@rias.COM</A>
+Friday, June 07, 1996
+</B>
+Humba!
+
+On Monday, June 03, 1996 6:09 AM, Mike Ward wrote:
+> Environment: VC++4.1, Win95/NT
+> SDI app, OLE server, Compound files enabled, Shared MFC DLL
+>=20
+> MFC has a habit of opening doc files with the STGM_SHARE_EXCLUSIVE
+> flag. [...] Does anyone else have a suggestion on=20
+> how to work around this problem?
+
+No direct suggestion, but more info maybe. I have the same problem. My =
+app needs to have read and write access to its compound file all the =
+time. I tried all combinations of STGM_READWRITE with STGM_SHARE*. Only =
+STGM_SHARE_EXCLUSIVE worked. Everything else caused StgOpenStorage or =
+StgCreateDocfile to return with STG_E_INVALIDFLAG.
+
+Browsing through "Inside OLE", I found only occurrences of =
+STGM_SHARE_DENY_WRITE together with STGM_READ. My guess is that only the =
+following combinations are possible:
+
+STGM_SHARE_DENY_WRITE with STGM_READ,
+STGM_SHARE_DENY_READ with STGM_WRITE and
+STGM_SHARE_EXCLUSIVE with STGM_READWRITE.
+
+I have no idea when STGM_SHARE_DENY_NONE can be used. It didn't work =
+with STGM_READWRITE.
+
+But even when your app is the only one accessing the compound file, a =
+problem arises when you have MAPI support enabled and try to send your =
+file via eMail. The mail client tries to open your compound file for =
+reading and gets a sharing violation. My only solution would be to =
+release the file before and reopen it afterwards.
+
+Bye...Michael
+
+/---------------------------------------------------------------------\
+| Michael Schuschk                                   michael@rias.com |
+| Roche Image Analysis Systems                                        |
+| 112 Orange Drive                             I can think on my own, |
+| Elon College, NC 27244          so I'm not speaking for the company |
+| USA                                                                 |
+\---------------------------------------------------------------------/
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Roger Onslow -- <A HREF="mailto:Roger_Onslow@compsys.com.au">Roger_Onslow@compsys.com.au</A>
+Tuesday, June 11, 1996
+</B>
+>Environment: VC++4.1, Win95/NT
+>
+>SDI app, OLE server, Compound files enabled, Shared MFC DLL
+>
+>MFC has a habit of opening doc files with the STGM_SHARE_EXCLUSIVE
+>flag.  This has proven to be a problem to our app time and time again
+>since we usually have many readers but only own writer of the doc. 
+>I'ld really like to open like to open the file STGM_SHARE_DENYWRITE. 
+>Wading into the MFC code, it appears that everywhere a doc file is
+>opened, the first attempt is SHARE_EXCLUSIVE, and if that fails, then 
+>its opened SHARE_DENYWRITE.  I'm guessing one solution might be to 
+>open the file SHARE_READ, let OpenDocument() do its thing, and then 
+>close the SHARE_READ handle.  Does anyone else have a suggestion on 
+>how to work around this problem?
+
+We had a similar problem (especailly during testing, were the app
+somtimes crashed and left the file locked!!)
+
+We have a "library" document which is usually only read, but
+is occasionally written as things are added/updated/deleted.
+
+To avoid locking the library, we talk a simple approach
+(though perhaps not as nice).
+
+We simple open the library document, read it, and then close it,
+(without deleting the contents).  When the app exits, we delete
+the contents "manually").
+
+If we need to write to the document, we simply re-open it, write it
+and close it (again without deleting contents).
+
+Only trick when doing this is MFC's insistance on deleting
+the contents of the document.  Even setting m_bAutoDelete
+= FALSE doesn't help (still does DeleteContents, just
+stops doing a "delete this;").  So we overrode DeleteContents
+to do nothing and explicitly called a real contents deleter
+when doing the final close (and delete).
+
+Here's some code...
+void CLibrary::LoadLibrary(LPCTSTR libname) {
+ CFileStatus status;
+ CWaitCursor wait;
+ if (! CFile::GetStatus(libname,status) || ! 
+COleDocument::OnOpenDocument(libname)) {
+  if (! COleDocument::OnNewDocument()) {
+   ::AfxMessageBox("Could not create or load library\n"+libname);
+   return;
+  }
+ }
+ CloseLibraryKeepData();
+}
+
+void CLibrary::SaveLibrary(LPCTSTR libname) {
+ m_bRemember = FALSE;
+ CWaitCursor wait;
+ if (! COleDocument::OnSaveDocument(libname)) {
+  ::AfxMessageBox("Could not save library\n"+libname);
+  return;
+ }
+ CloseLibraryKeepData();
+}
+
+void CLibrary::DeleteContents() {
+ // don't delete contents when closing
+ // as we close straight after load
+}
+
+void CLibrary::CloseLibraryKeepData() {
+ m_bAutoDelete = FALSE; // don't delete
+ COleDocument::OnCloseDocument(); // does NOT delete this
+ m_bAutoDelete = TRUE;
+}
+
+void CLibrary::CloseLibrary() {
+ m_bAutoDelete = TRUE;
+ RealDeleteContents(); // really delete contents now
+ OnCloseDocument(); // does delete this
+}
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

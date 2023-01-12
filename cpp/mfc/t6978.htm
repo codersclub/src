@@ -1,0 +1,196 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Memory leaks in strcore.cpp
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Peter Boulton -- <A HREF="mailto:Peter@dataper.demon.co.uk">Peter@dataper.demon.co.uk</A>
+Saturday, September 28, 1996
+</B>
+Environment: VC4.2 / Windows 95
+
+Problem:
+--------
+On exit from my program in debug mode, I get the following-
+
+!Detected memory leaks!
+Dumping objects ->
+strcore.cpp(76) : {1802} normal block at 0x007E7610, 54 bytes long.
+ Data: <        )    or > 01 00 00 00 00 00 00 00 29 00 00 00 00 6F 72 20 
+Object dump complete.
+The program 'C:\Msdev\Projects\Prophwin\Debug\Prophwin.exe' has exited with code 0
+(0x0).
+
+What I've done so far
+---------------------
+I've added the line _CrtSetBreakAlloc(1802); to my application constructor and
+walked the call stack back to my own code when the break occurs.
+
+My own code allocates a character buffer (message[]), uses it to set the status bar
+text a number of times within a loop, and then is either deleted or goes out of
+scope depending on whether it's allocated as char buffer[256] or using new -
+
+char* message = new char[256];
+CStatusBar* pstatus=(CStatusBar *)AfxGetApp()->m_pMainWnd->GetDescendant
+Window(AFX_IDW_STATUS_BAR);
+
+        ... now loop over, calling-
+sprintf(message, "%d%% done -(Retrieving %s in %s)", 100*(products * acctmax+account
+s)/(prodmax*acctmax),thisprod->m_sht_hierfile.sht_name, thisacct-
+>m_sht_hierfile.sht_name);
+        
+pstatus->SetPaneText(0, message, TRUE);         << _CrtSetBreakAlloc(1802) traces
+back to this line of my code!
+
+
+Eventually I delete message[] properly.
+
+This is all called within my CDocument object.
+
+Can anyone please tell me whether the memory link is caused by my code?  To me, it
+looks like it's caused by the SECOND call to SetPaneText() in my loop because that's
+where allocation number 1802 traces back through the call stack to when the debugger
+breaks.
+
+Thanks!
+
+Pete
+--------------------------------------------------
+Peter Boulton,
+Data Perceptions,
+Creator of the Prophecy Sales Forecasting System.
+<A HREF="http://www.dataper.demon.co.uk">http://www.dataper.demon.co.uk</A>
+--------------------------------------------------
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mario Contestabile -- <A HREF="mailto:Mario_Contestabile.UOS__MTL@UOSMTL2.universal.com">Mario_Contestabile.UOS__MTL@UOSMTL2.universal.com</A>
+Monday, September 30, 1996
+</B>
+[Mini-digest: 2 responses]
+
+>pstatus->SetPaneText(0, message, TRUE);         << _CrtSetBreakAlloc(1802) 
+traces
+>back to this line of my code!
+
+SetPaneText() will leak memory under 4.2, due to a change in the CString class.
+I'm not 100% sure but I believe it could be the Empty() function..(TLTC)
+
+mcontest@universal.com
+
+-----From: Mast-CBT <mast@ibenet.it>
+
+At 16.47 28/09/96 +0100, you wrote:
+>Environment: VC4.2 / Windows 95
+>
+>Problem:
+>--------
+>On exit from my program in debug mode, I get the following-
+>
+>!Detected memory leaks!
+>Dumping objects ->
+>strcore.cpp(76) : {1802} normal block at 0x007E7610, 54 bytes long.
+> Data: <        )    or > 01 00 00 00 00 00 00 00 29 00 00 00 00 6F 72 20 
+>Object dump complete.
+>The program 'C:\Msdev\Projects\Prophwin\Debug\Prophwin.exe' has exited with
+code 0
+>(0x0).
+>
+>What I've done so far
+>---------------------
+>I've added the line _CrtSetBreakAlloc(1802); to my application constructor and
+>walked the call stack back to my own code when the break occurs.
+>
+>My own code allocates a character buffer (message[]), uses it to set the
+status bar
+>text a number of times within a loop, and then is either deleted or goes out of
+>scope depending on whether it's allocated as char buffer[256] or using new -
+>
+>char* message = new char[256];
+>CStatusBar* pstatus=(CStatusBar *)AfxGetApp()->m_pMainWnd->GetDescendant
+>Window(AFX_IDW_STATUS_BAR);
+>
+>        ... now loop over, calling-
+>sprintf(message, "%d%% done -(Retrieving %s in %s)", 100*(products *
+acctmax+account
+>s)/(prodmax*acctmax),thisprod->m_sht_hierfile.sht_name, thisacct-
+>>m_sht_hierfile.sht_name);
+>        
+>pstatus->SetPaneText(0, message, TRUE);         << _CrtSetBreakAlloc(1802)
+traces
+>back to this line of my code!
+>
+>
+>Eventually I delete message[] properly.
+>
+>This is all called within my CDocument object.
+>
+>Can anyone please tell me whether the memory link is caused by my code?  To
+me, it
+>looks like it's caused by the SECOND call to SetPaneText() in my loop
+because that's
+>where allocation number 1802 traces back through the call stack to when the
+debugger
+>breaks.
+>
+
+I think that the problem occourse because you don't destroy 'message' correctly.
+You must destroy 'message' with:
+
+if message
+   delete message;      'Delete message if message != NULL
+
+This because message is a pointer to array and not a pointer to an array of
+pointer.
+
+You can omitted control if message is != NULL, because delete a pointer NULL
+has no effect.
+
+Bye,
+Mast-CBT
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

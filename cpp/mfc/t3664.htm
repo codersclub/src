@@ -1,0 +1,240 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Two applications, focus changes with a dialog
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Brad Wilson -- <A HREF="mailto:bradw@netnet.net">bradw@netnet.net</A>
+Friday, January 26, 1996
+</B>
+Excuse the horrid subject line.  :-)
+
+Environment:  Visual C++ 4, MFC 4, NT 3.51 and Windows 95
+
+I have two applications, both built with the DLL version of MFC.  The first
+application is meant to run all the time and present a minimized icon under
+NT (I will be using a tooltray icon instead under 95).  The first app is
+supposed to sit around and give the user helpful reminders on a regular
+basis (like an alarm clock system).
+
+The second application is a large application/screen saver that the user
+will run off and on as needed.  One of the menu options allows them to
+configure the alarms for the first application (I used two applications
+to allow the user to quit the large, resource consuming main application
+and still get their alarm clocks).  The dialog that does the editing of
+the alarm clocks is present in the small, first application.
+
+The large (2nd) app sends a registered message to the small (1st) app to
+tell it to display that editing dialog box when the user chooses the
+appropriate menu option.  In the LPARAM it passes the window handle.
+
+I want the user to "believe" that the dialog box comes from the 2nd app,
+so I created my CDialog-derived class with the LPARAM window handle as the
+parent window.
+
+Now, I've got focus hassles up the wazoo, as you can probably guess.  If
+I try and click on the main window of the 2nd application while the dialog
+is up and running, I lock up the 2nd application (no message routing, and
+I can't get the dialog to interact with me either).  Also, while the dialog
+is up, paint messages for the 2nd app get "lost".
+
+I'm kind of lost on the route I should take.  One thing I thought about
+doing was having the dialog actually use the 1st app's window as it's
+parent and then disabling the 2nd app's main window.  I had some painting
+problems there (the title bar of the window that I disabled did not repaint
+itself with the inactive color); I had some Z-order problems (which I solved
+with strategic calls to SetForegroundWindow()).
+
+Has anyone ever tried to do this?  What should I do?
+
+Here is the code I'm currently using inside the 1st (small) app to bring
+up the dialog:
+
+    //  Get the window that sent the message
+
+    CWnd wnd;
+    wnd.Attach( HWND( lParam ));
+
+    //  Do the editing dialog
+
+    CAlarmClockDlg dlg( &wnd );
+    dlg.DoModal( );
+
+    //  Detach from the window who sent the message
+
+    wnd.Detach( );
+    return 1;
+
+Thanks in advance for any help ...
+
+--
+class CBradWilson : public CWorldWatchProgrammingTeam {
+  public:
+    void GetInetAddr  ( CString& s ) { s = "bradw@exptech.com";      }
+    void GetE164Addr  ( CString& s ) { s = "+1 (810) 620-9803";      }
+    void GetURL       ( CString& s ) { s = "http://www.exptech.com"; }
+    void GetDisclaimer( CString& s ) { s = "All I say is fact :-p";  }
+};
+
+//  QOTW:  "Don't think of yourself as the least intelligent creature in this
+//          room ... if you consider the entire planet, you're smarter than
+//          literally hundreds of people."  - Dogbert to Dilbert
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Niels Ull Jacobsen -- <A HREF="mailto:nuj@kruger.dk">nuj@kruger.dk</A>
+Monday, January 29, 1996
+</B>
+> 
+> Excuse the horrid subject line.  :-)
+> 
+> Environment:  Visual C++ 4, MFC 4, NT 3.51 and Windows 95
+> 
+> I have two applications, both built with the DLL version of MFC.  The first
+> application is meant to run all the time and present a minimized icon under
+> NT (I will be using a tooltray icon instead under 95).  The first app is
+> supposed to sit around and give the user helpful reminders on a regular
+> basis (like an alarm clock system).
+> 
+> The second application is a large application/screen saver that the user
+> will run off and on as needed.  One of the menu options allows them to
+> configure the alarms for the first application (I used two applications
+> to allow the user to quit the large, resource consuming main application
+> and still get their alarm clocks).  The dialog that does the editing of
+> the alarm clocks is present in the small, first application.
+> 
+> The large (2nd) app sends a registered message to the small (1st) app to
+> tell it to display that editing dialog box when the user chooses the
+> appropriate menu option.  In the LPARAM it passes the window handle.
+> 
+> I want the user to "believe" that the dialog box comes from the 2nd app,
+> so I created my CDialog-derived class with the LPARAM window handle as the
+> parent window.
+[.. Various problems with focus left out...]
+> 
+> I'm kind of lost on the route I should take.
+[...]
+> 
+> Has anyone ever tried to do this?  What should I do?
+
+I assume that you'll also need the alarm edit dialog in the small
+"tooltray" application. Otherwise you could probably just put it in
+the large application and pass a pointer to an AlarmState struct in
+the registered messages LPARAM and a GetState/SetState flag in the
+WPARAM.
+
+Actually, this might be the simplest way to do it anyway. How about
+putting the alarm editing dialog in a DLL which both programs use?
+They could both load it dynamically, thus not using any resources when
+it's not up. Or just put it in both, unless it's very complex and
+you're really concerned about the size of the small app?
+
+Finally, I'm not quite sure if you really need two applications?
+Couldn't you just put all the functionality of the large app in a DLL
+which the small app loaded dynamically? I don't know if this would be
+much easier though.
+
+> class CBradWilson : public CWorldWatchProgrammingTeam {
+
+
+--
+Niels Ull Jacobsen, Kruger A/S
+
+Everything stated herein is THE OFFICIAL POLICY of the entire Kruger
+group and should be taken as legally binding in every respect. Pigs
+will grow wings and fly.
+
+
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Brad Wilson -- <A HREF="mailto:bradw@netnet.net">bradw@netnet.net</A>
+Thursday, February 01, 1996
+</B>
+Niels Ull Jacobsen wrote:
+ 
+> I assume that you'll also need the alarm edit dialog in the small
+> "tooltray" application. Otherwise you could probably just put it in
+> the large application and pass a pointer to an AlarmState struct in
+> the registered messages LPARAM and a GetState/SetState flag in the
+> WPARAM.
+
+The way that I solved this was to post the message instead of send it.
+Everything works okay then (why, I don't know :-).
+
+> Actually, this might be the simplest way to do it anyway. How about
+> putting the alarm editing dialog in a DLL which both programs use?
+
+The data is in the small app.  The small app is the only place that the
+data resides.  It was easiest to move the data to the small app.
+
+> Finally, I'm not quite sure if you really need two applications?
+
+Well, I had a single application (one large application), and customers
+wanted to be able to get the alarm clocks at any time.  The simplest
+solution was to take all the alarm-related functionality and put it
+into the small application.  Anything else (like the DLL solution)
+would've entailed a large re-write, which I didn't want.  :-)
+
+--
+class CBradWilson : public CWorldWatchProgrammingTeam {
+  public:
+    void GetInetAddr  ( CString& s ) { s = "bradw@exptech.com";      }
+    void GetE164Addr  ( CString& s ) { s = "+1 (810) 620-9803";      }
+    void GetURL       ( CString& s ) { s = "http://www.exptech.com"; }
+    void GetDisclaimer( CString& s ) { s = "All I say is fact :-p";  }
+};
+
+//  QOTW:  "Don't think of yourself as the least intelligent creature in this
+//          room ... if you consider the entire planet, you're smarter than
+//          literally hundreds of people."  - Dogbert to Dilbert
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

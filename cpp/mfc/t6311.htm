@@ -1,0 +1,257 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+HELP! How to do an immediate refresh.
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Marc -- <A HREF="mailto:msd@cadcentre.co.uk">msd@cadcentre.co.uk</A>
+Friday, August 16, 1996
+</B>
+
+Environment:  VC++ 4.0, Windows NT 3.51, SP 4
+
+Hi,
+
+I want to do an immediate refresh of the whole thread/application, such that
+requests to create windows, change text, etc. are displayed on the screen
+before I drop back into the MFC message loop(/pumper!).
+
+I've tried  RedrawWindow(NULL, NULL, RDW_INVALIDATE |
+                                     RDW_UPDATENOW |
+                                     RDW_ALLCHILDREN)
+on each of my CFrameWnd derived objects, but this sends a WM_PAINT message
+to all windows whether they need refreshing or not, which is slow and causes
+the whole application to flicker. This technique also didn't allow me
+to curtail paint messages for my graphics areas, as they were sent to my
+OnPaint handler *after* I returned from RedrawWindow, so I couldn't
+differentiate them from other, normal paint messages. I thought RDW_UPDATENOW
+meant lots of little SendMessages would be sent and processed *before*
+RedrawWindow returned, as opposed to the PostMessage alternative.
+
+I also tried explicitly looking for WM_PAINT messages in the event queue
+using ::PeekMessage, this would have done the trick, but for some reason
+it's a feature of ::PeekMessage to view/retrieve all types of messages except,
+you guessed it, WM_PAINT messages.
+
+I hope someone can help me out.
+Thanks,
+Marc.
+
+-- 
+ -----------------------------------------------------------------
+ CADCENTRE Ltd.           Telephone   +44(0)1223 556655 Ext.732
+ High Cross               Fax         +44(0)1223 556666
+ Madingley Road           Email       m.delamere@cadcentre.co.uk
+ Cambridge
+ CB3 0HB   UK             Home Page   http://www.cadcentre.co.uk
+ -----------------------------------------------------------------
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Pradeep Tapadiya -- <A HREF="mailto:pradeep@nuview.com">pradeep@nuview.com</A>
+Monday, August 19, 1996
+</B>
+[Mini-digest: 6 responses]
+
+At 04:10 PM 8/16/96 +0100, you wrote:
+>
+>Environment:  VC++ 4.0, Windows NT 3.51, SP 4
+>
+>Hi,
+>
+>I want to do an immediate refresh of the whole thread/application, such that
+>requests to create windows, change text, etc. are displayed on the screen
+>before I drop back into the MFC message loop(/pumper!).
+>
+>I've tried  RedrawWindow(NULL, NULL, RDW_INVALIDATE |
+>                                     RDW_UPDATENOW |
+>                                     RDW_ALLCHILDREN)
+>on each of my CFrameWnd derived objects, but this sends a WM_PAINT message
+>to all windows whether they need refreshing or not, which is slow and causes
+>the whole application to flicker. This technique also didn't allow me
+>to curtail paint messages for my graphics areas, as they were sent to my
+>OnPaint handler *after* I returned from RedrawWindow, so I couldn't
+>differentiate them from other, normal paint messages. I thought RDW_UPDATENOW
+>meant lots of little SendMessages would be sent and processed *before*
+>RedrawWindow returned, as opposed to the PostMessage alternative.
+>
+>I also tried explicitly looking for WM_PAINT messages in the event queue
+>using ::PeekMessage, this would have done the trick, but for some reason
+>it's a feature of ::PeekMessage to view/retrieve all types of messages except,
+>you guessed it, WM_PAINT messages.
+>
+>I hope someone can help me out.
+>Thanks,
+>Marc.
+>
+
+I am obviously missing something. Why can't you call UpdateAllViews for
+all the docs that you have? Moreover, you can pass a "hint" parameter
+in UpdateAllViews and specify what exactly do you want to be updated.
+
+Pradeep
+
+-----From: "Greg Tighe" <gdt@eng.aisinc.com>
+
+> Environment:  VC++ 4.0, Windows NT 3.51, SP 4
+> 
+> I want to do an immediate refresh of the whole thread/application, such that
+> requests to create windows, change text, etc. are displayed on the screen
+> before I drop back into the MFC message loop(/pumper!).
+> 
+How about looping through all of your application's windows and 
+invoking the UpdateWindow() method for each?  From the online help:
+
+Updates the client area by sending a WM_PAINT message if the update
+region is not empty. The UpdateWindow member function sends a WM_PAINT
+message directly, bypassing the application queue. If the update
+region is empty, WM_PAINT is not sent.
+
+
+	-Greg Tighe
+	Applied Intelligent Systems, Inc.
+	Ann Arbor, MI
+	gdt@aisinc.com
+-----From: Marty Fried <mfried@linex.com>
+
+Have you tried UpdateWindow()?  That should only send a WM_PAINT if
+the update region is not empty, ie if the window actually needs
+updating.
+
+WM_PAINT messages are generated by the system, and sent as needed.
+Otherwise, the messages would clog the queue, and you would be
+processing them much too often.  I believe WM_TIMER messages also
+work this way.
+
+Marty Fried
+
+-----From: bop@gandalf.se
+
+Well, you say INVALIDATE ALLCHILDREN, and it does! All child
+windows are repainted, because you said they were invalid.
+
+Try invalidating ONLY the areas that NEED repainting (sounds logical,
+doesn't it ?). In many cases you can then use pDC->RectVisible(...)
+in the drawing function to determine if a particular part of your window 
+needs repainting. 
+
+> This technique also didn't allow me
+> to curtail paint messages for my graphics areas, as they were sent to my
+> OnPaint handler *after* I returned from RedrawWindow, so I couldn't
+> differentiate them from other, normal paint messages. I thought RDW_UPDATENOW
+> meant lots of little SendMessages would be sent and processed *before*
+> RedrawWindow returned, as opposed to the PostMessage alternative.
+>
+> I also tried explicitly looking for WM_PAINT messages in the event queue
+> using ::PeekMessage, this would have done the trick, but for some reason
+> it's a feature of ::PeekMessage to view/retrieve all types of messages except,
+> you guessed it, WM_PAINT messages.
+
+WM_PAINT is special, because it is deliberately suppressed until all
+other messages have been processed. If you think about it, it is smart to
+NOT start painting until ALL messages potentially affecting the
+window have been processed.
+
+BTW, I think WM_PAINT isn't actually stored in the message
+queue, but is an internal flag that a windows needs repainting.
+This way you get only ONE paint message, and only after
+other messages are processed.
+
+
+Bo Persson
+bop@gandalf.se
+-----From: Mike Blaszczak <mikeblas@nwlink.com>
+
+At 04:10 PM 8/16/96 +0100, you wrote:
+
+>Environment:  VC++ 4.0, Windows NT 3.51, SP 4
+
+>I want to do an immediate refresh of the whole thread/application, such that
+>requests to create windows, change text, etc. are displayed on the screen
+>before I drop back into the MFC message loop(/pumper!).
+
+You can't.  Windows are refreshed via WM_PAINT messages which are only
+sent when your message pump is running.  That you want to do this suggests
+that you have something very wrong with the design of your application.
+
+>RedrawWindow() ... causes the whole application to flicker.
+
+RedrawWindow() doesn't cause an application to flicker: improperly written
+painting  code does. When you paint, you should try to repaint as little
+as possible. An application flickers when it erases everything and repaints
+everything. You should either not erase and paint in-place or absolutely
+minimize the area of painting you do.
+
+>This technique also didn't allow me
+>to curtail paint messages for my graphics areas, as they were sent to my
+>OnPaint handler *after* I returned from RedrawWindow, so I couldn't
+>differentiate them from other, normal paint messages.
+
+You might try using ValidateRect(). You might also try LockWindowUpdate().
+
+
+
+.B ekiM
+http://www.nwlink.com/~mikeblas   <--- trip report central
+1995 Honda VFR750F (Serial number 00050!)  4 Corners 1996!
+1987 Yamaha FZ700 (damaged)                AMA, HRC, VFROC
+     These words are my own: I do not speak for Microsoft.
+
+-----From: "Rommel Songco" <rsongco@spectrasoft.com>
+
+	In handling a WM_PAINT message, why don't you check your internal data
+structures to see if a window needs repainting.  As you said, a WM_PAINT
+message can be caused by either a normal invalid area in the window or a
+call to RedrawWindow with entire windows invalidated.  All your windows
+receive the WM_PAINT message because you invalidated the entire client
+areas of your windows by making hrgnUpdate and lprcUpdate NULL and using
+the flag RDW_INVALIDATE.  
+
+Regards,
+Rommel
+rsongco@spectrasoft.com
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

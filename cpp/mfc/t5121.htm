@@ -1,0 +1,334 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Memory leak problem with Splitter window
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Davoud Maha -- <A HREF="mailto:davoud@jupiter.Legato.COM">davoud@jupiter.Legato.COM</A>
+Friday, May 10, 1996
+</B>
+
+        VC++ 4.1, NT 3.51
+
+        I am trying to create a splitter window with 1 column and 2 rows.
+All the 
+examples and docs I have seen uses CMDChildWnd or CFrameWnd as the parent of
+the splitter window.
+
+        My problem is that the parent of my Splitter windows needs to be a
+CWnd. Since that 
+is the case, I don't get the OnCreateClient message so that I can setup my
+static splitter and
+create the views inside of it.
+
+        I have overridden the Create function for the splitter, and I am
+doing the static 
+create and view creates there. Everything seems to work, but when I exit the
+debugger, I get
+some memory leakes. The memory leaks point to the two RUTIMES_CLASSes that I
+have in create.
+
+        I know this is NOT the right model, so please help if you know the
+answer.
+Also the code calling this create does not have a valid pContext since the
+caller
+is a CWnd object.
+       
+
+BOOL CMonitorSplitterWnd::Create(LPCTSTR /* lpszClassName */,
+                         LPCTSTR /* lpszWindowName */,
+                         DWORD /* dwStyle */,
+                         const RECT& /* rect */,
+                         CWnd* pParentWnd,
+                         UINT /* nID */,
+                         CCreateContext* pContext) // <- Not really valid 
+{
+                if (!CreateStatic(pParentWnd, 2, 1, WS_CHILD
+,AFX_IDW_PANE_FIRST ))
+		{
+			TRACE0("Failed to CreateStaticSplitter\n");
+			return ( FALSE );
+		}
+
+	   	// add the first splitter pane - the default view in column 0
+		if (!CreateView(0, 0, 
+		  RUNTIME_CLASS( CMonitorGraph) , CSize(100, 400), pContext))
+		{
+			TRACE0("Failed to create first pane\n");
+			return ( FALSE );
+		}
+		// add the second splitter pane
+	   	if (!CreateView(1, 0,
+			RUNTIME_CLASS(CMonitorMsg), CSize(100, 20), pContext))
+		{
+			TRACE0("Failed to create second pane\n");
+			return ( FALSE );
+		}
+		
+		return TRUE;	  
+}
+
+
+
+        Thanks, Davoud.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Frederic Steppe -- <A HREF="mailto:FredericS@msn.com">FredericS@msn.com</A>
+Monday, May 13, 1996
+</B>
+>        VC++ 4.1, NT 3.51
+>
+>        I am trying to create a splitter window with 1 column and 2 rows.
+>All the 
+>examples and docs I have seen uses CMDChildWnd or CFrameWnd as the parent of
+>the splitter window.
+>        My problem is that the parent of my Splitter windows needs to be a
+>CWnd. Since that 
+>is the case, I don't get the OnCreateClient message so that I can setup my
+>static splitter and
+>create the views inside of it.
+>        I have overridden the Create function for the splitter, and I am
+>doing the static 
+>create and view creates there. Everything seems to work, but when I exit the
+>debugger, I get
+>some memory leakes. The memory leaks point to the two RUTIMES_CLASSes that I
+>have in create.
+>        I know this is NOT the right model, so please help if you know the
+>answer.
+>Also the code calling this create does not have a valid pContext since the
+>caller
+>is a CWnd object.
+
+
+The memory leaks comes from the fact that a CWnd doesn't handle the views 
+mechanism.  You have to make the parent window a kind of CFrameWnd, or to 
+handle everything by yourself.  The pContext problem is the same.  You'll have 
+to do the job and create one.
+
+By the way, why can't you parent window be a CFrameWnd ?
+
+Frederic Steppe (frederics@msn.com)
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Frederic Steppe -- <A HREF="mailto:FredericS@msn.com">FredericS@msn.com</A>
+Thursday, May 16, 1996
+</B>
+>        VC++ 4.1, NT 3.51
+>
+>        I am trying to create a splitter window with 1 column and 2 rows.
+>All the 
+>examples and docs I have seen uses CMDChildWnd or CFrameWnd as the parent of
+>the splitter window.
+>        My problem is that the parent of my Splitter windows needs to be a
+>CWnd. Since that 
+>is the case, I don't get the OnCreateClient message so that I can setup my
+>static splitter and
+>create the views inside of it.
+>        I have overridden the Create function for the splitter, and I am
+>doing the static 
+>create and view creates there. Everything seems to work, but when I exit the
+>debugger, I get
+>some memory leakes. The memory leaks point to the two RUTIMES_CLASSes that I
+>have in create.
+>        I know this is NOT the right model, so please help if you know the
+>answer.
+>Also the code calling this create does not have a valid pContext since the
+>caller
+>is a CWnd object.
+
+I think a little example is better than a long speach. Here is my way to 
+handle multiple views, including splitters, in an MDI child frame :
+
+1. Define a class for your splitter window (even if you don't have anything 
+special to do, you need this for dynamic creation)
+
+class CMySplitter : public CSplitterWnd
+{
+	DECLARE_DYNCREATE(CMySplitter);
+protected:
+	CMySplitter();
+
+public:
+	virtual BOOL Create(LPCTSTR lpszClassName, LPCTSTR lpszWindowName, DWORD 
+dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID, CCreateContext* 
+pContext = NULL);
+
+};
+
+IMPLEMENT_DYNCREATE(CMySplitter, CSplitterWnd);
+
+CMySplitter::CMySplitter()
+{
+	// Initialize here ...
+}
+
+BOOL CMySplitter::Create(LPCTSTR lpszClassName, LPCTSTR lpszWindowName, DWORD 
+dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID, CCreateContext* 
+pContext)
+{
+	CreateStatic(pParentWnd, 2, 2, dwStyle, nID);
+
+	SIZE IdealSize;
+	IdealSize.cx = 100;
+	IdealSize.cy = 100;
+
+	// In this sample, create 4 static panes
+
+	CreateView(0, 0, RUNTIME_CLASS(CMdiViewsView), IdealSize, pContext);
+	CreateView(0, 1, RUNTIME_CLASS(CMdiViewsView), IdealSize, pContext);
+	CreateView(1, 0, RUNTIME_CLASS(CMdiViewsView), IdealSize, pContext);
+	CreateView(1, 1, RUNTIME_CLASS(CMdiViewsView), IdealSize, pContext);
+
+	return TRUE;
+}
+
+
+2. Override CChildFrame::OnCreateClient to create all your views (and add 
+members to store them)
+
+// Members of CChildFrame :
+
+	CWnd *m_pWnd[3];
+	UINT m_nActiveWnd;
+
+
+BOOL CChildFrame::OnCreateClient(LPCREATESTRUCT lpcs, CCreateContext* 
+pContext) 
+{
+	pContext->m_pNewViewClass = RUNTIME_CLASS(CMdiViewsView);
+	m_pWnd[0] = CreateView(pContext, AFX_IDW_PANE_FIRST);
+
+	pContext->m_pNewViewClass = RUNTIME_CLASS(CMySplitter);
+	m_pWnd[1] = CreateView(pContext, AFX_IDW_PANE_FIRST + 1);
+
+	pContext->m_pNewViewClass = RUNTIME_CLASS(CMdiViewsView);
+	m_pWnd[2] = CreateView(pContext, AFX_IDW_PANE_FIRST + 2);
+
+	m_nActiveWnd = 0;
+	
+	return TRUE;	// Yes, I know, some checking has to be done.  I'm optimistic by 
+nature.
+}
+
+You can create more views, and view of different classes, of course.  You can 
+even define different splitter classes and add them too.  The view with ID 
+equal to AFX_IDW_PANE_FIRST will be the initial view.  Always set m_nActiveWnd 
+to the correct item (the first one here, but you may switch them).
+
+
+3. Override CChildFrame::DestroyWindow() to delete the splitter
+
+BOOL CChildFrame::DestroyWindow() 
+{
+	m_pWnd[1]->DestroyWindow();		// Must destroy and delete the splitter(s)
+	delete m_pWnd[1];
+
+	return CMDIChildWnd::DestroyWindow();	// Better succeed, as the splitter 
+isn't here anymore !
+}
+
+
+4. Add a method to switch the views (member of the child frame)
+
+void CChildFrame::ChangeView(UINT nView)
+{
+	if(nView == m_nActiveWnd) return;
+
+	m_pWnd[m_nActiveWnd]->SetDlgCtrlID(m_pWnd[nView]->GetDlgCtrlID());
+	m_pWnd[nView]->SetDlgCtrlID(AFX_IDW_PANE_FIRST);
+
+	m_pWnd[nView]->ShowWindow(SW_SHOW);
+	m_pWnd[m_nActiveWnd]->ShowWindow(SW_HIDE);
+
+	RecalcLayout();	
+
+	m_nActiveWnd = nView;
+}
+
+
+5. Remove the default view class from the document template (in InitInstance)
+
+	pDocTemplate = new CMultiDocTemplate(
+		IDR_MDIVIETYPE,
+		RUNTIME_CLASS(CMdiViewsDoc),
+		RUNTIME_CLASS(CChildFrame), // custom MDI child frame
+		NULL);	// No default view, please.
+
+
+6. Try it !
+
+What you have to do is to call ChangeView with the number of the view that 
+must be displayed (from 0 to 2 here).
+I did it from menu items, for test purposes, but you can do it another way 
+(tab controls, etc).
+
+void CChildFrame::OnView1() 
+{
+	ChangeView(0);
+}
+
+void CChildFrame::OnView2() 
+{
+	ChangeView(1);
+}
+
+void CChildFrame::OnView3() 
+{
+	ChangeView(2);
+}
+
+
+Good luck.
+
+
+Frederic Steppe (frederics@msn.com)
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

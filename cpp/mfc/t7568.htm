@@ -1,0 +1,220 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+TRACE and PulseEvent
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Rick Esterling -- <A HREF="mailto:rick@eco.twg.com">rick@eco.twg.com</A>
+Monday, November 04, 1996
+</B>
+Environment: VC++ 4.2b, Windows NT 4.0 SP1 
+
+Whenever I preceed a call to PulseEvent with a call to the TRACE macro, the
+event doesn't "pulse", at least not as far as any call to
+WaitFor...Object() can tell.  The following code is from a minimal console
+app that demonstrates the problem even though it exists in GUI apps as
+well.  Obviously, this only affects debug builds.
+
+/************* STDAFX.H ***********/
+
+#include <afx.h>
+#include <afxext.h>
+#include <afxcoll.h>
+#include <iostream.h>
+
+#include <afxmt.h>
+
+/*************** TestApp.cpp ************/
+#include "StdAfx.h"
+
+LPTHREAD_START_ROUTINE ThreadProc( LPVOID lpParam );
+
+/////////////////////////////////////////////////////////////////////
+void main( ) {
+   TRACE( "1 - main() entered\n" );
+
+   CEvent* pEvt = new CEvent;
+
+   TRACE( "1 - Starting second thread\n" );
+   DWORD dwThreadID;
+   HANDLE hThread = CreateThread( NULL, 
+                                  0, 
+                                  (LPTHREAD_START_ROUTINE) ThreadProc, 
+                                  (LPVOID) pEvt, 
+                                  0, 
+                                  &dwThreadID );
+
+   TRACE( "1 - Begin sleep...\n" );
+
+   // Sloppy, yes, but in the interest of keeping this snippet short,
+   // the following call ensures the second thread really gets started.
+   // You should still verify everything happened in the correct order by
+   // reviewing the output debug window.
+   
+   Sleep( 1000 );
+
+   /*****************************************
+   If the next line is not commented out, the event never "pulses", at 
+   least not so far as WaitForS/MObject can tell
+   ******************************************/
+
+   TRACE( "1 - Calling PulseEvent\n" );
+
+   pEvt->PulseEvent( );
+
+   TRACE( "1 - main waiting for secondary thread to terminate\n" );
+   WaitForSingleObject( hThread, 
+                        INFINITE );
+
+   TRACE( "1 - Deleting event\n" );
+   delete pEvt;
+
+}
+
+/////////////////////////////////////////////////////////////////////
+LPTHREAD_START_ROUTINE ThreadProc( LPVOID lpParam ) {
+   TRACE( "2 - Thread started\n" );
+
+   CEvent* pEvt = (CEvent*) lpParam;
+
+   BOOL bContinue = TRUE;
+   while( bContinue ) {
+      
+      TRACE( "2 - Waiting for event...\n" );
+      DWORD dwResult = WaitForSingleObject( pEvt->m_hObject, 
+                                            INFINITE );
+      TRACE( "2 - Event signaled, checking\n" );
+      if( dwResult == WAIT_OBJECT_0 ) {
+         TRACE( "2 - Correct event signaled, exiting!\n" );
+         bContinue = FALSE;
+      }
+   }
+   return 0;
+}
+
+-----
+
+Here's the debug output when the annotated line *is* commented out; i.e.,
+when it works:
+
+1 - main() entered
+1 - Starting second thread
+1 - Begin sleep...
+2 - Thread started
+2 - Waiting for event...
+1 - main waiting for secondary thread to terminate
+2 - Event signaled, checking
+2 - Correct event signaled, exiting!
+The thread 0xDC has exited with code 0 (0x0).
+1 - Deleting event
+The program 'C:\Tmp\TestApp\Debug\TestApp.exe' has exited with code 
+1245104 (0x12FFB0).
+
+-----
+
+Here's the same output when the annotated line is *not* commented out;
+i.e., when the program gets hung waiting for an event that never sets:
+
+1 - main() entered
+1 - Starting second thread
+1 - Begin sleep...
+2 - Thread started
+2 - Waiting for event...
+1 - Calling PulseEvent
+1 - main waiting for secondary thread to terminate
+
+-----
+
+Note that this does not appear to be a CEvent problem as the SDK
+counterparts to CEvent yield the same results.  That leads me to belive
+this is a TRACE problem or, more specifically, an AfxTrace problem.
+
+Searched MSDN, KB, etc., etc., and found this mentioned nowhere.  Thought
+I'd bring it up here before I send it to the VC Bug Report web site.
+
+Does anyone else have any details/comments on this one?  
+
+Later,
+Rick
+
+------------------------------------------------------------------------
+
+Richard A. Esterling            Attachmate Internet Products Group (IPG)
+Senior Software Engineer        McLean, VA                  703-847-4500
+<A HREF="http://widget.eco.twg.com:1080">http://widget.eco.twg.com:1080</A>  http://www.attachmate.com
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Saturday, November 09, 1996
+</B>
+At 17:20 11/4/96 -0500, "Rick Esterling" <rick@eco.twg.com> wrote:
+>Environment: VC++ 4.2b, Windows NT 4.0 SP1 
+
+>LPTHREAD_START_ROUTINE ThreadProc( LPVOID lpParam );
+
+Your thread function isn't correctly prototyped.
+
+>   HANDLE hThread = CreateThread( NULL, 
+>                                  0, 
+>                                  (LPTHREAD_START_ROUTINE) ThreadProc, 
+>                                  (LPVOID) pEvt, 
+>                                  0, 
+>                                  &dwThreadID );
+
+The (LPTREAD_START_ROUTINE) cast is bogus and wouldn't be necessary if
+you'd corrrectly prototyped your function.
+
+Does the problem persist if you fix your code?
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+I'm afraid I've become some sort of speed freak.
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

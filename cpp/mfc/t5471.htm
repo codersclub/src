@@ -1,0 +1,262 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Trapping TABs and arrow keys in an OLE control
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Peter Moss -- <A HREF="mailto:pmoss@bbn.com">pmoss@bbn.com</A>
+Tuesday, June 11, 1996
+</B>
+Environment: MSVC 4.1, Win32
+
+I am trying to build an OLE control based on a subclassed EDIT control. I then 
+insert this control into a dialog box.  
+
+ I would like to be able to trap TAB key presses and any of the 4 arrow keys.  
+I have written a OnKeyDown handler for the WM_KEYDOWN msg.  This successfully 
+traps the Delete key and all of the std keys, but TABs and arrows don't come 
+thru.  I used SPY and it reports that the keydown is being sent to my window, 
+but it never makes it to my handler.
+
+Funny thing is that when I test the handler using the OLE Test Container EXE, 
+the msgs do come thru (in this scenario, the control is not embedded in a 
+dlg).  Somehow, (even tho SPY reports that the msg is directed to my OLE 
+control wnd), the dlg class window proc must  intercept the msgs (???) b4 I 
+can handle them, and it must use them to change the focus.  
+
+Is there any way to make the OLE control get these msgs w/o having to write 
+code in the dlg proc (which would defeat the purpose of building the OLE 
+control)?
+
+Thanks,
+Pete Moss
+pmoss@bbn.com
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Joe Willcoxson -- <A HREF="mailto:joew@statsoftinc.com">joew@statsoftinc.com</A>
+Wednesday, June 12, 1996
+</B>
+[Mini-digest: 4 responses]
+
+>Environment: MSVC 4.1, Win32
+>
+>I am trying to build an OLE control based on a subclassed EDIT control. I then 
+>insert this control into a dialog box.  
+>
+> I would like to be able to trap TAB key presses and any of the 4 arrow keys.  
+>I have written a OnKeyDown handler for the WM_KEYDOWN msg.  This successfully 
+>traps the Delete key and all of the std keys, but TABs and arrows don't come 
+>thru.  I used SPY and it reports that the keydown is being sent to my window, 
+>but it never makes it to my handler.
+
+Look at WM_GETDLGCODE
+Joe Willcoxson (joew@statsoftinc.com)
+http://www.statsoftinc.com
+http://users.aol.com/chinajoe
+
+
+-----From: craigtt@ccmail.PE-Nelson.COM
+
+     Check out the WM_GETDLGCODE message for when your control is in a 
+     dialog.  There's an article Q83302 giving the details.
+     
+     Tim Craig
+     PE-Nelson
+
+-----From: "Frederic Steppe" <FredericS@msn.com>
+
+Peter,
+
+Try trapping the WM_GETDLGCODE message and return DLGC_WANTALLKEYS.
+I never tried that with OLD controls, but the symptoms are the same, so maybe 
+the medecine is too.
+
+Frederic Steppe (frederics@msn.com)
+-----From: Roger Onslow/Newcastle/Computer Systems Australia/AU <Roger_Onslow@compsys.com.au>
+
+Perhaps this entry from "C and Visual C++ KB" in MSDN can help...
+NOTE: key step here is...
+UINT CMyEdit::OnGetDlgCode() {
+ return DLGC_WANTARROWS|DLGC_WANTALLKEYS|DLGC_WANTCHARS;
+}
+
+Don't know if this is relevant for OLE controls??
+
+Roger Onslow
+RogerO@compsys.com.au
+
+Here t'is...
+How to Trap Arrow Keys in an Edit Control of a Dialog Box
+  
+PSS ID Number: Q104637
+Article last modified on 12-07-1995
+ 
+1.00 1.50 1.51 1.52 | 1.00 2.00 2.10 4.00
+ 
+WINDOWS             | WINDOWS NT
+ 
+
+ 
+----------------------------------------------------------------------
+The information in this article applies to:
+ 
+ - The Microsoft Foundation Classes (MFC), included with:
+ 
+    - Microsoft Visual C++ for Windows, versions 1.0, 1.5, 1.51. and
+      1.52
+    - Microsoft Visual C++ 32-bit Edition, versions 1.0, 2.0, 2.1, and
+      4.0
+----------------------------------------------------------------------
+ 
+SUMMARY
+=======
+ 
+This article describes how to trap arrow keys in an edit control of a
+dialog box with the Microsoft Foundation Classes (MFC) versions 2.0 and
+above. Although the example in this article uses an edit control, a similar
+mechanism applies to other controls as well.
+ 
+MORE INFORMATION
+================
+ 
+To trap the arrow keys in an edit control of a dialog box, the following
+steps may be taken:
+ 
+1. Create a dialog box class derived from CDialog. For example, you
+   can create a dialog box class called CMyDlg:public CDialog with
+   Class Wizard.
+ 
+2. Create your own edit class and trap WM_GETDLGCODE and WM_KEYDOWN.
+   The code will resemble the following:
+ 
+      class CMyEdit : public CEdit
+      {
+      // Construction
+      public:
+           CMyEdit();
+ 
+      public:
+           virtual ~CMyEdit();
+      protected:
+           afx_msg UINT OnGetDlgCode();
+           afx_msg void OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags);
+           DECLARE_MESSAGE_MAP()
+      };
+ 
+      CMyEdit::CMyEdit()
+      {
+      }
+ 
+      CMyEdit::~CMyEdit()
+      {
+      }
+ 
+      BEGIN_MESSAGE_MAP(CMyEdit, CEdit)
+           ON_WM_GETDLGCODE()
+           ON_WM_KEYDOWN()
+      END_MESSAGE_MAP()
+ 
+      UINT CMyEdit::OnGetDlgCode()
+      {
+ 
+           return DLGC_WANTARROWS|DLGC_WANTALLKEYS|DLGC_WANTCHARS;
+      }
+ 
+      void CMyEdit::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
+     {
+           //Check if the key pressed was a DOWN ARROW key
+           if (nChar == VK_DOWN)
+                AfxMessageBox("It is a down arrow key!");
+           if (nChar == VK_RIGHT)
+                AfxMessageBox("It is a right arrow key!");
+           if (nChar == VK_LEFT)
+                AfxMessageBox("It is a left arrow key!");
+           if (nChar == VK_UP)
+                AfxMessageBox("It is a up arrow key!");
+           CEdit::OnKeyDown(nChar, nRepCnt, nFlags);
+      }
+ 
+   NOTE: if Class Wizard is used to add a CMyEdit class, you must
+   derive the class from CWnd first and then manually change any
+   references of CWnd to CEdit in the code. It is important to trap
+   WM_GEDLGCODE in your own edit class and specify DLGC_WANTARROWS in
+   OnGetDlgCode().
+ 
+3. Create a member variable that maps to your own edit class in the
+   dialog box class and override CWnd::DoDataExchange(). Your code
+   should resemble the following:
+ 
+      class CMyDlg : public CDialog
+      {
+      public:
+           CMyEdit m_edit;
+      protected:
+           virtual void DoDataExchange(CDataExchange* pDX); //DDX/DDV
+ 
+           DECLARE_MESSAGE_MAP()
+      };
+      void CMyDlg::DoDataExchange(CDataExchange* pDX)
+      {
+           CDialog::DoDataExchange(pDX);
+           DDX_Control(pDX, IDC_EDIT1, m_edit);
+      }
+ 
+   NOTE: This can be done easily by Class Wizard. For example, you can
+   add a member variable m_edit and map it to CEdit and then manually
+   change CEdit references in MyEdit.CPP and MyEdit.H files to
+   CMyEdit.
+ 
+Additional reference words: kbinf 1.00 1.50 1.51 1.52 2.00 2.10 2.50 2.51
+3.00 3.10 4.00
+KBCategory: kbprg
+KBSubcategory: MfcUI
+=============================================================================
+Copyright Microsoft Corporation 1995.
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

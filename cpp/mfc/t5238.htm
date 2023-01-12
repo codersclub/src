@@ -1,0 +1,146 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+DAO 'multithread' - Solution So Far!
+</B></FONT>
+<BR>
+<PRE>
+<B>
+David Ohlssen -- <A HREF="mailto:DAVIDO@COMMERCE.CTECH.AC.ZA">DAVIDO@COMMERCE.CTECH.AC.ZA</A>
+Monday, May 20, 1996
+</B>
+Thanks to those who have replied, it seems clear that DAO functions 
+must be called ONLY from the one and only CWinApp thread.
+
+The (2) problems here are that the same thread by default controls the 
+UI.  
+
+1) UI thread can get tied up for a "long" time during UI processing.
+====================================================================
+This means there is lots of work to do if the user gets active or 
+the displayed data is voluminous.    Thus, I am sure that even the 
+most anti-thread-proliferation guru's will agree that an extra thread 
+camping on the RS232 comms line is justified.   The comms thread 
+validates and acknowledges good frame messages and then with a mutex, 
+adds them to a list in the app data.   Now, I want to write these to 
+an mdb table.   I have to let the main UI thread check the list via 
+the same mutex as the comms thread and take off the first entry and 
+write it to the db.    The main thread can do this in idle time, 
+except that the idle calls dry up when a menu is pulled open or a 
+dialog is displayed.   So I added a timer to also call the 
+listcheckupdate.   The timer only ticks in the CView which then just 
+does a call to the listcheck function in the app because they are the 
+same thread and the idle processing will complete before the timer 
+tick is seen by the view and vice versa.   So far so good!
+
+2) User can "block" the system
+==============================
+The interesting one.  When the user holds a mouse button down over 
+the title bar, all messages seem to be suspended for the main thread. 
+There is no idle call and no timer message.   If the mouse moves, 
+then a few messages come through.   If the user just sits and holds 
+the button, we are FROZEN.   (One way to do this is to accidentally 
+rest a book on the mouse).   This means the UI thread is then not 
+able to provide decent response as a db server.   One thought is to 
+"retire" the main thread into a dedicated db server role and fire a 
+new UI thread to take over the frame window.    Perhaps some kind 
+soul could comment on that, or better, show sample code .....
+
+David O. Ohlssen
+I  _____________________________________  I
+I  | Davido@Commerce.CTech.ac.ZA       |  I
+I  |    __  ____________               |  I
+I  |   /  \/ Cape Town  \  _           |  I
+I  |__/     South Africa \/ \__________|  I
+I_________________________________________I
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+David W. Gillett -- <A HREF="mailto:DGILLETT@expertedge.com">DGILLETT@expertedge.com</A>
+Tuesday, May 21, 1996
+</B>
+[Mini-digest: 2 responses]
+
+> The (2) problems here are that the same thread by default controls the 
+> UI.  
+> 
+> 1) UI thread can get tied up for a "long" time during UI processing.
+> 
+> 2) User can "block" the system
+
+  Although the overhead for a process switch is obviously greater 
+than for a thread switch, maybe it's time to consider putting the 
+DAO/comms stuff into a separate process from the UI.
+
+Dave
+
+-----From: "Ray Frohnhoefer" <rayf@datatree.com>
+
+You might go so far as considering separating the database functionality
+into a separate .EXE which communicates by some mechanism (TCP/IP might be a
+good choice) with the rest of the system.  Further down the road, you'll
+find that this will help with the operation of your application.  For
+example, when the database is down, you can quickly recover and move
+execution of the database functionality to another system without impacting
+the remainder of the application.  The more you can separate the major
+functions, UI, db server, and communications, the better -- the design is
+simpler, the application more distributable and easier to operate,
+performance is usually better, and coding and maintenance are simplified.
+
+Regards,
+Ray F.
+
+           Gott wuerfelt nicht.
+                        - Albert Einstein                     
+**********************************************************************
+*  Ray Frohnhoefer                         email: rayf@datatree.com
+*  Software Development Mgr.                      Frohnzie@aol.com          
+*  DataTree Corporation                    phone: (619) 231-3300 x131
+*  550 West "C" Street, Ste. 2040          fax:   (619) 231-3301 
+*  San Diego, CA  92101              
+**********************************************************************
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

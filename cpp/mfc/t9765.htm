@@ -1,0 +1,189 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Removing an MFC COM interface in a derived class
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Carl Gunther -- <A HREF="mailto:cgunther@ix.netcom.com">cgunther@ix.netcom.com</A>
+Tuesday, February 25, 1997
+</B>
+Environment:  VC++ 4.1, Win 95
+
+
+I'm creating a set of OCX controls based upon MFC's
+COleControl class.  These controls come in both 16 and
+32-bit flavors which are intended to be completely compatible.
+Specifically, this means that a 16-bit VB 4.0 project created 
+using the 16-bit version
+of these controls must be loadable by 32-bit VB (using the
+32-bit version of the controls) and vice-versa.
+
+I've run into a compatibility problem with the serialized data.
+Specifically, this problem occurs with a BLOB that is 
+serialized using the standard PX_Blob() function from
+CMyControl::DoPropExchange().  The BLOB created by the 16-bit
+version cannot be read by the 32-bit version, and returns
+NULL.
+
+I've traced this problem to the fact that MFC 4.1 (which I'm
+using for my 32-bit version) implements
+an optional interface for persistence that is not implemented
+by MFC 1.52c (which I'm using for my 16-bit version).
+This interface is called IPersistPropertyBag.  There are other
+interfaces that could also be used, but when IPersistPropertyBag
+is available, 32-bit VB 4.0 uses it because it is more efficient
+for certain operations.  I suspect that if it were not available
+then VB would probably use IPersistStreamInit, which is also
+available to the MFC 1.52c version of the controls.  Hopefully,
+this would solve my compatibility problem.
+
+I have not been able to figure out how to declare 
+IPersistPropertyBag as E_NOINTERFACE (not available) in my 
+32-bit controls.  I can *override* the interface, but I can't
+seem to get RID of it.  The CCmdTarget class (from which 
+COleControl is derived) implements QueryInterface() for the
+control using a data-driven approach that searches upward from
+the most-derived class to CCmdTarget itself, looking for
+a requested interface (in this case, IPersistPropertyBag).
+While this allows me to add NEW interfaces, and even to 
+override an existing one, I can't find a way to tell this 
+function that the interface should be returned as NOT implemented.
+
+Overriding the interface and replacing its functionality with
+that of IPersistStreamInit would probably be breaking a 
+fundamental OLE contract, and VB might be unpleasantly surprised
+by the changed behavior in any case.
+
+I'd like to know how to remove the IPersistPropertyBag interface
+that is defined in COleControl from my COleControl-derived
+control object, so that a container requesting it via QueryInterface()
+will receive E_NOINTERFACE as a return value and a NULL pointer back.
+However, other suggestions on how to approach the more
+general problem would also be very welcome.
+Thanks in advance.
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Regis NICOLAS -- <A HREF="mailto:regis.nicolas@smartcode.fr">regis.nicolas@smartcode.fr</A>
+Thursday, February 27, 1997
+</B>
+At 02:08 PM 2/25/97 -0800, you wrote:
+>Environment:  VC++ 4.1, Win 95
+>
+>
+>I'm creating a set of OCX controls based upon MFC's
+>COleControl class.  These controls come in both 16 and
+>32-bit flavors which are intended to be completely compatible.
+>Specifically, this means that a 16-bit VB 4.0 project created 
+>using the 16-bit version
+>of these controls must be loadable by 32-bit VB (using the
+>32-bit version of the controls) and vice-versa.
+>
+>I've run into a compatibility problem with the serialized data.
+>Specifically, this problem occurs with a BLOB that is 
+>serialized using the standard PX_Blob() function from
+>CMyControl::DoPropExchange().  The BLOB created by the 16-bit
+>version cannot be read by the 32-bit version, and returns
+>NULL.
+>
+>I've traced this problem to the fact that MFC 4.1 (which I'm
+>using for my 32-bit version) implements
+>an optional interface for persistence that is not implemented
+>by MFC 1.52c (which I'm using for my 16-bit version).
+>This interface is called IPersistPropertyBag.  There are other
+>interfaces that could also be used, but when IPersistPropertyBag
+>is available, 32-bit VB 4.0 uses it because it is more efficient
+>for certain operations.  I suspect that if it were not available
+>then VB would probably use IPersistStreamInit, which is also
+>available to the MFC 1.52c version of the controls.  Hopefully,
+>this would solve my compatibility problem.
+>
+>I have not been able to figure out how to declare 
+>IPersistPropertyBag as E_NOINTERFACE (not available) in my 
+>32-bit controls.  I can *override* the interface, but I can't
+>seem to get RID of it.  The CCmdTarget class (from which 
+>COleControl is derived) implements QueryInterface() for the
+>control using a data-driven approach that searches upward from
+>the most-derived class to CCmdTarget itself, looking for
+>a requested interface (in this case, IPersistPropertyBag).
+>While this allows me to add NEW interfaces, and even to 
+>override an existing one, I can't find a way to tell this 
+>function that the interface should be returned as NOT implemented.
+>
+>Overriding the interface and replacing its functionality with
+>that of IPersistStreamInit would probably be breaking a 
+>fundamental OLE contract, and VB might be unpleasantly surprised
+>by the changed behavior in any case.
+>
+>I'd like to know how to remove the IPersistPropertyBag interface
+>that is defined in COleControl from my COleControl-derived
+>control object, so that a container requesting it via QueryInterface()
+>will receive E_NOINTERFACE as a return value and a NULL pointer back.
+>However, other suggestions on how to approach the more
+>general problem would also be very welcome.
+>Thanks in advance.
+>
+>
+>
+May be you could subclass the QueryInterface itself and return E_NOINTERFACE
+or some other appropriate error code when the riid requested is
+IID_IPersistPropertyBag ?
+
+Hope this helps...
+
+------------------------------
+Regis NICOLAS -    R&D Windows
+Smartcode Technologie
+
+<A HREF="mailto:nicolas@smartcode.fr">mailto:nicolas@smartcode.fr</A>
+<A HREF="http://www.smartcode.fr/">http://www.smartcode.fr/</A>
+<A HREF="http://www.smartcodesoft.com/">http://www.smartcodesoft.com/</A>
+Tel.: (33) (0)4 67 59 30 16
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+    <A HREF="http://www.digiday.com/mfcpro/joinmfcl.htm">Become an MFC-L member</A>
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

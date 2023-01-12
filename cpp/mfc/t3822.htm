@@ -1,0 +1,211 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+MFC/OLE server in *.EXE only?
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Matthias Bohlen -- <A HREF="mailto:MATTES@logotec.com">MATTES@logotec.com</A>
+Monday, February 05, 1996
+</B>
+Hello omni-sapient folks,
+
+on the MSDN Library CD January 1996, I have found the following, 
+startling paragraph in the article "Product Doc, Lang, Vis C++ 4.0, 
+Programming with MFC, Encyclopedia, DLLs: Programming Tips":
+
+    "OLE allows object servers to be completely implemented
+    inside a DLL. This type of server is called an "in-proc
+    server". MFC does not completely support in-proc servers for
+    all the features of visual editing, mainly because OLE does
+    not provide a way for a server to hook into the container's
+    main message loop. MFC requires access to the container
+    application's message loop to handle accelerator keys and
+    idle-time processing."
+
+Our application "LOGOCAD" consists of a rather small main program
+(*.EXE) and about 150 DLL's, one for each group of functions. The
+above statement, does it mean that I cannot write an OLE server using
+MFC inside one of those 150 DLL's ? What will happen if I ignore the
+warning and put the OLE server into a DLL?
+
+To put it into the *.EXE program would be disastrous as it would
+spoil our source code structure!
+
+Could anyone comment on this?
+
+TIA...
+Matthias Bohlen
+
+-------------------------------------------------------
+Matthias Bohlen               Logotec Software GmbH
+Phone: +49 228 64 80 520      Chateauneufstr. 10 
+FAX:   +49 228 64 80 525      D-53347 Alfter, Germany
+
+E-mail: mattes@logotec.com
+-------------------------------------------------------
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Randal Parsons -- <A HREF="mailto:Randal.Parsons@btal.com.au">Randal.Parsons@btal.com.au</A>
+Wednesday, February 07, 1996
+</B>
+Matthias Bohlen wrote:
+> 
+> Hello omni-sapient folks,
+> 
+> on the MSDN Library CD January 1996, I have found the following,
+> startling paragraph in the article "Product Doc, Lang, Vis C++ 4.0,
+> Programming with MFC, Encyclopedia, DLLs: Programming Tips":
+> 
+>     "OLE allows object servers to be completely implemented
+>     inside a DLL. This type of server is called an "in-proc
+>     server". MFC does not completely support in-proc servers for
+>     all the features of visual editing, mainly because OLE does
+>     not provide a way for a server to hook into the container's
+>     main message loop. MFC requires access to the container
+>     application's message loop to handle accelerator keys and
+>     idle-time processing."
+> 
+> Our application "LOGOCAD" consists of a rather small main program
+> (*.EXE) and about 150 DLL's, one for each group of functions. The
+> above statement, does it mean that I cannot write an OLE server using
+> MFC inside one of those 150 DLL's ? What will happen if I ignore the
+> warning and put the OLE server into a DLL?
+> 
+
+Hi.
+
+It sort of depends what part of OLE you want to implement. If you want 
+to implement OLE Automation, then there is no problem having an in-proc 
+server at all, and since OCXs (custom controls) are really special DLLs, 
+you have quite a lot of the visual parts of OLE too. If you want, you 
+can make an OLE Automation mini-server or full-server (which are EXEs), 
+but the dispatch interface is much slower (~500 times I think) because 
+of the marshalling between processes.
+
+I believe that the restriction mentioned is in relation to in-place 
+activation - where you want to modify the menus displayed in the 
+container application (and the accelerator keys available). This 
+requires a window and message loop in the server, which DLLs don't have. 
+Its the sort of thing you would need to activate an embedded spreadsheet 
+in a word-processing document, so you could access all the normal 
+spreadsheet functionality.
+
+My advice - just go ahead and make some OLE in-proc servers.
+
+Regards,
+
+Randal Parsons
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Jim Lavin -- <A HREF="mailto:ooptech@Onramp.NET">ooptech@Onramp.NET</A>
+Thursday, February 08, 1996
+</B>
+At 03:07 PM 2/5/96 +0100, you wrote:
+>Hello omni-sapient folks,
+>
+>on the MSDN Library CD January 1996, I have found the following, 
+>startling paragraph in the article "Product Doc, Lang, Vis C++ 4.0, 
+>Programming with MFC, Encyclopedia, DLLs: Programming Tips":
+>
+>    "OLE allows object servers to be completely implemented
+>    inside a DLL. This type of server is called an "in-proc
+>    server". MFC does not completely support in-proc servers for
+>    all the features of visual editing, mainly because OLE does
+>    not provide a way for a server to hook into the container's
+>    main message loop. MFC requires access to the container
+>    application's message loop to handle accelerator keys and
+>    idle-time processing."
+>
+>Our application "LOGOCAD" consists of a rather small main program
+>(*.EXE) and about 150 DLL's, one for each group of functions. The
+>above statement, does it mean that I cannot write an OLE server using
+>MFC inside one of those 150 DLL's ? What will happen if I ignore the
+>warning and put the OLE server into a DLL?
+>
+>To put it into the *.EXE program would be disastrous as it would
+>spoil our source code structure!
+>
+>Could anyone comment on this?
+>
+>TIA...
+>Matthias Bohlen
+>
+>-------------------------------------------------------
+>Matthias Bohlen               Logotec Software GmbH
+>Phone: +49 228 64 80 520      Chateauneufstr. 10 
+>FAX:   +49 228 64 80 525      D-53347 Alfter, Germany
+>
+>E-mail: mattes@logotec.com
+>-------------------------------------------------------
+>
+>
+We had the same problem with our current application architecture.  We have
+a client that displays one of several interface objects based on the type of
+view they wish to see.  We also needed to provide OLE embedding to each
+specific view.  We opted to use mini-servers which provided an In-Place
+activated object and kept the code seperated.  We were not able to find any
+examples of In-Place Activated In-Proc Servers that were totaly MFC based
+with out resorting to OCXs.  OCXs were not an option since we needed the
+menus and toolbars that both min and full servers provide.  You may need to
+do the samething, build a series of mini-servers that provide the In-Place
+Activated objects you want but are not runnable except by being embedded or
+linked as an object.  This keeps the code size down and managable when you
+have a-lot of different pieces that specialize in one or two functional areas.
+
+
+Jim Lavin
+OOP Technologies
+http://emporium.turnpike.net/~jlavin
+http://rampages.onramp.net/~ooptech
+
+I've seen programmers who couldn't be passed by reference or by value!
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

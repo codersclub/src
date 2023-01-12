@@ -1,0 +1,311 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Derived Combo Box
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Raja Bhattacharjee -- <A HREF="mailto:raja@bhi.com">raja@bhi.com</A>
+Tuesday, March 11, 1997
+</B>
+Environment: VC++ 4.2-flat, NT 4.0
+
+I have derived a class MyComboBox from CComboBox to handle
+SetDataItemPtr
+for the items. I am using the combobox in many dialogs where I have to
+set
+the dataitem value to a CString object.
+
+I have added a method SetCStringItem(index,CString) to MyComboBox
+{
+	// allocate space in the heap (needs to be destroyed explicitely)
+	LPSTR pKeyVal = new TCHAR[pstr.GetLength()+1];
+	if (pKeyVal == NULL) return CB_ERR;
+
+	// copy the data to the ptr
+	strcpy(pKeyVal,pstr);
+
+	// set the data item
+	m_bDataSet = TRUE;
+	return (SetItemDataPtr(pIndex, pKeyVal ));
+}
+
+Now My problem is I am not finding the correct event to destroy the
+items.
+I have to use GetCount() and GetItemDataPtr() which
+gives Assertion in destructor. I tried DestroyWindow(), OnClose(),
+OnDestroy() none of them gets invoked before destructor. Can anyone
+suggest me a way to do the cleanup ?
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+LeRoy Baxter -- <A HREF="mailto:lbaxter@transport.com">lbaxter@transport.com</A>
+Friday, March 14, 1997
+</B>
+[Mini-digest: 2 responses]
+
+
+The MSVC++ help system shows  a CComboBox class member of
+"DeleteItem".  Override this function to delete your datapointers.
+
+-----Original Message-----
+From:	Raja Bhattacharjee [SMTP:raja@bhi.com]
+Sent:	Tuesday, March 11, 1997 2:25 PM
+To:	mfc-l@netcom.com
+Subject:	Derived Combo Box
+
+Environment: VC++ 4.2-flat, NT 4.0
+
+I have derived a class MyComboBox from CComboBox to handle
+SetDataItemPtr
+for the items. I am using the combobox in many dialogs where I have to
+set
+the dataitem value to a CString object.
+
+I have added a method SetCStringItem(index,CString) to MyComboBox
+{
+	// allocate space in the heap (needs to be destroyed explicitely)
+	LPSTR pKeyVal = new TCHAR[pstr.GetLength()+1];
+	if (pKeyVal == NULL) return CB_ERR;
+
+	// copy the data to the ptr
+	strcpy(pKeyVal,pstr);
+
+	// set the data item
+	m_bDataSet = TRUE;
+	return (SetItemDataPtr(pIndex, pKeyVal ));
+}
+
+Now My problem is I am not finding the correct event to destroy the
+items.
+I have to use GetCount() and GetItemDataPtr() which
+gives Assertion in destructor. I tried DestroyWindow(), OnClose(),
+OnDestroy() none of them gets invoked before destructor. Can anyone
+suggest me a way to do the cleanup ?
+-----From: "Jason Healy" <jason@hkjcs.oz.au>
+
+I have managed to override the OnDestroy notification function, and
+successfully
+deleted the data I allocated. You must delete the data allocated before
+calling the
+base class implementation, which destroys the internal data, and therefor
+your link to the
+data allocated by you.
+
+void CPtrComboBox::OnDestroy() 
+{
+	for (int nIndex = 0; nIndex < GetCount(); nIndex++)
+		delete[] (LPTSTR)GetItemDataPtr(nIndex);
+
+	CComboBox::OnDestroy();	
+}
+
+I ran this using VC 4.2 ont NT 3.51
+
+Jason
+Jason@hkjcs.oz.au
+
+----------
+> Environment: VC++ 4.2-flat, NT 4.0
+> 
+> I have derived a class MyComboBox from CComboBox to handle
+> SetDataItemPtr
+> for the items. I am using the combobox in many dialogs where I have to
+> set
+> the dataitem value to a CString object.
+> 
+> I have added a method SetCStringItem(index,CString) to MyComboBox
+> {
+> 	// allocate space in the heap (needs to be destroyed explicitely)
+> 	LPSTR pKeyVal = new TCHAR[pstr.GetLength()+1];
+> 	if (pKeyVal == NULL) return CB_ERR;
+> 
+> 	// copy the data to the ptr
+> 	strcpy(pKeyVal,pstr);
+> 
+> 	// set the data item
+> 	m_bDataSet = TRUE;
+> 	return (SetItemDataPtr(pIndex, pKeyVal ));
+> }
+> 
+> Now My problem is I am not finding the correct event to destroy the
+> items.
+> I have to use GetCount() and GetItemDataPtr() which
+> gives Assertion in destructor. I tried DestroyWindow(), OnClose(),
+> OnDestroy() none of them gets invoked before destructor. Can anyone
+> suggest me a way to do the cleanup ?
+> 
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Jason Healy -- <A HREF="mailto:jason@hkjcs.oz.au">jason@hkjcs.oz.au</A>
+Wednesday, March 19, 1997
+</B>
+DeleteItem is only called for an owner-draw Combobox
+Jason
+jason@hkjcs.oz.au
+
+----------
+> 
+> [Mini-digest: 2 responses]
+> 
+> 
+> The MSVC++ help system shows  a CComboBox class member of
+> "DeleteItem".  Override this function to delete your datapointers.
+> 
+> -----Original Message-----
+> From:	Raja Bhattacharjee [SMTP:raja@bhi.com]
+> Sent:	Tuesday, March 11, 1997 2:25 PM
+> To:	mfc-l@netcom.com
+> Subject:	Derived Combo Box
+> 
+> Environment: VC++ 4.2-flat, NT 4.0
+> 
+> I have derived a class MyComboBox from CComboBox to handle
+> SetDataItemPtr
+> for the items. I am using the combobox in many dialogs where I have to
+> set
+> the dataitem value to a CString object.
+> 
+> I have added a method SetCStringItem(index,CString) to MyComboBox
+> {
+> 	// allocate space in the heap (needs to be destroyed explicitely)
+> 	LPSTR pKeyVal = new TCHAR[pstr.GetLength()+1];
+> 	if (pKeyVal == NULL) return CB_ERR;
+> 
+> 	// copy the data to the ptr
+> 	strcpy(pKeyVal,pstr);
+> 
+> 	// set the data item
+> 	m_bDataSet = TRUE;
+> 	return (SetItemDataPtr(pIndex, pKeyVal ));
+> }
+> 
+> Now My problem is I am not finding the correct event to destroy the
+> items.
+> I have to use GetCount() and GetItemDataPtr() which
+> gives Assertion in destructor. I tried DestroyWindow(), OnClose(),
+> OnDestroy() none of them gets invoked before destructor. Can anyone
+> suggest me a way to do the cleanup ?
+> -----From: "Jason Healy" <jason@hkjcs.oz.au>
+> 
+> I have managed to override the OnDestroy notification function, and
+> successfully
+> deleted the data I allocated. You must delete the data allocated before
+> calling the
+> base class implementation, which destroys the internal data, and therefor
+> your link to the
+> data allocated by you.
+> 
+> void CPtrComboBox::OnDestroy() 
+> {
+> 	for (int nIndex = 0; nIndex < GetCount(); nIndex++)
+> 		delete[] (LPTSTR)GetItemDataPtr(nIndex);
+> 
+> 	CComboBox::OnDestroy();	
+> }
+> 
+> I ran this using VC 4.2 ont NT 3.51
+> 
+> Jason
+> Jason@hkjcs.oz.au
+> 
+> ----------
+> > Environment: VC++ 4.2-flat, NT 4.0
+> > 
+> > I have derived a class MyComboBox from CComboBox to handle
+> > SetDataItemPtr
+> > for the items. I am using the combobox in many dialogs where I have to
+> > set
+> > the dataitem value to a CString object.
+> > 
+> > I have added a method SetCStringItem(index,CString) to MyComboBox
+> > {
+> > 	// allocate space in the heap (needs to be destroyed explicitely)
+> > 	LPSTR pKeyVal = new TCHAR[pstr.GetLength()+1];
+> > 	if (pKeyVal == NULL) return CB_ERR;
+> > 
+> > 	// copy the data to the ptr
+> > 	strcpy(pKeyVal,pstr);
+> > 
+> > 	// set the data item
+> > 	m_bDataSet = TRUE;
+> > 	return (SetItemDataPtr(pIndex, pKeyVal ));
+> > }
+> > 
+> > Now My problem is I am not finding the correct event to destroy the
+> > items.
+> > I have to use GetCount() and GetItemDataPtr() which
+> > gives Assertion in destructor. I tried DestroyWindow(), OnClose(),
+> > OnDestroy() none of them gets invoked before destructor. Can anyone
+> > suggest me a way to do the cleanup ?
+> > 
+> 
+> 
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:DFPav@aol.com">DFPav@aol.com</A>
+Monday, March 24, 1997
+</B>
+All:
+I would guess that listbox and combo box details are the same, but I am not
+sure.  For listboxes, however I know that:
+they must be owner draw to receive WM_DRAWITEM (obvious)
+but they must also NOT have HASSTRINGS to receive WM_COMPAREITEM,
+WM_DELETEITEM
+Hope this helps,
+Dan
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+    <A HREF="http://www.digiday.com/mfcpro/joinmfcl.htm">Become an MFC-L member</A>
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,309 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CRichEditCtrl and embedded graphics in a .rtf file
+</B></FONT>
+<BR>
+<PRE>
+<B>
+David E. Wach -- <A HREF="mailto:david@Clipper.Net">david@Clipper.Net</A>
+Friday, September 13, 1996
+</B>
+
+Environment: VC++ 4.0, Win 95, NT 3.51
+
+I have a CRichEditCtrl in a dialog that I am reading .rtf files into 
+using StreamIn.  I get all the text in with the proper formating no 
+problem, but wherever I have a graphic (e.g. a metafile, or a bitmap) 
+embedded in the .rtf, it doesn't show up in the CRichEditCtrl.  I've 
+edited the .rtf file by hand to verify that the data is actually in the 
+file.  Anybody else doing this sucessfully?  I'm tearing out my hair on 
+this one...
+
+Thanks!
+-dave
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:beriksen@cda.com">beriksen@cda.com</A>
+Monday, September 16, 1996
+</B>
+     To my knowledge, the CRichEditCtrl only does text, not graphics.  This 
+     is from experience and from something I read, though I can't remember 
+     where I read it.  (I do know that if you cut from Word, say, a section 
+     of a document that contains a bitmap or icon, what's pasted into the 
+     CRichEditCtrl object is everything except the bmp.)
+     
+     Brian Eriksen
+     CDA/Wiesenberger (a Thompson Financial Services company)
+     beriksen@cda.com
+
+
+______________________________ Reply Separator _________________________________
+Subject: CRichEditCtrl and embedded graphics in a .rtf file
+Author:  mfc-l@netcom.com at Internet_Mail
+Date:    9/15/96 9:13 AM
+
+
+     
+Environment: VC++ 4.0, Win 95, NT 3.51
+     
+I have a CRichEditCtrl in a dialog that I am reading .rtf files into 
+using StreamIn.  I get all the text in with the proper formating no 
+problem, but wherever I have a graphic (e.g. a metafile, or a bitmap) 
+embedded in the .rtf, it doesn't show up in the CRichEditCtrl.  I've 
+edited the .rtf file by hand to verify that the data is actually in the 
+file.  Anybody else doing this sucessfully?  I'm tearing out my hair on 
+this one...
+     
+Thanks!
+-dave
+     
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Roger Onslow/Newcastle/Computer Systems Australia/
+Tuesday, September 17, 1996
+</B>
+[Mini-digest: 3 responses]
+
+Wordpad uses a rich edit control in its view and supports OLE objects etc.
+This support is provided by CRichEditDoc/CtnrItem/View classes
+If you look at the source for these, you may be able to find out how to support 
+this in plain vanilla CRichEditCtrl.
+This may entail a bit of work :-)
+
+Roger Onslow
+-----From: Ed Ball <ed@logos.com>
+
+
+Your best bet is to figure out how CRichEditView does it (see afxrich.h
+and viewctrl.cpp), since CRichEditView (used by WordPad) uses the
+CRichEditCtrl to do what it does. I imagine you'll have to provide an
+OLE callback for the CRichEditCtrl::SetOleCallback function and
+implement GetNewStorage, QueryInsertObject, etc., etc. Again, see the
+MFC source (and possibly also the WordPad source) to see how they did
+it...
+
+- Ed
+>
+-----From: kyork@tgv.com (k.york)
+
+This is a rather annoying and undocumented problem. It seems you need to
+add some OLE stuff which I found somewhere but cannot remember at the
+moment. Here are the gory details with sample source...
+
+* derive your class from CRichEditCtrl (surprise)
+* add members:
+  DWORD          stgItem;       // these are use by OLE
+  LPSTORAGE      pstg;
+* in the header file, insert the stuff marked ``begin header insertion''
+* in the source file, insert the stuff marked ``begin source insertion''
+* in the constructor, add:
+  pstg = OleStdCreateRootStorage(0, STGM_SHARE_EXCLUSIVE);
+* in the destructor, add:
+  pstg->Release(); // close & get rid of this file
+* override OnCreate and add:
+  SetOLECallback(&m_xRichEditOleCallback);
+
+This should do it. All this work simply boils down to creating a storage
+object which is needed for bitmaps and metafiles.
+Apparently mickeysoft never really thought anyone would use these outside
+of the CRichEditView/CRichEditDocument architecture.
+
+Best O' Luck
+--kyle
+
+/********
+  begin header insertion
+  Note: insert this immediatly after the ``DECLARE_MESSAGE_MAP()''
+statement
+*********/
+public:
+ 	BEGIN_INTERFACE_PART(RichEditOleCallback, IRichEditOleCallback)
+		INIT_INTERFACE_PART(CRichEditView, RichEditOleCallback)
+		STDMETHOD(GetNewStorage) (LPSTORAGE*);
+		STDMETHOD(GetInPlaceContext) (LPOLEINPLACEFRAME*,
+									  LPOLEINPLACEUIWINDOW*,
+									  LPOLEINPLACEFRAMEINFO);
+		STDMETHOD(ShowContainerUI) (BOOL);
+		STDMETHOD(QueryInsertObject) (LPCLSID, LPSTORAGE, LONG);
+		STDMETHOD(DeleteObject) (LPOLEOBJECT);
+		STDMETHOD(QueryAcceptData) (LPDATAOBJECT, CLIPFORMAT*, DWORD,BOOL,
+HGLOBAL);
+		STDMETHOD(ContextSensitiveHelp) (BOOL);
+		STDMETHOD(GetClipboardData) (CHARRANGE*, DWORD, LPDATAOBJECT*);
+		STDMETHOD(GetDragDropEffect) (BOOL, DWORD, LPDWORD);
+		STDMETHOD(GetContextMenu) (WORD, LPOLEOBJECT, CHARRANGE*, HMENU*);
+	END_INTERFACE_PART(RichEditOleCallback)
+
+	DECLARE_INTERFACE_MAP()
+/***********
+  begin source insertions
+***********/
+/********************************************************************
+ **
+ ** this is the minimal OLE interface necessary to allow
+ ** display of bitmaps
+ **
+ ********************************************************************/
+
+
+BEGIN_INTERFACE_MAP(CDerivedRichEditCtrl, CView)
+	// we use IID_IUnknown because richedit doesn't define an IID
+	INTERFACE_PART(CDerivedRichEditCtrl, IID_IUnknown, RichEditOleCallback)
+END_INTERFACE_MAP()
+
+STDMETHODIMP_(ULONG) CDerivedRichEditCtrl::XRichEditOleCallback::AddRef()
+{
+	METHOD_PROLOGUE_EX_(CDerivedRichEditCtrl, RichEditOleCallback)
+	return (ULONG)pThis->ExternalAddRef();
+}
+
+STDMETHODIMP_(ULONG) CDerivedRichEditCtrl::XRichEditOleCallback::Release()
+{
+	METHOD_PROLOGUE_EX_(CDerivedRichEditCtrl, RichEditOleCallback)
+	return (ULONG)pThis->ExternalRelease();
+}
+
+STDMETHODIMP CDerivedRichEditCtrl::XRichEditOleCallback::QueryInterface(
+	REFIID iid, LPVOID* ppvObj)
+{
+	METHOD_PROLOGUE_EX_(CDerivedRichEditCtrl, RichEditOleCallback)
+	return (HRESULT)pThis->ExternalQueryInterface(&iid, ppvObj);
+}
+
+STDMETHODIMP
+CDerivedRichEditCtrl::XRichEditOleCallback::GetNewStorage(LPSTORAGE* ppstg)
+{
+	METHOD_PROLOGUE_EX_(CDerivedRichEditCtrl, RichEditOleCallback)
+	SCODE sc = S_OK;
+	WCHAR szItemW[OLEUI_CCHPATHMAX];
+  char  szItem[OLEUI_CCHPATHMAX];
+
+
+  wsprintf(szItem, "REOBJ%ld", pThis->stgItem);
+  int ii;
+  for (ii=0; szItem[ii]; ii++) 
+    szItemW[ii] = szItem[ii];
+  szItemW[ii] = 0;
+
+	if(!(*ppstg = OleStdCreateChildStorage(pThis->pstg, szItemW)))
+	{
+		sc = E_FAIL;
+	}
+  return sc; //ResultFromScode(sc);
+}
+
+STDMETHODIMP CDerivedRichEditCtrl::XRichEditOleCallback::GetInPlaceContext(
+	LPOLEINPLACEFRAME* lplpFrame, LPOLEINPLACEUIWINDOW* lplpDoc,
+	LPOLEINPLACEFRAMEINFO lpFrameInfo)
+{
+	METHOD_PROLOGUE_EX(CDerivedRichEditCtrl, RichEditOleCallback)
+  return ResultFromScode(E_NOTIMPL);
+}
+
+STDMETHODIMP
+CDerivedRichEditCtrl::XRichEditOleCallback::ShowContainerUI(BOOL fShow)
+{
+	METHOD_PROLOGUE_EX(CDerivedRichEditCtrl, RichEditOleCallback)
+  return ResultFromScode(E_NOTIMPL);
+}
+
+STDMETHODIMP CDerivedRichEditCtrl::XRichEditOleCallback::QueryInsertObject(
+	LPCLSID /*lpclsid*/, LPSTORAGE /*pstg*/, LONG /*cp*/)
+{
+	METHOD_PROLOGUE_EX(CDerivedRichEditCtrl, RichEditOleCallback)
+	return S_OK;
+}
+
+STDMETHODIMP
+CDerivedRichEditCtrl::XRichEditOleCallback::DeleteObject(LPOLEOBJECT
+/*lpoleobj*/)
+{
+	METHOD_PROLOGUE_EX_(CDerivedRichEditCtrl, RichEditOleCallback)
+	return S_OK;
+}
+
+STDMETHODIMP CDerivedRichEditCtrl::XRichEditOleCallback::QueryAcceptData(
+	LPDATAOBJECT lpdataobj, CLIPFORMAT* lpcfFormat, DWORD reco,
+	BOOL fReally, HGLOBAL hMetaPict)
+{
+	METHOD_PROLOGUE_EX(CDerivedRichEditCtrl, RichEditOleCallback)
+  return ResultFromScode(S_OK);
+}
+
+STDMETHODIMP
+CDerivedRichEditCtrl::XRichEditOleCallback::ContextSensitiveHelp(BOOL
+/*fEnterMode*/)
+{
+	return E_NOTIMPL;
+}
+
+STDMETHODIMP CDerivedRichEditCtrl::XRichEditOleCallback::GetClipboardData(
+	CHARRANGE* lpchrg, DWORD reco, LPDATAOBJECT* lplpdataobj)
+{
+	METHOD_PROLOGUE_EX(CDerivedRichEditCtrl, RichEditOleCallback)
+	return E_NOTIMPL;
+}
+
+STDMETHODIMP CDerivedRichEditCtrl::XRichEditOleCallback::GetDragDropEffect(
+	BOOL fDrag, DWORD grfKeyState, LPDWORD pdwEffect)
+{
+	return E_NOTIMPL;
+}
+
+STDMETHODIMP CDerivedRichEditCtrl::XRichEditOleCallback::GetContextMenu(
+	WORD seltype, LPOLEOBJECT lpoleobj, CHARRANGE* lpchrg,
+	HMENU* lphmenu)
+{
+	return E_NOTIMPL;
+}
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

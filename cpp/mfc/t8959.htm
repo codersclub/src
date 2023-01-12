@@ -1,0 +1,346 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Threads & Messages
+</B></FONT>
+<BR>
+<PRE>
+<B>
+<A HREF="mailto:ajit@cmc.stph.net">ajit@cmc.stph.net</A>
+Monday, January 13, 1997
+</B>
+
+
+
+Environment : VC++ 4.0, Windows NT 3.51
+
+	User defined messages posted to user created threads, when the thread 
+	is already processing a message, are mingled (i. e not handled !).
+
+	eg : 
+
+	// Code in CMyView 
+
+	CMyView::OnLButtonDown(/*  parameters  */)
+
+	{
+		myThread->PostThreadMessage(MY_MESSAGE,0,0);
+		myThread->PostThreadMessage(MY_MESSAGE,0,0);
+	}
+
+	//  Code in CMyThread :
+
+	CMyThread::OnMyMessage(UINT, LONG)
+	{
+		AfxMessageBox("Your Message Handled !");
+	}
+
+	It is observed that when the Left button is pressed on the view,
+	
+	Only one of the two messages posted (first) is handled.
+	
+	Same is the case even if the messages are different.
+
+	can somebody help me PLEASE ?
+
+	- ajit@sunserv.cmc.stph.net
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Kenneth A. Argo -- <A HREF="mailto:argo@rias.COM">argo@rias.COM</A>
+Monday, January 13, 1997
+</B>
+[Mini-digest: 4 responses]
+
+There is a technote on the use of PostThreadMessage() message in the =
+knowledge base you may want to have a look at it  (Q142415)!
+
+If memory serves MFC does not properly dispatch messages sent this way =
+because of their source HWND which is NULL in the case of a thread =
+message.  The article shows a work around which involves creating an =
+overload of PreTranslateMessage().
+
+This is a cut from the text of the technote showing theis solution:
+
+BOOL CThreadMsgApp::PreTranslateMessage(MSG* pMsg)
+{
+    // Is it the Message you want?
+    // You can use a switch statement but because this is
+    // only looking for one message, you can use the if/else
+    if (pMsg->message =3D=3D WM_USER+2268)
+    {
+        // Call the function to handle this message
+   OnReceivedCommand(pMsg->wParam,pMsg->lParam);
+        // Tell MFC no more processing is needed
+        return TRUE;
+    }
+    else
+        // Call MFC to have it continue processing the message
+        return CWinThread::PreTranslateMessage(pMsg);
+}
+=20
+BOOL CThreadMsgApp::InitInstance()
+{
+    WPARAM wParam;
+    LPARAM lParam;
+    wParam =3D MAKEWPARAM(0,0); // We can put whatever we
+    lParam =3D MAKELPARAM(0,0); // want in wParam & lParam
+=20
+    // Send the user-defined Thread Message
+    // m_nThreadID is a member of CWinThread that holds the thread ID
+    PostThreadMessage(m_nThreadID, WM_USER+2268, wParam, lParam);
+=20
+    return TRUE;
+}
+=20
+void CThreadMsgApp::OnReceivedCommand(WPARAM wParam, LPARAM lParam)
+{
+    // You can do whatever you want in here, this is simply
+    // sending output to the debug window
+    TRACE0("Received WM_USER+2268!!\n");
+}
+=20
+
+
+Ken
+
+
+
+----------
+From:  ajit@cmc.stph.net[SMTP:ajit@cmc.stph.net]
+Sent:  Monday, January 13, 1997 11:01 AM
+To:  mike@nwlink.com
+Cc:  mfc-l@netcom.com; AJIT ATHAVALE SAMYUKTHA
+Subject:  Threads & Messages
+
+
+
+
+Environment : VC++ 4.0, Windows NT 3.51
+
+	User defined messages posted to user created threads, when the thread=20
+	is already processing a message, are mingled (i. e not handled !).
+
+	eg :=20
+
+	// Code in CMyView=20
+
+	CMyView::OnLButtonDown(/*  parameters  */)
+
+	{
+		myThread->PostThreadMessage(MY_MESSAGE,0,0);
+		myThread->PostThreadMessage(MY_MESSAGE,0,0);
+	}
+
+	//  Code in CMyThread :
+
+	CMyThread::OnMyMessage(UINT, LONG)
+	{
+		AfxMessageBox("Your Message Handled !");
+	}
+
+	It is observed that when the Left button is pressed on the view,
+=09
+	Only one of the two messages posted (first) is handled.
+=09
+	Same is the case even if the messages are different.
+
+	can somebody help me PLEASE ?
+
+	- ajit@sunserv.cmc.stph.net
+
+
+
+-----From: Mihir Dalal <m_dalal@ECE.concordia.CA>
+
+
+On Mon, 13 Jan 1997 ajit@cmc.stph.net wrote:
+
+> Environment : VC++ 4.0, Windows NT 3.51
+> 
+> 	User defined messages posted to user created threads, when the thread 
+> 	is already processing a message, are mingled (i. e not handled !).
+> 
+> 	eg : 
+> 
+> 	// Code in CMyView 
+> 
+> 	CMyView::OnLButtonDown(/*  parameters  */)
+> 
+> 	{
+> 		myThread->PostThreadMessage(MY_MESSAGE,0,0);
+> 		myThread->PostThreadMessage(MY_MESSAGE,0,0);
+> 	}
+> 
+> 	//  Code in CMyThread :
+> 
+> 	CMyThread::OnMyMessage(UINT, LONG)
+> 	{
+> 		AfxMessageBox("Your Message Handled !");
+> 	}
+> 
+> 	It is observed that when the Left button is pressed on the view,
+> 	
+> 	Only one of the two messages posted (first) is handled.
+> 	
+> 	Same is the case even if the messages are different.
+> 
+> 	can somebody help me PLEASE ?
+
+
+Ajit,
+
+Just wondering whether the way in which you are testing your message 
+posting is correct or not.
+
+I believe your problem is that you are using AfxMessageBox() on the 
+very first PostThreadMessage() which puts the rest of your application 
+in a kind of deadlock, unless you do away with the message box by 
+clicking OK.
+
+Try using the TRACE macro instead to confirm the message posting. That 
+should possibly show both of your messages being handled. 
+
+Or still better use Spy++.
+
+Mihir Dalal. 
+(m_dalal@ece.concordia.ca)
+(University Researcher)
+
+
+
+-----From: Mike Blaszczak <mikeblas@nwlink.com>
+
+At 16:00 1/13/97 +0000, ajit@cmc.stph.net wrote:
+>Environment : VC++ 4.0, Windows NT 3.51
+
+> User defined messages posted to user created threads, when the thread 
+> is already processing a message, are mingled (i. e not handled !).
+
+MFC 4.0 doesn't handle thread messages. It completely ignores them.
+How are you processing them?  Did you override PreTranslateMessage(),
+then?
+
+Since you're immediately posting two messages in a row, you're _not_ showing
+that the message is already being processed. Windows will probably
+queue both messages before yielding to the other thread.  It may or may
+not behave that way--it's really not deterministic and depends on the
+relative priorities of the different threads and what else is happening on
+the system. 
+
+But since your code doesn't force the other thread to execute, you're
+not guaranteeing that the messages are lost because the message handler
+is already running--you're just showing that you can't tell if the
+message was handled or not.
+
+>	//  Code in CMyThread :
+>	CMyThread::OnMyMessage(UINT, LONG)
+>	{
+>		AfxMessageBox("Your Message Handled !");
+>	}
+
+A message box provides a modal dialog.  It's possible that, while a message
+box is active and the modal loop inside of windows is processing messgaes,
+it too ignores thread messages; I'll see if I can look into that when I
+have time.  What if you substitute a TRACE() message for the MessageBox?
+
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+Why does the "new" Corvette look like a 1993 RX-7?
+These words are my own. I do not speak on behalf of Microsoft.
+
+-----From: Jim Lawson Williams <jimlw@mail.ccur.com.au>
+
+At 04:00 PM 13/01/97 +0000, ajit@cmc.stph.net wrote:
+>
+>Environment : VC++ 4.0, Windows NT 3.51
+>
+>	User defined messages posted to user created threads, when the thread 
+>	is already processing a message, are mingled (i. e not handled !).
+>
+>	eg : 
+>
+>	// Code in CMyView 
+>
+>	CMyView::OnLButtonDown(/*  parameters  */)
+>
+>	{
+>		myThread->PostThreadMessage(MY_MESSAGE,0,0);
+>		myThread->PostThreadMessage(MY_MESSAGE,0,0);
+>	}
+>
+>	//  Code in CMyThread :
+>
+>	CMyThread::OnMyMessage(UINT, LONG)
+>	{
+>		AfxMessageBox("Your Message Handled !");
+>	}
+>
+>	It is observed that when the Left button is pressed on the view,
+>	
+>	Only one of the two messages posted (first) is handled.
+>	
+>	Same is the case even if the messages are different.
+>
+>	can somebody help me PLEASE ?
+>
+>	- ajit@sunserv.cmc.stph.net
+>
+>
+What happens if you substitute TRACE for AfxMessageBox?  What does PreTranslateMessage() see going past?
+Regards,
+Jim LW
+
+
+>From the BBC's "Barchester Chronicles":
+
+    "I know that ultimately we are not supposed to understand.
+    But I also know that we must try."
+
+       -- the Reverend Septimus Harding, crypt-analyst, clog-dancer, C++ programmer
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

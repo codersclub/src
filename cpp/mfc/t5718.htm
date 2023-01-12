@@ -1,0 +1,222 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Detect printer change in CPrintDialog
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Michael E. Kropp -- <A HREF="mailto:mkropp@imagesw1.MV.COM">mkropp@imagesw1.MV.COM</A>
+Tuesday, July 02, 1996
+</B>
+Environment: MSVC 4.1  Win95/Win32s
+
+I'm expanding CPrintDialog to include some options like Fit-to-page, =
+etc.  When the user clicks the Properties button he has the capability =
+of change paper size, orientation, etc.  I have yet to find a way to get =
+any updated information while the print dialog is still up (I'm trying =
+to display the printed size, etc. in the dialog).  The DEVMODE structure =
+seems to get updated when I leave the print dialog but not when I come =
+back to it from a jaunt to Properties...
+
+I haven't been able to find anything on the VC++, MSVC CDs or on the =
+Internet.  Any suggestions on how this might be done?
+
+Mike Kropp
+Image Software
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Roger Onslow -- <A HREF="mailto:Roger_Onslow@compsys.com.au">Roger_Onslow@compsys.com.au</A>
+Monday, July 08, 1996
+</B>
+>I'm expanding CPrintDialog to include some options like Fit-to-page, etc. 
+>When the user clicks the Properties button he has the capability of
+>change paper size, orientation, etc. 
+>I have yet to find a way to get any updated information while the print dialog 
+is still up
+>(I'm trying to display the printed size, etc. in the dialog).
+>The DEVMODE structure seems to get updated when I leave the print dialog
+>but not when I come back to it from a jaunt to Properties...
+
+I have an application that has similar requirements.
+
+Rather that fiddling about with extending CPrintDialog, I took the "easy" way 
+out and simply pop up a dialog after the standard dialog to specify print 
+position (shere laziness, I guess).
+
+I'd much rather do it the right way by extending the print dialog (probably 
+adding a button and popping up my print position dialog, which coincidentally 
+looks very much like the one used in Microsoft Image from Office CD).
+
+If you find a way of doing this, please let me know how...
+
+If you like, I could let you have a look at my code, but it probably won't 
+help, as you need the info from within the print dialog (not after).
+
+           /|\        Roger Onslow
+      ____|_|.\       ============
+    _/.........\Senior Software Engineer
+   /CCC.SSS..A..\
+  /CC..SS...A.A..\   Computer
+ /.CC...SS..AAA...\       Systems
+/\.CC....SSAA.AA../            Australia
+\ \.CCCSSS.AA.AA_/
+ \ \...........//      Ph: +61 49 577155
+  \ \...._____//      Fax: +61 49 675554
+   \ \__|_/\_//    RogerO@compsys.com.au
+    \/_/  \//
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Lee Jonas -- <A HREF="mailto:lj@turnpike.com">lj@turnpike.com</A>
+Friday, July 12, 1996
+</B>
+In message <9607090024.AA7579@acacia.compsys.com.au>, Roger
+Onslow/Newcastle/Computer Systems Australia/AU
+<Roger_Onslow@compsys.com.au> writes
+
+>>I'm expanding CPrintDialog to include some options like Fit-to-page, etc. 
+>>When the user clicks the Properties button he has the capability of
+>>change paper size, orientation, etc. 
+>>I have yet to find a way to get any updated information while the print dialog 
+>is still up
+>>(I'm trying to display the printed size, etc. in the dialog).
+>>The DEVMODE structure seems to get updated when I leave the print dialog
+>>but not when I come back to it from a jaunt to Properties...
+>
+>I have an application that has similar requirements.
+>
+>Rather that fiddling about with extending CPrintDialog, I took the "easy" way 
+>out and simply pop up a dialog after the standard dialog to specify print 
+>position (shere laziness, I guess).
+>
+>I'd much rather do it the right way by extending the print dialog (probably 
+>adding a button and popping up my print position dialog, which coincidentally 
+>looks very much like the one used in Microsoft Image from Office CD).
+>
+>If you find a way of doing this, please let me know how...
+>
+>If you like, I could let you have a look at my code, but it probably won't 
+>help, as you need the info from within the print dialog (not after).
+>
+>           /|\        Roger Onslow
+>      ____|_|.\       ============
+>    _/.........\Senior Software Engineer
+>   /CCC.SSS..A..\
+>  /CC..SS...A.A..\   Computer
+> /.CC...SS..AAA...\       Systems
+>/\.CC....SSAA.AA../            Australia
+>\ \.CCCSSS.AA.AA_/
+> \ \...........//      Ph: +61 49 577155
+>  \ \...._____//      Fax: +61 49 675554
+>   \ \__|_/\_//    RogerO@compsys.com.au
+>    \/_/  \//
+>
+>
+
+The problem lies with the implementation of the PRINTDLG common dialog
+that CPrintDialog is a wrapper class for.
+
+PRINTDLG takes a DEVMODE struct that it uses to initialise its fields,
+displays the modal dialog, then refills the DEVMODE struct with the
+user's changes when the user closes the dialog.
+
+This means you cannot get information on the state of the dialog's
+controls from the pd.m_pd.hDevMode struct whilst it is running, and as
+most of the CPrintDialog member functions retrieve information from this
+DEVMODE struct, they are also no good at this point.  
+
+Hence you must tap into the print dialog directly:  In your
+MyPrintDialog class, add control notification handlers for the controls
+you are interested in (look in commdlg.rc for their IDs, eg. Paper Size
+combo is "cmb2", Orientation Radiobuttons are "rad1" & "rad2", etc).
+These handlers can then check to see the states of the relevant common
+controls and update your own controls accordingly.
+
+Eg. add ON_CBN_SELCHANGE(cmb2, OnUpdatePrintedSizeDisplay),
+ON_BN_CLICKED(rad1, OnUpdatePrintedSizeDisplay), and ON_BN_CLICKED(rad2,
+OnUpdatePrintedSizeDisplay).  Then:
+
+void MyPrintDialog::OnUpdatePrintedSizeDisplay()
+{
+    // get data from Paper Size & Orientation controls
+    ...
+
+    // update display control
+    ...
+}
+
+NB: to get the value of the paper size from the selected combobox
+string, take a look at DeviceCapabilities with DC_PAPERNAMES, DC_PAPERS,
+and DC_PAPERSIZES.  These functions are used to fill in three arrays,
+one with the name of the paper sizes, one with the dmPaperSize
+identifiers, and one with the actual dimensions of these paper sizes
+respectively.  All three arrays correspond to each other, ie. the same
+index value used in all arrays gives you the name, id, and dimensions of
+a particular supported paper type.  You can match the selected combobox
+string to the identifier using the DC_PAPERNAMES and DC_PAPERS arrays.
+Furthermore, if the user has selected a non-standard paper type (eg.
+"custom" in MS-Word) you can also get information on that paper type's
+dimensions from the DC_PAPERSIZES array.  
+
+Don't forget to call DeviceCapabilities on the correct driver - the user
+may have changed the printer selected in the "Specific Printer"
+combobox.  In order to do this, look at the pd.m_pd.hDevNames handle.
+This is a handle to a DEVNAMES struct which specifies the printer name
+currently selected, its associated driver, and the port it is attached
+to.  The print dialog changes pd.m_pd.hDevMode as soon as the user
+changes the printer selection combobox in the dialog, so it is never out
+of date.
+
+I hope this helps...
+    
+-------------------------------------------------------------------------
+Lee Jonas, T U R N P I K E  Ltd
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

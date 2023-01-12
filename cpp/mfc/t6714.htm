@@ -1,0 +1,175 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CDaoDatabase
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Venkat NJAOST -- <A HREF="mailto:VVaitheeswa@NJAOST.ML.com">VVaitheeswa@NJAOST.ML.com</A>
+Wednesday, September 11, 1996
+</B>
+Environment: VC++ 4.2, Win NT 3.51
+
+	I have the following scenario.
+
+	Main thread
+	 (initialize the Workspace, Open the database)
+	Worker Thread 
+	(fetch information from the table and return the recordset pointer)
+
+	The problem: 
+	When the worker thread ends, it notifies the main thread through a 
+	call back function that the job has been completed).
+	
+	At this point the recordset pointer seems to be valid. But once the
+mainthread
+	uses the recordset pointer to do a MoveNext() DAO3032.DLL fails with an
+	access violation. At this point the pointer is still valid, but the
+Daodatabase is
+	closed. (m_bOpen is 0 - in debug environment while watching the
+variable)
+
+	Is there something that I  am missing. If I remove the worker thread
+and 
+	do the same in the main thread the app works clean. What am I messing
+up
+	by moving it to a worker thread ?
+
+
+	PS: Is CDaodatabase thread-safe ?
+
+Venkatramani
+  The train never waits ......
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Wednesday, September 11, 1996
+</B>
+[Mini-digest: 4 responses]
+
+At 09:27 AM 9/11/96 -0400, you wrote:
+>Environment: VC++ 4.2, Win NT 3.51
+
+>	I have the following scenario.
+>	Main thread
+>	 (initialize the Workspace, Open the database)
+>	Worker Thread 
+>	(fetch information from the table and return the recordset pointer)
+
+You're not providing enough details--you're skipping to many steps and
+leaving details out.  I'm assuming that you're using DAO based only on your
+subject line, so, to fetch data from a table using DAO, you need to
+use a CDaoRecordset.  Who's creating that?  Presumably, you're creating
+a CDaoDatabase in the main thread, but are you creating the CDaoRecordset
+in the main thread or the worker thread?
+
+>	The problem: 
+>	When the worker thread ends, it notifies the main thread through a 
+>	call back function that the job has been completed).
+
+You're saying that you return the recordset pointer. I'm not sure I
+understand why--isn't the worker thread supposed to be doing the fetching?
+Or do you mean that you're not returning a pointer to a CDaoRecordset
+object, but instead returning a pointer to some data structure that
+actually holds the recordset data as you've fetched it?
+	
+>At this point the recordset pointer seems to be valid. But once the
+>mainthread
+>uses the recordset pointer to do a MoveNext() DAO3032.DLL fails with an
+>access violation.
+
+This makes it sounds like you're really passing back and forth a
+pointer to a CDaoRecordset object. If that's the case, you're fundamentally
+in trouble because DAO objects can't be referenced from multiple threads.
+
+>	PS: Is CDaodatabase thread-safe ?
+
+According to the documentation, no.  If you open the Visual C++ 4.2
+documentation to this topic:
+
+Visual C++ Books
+   MFC 4.2
+      Programming with MFC: Encyclopedia
+         DAO and MFC
+
+This is one of three topics that's hit if you use the search feature to search
+for "DAO near thread".
+
+You don't explain what it is your program does--in particular, what your
+main thread is really doing.  If you want to use DAO like this, you'll have
+to cosnider a little more advanced architecture: you'll need to find some way
+to let one thread do the work of hitting the database and communicate the
+results back to the other threads.
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+These words are my own. I do not speak on behalf of Microsoft.
+
+-----From: "Dan Kirby" <dkirby@accessone.com>
+
+Hi,
+DAO should only be used in the primary thread of an application.   There is
+a Microsoft Knowledgebase article on this.  No, it is not thread safe
+either.
+
+--dan
+
+-----From: "John Bundgaard" <johnb@image.dk>
+
+Remember that the DAO-classes is NOT multithread safe.
+
+-----From: Jim Leavitt <jimll@halcyon.com>
+
+The docs are clear that the dao classes are NOT thread safe. I'd love it if they were, as my work is primarily database stuff as well. 
+"DAO itself is not multithreaded, so you can't use the MFC DAO classes in multiple threads. 
+Confine your DAO code to a single thread of execution." 
+
+Lifted from topic 'DAO: Database Application Design Options'
+Jim Leavitt
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

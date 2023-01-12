@@ -1,0 +1,221 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CPropertySheet resizing
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Mark Parr -- <A HREF="mailto:markp@e9.com">markp@e9.com</A>
+Thursday, April 03, 1997
+</B>
+Environment:  VC++ 5.0, Win 95
+
+I'm creating a tabbed dialog box using the CPropertySheet class.  But I 
+would like to replace the OK, CANCEL, and APPLY buttons with my own and 
+different places with the tabbed dialogs.  What's the best way to proceed 
+and perform this task?
+
+Thanks
+Mark
+
+
+======
+
+Mark Parr -- markp@e9.com -- (601) 393-2046
+Application Data Systems -- Southaven, MS
+
+If you believe in yourself and have dedication and pride -- and never quit, 
+you'll be a winner. The price of victory is high -- but so are the rewards. 
+  ---   Paul "Bear" Bryant
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Kostya Sebov -- <A HREF="mailto:sebov@is.kiev.ua">sebov@is.kiev.ua</A>
+Friday, April 04, 1997
+</B>
+Dear Mark,
+
+You can always avoid the "Apply" and "Help" buttons by simply clearing =
+the appropriate bit flags in CPropertySheet::m_psh.dwFlags field. =
+Consult the documentation.
+
+On the other hand, I don't recommend you removing the "OK" and "Cancel". =
+First, I suspect the modal=20
+property sheet code being so much dependent on their existence that its =
+not worth the level of code=20
+customization you'd have to implement. Fortunately, you can always =
+"rename" these buttons using=20
+SetDlgItemText with IDOK and IDCANCEL IDs and provide your handlers to =
+such modified confirmation/cancellation
+operations. If you think longer you surely will be able to apply this =
+pattern to your situation.
+
+Finally, if you need to implement additional buttons you may find useful =
+the snippets below.
+It includes the CHECK macro that throws a runtime_error exception when =
+the expression inside it evaluates to 0.
+Note the technique does not require additional data members in your =
+class.
+
+I believe, there's also an example in the Visual's CD.
+
+Let me know if you need further clarification.
+
+HTH,
+	Kostya Sebov.=20
+-------------------------------------------------------------------------=
+---
+Tel: +(38 044) 266-6387 /work/,   +(38 044) 513-2591 /home/
+<A HREF="mailto:sebov@is.kiev.ua">mailto:sebov@is.kiev.ua</A>
+-------------------------------------------------------------------------=
+--
+MCPS, Leading programmer=20
+Intelligent Systems (Boston-Kiev)
+voice/fax: +(38 044)266-6195
+<A HREF="mailto:company@is.kiev.ua">mailto:company@is.kiev.ua</A>
+<A HREF="http://www.i-rip.com">http://www.i-rip.com</A>
+
+
+int CPageSetupSht::OnCreate( LPCREATESTRUCT lpCreateStruct )=20
+{
+	try
+	{
+		CHECK( inherited::OnCreate( lpCreateStruct ) !=3D -1 );
+
+		if( !( m_dwOptions & PSD_DISABLEPRINTER ))
+			CHECK( ::IsWindow( ::CreateWindowEx( WS_EX_NOPARENTNOTIFY,
+												 _T("BUTTON"),=20
+												 GetStringFromId( IDS_PRINTER ),
+												 WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
+												 0,0,0,0, // Will be set later
+												 m_hWnd, HMENU( IDC_PRINTER ),=20
+												 AfxGetInstanceHandle(), NULL
+											   )
+							 )
+				 );
+
+		return 0;
+	}
+	catch( runtime_error& error )
+	{
+		TRACE_ERROR	( error );
+	}
+
+	return -1;
+}
+
+BOOL CPageSetupSht::OnInitDialog()=20
+{
+	inherited::OnInitDialog();
+
+	CWnd* pPrinter =3D GetDlgItem( IDC_PRINTER );
+	if( pPrinter )
+	{
+		CWnd* pHelp =3D GetDlgItem( IDHELP );
+		ASSERT( pHelp );
+
+		CRect rectPrinter;
+		pHelp->GetWindowRect( rectPrinter );
+		ScreenToClient( rectPrinter );
+
+		CRect rectClient;
+		GetClientRect( rectClient );
+		ASSERT( rectClient.left =3D=3D 0 );
+
+		// Adjust the "Printer" button symetrically to the "Help" button.
+		ASSERT( rectPrinter.right < rectClient.right );
+		rectPrinter.OffsetRect(( rectClient.right - rectPrinter.right ) - =
+rectPrinter.left, 0 );
+
+		VERIFY( pPrinter->SetWindowPos( pHelp,=20
+										rectPrinter.left, rectPrinter.top,=20
+										rectPrinter.Width(), rectPrinter.Height(),
+										SWP_NOACTIVATE
+									  )
+			  );
+
+		pPrinter->SetFont( GetFont());
+	=09
+		EnableToolTips();
+	}
+	else
+		ASSERT( m_dwOptions & PSD_DISABLEPRINTER );
+
+	return TRUE;
+}
+
+-----Original Message-----
+From:	Mark Parr [SMTP:]
+Sent:	Thursday, April 03, 1997 19:21
+To:	'MFC-L'
+Subject:	CPropertySheet resizing
+
+Environment:  VC++ 5.0, Win 95
+
+I'm creating a tabbed dialog box using the CPropertySheet class.  But I=20
+would like to replace the OK, CANCEL, and APPLY buttons with my own and=20
+different places with the tabbed dialogs.  What's the best way to =
+proceed=20
+and perform this task?
+
+Thanks
+Mark
+
+
+=3D=3D=3D=3D=3D=3D
+
+Mark Parr -- markp@e9.com -- (601) 393-2046
+Application Data Systems -- Southaven, MS
+
+If you believe in yourself and have dedication and pride -- and never =
+quit,=20
+you'll be a winner. The price of victory is high -- but so are the =
+rewards.=20
+  ---   Paul "Bear" Bryant
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+    <A HREF="http://www.digiday.com/mfcpro/joinmfcl.htm">Become an MFC-L member</A>
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

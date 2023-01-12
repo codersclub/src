@@ -1,0 +1,637 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Activating a previous instance of an app revisited
+</B></FONT>
+<BR>
+<PRE>
+<B>
+<A HREF="mailto:MARGHAL@gw2k.com">MARGHAL@gw2k.com</A>
+Friday, May 03, 1996
+</B>
+Environment:  Visual C++ 4.1   with  Win95 and WinNT	
+
+Ever wonder why the question of how to limit an application to a single
+instance and activate the original instance comes up so often? Having had to
+implement this functionality myself this week, I now know why. The sample
+programs don't work, the knowledgebase articles and faq are out of date, and
+the answers I've seen posted to this list were incomplete or wouldn't work 
+in
+all cases. Here's a slightly different way to solve the problem.
+
+Actually there are two questions to answer:
+
+1) How to detect a previous instance of a program.
+2) How to activate the first instance, or request it to do something.
+
+The first question has been discussed on the list in detail recently with 
+several good approaches suggested.  I used the approach that creates and 
+checks a named mutex in the InitInstance call.
+
+The second question is, I think, the harder one: how to get the handle of
+the main window of the first instance. The common answer is to use
+FindWindow or EnumWindow, however, I prefer not to use those functions.
+EnumWindow is somewhat inefficient and using FindWindow pretty much requires
+me to register my own class (another task for which a *complete* example 
+is lacking).
+
+The technique I used is to create a shared data segment in the application's
+EXE, declare a global handle variable in the shared segment, and store the
+window handle of the first instance's frame window in the global variable.
+Subsequent instances of the application can get the handle from the global
+variable and use it to manipulate the first instance.
+
+
+If you haven't used shared data segments in an EXE before here's how:
+
+In the cpp file for the CWinApp object create a shared data segment like 
+this:
+
+    #pragma data_seg (".MYAPP_SHARED" )    
+    // We will set this to the main window handle in CWinApp's 
+ActivateFrame.
+    HWND gAppHwnd = 0;  // Must be initialized, or it won't be in shared 
+memory
+    #pragma data_seg () // End the shared segment.
+
+
+In the cpp file for CMainFrame, declare the shared global variable as 
+extern:
+
+    extern HWND gAppHwnd;   
+
+
+Override the ActivateFrame member function in CMainFrame and save the 
+app's handle.
+
+    // Save the app's handle in shared global memory.
+    if ( gAppHwnd == 0 )
+        gAppHwnd = AfxGetMainWnd()->GetSafeHwnd();
+
+
+At the beginning of CWinApp's InitInstance, check for a previous instance 
+with
+a couple of helper functions:
+
+    // Allow one and only one instance of this application to run.
+    if ( FoundPrevInstance() )
+    {
+        UsePrevInstance();
+        return FALSE;
+    }
+
+
+FoundPrevInstance looks like this:
+
+// 
+----------------------------------------------------------------------------
+//  FoundPrevInstance
+//
+//  We want only one instance of this app to run at a time.  This function 
+//  determines whether the app is already running.
+//
+//  Returning FALSE from this routine indicates that another instance of the
+//  app is *not* running.
+//  Returning TRUE indicates that another instance of the app is running.
+// 
+----------------------------------------------------------------------------
+
+BOOL COneinstApp::FoundPrevInstance()
+
+{
+    BOOL bFound = FALSE;             
+
+    // Handle to mutex that indicates another instance is running.
+    HANDLE hMutexOneInstance = NULL; 
+
+    // The first instance of the app will successfully create this mutex.  
+When 
+    // later instances try to create the mutex, they will fail because it
+    // already exists, indicating to us that a previous instance is running.
+    
+    const char szMutex[] = "PreventSecondInstanceOfThisApp";
+    hMutexOneInstance = CreateMutex( NULL, TRUE, szMutex );
+    if( GetLastError() == ERROR_ALREADY_EXISTS )
+    {
+        bFound = TRUE;
+    }
+    
+    if ( hMutexOneInstance ) 
+    {
+        ReleaseMutex( hMutexOneInstance );
+    }
+
+    return bFound;
+}
+
+
+UsePrevInstance looks like this:
+
+// 
+----------------------------------------------------------------------------
+//  UsePrevInstance
+//
+//  This function tells an already running instance of GWLIS to prompt for 
+//  login info for all registered applications.
+// 
+----------------------------------------------------------------------------
+
+void COneinstApp::UsePrevInstance()
+
+{
+    //
+    // The original instance of this program saved its main frame window 
+    // in a global variable in shared memory. Now we are going to use that
+    // handle to activate the first instance. 
+    // 
+
+    // Associate the CWnd object with the handle of the original instance
+    // so we can use MFC functions on the window.
+
+    CWnd FirstInst;   
+    FirstInst.Attach( gAppHwnd );
+    
+    if(FirstInst.IsIconic())
+    {
+        FirstInst.ShowWindow(SW_SHOWNORMAL);
+    }
+    FirstInst.BringWindowToTop();
+    FirstInst.GetLastActivePopup()->BringWindowToTop();
+    
+    // Detach the handle from the CWnd or die.
+    FirstInst.Detach();
+
+    // If we wanted to ask the original instance to do something specific
+    // we could define a user-defined message, implement a handler for the
+    // user defined message in CMainFrame, and use code like this:
+
+    #ifdef TELL_THE_FIRST_INSTANCE_SOMETHING
+    
+    ::PostMessage( gAppHwnd, WM_SOME_USER_DEFINED_MSG, 0, 0 );
+
+    #endif 
+}
+
+
+
+Lastly, You need to add a .DEF file to the project that looks like this:
+
+;////////////////////////////////////////////////////////////////////////////
+//
+NAME      APPNAME
+CODE      PRELOAD MOVEABLE DISCARDABLE
+DATA      PRELOAD MOVEABLE MULTIPLE
+HEAPSIZE  1024
+
+SECTIONS
+    .MYAPP_SHARED READ WRITE SHARED
+
+;////////////////////////////////////////////////////////////////////////////
+//
+
+
+I hope someone finds this technique useful.
+Al Margheim
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Frederic Steppe -- <A HREF="mailto:FredericS@msn.com">FredericS@msn.com</A>
+Thursday, May 09, 1996
+</B>
+[Mini-digest: 3 responses]
+
+>Environment:  Visual C++ 4.1   with  Win95 and WinNT	
+>1) How to detect a previous instance of a program.
+>2) How to activate the first instance, or request it to do something.
+
+Wouldn't it be easiest to broadcast a registered user message and just get the 
+answer ?
+The existing instance may get the message, reply and activates itself with 
+just a few lines of code.
+
+Or isn't it that simple ?
+
+Frederic Steppe (frederic@msn.com)
+-----From: mikeblas@interserv.com
+
+On Fri, 03 May 96, MARGHAL@gw2k.com wrote:
+>Environment:  Visual C++ 4.1   with  Win95 and WinNT	
+
+Thanks.
+
+>Actually there are two questions to answer:
+
+>1) How to detect a previous instance of a program.
+>2) How to activate the first instance, or request it to do something.
+
+>The first question has been discussed on the list in detail recently with 
+>several good approaches suggested.  I used the approach that creates and 
+>checks a named mutex in the InitInstance call.
+
+Great.  That's the most robust method.  But maybe you should use an event 
+instead.
+
+>The second question is, I think, the harder one: how to get the handle of
+>the main window of the first instance.
+
+You don't need it.  If you used an event instead of a mutex, it would be easy 
+to have the other application activate itself.  I think you should do this:
+
+1) Create an event named with your application's name.
+2) If that mutex exists, go to step A, below
+3) Create a new thread.  Give it a pointer to your CWinApp.
+4) Have that thread wait for two objects: the named event and an unnamed 
+event in your application object.
+5) continue initialing your application.
+6) When your user exits, destroy the named event and signal the unnamed 
+event.  Wait for your extra thread to die.  When it dies, exit.
+
+in the extra thread:
+
+4a) you're waiting (as above, remember?) on either of two objects: the 
+unnamed event or the named event.
+4b) if the named event fires, use SetForegroundWindow() on your 
+pApp->m_pMainWnd. go back to step 4a.
+4c) if the unnamed event fires, terminate this thread.
+
+If your app starts and find that the named event already exists:
+
+A) Since the event means someone else is running, singal it.
+B) Exit your applicaiton.  The "come to the foreground" is implemented by the 
+other app's secondary thread in step 4b.
+
+> FindWindow() ... or EnumWindow() ...
+
+I think that a thread that sleeps all day is actually cheaper than using 
+EnumWindow and FindWindow and a shared data area.
+
+>The technique I used is to create a shared data segment in the application's
+>EXE, declare a global handle variable in the shared segment, and store the
+>window handle of the first instance's frame window in the global variable.
+
+This is a very awkward approach.  Some applications (and, more importantly, 
+some users) don't like it when a window suddenly comes to the foreground.  
+That's mainly because it screws up the keyboard input focus.  You can tailor 
+step 4b above so that any state of your application can be checked.  Maybe 
+you can just ring the bell, or maybe you could just come to the foreground if 
+its safe, or come to the foreground later if it isn't.  Me, I like to format 
+the user's hard drive.
+
+.B ekiM
+--
+TCHAR szDisc[] = _T("These words are my own; I do not speak for Microsoft.");
+
+-----From: Mario Contestabile <Mario_Contestabile.UOS__MTL@UOSMTL2.universal.com>
+
+Your e-mail is very similar to a posting I wrote on the subject a while back,
+which is in the faq 4.0 (section 11.8), yet questions on preventing multiple 
+instances
+are very popular.
+
+mcontest@universal.com
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@msn.com">mikeblas@msn.com</A>
+Saturday, May 11, 1996
+</B>
+----------
+From: 	owner-mfc-l@netcom.com on behalf of Frederic Steppe
+Sent: 	Thursday, May 09, 1996 12:26
+
+>>Environment:  Visual C++ 4.1   with  Win95 and WinNT	
+>>1) How to detect a previous instance of a program.
+>>2) How to activate the first instance, or request it to do something.
+
+> Wouldn't it be easiest to broadcast a registered user message
+> and just get the answer ?
+
+It's not that simple because broadcast messages must be asynchronously posted 
+and not synchronously sent. That means that you must have some other mechanism 
+for the second instance to wait for an explicitly sent reply from the first 
+instance.  Since posting messages is asynchronous, you don't know what the 
+first instance is doing. It might be too busy to pump messages at the moment 
+and not respond to your second instance. So the second instance will have to 
+build in a time out of at least, say, half a second.  And that means your 
+application will necessarily take half a second to start because the second 
+instance has to time out before it knows its the first instance and is 
+actually allowed to run.
+
+.B ekiM
+TCHAR sz[] = _T("What's that smell?");
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Eric Raymond -- <A HREF="mailto:RAYMOND@btw.com">RAYMOND@btw.com</A>
+Monday, May 13, 1996
+</B>
+[Mini-digest: 3 responses]
+
+
+> It's not that simple because broadcast messages must be asynchronously 
+posted
+> and not synchronously sent. That means that you must have some other
+> mechanism
+> for the second instance to wait for an explicitly sent reply from the 
+first
+> instance.  Since posting messages is asynchronous, you don't know what the 
+
+> first instance is doing. It might be too busy to pump messages at the 
+moment
+> and not respond to your second instance. So the second instance will have 
+to
+> build in a time out of at least, say, half a second.  And that means your
+> application will necessarily take half a second to start because the 
+second
+> instance has to time out before it knows its the first instance and is
+> actually allowed to run.
+>
+> .B ekiM
+> TCHAR sz[] = _T("What's that smell?");
+
+Clearly this is desirable behavior for many programs.
+Clearly this is not a simple/obvious thing to do correctly.
+
+Seems like this is good criteria for deciding what to put into MFC (or any 
+library).
+
+-----From: Andrew Dalgleish <andrewd@axonet.com.au>
+
+
+1.  Use a mutex to detect whether you are the 1st or 2nd instance. Create   
+the mutex in CYourApp::InitInstance(), release it in   
+CYourApp::ExitInstance().
+2.  Use a broadcast registered message to re-activate the 1st instance.   
+This avoids finding and manipulating windows which belong to another   
+instance. Drawbacks - doesn't reactivate if a message box is open.
+
+The shared global variable approach posted earlier by Al Margheim works   
+well, but needs a semaphore to serialize access to the variable.
+
+Regards,
+Andrew Dalgleish
+
+-----From: "Frederic Steppe" <FredericS@msn.com>
+
+>>>Environment:  Visual C++ 4.1   with  Win95 and WinNT	
+>
+>> Wouldn't it be easiest to broadcast a registered user message
+>> and just get the answer ?
+>
+>It's not that simple because broadcast messages must be asynchronously posted 
+
+>and not synchronously sent. That means that you must have some other 
+mechanism 
+>for the second instance to wait for an explicitly sent reply from the first 
+>instance.
+> ...
+
+You're right.  Thank you for the clear explaination.  I'll refer to the 
+response you gave some days ago about the same subject,  (using one thread 
+waiting for two objects).
+
+Please thake this as a real 'thank you' message.  I mean it.  You deserve it.
+
+Frederic Steppe (frederics@msn.com)
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Wolfgang Loch -- <A HREF="mailto:Wolfgang.Loch@RZ.TU-Ilmenau.DE">Wolfgang.Loch@RZ.TU-Ilmenau.DE</A>
+Thursday, May 23, 1996
+</B>
+Environment: Visual C++ 2.0, WinNT
+
+..a never ending story..
+
+Here is my approach to detect a previous instance:
+
+* Create an application specific value in the registry under
+HKEY_LOCAL_MACHINE
+* Check for the existence of that value in InitInstance()
+* if it exists reactivate the previous instance by sending a broadcast
+message
+* if not, create the value in the registry
+* delete the registry value at ExitInstance()
+Hint: * Make sure to create the registry value als VOLATILE to be able
+to start your app after a system crash.
+
+I found the registry to be a convinient place for inter process data
+exchange.
+
+Wolfgang Loch (Wolfgang.Loch@rz.tu-ilmenau.de)
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Niels Ull Jacobsen -- <A HREF="mailto:nuj@kruger.dk">nuj@kruger.dk</A>
+Wednesday, May 29, 1996
+</B>
+[Mini-digest: 6 responses]
+
+At 11:16 23-05-96 +0200, you wrote:
+>Environment: Visual C++ 2.0, WinNT
+>
+>..a never ending story..
+>
+>Here is my approach to detect a previous instance:
+>
+>* Create an application specific value in the registry under
+>HKEY_LOCAL_MACHINE
+>* Check for the existence of that value in InitInstance()
+>* if it exists reactivate the previous instance by sending a broadcast
+>message
+>* if not, create the value in the registry
+>* delete the registry value at ExitInstance()
+>Hint: * Make sure to create the registry value als VOLATILE to be able
+>to start your app after a system crash.
+
+The major problem with this is: What if your program is terminated
+prematurely (killed, the machine crashes, power failure, whatever)?
+The user will never be able to start it again!
+
+Also, this won't work if two instances are started (nearly)
+simultaneously. If the first process is deactivated after the chekck, but=
+ before
+having created the key, it will fail. Or if one instance is exiting,
+it may have stopped pumping messages but not yet deleted the registry key.
+It will never get the broadcasted message.
+
+>
+>I found the registry to be a convinient place for inter process data
+>exchange.
+
+Why? A machine crash could fill up the registry with unwanted data?
+Why not use the registry for what it was intended for and use the
+inter-process communication facilities provided (memory-mapped files)?
+
+>Wolfgang Loch (Wolfgang.Loch@rz.tu-ilmenau.de)
+Niels Ull Jacobsen, Kr=FCger A/S (nuj@kruger.dk)
+Everything stated herein is THE OFFICIAL POLICY of the entire Kruger grou=
+p
+and should be taken as legally binding in every respect. Pigs will grow
+wings and fly.
+
+-----From: "David Pham" <dpham@b-r.com>
+
+
+Environment: Visual C++ 4.1, WinNT 4.0 Beta
+
+Here is how to detect a previous instance:
+
+Search MSDN for PSS ID Number: Q141752
+SAMPLE: Limiting 32-bit Applications to a Single Instance
+
+How it works:
+
+1. In your InitInstance(), use the FindWindow() to look for your own class name (Say 
+classABC).
+
+2. If you can not find that window, then it must tbe the 1st 
+instance. In this case, register your class name classABC using 
+AfxRegisterClass(). In your CMainFrame::PrecreateWindow() add the 
+line:
+
+cs.lpszClass = _T("classABC");
+
+Then do your bussiness as usual. Remember to 
+::UnregisterClass() your classABC in your ExitInstance() if you 
+register your class name.
+
+PS> You must FindWindow() using CLASS NAME so it will always find the 
+2nd instance whether your document view is maximized or not. 
+
+Good luck
+_______________________________________________
+
+David Pham                dpham@b-r.com
+System Analyst            (713) 676-3824
+Brown & Root, Inc.        1-800-888-ROOT X3824
+Houston, TX U.S.A         FAX: 713-676-4808
+_______________________________________________
+-----From: Mario Contestabile
+
+>Environment: Visual C++ 2.0, WinNT
+>..a never ending story..
+No kidding.
+
+>Here is my approach to detect a previous instance:
+>* Create an application specific value in the registry under
+>HKEY_LOCAL_MACHINE
+>* Check for the existence of that value in InitInstance()
+>* if it exists reactivate the previous instance by sending a broadcast
+>message
+>* if not, create the value in the registry
+>* delete the registry value at ExitInstance()
+Ouch, sounds like the perfect way to create a race condition between the two 
+applications.
+Since you never know when there will be a task switch, theoretically you
+could have a condition where the app is started twice in a close time span.
+
+>Hint: * Make sure to create the registry value als VOLATILE to be able
+>to start your app after a system crash.
+This won't work on Win95.
+
+>I found the registry to be a convinient place for inter process data
+>exchange.
+Perhaps for very small, very seldomly needed information. For most
+real world apps a DLL or MMFile would be more appropriate.
+
+mcontest@universal.com
+
+-----From: Ron Forrester <rjf@infograph.com>
+
+What if your application crashes before you hit ExitInstance()?
+
+rjf
+
+-----From: Andrew Dalgleish <andrewd@axonet.com.au>
+
+
+The registry can be a handy place to save data, but it lacks the ability   
+to do a "test & set" as a single atomic operation.
+
+This approach can fail if two instances are started at almost exactly the   
+same time.
+
+Instance 1 tests flag
+Instance 2 tests flag
+Instance 1 sets flag
+
+
+Regards,
+Andrew Dalgleish
+andrewd@axonet.com.au
+
+-----From: "David Ohlssen" <DAVIDO@COMMERCE.CTECH.AC.ZA>
+
+The code below depends on how "volatile" the registry entry is after
+an app crash versus a system crash.  How about just creating a mutex,
+which has to be done without asking for ownership, then requesting
+ownership in a second step.  If that fails, the app is already 
+running.   If you ask for ownership with the create, it does not seem 
+to distinguish properly.   Many other ways can be used to tell the old 
+app to jump up, eg create/change the value of a registry val to "Y".  
+The old app can look for the value change in its idle, and if "Y", 
+set it back to "N" and jump up by ...
+
+    m_pMainWnd->SetActive();  // Or whatever view you want to activate
+    m_pMainWnd->ShowWindow(SW_RESTORE);  // Don't forget this.
+
+David O. Ohlssen
+I  _____________________________________  I
+I  | Davido@Commerce.CTech.ac.ZA       |  I
+I  |    __  ____________               |  I
+I  |   /  \/ Cape Town  \  _           |  I
+I  |__/     South Africa \/ \__________|  I
+I_________________________________________I
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

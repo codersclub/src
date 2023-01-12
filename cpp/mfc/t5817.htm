@@ -1,0 +1,283 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Questions relating CListCtrl
+</B></FONT>
+<BR>
+<PRE>
+<B>
+<A HREF="mailto:edwardlau@hactl.com.hk">edwardlau@hactl.com.hk</A>
+Friday, July 12, 1996
+</B>
+     Environment: VC++ 4.0 under Win 95
+     
+     I am using a CListCtrlEx control which is derived from CListCtrl. I am 
+     attempting to disable the resizing of the column header by returning 
+     TRUE when HDN_BEGINTRACK is captured, but this does not work..... 
+     Moreover, I want to get the column width required by using 
+     GetStringWidth but also fail with GPF. Can anyone tell me what's wrong 
+     with my code??
+     
+     PS : I have once want to set the style of the header control, whenever 
+     I use HDS_DIVIDERTRACK and when compiled, the compiler just tell me 
+     it's an undeclared identifier. Do I missing some files to include or 
+     what else????
+     
+     Thanks in advance......
+     
+     Edward, PEI, edwardlau@hactl.com.hk
+     
+     
+     BOOL CListCtrlEx::OnNotify(WPARAM wParam, LPARAM lParam, LRESULT* 
+     pResult) 
+     {
+        
+        HD_NOTIFY FAR * phdn = (HD_NOTIFY FAR *) lParam; 
+        NMHDR   hdr=phdn->hdr;
+        HD_ITEM FAR* pitem=phdn->pitem; 
+        int             iItem = phdn->iItem;
+     
+        switch(hdr.code) 
+        {       
+        case HDN_ENDTRACKW:
+        case HDN_ENDTRACKA:
+                {
+                        if (pitem->mask & HDI_WIDTH)
+                        {
+                                
+                                        WrapText(iItem);
+                                        
+                        }
+                        break;
+                }
+        
+        case HDN_BEGINTRACKW:
+        case HDN_BEGINTRACKA:
+                {
+                        if (!m_bAllowColSizing)
+                                return TRUE;
+                
+                }
+                break;
+        }
+        
+        return CListCtrl::OnNotify(wParam, lParam, pResult);
+     
+     }
+     
+     CHeaderCtrl* CListCtrlEx::GetHeaderCtrl()
+     {
+        m_pHeadCtrl = (CHeaderCtrl*)GetWindow(GW_CHILD);
+        return (m_pHeadCtrl);
+        
+     }
+     
+     void CListCtrlEx::WrapText(int iColItem)
+     {
+        CString tmpst;
+        TCHAR szBuffer[255];
+        
+        HD_ITEM hdi;
+        
+        for (int idx = 0; idx < GetHeaderCtrl()->GetItemCount(); idx++)
+        {
+                hdi.mask = HDI_HEIGHT | HDI_TEXT;
+                hdi.pszText = szBuffer;
+                hdi.cchTextMax = 255;
+                m_pHeadCtrl->GetItem(iColItem,&hdi);
+        
+                tmpst.Format("The width for this column is %s", 
+     GetStringWidth(hdi.pszText);
+                AfxMessageBox(tmpst);
+                        
+        }
+     
+     }
+     
+     
+     
+     
+     
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mario Contestabile -- <A HREF="mailto:Mario_Contestabile.UOS__MTL@UOSMTL2.universal.com">Mario_Contestabile.UOS__MTL@UOSMTL2.universal.com</A>
+Monday, July 15, 1996
+</B>
+Snip()===============
+     I am using a CListCtrlEx control which is derived from CListCtrl. I am 
+     attempting to disable the resizing of the column header by returning 
+     TRUE when HDN_BEGINTRACK is captured, but this does not work..... 
+     Moreover, I want to get the column width required by using 
+     GetStringWidth but also fail with GPF. Can anyone tell me what's wrong 
+     with my code??
+     
+     PS : I have once want to set the style of the header control, whenever 
+     I use HDS_DIVIDERTRACK and when compiled, the compiler just tell me 
+     it's an undeclared identifier. Do I missing some files to include or 
+     what else????
+     
+     Thanks in advance......
+     
+     Edward, PEI, edwardlau@hactl.com.hk
+     
+     
+     BOOL CListCtrlEx::OnNotify(WPARAM wParam, LPARAM lParam, LRESULT* 
+     pResult) 
+     {
+        
+        HD_NOTIFY FAR * phdn = (HD_NOTIFY FAR *) lParam; 
+        NMHDR   hdr=phdn->hdr;
+        HD_ITEM FAR* pitem=phdn->pitem; 
+        int             iItem = phdn->iItem;
+     
+        switch(hdr.code) 
+        {   
+        case HDN_BEGINTRACKW:
+        case HDN_BEGINTRACKA:
+                {
+                        if (!m_bAllowColSizing)
+                                return TRUE;
+                
+                }
+                break;
+        }
+EndSnip()============
+
+You can see for the on-line help for OnNotify():
+pResult   Pointer to an LRESULT variable in which to store the result code if 
+the message is handled.
+
+So, returning non-zero means you are processing the message, and you need to 
+store the returned
+value in pResult. There is even a macro in windowsx.h, SetDlgMsgResult(), which 
+can do this for you.
+Use pResult with MFC.
+
+mcontest@universal.com
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Roger Onslow -- <A HREF="mailto:Roger_Onslow@compsys.com.au">Roger_Onslow@compsys.com.au</A>
+Monday, July 22, 1996
+</B>
+>   I am using a CListCtrlEx control which is derived from CListCtrl. I am 
+>     attempting to disable the resizing of the column header by returning 
+>     TRUE when HDN_BEGINTRACK is captured, but this does not work..... 
+
+you need to set
+ *pResult = TRUE;
+as how the return value is set
+
+the actual return value of OnNotify indicates whether you have handled the 
+message or not, returning FALSE means you didn't do it so it is default 
+processed elsewhere, return TRUE means you handled it ll yourself.
+
+(See help on OnNotify);
+
+>                tmpst.Format("The width for this column is %s", 
+>     GetStringWidth(hdi.pszText);
+
+Should by "%d" not "%s"
+
+           /|\        Roger Onslow
+      ____|_|.\       ============
+    _/.........\Senior Software Engineer
+   /CCC.SSS..A..\
+  /CC..SS...A.A..\   Computer
+ /.CC...SS..AAA...\       Systems
+/\.CC....SSAA.AA../            Australia
+\ \.CCCSSS.AA.AA_/
+ \ \...........//      Ph: +61 49 577155
+  \ \...._____//      Fax: +61 49 675554
+   \ \__|_/\_//    RogerO@compsys.com.au
+    \/_/  \//
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Roger Onslow -- <A HREF="mailto:Roger_Onslow@compsys.com.au">Roger_Onslow@compsys.com.au</A>
+Monday, July 22, 1996
+</B>
+>   I am using a CListCtrlEx control which is derived from CListCtrl. I am 
+>     attempting to disable the resizing of the column header by returning 
+>     TRUE when HDN_BEGINTRACK is captured, but this does not work..... 
+
+you need to set
+ *pResult = TRUE;
+as how the return value is set
+
+the actual return value of OnNotify indicates whether you have handled the 
+message or not, returning FALSE means you didn't do it so it is default 
+processed elsewhere, return TRUE means you handled it ll yourself.
+
+(See help on OnNotify);
+
+>                tmpst.Format("The width for this column is %s", 
+>     GetStringWidth(hdi.pszText);
+
+Should by "%d" not "%s"
+
+           /|\        Roger Onslow
+      ____|_|.\       ============
+    _/.........\Senior Software Engineer
+   /CCC.SSS..A..\
+  /CC..SS...A.A..\   Computer
+ /.CC...SS..AAA...\       Systems
+/\.CC....SSAA.AA../            Australia
+\ \.CCCSSS.AA.AA_/
+ \ \...........//      Ph: +61 49 577155
+  \ \...._____//      Fax: +61 49 675554
+   \ \__|_/\_//    RogerO@compsys.com.au
+    \/_/  \//
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,305 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+AW: CRichEditCtrl - WordBreak!
+</B></FONT>
+<BR>
+<PRE>
+<B>
+=?iso-8859-1?Q?Klaus_G=FCtter?= -- <A HREF="mailto:KG@it-gmbh.de">KG@it-gmbh.de</A>
+Monday, February 10, 1997
+</B>
+[Mini-digest: 2 responses]
+
+BTW, has anyone successfully implemented a custom work break proc for a
+rich edit control? I could not find any samples for this and was
+obviously unable to understand the documentation of the new action codes
+(lots of funny effects...)
+
+- Klaus
+
+-----From: Boerge Hansen <etoboh@eto.ericsson.se>
+
+pjn wrote:
+> 
+> On Thu, 30 Jan 1997 18:35:32 +0000, you wrote:
+> 
+> >Environment : VC++ 4.0 WIN NT3.51
+> >
+> >I want to switch off the wordbreak/wordwrap in my CRichEditCtrl. Does
+> >anybody know of an easy way to this?
+> >
+> >As far as I can understand I have to override some functions. Anybody
+> >know which one and how?
+> >
+> >Thanks!
+
+> 
+> Have a look at CRichEditCtrl::SetOptions(..)
+> 
+
+Thanks for the respone, but I'm not sure which options in SetOptions you
+think should help me.
+
+[Moderator's note: He's right - there doesn't seem to be an option
+to turn off word break in 4.1, and he's using 4.0.]
+
+Regards
+Boerge Hansen
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Lee Thompson -- <A HREF="mailto:lee@mail1.nai.net">lee@mail1.nai.net</A>
+Tuesday, February 11, 1997
+</B>
+Hi,
+
+I'm surprised this thread has gone on so long! CRichEditView has a
+function for this, documented as:
+
+	virtual void WrapChanged( );
+	Remarks
+	Call this function when the printing characteristics have 
+	changed (SetMargins or SetPaperSize). Override this function 
+	to modify the way the rich edit view responds to changes 
+	in m_nWordWrap or the printing characteristics (OnPrinterChanged).
+
+A quick trace into the source shows our friends at Microsoft have
+provided this wrapper:
+
+void CRichEditView::WrapChanged()
+{
+	CWaitCursor wait;
+	CRichEditCtrl& ctrl = GetRichEditCtrl();
+	if (m_nWordWrap == WrapNone)
+		ctrl.SetTargetDevice(NULL, 1);
+	else if (m_nWordWrap == WrapToWindow)
+		ctrl.SetTargetDevice(NULL, 0);
+	else if (m_nWordWrap == WrapToTargetDevice) // wrap to ruler
+	{
+		AfxGetApp()->CreatePrinterDC(m_dcTarget);
+		if (m_dcTarget.m_hDC == NULL)
+			m_dcTarget.CreateDC(_T("DISPLAY"), NULL, NULL, NULL);
+		ctrl.SetTargetDevice(m_dcTarget, GetPrintWidth());
+	}
+}
+
+
+Also look at m_nWordWrap in the help.
+
+Hopefully Helpful,
+Lee Thompson
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Boerge Hansen -- <A HREF="mailto:etoboh@eto.ericsson.se">etoboh@eto.ericsson.se</A>
+Thursday, February 13, 1997
+</B>
+LeeSoftWare wrote:
+>=20
+> Hi,
+>=20
+> I'm surprised this thread has gone on so long! CRichEditView has a
+> function for this, documented as:
+>=20
+>         virtual void WrapChanged( );
+>         Remarks
+>         Call this function when the printing characteristics have
+>         changed (SetMargins or SetPaperSize). Override this function
+>         to modify the way the rich edit view responds to changes
+>         in m_nWordWrap or the printing characteristics (OnPrinterChange=
+d).
+>=20
+> A quick trace into the source shows our friends at Microsoft have
+> provided this wrapper:
+>=20
+> void CRichEditView::WrapChanged()
+> {
+>         CWaitCursor wait;
+>         CRichEditCtrl& ctrl =3D GetRichEditCtrl();
+>         if (m_nWordWrap =3D=3D WrapNone)
+>                 ctrl.SetTargetDevice(NULL, 1);
+>         else if (m_nWordWrap =3D=3D WrapToWindow)
+>                 ctrl.SetTargetDevice(NULL, 0);
+>         else if (m_nWordWrap =3D=3D WrapToTargetDevice) // wrap to rule=
+r
+>         {
+>                 AfxGetApp()->CreatePrinterDC(m_dcTarget);
+>                 if (m_dcTarget.m_hDC =3D=3D NULL)
+>                         m_dcTarget.CreateDC(_T("DISPLAY"), NULL, NULL, =
+NULL);
+>                 ctrl.SetTargetDevice(m_dcTarget, GetPrintWidth());
+>         }
+> }
+>=20
+> Also look at m_nWordWrap in the help.
+>=20
+> Hopefully Helpful,
+> Lee Thompson
+
+Again this is about a CRichEditCtrl not a CRichEditView
+
+
+Boerge
+--=20
++-------------------------------------------+
+| B=F8rge Hansen       etoboh@eto.ericsson.se |
+|                    Memo : ETO.ETOBOH      |
+| Software Engineer  Tel  :+4766841516      |
++--                                       --+
+| ERICSSON AS        Network Management     |
+| Po Box 34          Competence Centre      |
+| N-1361 Billingstad Tel    :+4766841200    |
+| NORWAY             Fax    :+4766841550    |=20
++-------------------------------------------+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dorie Hannan -- <A HREF="mailto:DORIE@ris.risinc.com">DORIE@ris.risinc.com</A>
+Thursday, February 13, 1997
+</B>
+[Mini-digest: 2 responses]
+
+We had some wordbreak problems and this is what we did.
+
+1.  m_MyRichEdit.SendMessage( EM_SETWORDBREAKPROC, 
+                            0, 
+                            (LPARAM)(EDITWORDBREAKPROC)MyEditWordBreakProc);
+So I'm telling m_MyRichEdit to use MyEditWordBreakProc when it wants 
+to know when to break.
+
+2. Make your callback function
+//////////////////////////////////////////////////////////////////////
+///// // int CALLBACK MyEditWordBreakProc( LPTSTR lpch,     
+	// pointer to edit text
+                                       int    ichCurrent,	// index of
+                                       starting point int    cch,	    
+                                          // length in characters of
+                                       edit text int    code 	) {   //
+                                       action to take 
+
+ // find first matching substring
+ LPTSTR lpsz = _tcsstr(lpch, szCRLF);
+
+  if ( lpsz ) { 
+    lpsz[0] = 0x20;
+    lpsz[1] = 0x20;
+  };
+
+  switch ( code ) {
+  case WB_CLASSIFY:
+    return 0;
+    break;
+  case WB_ISDELIMITER :
+    return cch;
+    break;
+  case WB_LEFT :
+    return cch;
+    break;
+  case WB_LEFTBREAK :
+    return cch;
+    break;
+  case WB_MOVEWORDLEFT :
+    return cch;
+    break;
+  case WB_MOVEWORDRIGHT :
+    return cch;
+    break;
+  case WB_RIGHT :
+    return cch;
+    break;
+  case WB_RIGHTBREAK :
+    return cch;
+    break;
+ default:
+    return cch;
+    break;
+  };
+};
+
+This is a very simple example, you may need to change what your doing 
+in the callback function for your needs.
+
+I really hope this is what you are looking for.
+-----From: Mike Blaszczak <mikeblas@nwlink.com>
+
+At 08:44 2/13/97 +0000, Boerge Hansen wrote:
+
+>Again this is about a CRichEditCtrl not a CRichEditView
+
+Then just use the same code.  It's really not that hard:
+
+> void CYourDialog::WrapChanged()
+> {
+>         CWaitCursor wait;
+>         CRichEditCtrl* pCtrl = (CRichEditCtrl*)
+GetDlgItem(IDC_YOURCONTROLSID);
+	ASSERT(pCtrl != NULL);
+>         if (m_nWordWrap == WrapNone)
+>                 pCtrl->SetTargetDevice(NULL, 1);
+>         else if (m_nWordWrap == WrapToWindow)
+>                 pCtrl->SetTargetDevice(NULL, 0);
+>         else if (m_nWordWrap == WrapToTargetDevice) // wrap to ruler
+>         {
+>                 AfxGetApp()->CreatePrinterDC(m_dcTarget);
+>                 if (m_dcTarget.m_hDC == NULL)
+>                         m_dcTarget.CreateDC(_T("DISPLAY"), NULL, NULL,
+NULL);
+>                 pCtrl->SetTargetDevice(m_dcTarget, GetPrintWidth());
+>         }
+> }
+
+
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+These words are my own. I do not speak on behalf of Microsoft.
+           This performance was not lip-synched.
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+    <A HREF="http://www.digiday.com/mfcpro/joinmfcl.htm">Become an MFC-L member</A>
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

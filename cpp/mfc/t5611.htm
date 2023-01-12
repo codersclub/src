@@ -1,0 +1,311 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CSocket/OnReceive
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Rudi Perkins -- <A HREF="mailto:rperkins@welsh.com">rperkins@welsh.com</A>
+Monday, June 24, 1996
+</B>
+Hello,
+
+I am using MSVC++ 4.0/MFC 4.0 with Windows 95. The question is what can =
+be assumed/guaranteed by CSocket in terms of the asynchronous receive.
+
+I am deriving a class from CSocket and of course override the =
+OnReceive(). The general structure is like this (pseudo-code):
+
+CMySocket::OnReceive() {
+
+	GetDataFromBuffer();
+	If (CompleteLine()) {
+	   ReceivedLine=3DGetLineFromBuffer();
+	   If (m_state=3DPROCESS_FIRST_LINE)
+	   	ProcessFirstLine(ReceivedLine);
+	   Else
+		ProcessOtherLines(ReceivedLine);
+}
+
+CMySocket::ProcessFirstLine(CString ReceivedLine) {
+
+	DoSomeStuffToFirstLine();                            //Point 1
+	m_state=3DPROCESS_OTHER_LINES;
+}
+
+CMySocket::ProcessOtherLines(CString ReceivedLine) {
+
+	DoSomeStuffToOtherLines();
+}
+
+
+Currently this works great without problem but it is a bad design. If =
+the second line is received while execution is still at Point 1, then =
+the state is still PROCESS_FIRST_LINE when the OnReceive is called for =
+the second line. Hence the second line could get sent to the wrong =
+function. Changing the m_state before Point 1 would decrease the chance =
+but it still would not be guaranteed.
+
+I've checked MSDN and can't find a relevant model for CSocket without =
+Archives. I've seen the MSJ article from February covering a Web Server =
+but I don't see that is affected by not having guarantees.
+
+1) Anyone know the best model for my CSocket and the asyncronous =
+OnReceive() to be failsafe?
+
+2) Even if each procedure is run with the correct line, can I be =
+guaranteed that processing of each line will be in order they are =
+received?
+
+Thanks in advance,
+
+Rudi Perkins
+rperkins@welsh.com
+Welsh Consulting
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Brad Wilson/Crucial Software -- <A HREF="mailto:crucial@pobox.com">crucial@pobox.com</A>
+Wednesday, June 26, 1996
+</B>
+[Mini-digest: 5 responses]
+
+>> CMySocket::OnReceive() {
+
+Use a MUTEX in this function to prevent re-entry.
+
+-- 
+Brad Wilson        crucial@pobox.com        http://pobox.com/~crucial
+Software engineering services for Microsoft Windows NT and Windows 95
+
+"If everything is coming your way, then you're in the wrong lane."
+
+-----From: "Frederic Steppe" <FredericS@msn.com>
+
+Preserving the sequence imply two thgs to take care of :
+	- Use only stream sockets (TCP), as datagrams doesn't guarantee reliabiloty 
+nor sequence
+
+	- Your description of the problem imply you use multitasking code.  You may 
+use some synchronisation technique to ensure data are treated correctly.  This 
+may be an EnterCriticalSection before processing, and LeaveCriticalSection 
+after processing, or some other technique you may prefer.
+
+
+Frederic Steppe (frederics@msn.com)
+-----From: Roger Onslow/Newcastle/Computer Systems Australia/AU <Roger_Onslow@compsys.com.au>
+
+Try using critical sections around test and change of m_state.
+You can encapulate this in a class, like this..
+
+ #include "stdafx.h"
+ #include <afxmt.h>
+ class CIsFirstFlag {
+  BOOL m_first;
+  CMutex m_cs; // thread lock
+ public:
+  CIsFirstFlag() : m_first(TRUE) {}
+  void SetIsFirst() {
+   CSingleLock lock(&m_cs,TRUE);
+   return m_first = TRUE;
+  }
+  BOOL CheckForFirstAndUpdate() {
+   CSingleLock lock(&m_cs,TRUE);
+   BOOL first = m_first;
+   m_first = FALSE;
+   return first;
+  }
+ };
+
+Now you can write (in pseuodo code)...
+
+ class CMySoscket ... {
+ ...
+ CIsFirstFlag m_firstflag;
+ ...
+ };
+ ...
+ void CMySocket::OnReceive() {
+  GetDataFromBuffer();
+  if (CompleteLine()) {
+   ReceivedLine=GetLineFromBuffer();
+   if (m_firstflag.CheckForFirstAndUpdate()) {
+    ProcessFirstLine(ReceivedLine);
+   } else {
+    ProcessOtherLines(ReceivedLine);
+   }
+  }
+ }
+
+No need for m_state=PROCESS_OTHER_LINES in ProcessFirstLine routine.
+
+This may not be enough, if you need to reset back to first line flag again.
+Eg. If the ProcessOtherLines determines its at the end of a group and next line 
+will be start of a new group.
+In that case, you need a large critical section..
+Forget about the "CIsFirstFlag" above and put mutex in the CMySocket class...
+eg.
+ #include <afxmt.h>
+ ...
+ class CMySoscket ... {
+ ...
+ CMutex m_cs;
+ ...
+ };
+ ...
+ void CMySocket::OnReceive() {
+  GetDataFromBuffer();
+  if (CompleteLine()) {
+   ReceivedLine=GetLineFromBuffer();
+   BOOL first;
+   {
+    CSingleLock lock(m_cs,TRUE);
+    first = (m_state == PROCESS_FIRST_LINE);
+    m_state = EndOfGroup(ReceivedLine) ?
+     PROCESS_FIRST_LINE :
+     PROCESS_OTHER_LINES;
+   }
+   if (first) {   
+       ProcessFirstLine(ReceivedLine);
+   } else {
+    ProcessOtherLines(ReceivedLine);
+   }
+  }
+ }
+And again no need for m_state=POCES_OTHER_LINES in ProcessFirstLine routine.
+
+On other points...
+>1) Anyone know the best model for my CSocket and the asyncronous OnReceive() 
+to be failsafe?
+Don't know much about CSocket, but critical sections should help.
+
+>2) Even if each procedure is run with the correct line, can I be guaranteed 
+that processing of each line will be in order they are received?
+Does it really matter?  If so, then maybe the *whole* routine should be in a 
+critical section so it does thinks one at a time, in which case, why make it 
+asynchronous?
+
+Hope this helps...
+
+           /|\        Roger Onslow
+      ____|_|.\       ============
+    _/.........\Senior Software Engineer
+   /CCC.SSS..A..\
+  /CC..SS...A.A..\   Computer
+ /.CC...SS..AAA...\       Systems
+/\.CC....SSAA.AA../            Australia
+\ \.CCCSSS.AA.AA_/
+ \ \...........//      Ph: +61 49 577155
+  \ \...._____//      Fax: +61 49 675554
+   \ \__|_/\_//    RogerO@compsys.com.au
+    \/_/  \//
+
+
+-----From: Kevin_L_McCarthy.IACNET@ngate.zis.ziff.com
+
+Although I have not used the MFC socket classes, I have coded a Win3.1 winsock 
+app with async communications. My first bit of advice is to use synchronous 
+sockets in a separate thread. Getting async comm to work right is MUCH harder 
+than getting sync comm to work right. When I upgraded from VC 1.5 to VC 4.0, I 
+went and poked through the MFC socket code to see how they had done the async 
+side of things. I was not convinced that they had it 100% right. (the one thing 
+i remember was a blocking DNS call in the middle of an async connect). 
+Synchronous calls are much easier to understand and much easier to get right. 
+You will have to figure out threads, since you don't want your whole app to 
+block, but that will be time much better spent.
+
+Second, make a clean and complete separation between the code which recieves 
+the data from the network and the code which actually does anything useful with 
+that data. The network code should be doing nothing more than taking the data 
+and moving it into a work buffer. Other code then walks through the data, 
+processing it in order. This will make it easy to ensure that the first line is 
+completely processed before work on the second line begins.
+
+Kevin McCarthy
+-----From: "Doug Boone" <dboone@fasttax.com>
+
+I always put data into a structure so I can keep track of relevent
+information.
+  
+In your example I would include things like what line number I've got, how
+long it is, and the text of the line in a structure something like this:
+
+typedef _LIne {
+	short		nLineNumber;    // Never use "int" in a communications structure!
+	short		nLength;
+} ALINE;
+
+Then I would do something like:
+
+ OnReceive()
+{
+	ALINE		sRead;
+	char		szALine[MAXLINELENGTH];
+
+	Receive(&sRead,sizeof(ALINE));
+	Receive(&szALine[0],sRead.nLength);
+	if (!sRead.nLineNumber)
+		<Whatever>
+	else
+		<SonOfWhatever>
+}
+
+On the sending side it would be:
+
+Send(LPCSTR lpszAline,int iLineNumber)
+{
+	char	szABuffer[sizeof(ALINE) + MAXLINELENGTH];
+	ALINE	*pALineStruct;
+
+	pALineStruct = (ALINE *) szABuffer;
+	pALineStruct->nLineNumber = (short) iLineNumber;
+	pALineStruct->nLength = strlen(lpszAline);
+	strcpy(&szABuffer[sizeof(ALINE)],lpszAline);
+	Send(&szABuffer,(sizeof(ALINE) + pALineStruct->nLength);
+}
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

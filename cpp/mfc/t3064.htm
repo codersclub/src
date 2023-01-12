@@ -1,0 +1,957 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+C++ Protected Members and MFC
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Brad Wilson -- <A HREF="mailto:bradw@netnet.net">bradw@netnet.net</A>
+Friday, December 15, 1995
+</B>
+I'm sending this message in response to some back-channel discussion
+that's been going on regarding my "(protected is evil :-)" comments
+earlier this week to the list.  This is related to MFC in a vague way
+in that it came from the MFC implementations of toolbars, etc.
+
+I believe I conveyed the wrong opinion about protected members.  It
+is never my intent to mislead anybody ... programming is hard enough
+without having people to secretive about it :-).
+
+Protected members and methods are meant to be used by those people who
+implement child classes from the original class.  In the case of MFC,
+the structure was not documented (and there were stern warnings about
+changes to the underlying structure) and thus shouldn't have been used.
+But I don't fault the person who used it, since it's a perfectly legal
+thing to do, given the "protected" status of the variable.  It's very
+easy to presume that it was not documented because it was missed, and
+very easy to miss the stern warnings.  The only thing that is concrete
+proof of the intent of the member was its protected status.
+
+When you code something that is volatile (like that structure was/is),
+there should be no good reason to make it protected.  If your users need
+access to it or some of its members, you should provide protected methods
+to access them, so that when the underlying volatile structure changes,
+you can easily adapt to it.
+
+The fact that it was not documented doesn't excuse the poor programming
+practice.  The fact is, it should have been private.  Period.  In this
+case, there is without a doubt no excuse, because the given warnings
+indicated that they knew the structure would be changing.
+
+A lesson for all ... if you're not willing to document your protected
+members and methods, they shouldn't be protected.  They should be private.
+You should almost NEVER make members protected ... you should always
+shroud them in methods that, in the early stages, will cost nothing,
+since they should simply be inline functions that return pointers or
+references to the structure.  That way, if and when structures change
+(as they always do), you won't break anyones code.
+
+--
+class CBradWilson : public CWorldWatchProgrammingTeam {
+  public:
+    CString GetInetAddr()   { return CString("bradw@exptech.com");      }
+    CString GetPhone()      { return CString("+1 (810) 620-9803");      }
+    CString GetURL()        { return CString("http://www.exptech.com"); }
+    CString GetDisclaimer() { return CString("All I say is fact :-p");  }
+};
+
+"All we have to do now, is take these lies and make them true somehow
+ All we have to see, is that I don't belong to you, and you don't
+ belong to me."
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Eric Kenslow -- <A HREF="mailto:kenslowe@internet.OIT.OSSHE.EDU">kenslowe@internet.OIT.OSSHE.EDU</A>
+Wednesday, December 20, 1995
+</B>
+[Mini-digest: 3 responses]
+
+I'm afraid you are wrong.  If you want to make something 'forbidden', =
+and therefore inaccessible, you make it private.  If you expect and =
+allow others to modify it, you make it protected.  This is a rule of =
+C++, not MFC, and the members of the MFC group are the ones who screwed =
+up, certainly not the persons who used their code.
+
+Protected means 'yes derived classes, use this as it's not going to =
+change'.  Private means 'never use this, no matter how desperate you =
+are.'  This is a design decision, and obviously someone was asleep at =
+the wheel here.
+
+
+-----From: dhoward@kset.com
+
+I have a different take on this subject.
+
+C++ does not directly address the issue of backward compatibility inside 
+code.  It is up to the author of the code to provide a mechanism for 
+backward compatiblity if he desires it.  The MFC team's solution is not 
+great but it works for people who are very concerned about compatibility.
+
+I have to strongly disagree with making most members private.  When somebody 
+inherits from your class, you want to provide them as much rope as possible 
+but, at the same time, prevent them from hanging themselves.
+
+Generally, providing Get() and Put() methods for accessing private data is 
+ineffective because the parameters and return values of the methods usually 
+imply the structure of the data.  If you see a protected method prototype 
+such as "CString GetName();", the fact that the "name" string is stored as a 
+CString is not exactly hidden.  If the underlying represention of "name" 
+changed from a CString to an integer in the next version, you would be in as 
+much trouble as if you let your data member hang out in the protected 
+section.  The only way around this is to make your own class, CName, such 
+that the method prototype would be "CName GetName();" and then you could do 
+whatever you want.  Unfortunately, if you take this approach, you will 
+quickly be buried in your own types and you might never get around to doing 
+any programming.
+
+My rule of thumb is to make most everything protected.  Your classes should 
+be written in such a way that if a protected data member has its value 
+changed, the class should handle the change smoothly when it detects the 
+change.  For example, if you have a dialog box class which has a protected 
+data member which represents the border style and that data member is 
+modified while the dialog box is running, the dialog box should not crash 
+because it expects the data member to be same as it was initialized.  The 
+class should display the new border style at the next time at the next time 
+that it is convenient (i.e. the dialog box is repainted).
+
+The only time that you should use a private member is when you have two 
+pieces of data that need to remain synchronized.  For example, if you are 
+creating a string class and you have a integer that caches the length of the 
+string (so you don't have to call strlen() all the time) and you have a 
+boolean that tells whether the cache is valid, these two values work in 
+tandem.  When the integer is updated, the boolean must be updated as well.  
+Mucking with the boolean could cause the class to malfunction and you want 
+to prevent the inheritor of your class from setting the boolean to TRUE when 
+the integer contains garbage.  So, you should put the integer and the 
+boolean in the private section and provide protected functions which force 
+their values to remain in sync.
+
+By following these rules, I give the inheritor of my class maximum 
+flexibility while preventing the few situations where, at best, he can only 
+electrocute himself.
+
+-----From: "Mike Blaszczak" <mikeblas@msn.com>
+
+No; it needs to be protected.  Someday, it _will_ be documented and some day 
+you _will_ be able to override it and get something interesting done.  In a 
+commercial library like MFC, you can't make everything "private" because 
+people would complain--you're short-circuiting their ability to derive their 
+own classes and change things they don't dig.
+
+Ideally, non-implementation things that are interesting only to a class (or 
+subclasses of that class) would always be protected. But in an ideal world, 
+not only do you have all of the memory you need... you also have a huge, 
+tireless documentation staff that documents everything you write.  Even people 
+at Microsoft live in the real world--where things must be made "protected" 
+instead of "private" for other than idealistic reasons, and where things can't 
+always be documented even if they really _should_ be "protected".
+
+.B ekiM
+---------
+From: 	owner-mfc-l@netcom.com on behalf of Brad Wilson
+Sent: 	Friday, December 15, 1995 11:04
+To: 	'mfc-l@netcom.com'
+Subject: 	C++ Protected Members and MFC
+
+
+The fact that it was not documented doesn't excuse the poor programming
+practice.  The fact is, it should have been private.  Period.  In this
+case, there is without a doubt no excuse, because the given warnings
+indicated that they knew the structure would be changing.
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Brad Wilson -- <A HREF="mailto:bradw@netnet.net">bradw@netnet.net</A>
+Thursday, December 21, 1995
+</B>
+dhoward@kset.com said ...
+
+>> Generally, providing Get() and Put() methods for accessing private data is 
+>> ineffective because the parameters and return values of the methods usually 
+>> imply the structure of the data.  If you see a protected method prototype 
+>> such as "CString GetName();", the fact that the "name" string is stored as a 
+>> CString is not exactly hidden.
+
+The fact that it is locally stored is not implied at all.  Presume
+that your class keep "CString m_sName" as a private and provides
+"GetName( CString& )" to get access to it.  Now presume that the
+name changes from time to time and you don't always know when it
+changes (though you can poll to find out the name).  Now, if you
+have provided them direct access to m_sName, you would break
+code.  In the latter case, you can use the call to GetName()
+to make your API call(s) to find out the "current" name.
+
+Does this better illustrate why this is good?  And keep in mind
+that inline functions don't cost anything.  That's why its usually
+good to keep data hidden and provide access methods.
+
+>>  If the underlying represention of "name" 
+>> changed from a CString to an integer in the next version, you would be in as 
+>> much trouble as if you let your data member hang out in the protected 
+>> section.
+
+Not necessarily.  GetName() could still provide a CString representation
+of the name (if this is appropriate), as well as overloading it to give
+you an integer representation as well.
+
+>> For example, if you have a dialog box class which has a protected 
+>> data member which represents the border style and that data member is 
+>> modified while the dialog box is running, the dialog box should not crash 
+>> because it expects the data member to be same as it was initialized.
+
+Does your dialog box poll for changes to this variable to change its
+visible style?  Wouldn't a SetStyle() function be more prudent?
+
+>> The 
+>> class should display the new border style at the next time at the next time 
+>> that it is convenient (i.e. the dialog box is repainted).
+
+You would force them to repaint the whole dialog just to get the
+new border style?
+
+>> The only time that you should use a private member is when you have two 
+>> pieces of data that need to remain synchronized.
+
+I definitely disagree with this.  Private data should be used
+for anything that is potentially volatile.
+
+I would highly recommend you read "Code Complete" by Steve
+McConnell.  He has some excellent reasons for many of the things
+that I've told the list about.  His book is invaluable, next to
+a book like Booch.
+
+Mike B then said ...
+
+>> Someday, it _will_ be documented and some day 
+>> you _will_ be able to override it and get something interesting done.
+
+To steal your quote, "the future is not today".  :-)
+
+>> In a 
+>> commercial library like MFC, you can't make everything "private" because 
+>> people would complain--you're short-circuiting their ability to derive their 
+>> own classes and change things they don't dig.
+
+Who said anything about "everything"?  Who said anything about
+people not being able to get to things?  I merely suggested that
+people "wrap" their volatile data structures in methods.  The
+"MFC design philosophy" has already burned one person.  A "C++
+design philosophy" might've helped to prevent it.
+
+I would highly recommend you read "Code Complete" by Steve
+McConnell (Microsoft press, hint hint :-).
+
+Brad
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+John & Annette Elsbree -- <A HREF="mailto:elsbree@msn.com">elsbree@msn.com</A>
+Saturday, December 23, 1995
+</B>
+From: 	owner-mfc-l@netcom.com on behalf of Eric Kenslow
+> I'm afraid you are wrong.  If you want to make something 'forbidden', =
+> and therefore inaccessible, you make it private.  If you expect and =
+> allow others to modify it, you make it protected.  This is a rule of =
+> C++, not MFC, and the members of the MFC group are the ones who screwed =
+> up, certainly not the persons who used their code.
+
+There are cases in which using protected, or even public, on implementation 
+details is useful (see excerpt below).
+
+> Protected means 'yes derived classes, use this as it's not going to =
+> change'.  Private means 'never use this, no matter how desperate you =
+> are.'  This is a design decision, and obviously someone was asleep at =
+> the wheel here.
+
+What is your source for this definition for "protected"?
+
+Nobody was "asleep at the wheel." MFC just has a different interpretation of 
+"protected" than you do. I refer you to the topic "MFC: Using the MFC Source 
+Files" in the MFC Encyclopedia (included as part of the VC++ documentation):
+
+The most important section is the // Implementation section.
+
+This section houses all implementation details. Both member variables and 
+member functions can appear in this section. Everything below this line could 
+change in a future release of MFC. Unless you cant avoid it, you should not 
+rely on details below the // Implementation line. In addition, members 
+declared below the implementation line are not documented, although some 
+implementation is discussed in technical notes...
+
+Notice from the CStdioFile listing under An Example of the Comments that 
+members declared below the // Implementation comment may be declared as 
+public, protected, or private. The point is that you should only use these 
+members with caution, because they might change in the future. Declaring a 
+group of members as public may be necessary for the class library 
+implementation to work correctly. However, this does not imply that you may 
+safely use the members so declared.
+
+mfcTeam.m_johnels;	// does not represent Microsoft
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mark F. Fling -- <A HREF="mailto:mfling@mail.stratacorp.com">mfling@mail.stratacorp.com</A>
+Sunday, December 24, 1995
+</B>
+> Generally, providing Get() and Put() methods for accessing private data is 
+> ineffective because the parameters and return values of the methods usually
+> imply the structure of the data.  If you see a protected method prototype 
+> such as "CString GetName();", the fact that the "name" string is 
+> stored as a CString is not exactly hidden.
+                                     ^^^^^^
+Really?  What if "name" is stored on a DBMS located a continent 
+away, requires locking to protect it, and is cached within the class 
+thus requiring conditional read/update?  Client/server classes 
+routinely provide accessor/operation methods to "get/set" that extend 
+far beyond the machine boundary and hide the whereabouts, type, and 
+concurrency of a class attribute.
+
+If I public'ed these member variables, and you get/set them directly, 
+you probably would corrupt the database over time.  In this scenario the 
+"attribute" is really a member variable AND some code to enforce 
+integrity.  A good case for private/protected, would'nt you say?
+
+___________________________________________________________________________
+Mark F. Fling                                         mfling@stratacorp.com
+Strata Corporation / SBA                               Voice (805) 967-3051
+922 Via Brocha                                           Fax (805) 967-8203
+Santa Barbara, CA  93110 
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:dhoward@kset.com">dhoward@kset.com</A>
+Tuesday, December 26, 1995
+</B>
+I have read Steve McConnell's Code Complete.  It is a respectable book.
+
+Mike B.'s point is that the MFC team cannot predict the goals of every user 
+of the library.  Rightly, MFC does to force compatibility on the users who 
+aren't interested in it.  Recompiling without any changes in the new version 
+is an important goal for some people, not so important to others and 
+unimportant to others.  Some programmers are going to want full access.  
+They're going to want to tweak MFC to do things that the creators did not 
+anticipate.  The only way to satisfy these people is to have most everything 
+as protected.
+
+It is the now old issue of "object bloat" as described by Taligent, Inc.  Is 
+it worthwhile to hide all data members behind Get() and Set() methods?
+
+My conclusion is: most of the time, it is not.  The Get() and Set() methods 
+usually imply the structure of the data.  It creates more code and more code 
+is more expensive to maintain.  Hiding data behind a Get() method will allow 
+a few more options but it still is a rather limited approach to data 
+encapulation.
+
+An example: CDocument::GetPathName() returns a CString.  This implies that 
+pathnames are stored as strings.  On the Mac, pathnames are usually stored 
+as FSSpec's.  So, to use the Mac Portability Library, the programmer has to 
+go through contortions (e.g. WrapFile()) to convert the Mac filename in the 
+CString into a FSSpec.  If CDocument::GetPathName() returned CFileName, 
+WrapFile() would not be necessary.  Sure, GetPathName() provided a little 
+protection.  But the MFC team realized that the Mac file structure does not 
+follow the assumption that a pathname is a string.  To keep compatibility 
+with the old stuff, they had to keep that assumption and (basically, 
+although I am not blaming them) hack the FSSpec into a CString.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Jeff Dickey -- <A HREF="mailto:jdickey@sevensigma.com">jdickey@sevensigma.com</A>
+Wednesday, December 27, 1995
+</B>
+-----BEGIN PGP SIGNED MESSAGE-----
+
+All right guys, this has gone on long enough.  Data members have NO
+BUSINESS WHATEVER being public or even protected -- inline
+accessor/modifier methods still buy you room to fiddle in the future.
+Anybody who's ever worked on a large project ought to know this through
+(probably painfully acquired) experience.
+
+Just as one example, Stroustrup winds up a discussion of
+private/public/protected in "Design and Evolution of C++" (p. 302) as:
+
+   "Fortunately, you don't have to use protected data in C++; 'private'
+    is the default in classes and is usually the better choice.  Note
+    that none of these objections [protected data members being subject
+    to "users poking where they shouldn't in ways that they ought to
+    have known better than"] are significant for protected member
+    _functions_.  I still consider 'protected' a fine way of specifying
+    operations for use in derived classes".
+
+The embedded quote (from Mark Linton, implementor of InterViews, on why
+he banned protected data members in InterViews) is uncannily
+appropriate to MFC.  I had been programming in Windows for several
+years and in C++ on other platforms prior to my first exposure to MFC.
+It has always seemed to me as if MFC 1.0 was written in a dead hurry by
+a larger-than-optimal team with gonzo Windows and C knowledge, but who
+had never done a large-scale C++ application.  The abuse of the
+protection scheme was one 1.0 legacy that we're all living with.  I
+have done at least five major (full- scale, implement pilot project in
+each) framework evaluations over the last three for clients using a
+variety of criteria; whenever clean class design and implementation was
+any factor at all in the evaluation, MFC has uniformly placed at or
+near the bottom.  It scares me beyond words that companies are building
+consumer-level or stability-critical applications using that framework
+because it dramatically increases the costs and complexity of the
+project without any concomitant increase in stability or
+functionality.  Microsoft had a chance to fix a lot of things in MFC
+4.0 -- people could have swallowed broken code if the replacement was
+obviously better -- but once again, the ball was never even picked up,
+let alone dropped.
+
+We really need to demand that Microsoft:
+  - quit trying to implement Smalltalk in their C++ library;
+
+  - provide a clean set of small, easily-understood classes which can
+    be used to leverage an application system, not just give a "me-too"
+    Windows interface;
+
+  - adhere to established, non-proprietary standards (ANSI draft as
+    benchmarked by major compliance suites such as Plum Hall);
+
+  - get rid of the macro-based abortions which can be replaced by ANSI
+    functionality which has been stable for quite some time (namespaces
+    are supported in 4.0; why doesn't 4.0 use standard casting
+    operators rather than macros?  typesafe casting has been in the
+    spec a _lot_ longer);
+
+  - etc. etc. etc.
+
+If Microsoft wants to get everybody to write closed, proprietary code,
+they should stop trying to make it sound as if reusability and
+portability are features which they offer.
+
+Just my 0.0143254325 (damn Pentium bug!) after doing battle with M$ and
+doing work with other stuff...
+
+Jeff Dickey
+
+- -- In Reply To
+>I have read Steve McConnell's Code Complete.  It is a respectable book.
+>
+>Mike B.'s point is that the MFC team cannot predict the goals of every user 
+>of the library.  Rightly, MFC does to force compatibility on the users who 
+>aren't interested in it.  Recompiling without any changes in the new version 
+>is an important goal for some people, not so important to others and 
+>unimportant to others.  Some programmers are going to want full access.  
+>They're going to want to tweak MFC to do things that the creators did not 
+>anticipate.  The only way to satisfy these people is to have most everything 
+>as protected.
+>
+>It is the now old issue of "object bloat" as described by Taligent, Inc.  Is 
+>it worthwhile to hide all data members behind Get() and Set() methods?
+>
+>My conclusion is: most of the time, it is not.  The Get() and Set() methods 
+>usually imply the structure of the data.  It creates more code and more code 
+>is more expensive to maintain.  Hiding data behind a Get() method will allow 
+>a few more options but it still is a rather limited approach to data 
+>encapulation.
+>
+>An example: CDocument::GetPathName() returns a CString.  This implies that 
+>pathnames are stored as strings.  On the Mac, pathnames are usually stored 
+>as FSSpec's.  So, to use the Mac Portability Library, the programmer has to 
+>go through contortions (e.g. WrapFile()) to convert the Mac filename in the 
+>CString into a FSSpec.  If CDocument::GetPathName() returned CFileName, 
+>WrapFile() would not be necessary.  Sure, GetPathName() provided a little 
+>protection.  But the MFC team realized that the Mac file structure does not 
+>follow the assumption that a pathname is a string.  To keep compatibility 
+>with the old stuff, they had to keep that assumption and (basically, 
+>although I am not blaming them) hack the FSSpec into a CString.
+
+
+-----BEGIN PGP SIGNATURE-----
+Version: 2.6.2
+
+iQCVAwUBMOIStM5EtwLVuV0NAQFAUAP/djLNBWNFd8Y7P0VQxlxtJdgq0Ti6iqwp
+OtY08ZX8wj/cd+b/lztys+JJMqGAzp3EBtyvWOOZVNnznHapn+YReToDnZ9DDftF
+j9QvFXyKYT0m713M9qukxqmd3+CQB8GEjTCRWEpOqrDm2DxoxdAS+iUexnHaQCbj
+CA0+GirppXA=
+=ETus
+-----END PGP SIGNATURE-----
+Jeff Dickey
+Seven Sigma Software and Services
+PGP-secured mail encouraged!
+finger 'jdickey@sevensigma.com' or 'http://www.sevensigma.com/keylist.html'
+       for PGP public key
+
+Key fingerprint =  "99 CA 69 E5 2C 95 E8 4E  7E B2 59 5E FB A5 C2 FD"
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@msn.com">mikeblas@msn.com</A>
+Thursday, December 28, 1995
+</B>
+Mike B.'s point is that the MFC team cannot predict the goals of every user 
+of the library.
+
+It's sort of impossible, isn't it? You can't blame the MFC team if you run 
+naked through the park with a CSplitterWnd on your head. But  products like 
+ladders have to have stickers on them that say "if you use this ladder in a 
+thunderstorm, you might die" so that the ladder company doesn't get sued.
+
+Of course, some MFC classes have warning labels if you look at the *.H files. 
+Some people are used to seeing warning labels like "protected:" or "public:" 
+or "private:", but MFC actually tries to use more specific words like "// 
+implementation". The reason is very simple: it's something that escapes most 
+college students, and lots of people who have PhDs.  The reson is efficiency: 
+you can't design things perfectly and expect them to be very very fast _and_ 
+very very flexible.
+
+Doesn't someone on MFC-L have a .sig that says "fast cheap good: pick two"?
+
+It is the now old issue of "object bloat" as described by Taligent, Inc.  Is 
+it worthwhile to hide all data members behind Get() and Set() methods?
+
+Exactly. Didn't this list have a huge discussion about this earlier in the 
+summer?
+
+Rightly, MFC does to force compatibility on the users who 
+aren't interested in it.  
+
+If you said this to my hero, John Elsbree, he would say to you "This sentence 
+no verb".  Everbody makes gramatical errors (and some people have whole books 
+full of them), but the missing words in this sentence make it hard to 
+understand what the point of that paragraph is.
+
+.B ekiM
+TCHAR szDisclaimer[] = _T("These words are my own; I do not speak on behalf of 
+the Motion Pictures Association of America.");
+----------
+From: 	owner-mfc-l@netcom.com on behalf of dhoward@kset.com
+Sent: 	Tuesday, December 26, 1995 09:27
+To: 	mfc-l@netcom.com
+Subject: 	RE: C++ Protected Members and MFC
+
+I have read Steve McConnell's Code Complete.  It is a respectable book.
+
+Mike B.'s point is that the MFC team cannot predict the goals of every user 
+of the library.  Rightly, MFC does to force compatibility on the users who 
+aren't interested in it.  Recompiling without any changes in the new version 
+is an important goal for some people, not so important to others and 
+unimportant to others.  Some programmers are going to want full access.  
+They're going to want to tweak MFC to do things that the creators did not 
+anticipate.  The only way to satisfy these people is to have most everything 
+as protected.
+
+It is the now old issue of "object bloat" as described by Taligent, Inc.  Is 
+it worthwhile to hide all data members behind Get() and Set() methods?
+
+My conclusion is: most of the time, it is not.  The Get() and Set() methods 
+usually imply the structure of the data.  It creates more code and more code 
+is more expensive to maintain.  Hiding data behind a Get() method will allow 
+a few more options but it still is a rather limited approach to data 
+encapulation.
+
+An example: CDocument::GetPathName() returns a CString.  This implies that 
+pathnames are stored as strings.  On the Mac, pathnames are usually stored 
+as FSSpec's.  So, to use the Mac Portability Library, the programmer has to 
+go through contortions (e.g. WrapFile()) to convert the Mac filename in the 
+CString into a FSSpec.  If CDocument::GetPathName() returned CFileName, 
+WrapFile() would not be necessary.  Sure, GetPathName() provided a little 
+protection.  But the MFC team realized that the Mac file structure does not 
+follow the assumption that a pathname is a string.  To keep compatibility 
+with the old stuff, they had to keep that assumption and (basically, 
+although I am not blaming them) hack the FSSpec into a CString.
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@interserv.com">mikeblas@interserv.com</A>
+Thursday, December 28, 1995
+</B>
+On Wed, 27 Dec 1995, Jeff Dickey <jdickey@sevensigma.com> wrote:
+
+>We really need to demand that Microsoft:
+>  - quit trying to implement Smalltalk in their C++ library;
+
+I don't get it.
+
+.B ekiM
+--
+TCHAR szDisc[] = _T("These words are my own; I do not speak for Microsoft.");
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:jarvisb@timken.com">jarvisb@timken.com</A>
+Friday, December 29, 1995
+</B>
+<insert tongue firmly into cheek>
+
+No!  No!  You don't *understand*!!!
+
+Protected data members are *bad*!  :(
+Get-Set methods are *good*!!  :)
+*Public* data members are the Spawn of the Evil One!!!
+
+Obviously, the answer is to launch a full-scale thermonuclear attack
+on Redmond - take no prisoners - leave nothing behind but a fused
+glass plain.  DEATH TO THE INFIDELS!!!!!
+
+<remove tongue from cheek>
+
+It must be nice to have nothing to do but debate religious issues.
+Sheesh.
+
+Bob Jarvis
+
+*************************** Attachment ***********************************
+Date: 29 December 1995, 00:39:57 EST
+From: Mike Blaszczak                                 mikeblas at INTERNET
+      mikeblas@msn.com
+To:                                                mfc-l    at INTERNET
+      mfc-l@netcom.com
+
+Reply-To:                                                mfc-l    at INTERNET
+      mfc-l@netcom.com
+Subject: RE: C++ Protected Members and MFC
+Sender: owner-mfc-l@netcom.com
+Mike B.'s point is that the MFC team cannot predict the goals of every user
+of the library.
+
+It's sort of impossible, isn't it? You can't blame the MFC team if you run
+naked through the park with a CSplitterWnd on your head. But  products like
+ladders have to have stickers on them that say "if you use this ladder in a
+thunderstorm, you might die" so that the ladder company doesn't get sued.
+
+Of course, some MFC classes have warning labels if you look at the *.H files.
+Some people are used to seeing warning labels like "protected:" or "public:"
+or "private:", but MFC actually tries to use more specific words like "//
+implementation". The reason is very simple: it's something that escapes most
+college students, and lots of people who have PhDs.  The reson is efficiency:
+you can't design things perfectly and expect them to be very very fast _and_
+very very flexible.
+
+Doesn't someone on MFC-L have a .sig that says "fast cheap good: pick two"?
+
+It is the now old issue of "object bloat" as described by Taligent, Inc.  Is
+it worthwhile to hide all data members behind Get() and Set() methods?
+
+Exactly. Didn't this list have a huge discussion about this earlier in the
+summer?
+
+Rightly, MFC does to force compatibility on the users who
+aren't interested in it.
+
+If you said this to my hero, John Elsbree, he would say to you "This sentence
+no verb".  Everbody makes gramatical errors (and some people have whole books
+full of them), but the missing words in this sentence make it hard to
+understand what the point of that paragraph is.
+
+.B ekiM
+TCHAR szDisclaimer[] = _T("These words are my own; I do not speak on behalf of
+the Motion Pictures Association of America.");
+----------
+From: 	owner-mfc-l@netcom.com on behalf of dhoward@kset.com
+Sent: 	Tuesday, December 26, 1995 09:27
+To: 	mfc-l@netcom.com
+Subject: 	RE: C++ Protected Members and MFC
+
+I have read Steve McConnell's Code Complete.  It is a respectable book.
+
+Mike B.'s point is that the MFC team cannot predict the goals of every user
+of the library.  Rightly, MFC does to force compatibility on the users who
+aren't interested in it.  Recompiling without any changes in the new version
+is an important goal for some people, not so important to others and
+unimportant to others.  Some programmers are going to want full access.
+They're going to want to tweak MFC to do things that the creators did not
+anticipate.  The only way to satisfy these people is to have most everything
+as protected.
+
+It is the now old issue of "object bloat" as described by Taligent, Inc.  Is
+it worthwhile to hide all data members behind Get() and Set() methods?
+
+My conclusion is: most of the time, it is not.  The Get() and Set() methods
+usually imply the structure of the data.  It creates more code and more code
+is more expensive to maintain.  Hiding data behind a Get() method will allow
+a few more options but it still is a rather limited approach to data
+encapulation.
+
+An example: CDocument::GetPathName() returns a CString.  This implies that
+pathnames are stored as strings.  On the Mac, pathnames are usually stored
+as FSSpec's.  So, to use the Mac Portability Library, the programmer has to
+go through contortions (e.g. WrapFile()) to convert the Mac filename in the
+CString into a FSSpec.  If CDocument::GetPathName() returned CFileName,
+WrapFile() would not be necessary.  Sure, GetPathName() provided a little
+protection.  But the MFC team realized that the Mac file structure does not
+follow the assumption that a pathname is a string.  To keep compatibility
+with the old stuff, they had to keep that assumption and (basically,
+although I am not blaming them) hack the FSSpec into a CString.
+
+-----From: Jeff Dickey <jdickey@sevensigma.com>
+
+Mike,
+
+The model/view/controller scheme and the Great God Object Mega-Superclass
+both come from
+Smalltalk.  MVC fit into the general mindset, and CObject-equivalent was
+meeded because
+nobody knew any other ways to do dynamic late binding without _really_
+slowing things
+down.
+
+Anyway, that's what I meant.
+
+Jeff
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@interserv.com">mikeblas@interserv.com</A>
+Sunday, December 31, 1995
+</B>
+On Fri, 29 Dec 95, <jarvisb@timken.com> wrote:
+
+>Protected data members are *bad*!  :(
+>Get-Set methods are *good*!!  :)
+
+That's sort of confusing.  If you have a protected data member, it's bad (you 
+told me so yourself) so I'll make it public.  Then, I'll implement Get/Set 
+methods (since you said they were good).  But why would I want Get/Set 
+methods for accessing public member variables?  Just to make a bigger EXE?
+
+>*Public* data members are the Spawn of the Evil One!!!
+
+Oh, wait--public is impish and protected is bad.  So, do you mean that all 
+data members should be _private_?
+
+>Obviously, the answer is to launch a full-scale thermonuclear attack
+>on Redmond - take no prisoners - leave nothing behind but a fused
+>glass plain.  DEATH TO THE INFIDELS!!!!!
+
+I don't understand that, either.  Why would you murder me, my friends, and 
+all of the innocent bystanders here in Redmond just because you have a 
+different opinion than some other people on the list?  I really think you 
+need to get a little bit of help--before you know it, you'll be beating your 
+girlfriend over a trivial matter, or something.
+
+Anyway, please make sure what you meant by your two seemingly contradictory 
+statements. I'd hate to think that my programming practices would get forty 
+or fifty thousand people killed!
+
+[Seriously: I really take offense to this kind of posting.  It is juvenile 
+and isn't productive; it isn't going to solve anything.  It does nothing but 
+show that the poster is closed-minded and ineloquent.  I have to wonder what 
+place a note like that has on a moderated list.  And I'm not interested in 
+busting my ass on a product, going the extra mile to answer questions about 
+it in my "spare time", and then having people tell me they'd like to blow up 
+my neighborhood.  If you don't like it, go buy Borland C++ and use OWL.  
+Then, at least, I'll just worry about myself when I'm in Scotts Valley, and 
+not when I'm at home or work.]
+
+>It must be nice to have nothing to do but debate religious issues.
+
+Some people learn to skate while others curse the ice.  I guess others still 
+just blow up the pond, fish and all.
+
+.B ekiM
+--
+TCHAR szDisc[] = _T("These words are my own; I do not speak for Microsoft.");
+
+
+
+>*************************** Attachment ***********************************
+>Date: 29 December 1995, 00:39:57 EST
+>From: Mike Blaszczak                                 mikeblas at INTERNET
+>      mikeblas@msn.com
+>To:                                                mfc-l    at INTERNET
+>      mfc-l@netcom.com
+>
+>Reply-To:                                                mfc-l    at 
+INTERNET
+>      mfc-l@netcom.com
+>Subject: RE: C++ Protected Members and MFC
+>Sender: owner-mfc-l@netcom.com
+>Mike B.'s point is that the MFC team cannot predict the goals of every user
+>of the library.
+>
+>It's sort of impossible, isn't it? You can't blame the MFC team if you run
+>naked through the park with a CSplitterWnd on your head. But  products like
+>ladders have to have stickers on them that say "if you use this ladder in a
+>thunderstorm, you might die" so that the ladder company doesn't get sued.
+>
+>Of course, some MFC classes have warning labels if you look at the *.H 
+files.
+>Some people are used to seeing warning labels like "protected:" or "public:"
+>or "private:", but MFC actually tries to use more specific words like "//
+>implementation". The reason is very simple: it's something that escapes most
+>college students, and lots of people who have PhDs.  The reson is 
+efficiency:
+>you can't design things perfectly and expect them to be very very fast _and_
+>very very flexible.
+>
+>Doesn't someone on MFC-L have a .sig that says "fast cheap good: pick two"?
+>
+>It is the now old issue of "object bloat" as described by Taligent, Inc.  Is
+>it worthwhile to hide all data members behind Get() and Set() methods?
+>
+>Exactly. Didn't this list have a huge discussion about this earlier in the
+>summer?
+>
+>Rightly, MFC does to force compatibility on the users who
+>aren't interested in it.
+>
+>If you said this to my hero, John Elsbree, he would say to you "This 
+sentence
+>no verb".  Everbody makes gramatical errors (and some people have whole 
+books
+>full of them), but the missing words in this sentence make it hard to
+>understand what the point of that paragraph is.
+>
+>.B ekiM
+>TCHAR szDisclaimer[] = _T("These words are my own; I do not speak on behalf 
+of
+>the Motion Pictures Association of America.");
+>----------
+>From: 	owner-mfc-l@netcom.com on behalf of dhoward@kset.com
+>Sent: 	Tuesday, December 26, 1995 09:27
+>To: 	mfc-l@netcom.com
+>Subject: 	RE: C++ Protected Members and MFC
+>
+>I have read Steve McConnell's Code Complete.  It is a respectable book.
+>
+>Mike B.'s point is that the MFC team cannot predict the goals of every user
+>of the library.  Rightly, MFC does to force compatibility on the users who
+>aren't interested in it.  Recompiling without any changes in the new version
+>is an important goal for some people, not so important to others and
+>unimportant to others.  Some programmers are going to want full access.
+>They're going to want to tweak MFC to do things that the creators did not
+>anticipate.  The only way to satisfy these people is to have most everything
+>as protected.
+>
+>It is the now old issue of "object bloat" as described by Taligent, Inc.  Is
+>it worthwhile to hide all data members behind Get() and Set() methods?
+>
+>My conclusion is: most of the time, it is not.  The Get() and Set() methods
+>usually imply the structure of the data.  It creates more code and more code
+>is more expensive to maintain.  Hiding data behind a Get() method will allow
+>a few more options but it still is a rather limited approach to data
+>encapulation.
+>
+>An example: CDocument::GetPathName() returns a CString.  This implies that
+>pathnames are stored as strings.  On the Mac, pathnames are usually stored
+>as FSSpec's.  So, to use the Mac Portability Library, the programmer has to
+>go through contortions (e.g. WrapFile()) to convert the Mac filename in the
+>CString into a FSSpec.  If CDocument::GetPathName() returned CFileName,
+>WrapFile() would not be necessary.  Sure, GetPathName() provided a little
+>protection.  But the MFC team realized that the Mac file structure does not
+>follow the assumption that a pathname is a string.  To keep compatibility
+>with the old stuff, they had to keep that assumption and (basically,
+>although I am not blaming them) hack the FSSpec into a CString.
+>
+>-----From: Jeff Dickey <jdickey@sevensigma.com>
+>
+>Mike,
+>
+>The model/view/controller scheme and the Great God Object Mega-Superclass
+>both come from
+>Smalltalk.  MVC fit into the general mindset, and CObject-equivalent was
+>meeded because
+>nobody knew any other ways to do dynamic late binding without _really_
+>slowing things
+>down.
+>
+>Anyway, that's what I meant.
+>
+>Jeff
+>
+>
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dan L. Pierson -- <A HREF="mailto:dan@cthulhu.control.com">dan@cthulhu.control.com</A>
+Tuesday, January 02, 1996
+</B>
+> From:          "John Elsbree" <elsbree@msn.com>
+> Nobody was "asleep at the wheel." MFC just has a different interpretation of 
+> "protected" than you do. I refer you to the topic "MFC: Using the MFC Source 
+> Files" in the MFC Encyclopedia (included as part of the VC++ documentation):
+> 
+> The most important section is the // Implementation section.
+
+Good point, however I'd like to point out that the new VC++ 4.0 
+class-based editing feature does it's best to defeat this 
+convention.  If you ask it to add a member, it will put the new 
+member immediately after the first "public", "protected", etc. in the 
+class definition (rather odd, since it adds everything else at the 
+last possible place).
+
+Please take a strong suggestion that this (very nice) feature be 
+enhanced to support the MFC class structuring conventions, especially 
+since you folks recommend that we use them too (at least for MFC 
+extension classes).
+
+Thanks, 
+Dan Pierson
+Control Technology Corporation
+Dan Pierson, Control Technology Corporation, <dan@control.com>
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,977 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Communication between threads... Intercepting thread message
+</B></FONT>
+<BR>
+<PRE>
+<B>
+TA -- <A HREF="mailto:siemens@inet.uni-c.dk">siemens@inet.uni-c.dk</A>
+Wednesday, December 18, 1996
+</B>
+Environment: VC++ 4.0, Windows95
+
+Problem statement:
+I want to post a message to a thread of my own derived CWinThread class in
+order to tell it to self-terminate.
+Although the thread is a CWinThread-derived one, it does not own a window,
+and thus I use ::PostThreadMessage() to communicate with it. I use
+CWinThread because it is able to process messages which is needed for the
+CSocket objects, that it owns. I could, of course, create a class derived
+from CCommandTarget but that is not the issue here.
+
+I post a WM_COMMAND type message along with an ID but it won't work! The
+message arrives perfectly at the thread's PreTranslateMessage() ( it is not
+included in the sample below, but I have testet for it), but never reaches
+the handler for which it is destined. The only way that
+I see a solution to this problem is to use the PreTranslateMessage()
+function, but I feel that this is an incorrect behaviour in MFC. Is there
+an alternative to it? 
+
+My code looks like this:
+
+// ServerThread.h : header file
+//
+#ifndef __SERVERTHREAD_H__
+#define __SERVERTHREAD_H__
+
+#include "listensocket.h"
+
+#define ID_KILL_SERVER_THREAD 100 // Command ID
+////////////////////////////////////////////////////////////////////////////
+/
+// CSvrThread thread
+
+class CServerThread : public CWinThread
+{
+	DECLARE_DYNCREATE(CServerThread)
+protected:
+	CServerThread();           // protected constructor used by dynamic
+creation
+	
+	
+
+// Attributes
+public:
+	CListenSocket* m_pListenSocket;
+	int	m_nPort;
+
+// Operations
+public:
+
+// Overrides
+	// ClassWizard generated virtual function overrides
+	//{{AFX_VIRTUAL(CServerThread)
+	public:
+	virtual BOOL InitInstance();
+	virtual int ExitInstance();
+//}}AFX_VIRTUAL
+
+// Implementation
+public:
+	CServerThread(int nPort);
+
+public:
+	virtual ~CServerThread();
+
+	// Generated message map functions
+	//{{AFX_MSG(CServerThread)
+		afx_msg void OnKillServerThread();
+	//}}AFX_MSG
+
+	DECLARE_MESSAGE_MAP()
+};
+
+////////////////////////////////////////////////////////////////////////////
+/
+#endif
+
+// ServerThread.cpp : implementation file
+//
+
+#include "listensocket.h"
+#include "stdafx.h"
+#include "Control.h"
+#include "ServerThread.h"
+
+#ifdef _DEBUG
+#define new DEBUG_NEW
+#undef THIS_FILE
+static char THIS_FILE[] = __FILE__;
+#endif
+
+////////////////////////////////////////////////////////////////////////////
+/
+// CServerThread
+
+IMPLEMENT_DYNCREATE(CServerThread, CWinThread)
+
+CServerThread::CServerThread()
+{
+}
+
+
+CServerThread::CServerThread(int nPort) : m_nPort(nPort)
+{
+}
+
+
+CServerThread::~CServerThread()
+{
+}
+
+
+BOOL CServerThread::InitInstance()
+{
+	// Try to establish a server socket (listen socket)
+	m_pListenSocket=NULL;
+	try
+	{
+		m_pListenSocket = new CListenSocket;
+	}
+	catch (CMemoryException* e)
+	{
+		e->Delete();
+		return FALSE;
+	}
+
+	if( m_pListenSocket->Create(m_nPort) ) 
+	{
+		if ( m_pListenSocket->Listen(1) )
+			return TRUE;				
+	}
+	return FALSE;
+}
+
+
+int CServerThread::ExitInstance()
+{
+	if(m_pListenSocket) delete m_pListenSocket;
+	return CWinThread::ExitInstance();
+}
+
+
+BEGIN_MESSAGE_MAP(CServerThread, CWinThread)
+	//{{AFX_MSG_MAP(CServerThread)
+		ON_COMMAND(ID_KILL_SERVER_THREAD,OnKillServerThread)
+	//}}AFX_MSG_MAP
+END_MESSAGE_MAP()
+
+////////////////////////////////////////////////////////////////////////////
+/
+// CServerThread message handlers
+
+afx_msg void CServerThread::OnKillServerThread()
+{
+	AfxEndThread(1);
+}
+
+// end of file ServerThread.cpp
+
+As you probably can see, I've implemented the message as a WM_COMMAND
+message; I perform the following to try to end the thread:
+::PostThreadMessage(m_pSvrThreadID,WM_COMMAND,ID_KILL_SERVER_THREAD;NULL);
+and then a ::WaitForSingleObject on the thread to allow time for it to
+terminate.
+
+
+Thanks for your time,
+
+Mike Thomas Jakobsen
+Siemens@inet.uni-c.dk
+Siemens A/S
+Borupvang 3
+DK-2750 Ballerup
++45 4477 4477
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Richard Braley -- <A HREF="mailto:braley@sky.net">braley@sky.net</A>
+Thursday, December 19, 1996
+</B>
+[Mini-digest: 4 responses]
+
+Use the PostThreadMessage method of CWinThread to post a message to your =
+thread and the ON_THREAD_MESSAGE macro to map the call to the =
+appropriate message handler within your thread.
+I have used this and it works fine.
+Rick
+
+----------
+From: 	Siemens, TA[SMTP:siemens@inet.uni-c.dk]
+Sent: 	Wednesday, December 18, 1996 10:13 AM
+To: 	mfc-l
+Subject: 	Communication between threads... Intercepting thread messages
+
+Environment: VC++ 4.0, Windows95
+
+Problem statement:
+I want to post a message to a thread of my own derived CWinThread class =
+in
+order to tell it to self-terminate.
+Although the thread is a CWinThread-derived one, it does not own a =
+window,
+and thus I use ::PostThreadMessage() to communicate with it. I use
+CWinThread because it is able to process messages which is needed for =
+the
+CSocket objects, that it owns. I could, of course, create a class =
+derived
+from CCommandTarget but that is not the issue here.
+
+I post a WM_COMMAND type message along with an ID but it won't work! The
+message arrives perfectly at the thread's PreTranslateMessage() ( it is =
+not
+included in the sample below, but I have testet for it), but never =
+reaches
+the handler for which it is destined. The only way that
+I see a solution to this problem is to use the PreTranslateMessage()
+function, but I feel that this is an incorrect behaviour in MFC. Is =
+there
+an alternative to it?=20
+
+My code looks like this:
+
+// ServerThread.h : header file
+//
+#ifndef __SERVERTHREAD_H__
+#define __SERVERTHREAD_H__
+
+#include "listensocket.h"
+
+#define ID_KILL_SERVER_THREAD 100 // Command ID
+/////////////////////////////////////////////////////////////////////////=
+///
+/
+// CSvrThread thread
+
+class CServerThread : public CWinThread
+{
+	DECLARE_DYNCREATE(CServerThread)
+protected:
+	CServerThread();           // protected constructor used by dynamic
+creation
+=09
+=09
+
+// Attributes
+public:
+	CListenSocket* m_pListenSocket;
+	int	m_nPort;
+
+// Operations
+public:
+
+// Overrides
+	// ClassWizard generated virtual function overrides
+	//{{AFX_VIRTUAL(CServerThread)
+	public:
+	virtual BOOL InitInstance();
+	virtual int ExitInstance();
+//}}AFX_VIRTUAL
+
+// Implementation
+public:
+	CServerThread(int nPort);
+
+public:
+	virtual ~CServerThread();
+
+	// Generated message map functions
+	//{{AFX_MSG(CServerThread)
+		afx_msg void OnKillServerThread();
+	//}}AFX_MSG
+
+	DECLARE_MESSAGE_MAP()
+};
+
+/////////////////////////////////////////////////////////////////////////=
+///
+/
+#endif
+
+// ServerThread.cpp : implementation file
+//
+
+#include "listensocket.h"
+#include "stdafx.h"
+#include "Control.h"
+#include "ServerThread.h"
+
+#ifdef _DEBUG
+#define new DEBUG_NEW
+#undef THIS_FILE
+static char THIS_FILE[] =3D __FILE__;
+#endif
+
+/////////////////////////////////////////////////////////////////////////=
+///
+/
+// CServerThread
+
+IMPLEMENT_DYNCREATE(CServerThread, CWinThread)
+
+CServerThread::CServerThread()
+{
+}
+
+
+CServerThread::CServerThread(int nPort) : m_nPort(nPort)
+{
+}
+
+
+CServerThread::~CServerThread()
+{
+}
+
+
+BOOL CServerThread::InitInstance()
+{
+	// Try to establish a server socket (listen socket)
+	m_pListenSocket=3DNULL;
+	try
+	{
+		m_pListenSocket =3D new CListenSocket;
+	}
+	catch (CMemoryException* e)
+	{
+		e->Delete();
+		return FALSE;
+	}
+
+	if( m_pListenSocket->Create(m_nPort) )=20
+	{
+		if ( m_pListenSocket->Listen(1) )
+			return TRUE;			=09
+	}
+	return FALSE;
+}
+
+
+int CServerThread::ExitInstance()
+{
+	if(m_pListenSocket) delete m_pListenSocket;
+	return CWinThread::ExitInstance();
+}
+
+
+BEGIN_MESSAGE_MAP(CServerThread, CWinThread)
+	//{{AFX_MSG_MAP(CServerThread)
+		ON_COMMAND(ID_KILL_SERVER_THREAD,OnKillServerThread)
+	//}}AFX_MSG_MAP
+END_MESSAGE_MAP()
+
+/////////////////////////////////////////////////////////////////////////=
+///
+/
+// CServerThread message handlers
+
+afx_msg void CServerThread::OnKillServerThread()
+{
+	AfxEndThread(1);
+}
+
+// end of file ServerThread.cpp
+
+As you probably can see, I've implemented the message as a WM_COMMAND
+message; I perform the following to try to end the thread:
+::PostThreadMessage(m_pSvrThreadID,WM_COMMAND,ID_KILL_SERVER_THREAD;NULL)=
+;
+and then a ::WaitForSingleObject on the thread to allow time for it to
+terminate.
+
+
+Thanks for your time,
+
+Mike Thomas Jakobsen
+Siemens@inet.uni-c.dk
+Siemens A/S
+Borupvang 3
+DK-2750 Ballerup
++45 4477 4477
+-----From: Tim Robinson <timtroyr@ionet.net>
+
+At 17:13 12/18/96 +0100, you wrote:
+>Environment: VC++ 4.0, Windows95
+>
+>Problem statement:
+>I want to post a message to a thread of my own derived CWinThread class in
+>order to tell it to self-terminate.
+>Although the thread is a CWinThread-derived one, it does not own a window,
+>and thus I use ::PostThreadMessage() to communicate with it. I use
+>CWinThread because it is able to process messages which is needed for the
+>CSocket objects, that it owns. I could, of course, create a class derived
+>from CCommandTarget but that is not the issue here.
+
+Mike,
+
+This is my first time around on dealing with threads like yours, but I
+needed the same thing, so I'll pass on what I've got.  However, I'm
+suspecting it won't work for 4.0.  An associate tried the following with 4.1
+and it didn't work.  He had to upgrade to 4.2.
+
+Anyway, use PostThreadMessage with a unique message (as you assume) and the
+message handler is like the following:
+
+  ON_THREAD_MESSAGE( WM_DIE, OnDie )
+
+And the code is:
+
+void CMyThread::OnDie( WPARAM, LPARAM )
+  {
+  PostQuitMessage(0);
+  }
+
+At least, that part worked for me.  You might need more.  Pretty simple once
+I figured it out.
+
+| Tim Robinson, Esquire          | Liberty  means responsibility. |
+| timtroyr@ionet.net             | That is why most men dread it. |
+| <A HREF="http://www.ionet.net/~timtroyr">http://www.ionet.net/~timtroyr</A> |            George Bernard Shaw |
+
+-----From: "Dana M. Epp" <eppdm@uniserve.com>
+
+I had a similar occassion to wonder about this myself. And like yourself, I
+noticed it did enter PreTranslateMessage. I found out however that VC++ 4.0
+and 4.1's message cracking doesn't deal with THREADED messages the same way
+you would expect from other messages.. however your idealisms would work
+fine. It seems that in 4.2 however, Microsoft added the ability to crack the
+message with ON_THREAD_MESSAGE, which doesn't really help you with your 4.0
+situation. However the PreTranslateMessage in this case is acceptable.
+Taking from Mike B.'s authorship .. I derived my own 4.x thread solutions as
+follows:
+
+BOOL CDerivedThread::PreTranslateMessage(MSG* pMsg) 
+{
+	if( pMsg->hwnd == NULL ){
+		if( pMsg->message == YOURMESSAGE ) 
+                     OnYourMessage( pMsg->wParam, pMsg->lParam );
+		return TRUE;
+	}
+	return CWinThread::PreTranslateMessage(pMsg);
+}
+
+Works fine, and until you move to 4.2, seems to be the best course for
+dealing with threaded messages.
+
+At 05:13 PM 12/18/96 +0100, you wrote:
+>Environment: VC++ 4.0, Windows95
+>
+>Problem statement:
+>I want to post a message to a thread of my own derived CWinThread class in
+>order to tell it to self-terminate.
+>Although the thread is a CWinThread-derived one, it does not own a window,
+>and thus I use ::PostThreadMessage() to communicate with it. I use
+>CWinThread because it is able to process messages which is needed for the
+>CSocket objects, that it owns. I could, of course, create a class derived
+>from CCommandTarget but that is not the issue here.
+>
+>I post a WM_COMMAND type message along with an ID but it won't work! The
+>message arrives perfectly at the thread's PreTranslateMessage() ( it is not
+>included in the sample below, but I have testet for it), but never reaches
+>the handler for which it is destined. The only way that
+>I see a solution to this problem is to use the PreTranslateMessage()
+>function, but I feel that this is an incorrect behaviour in MFC. Is there
+>an alternative to it? 
+>
+PC'ing you,                     
+Dana M. Epp          
+eppdm@uniserve.com
+<A HREF="http://bedrock.cyberhq.com/dana">http://bedrock.cyberhq.com/dana</A>
+
+     "How can one work with the technology of today, using yesterdays
+      software and methods, and still be on the leading edge tomorrow?
+      Why settle for less... I won't! "
+
+-----From: Chris.Byrneham@ubs.com
+
+     Its a known problem with 4.0
+     
+     Go to www.microsoft.com/kb
+     
+     Search for Q142415
+     
+     Chris
+     
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Noel Burton-Krahn -- <A HREF="mailto:noel@harleystreet.com">noel@harleystreet.com</A>
+Friday, December 20, 1996
+</B>
+[Mini-digest: 3 responses]
+
+I have found that the PostThreadMessage() call in Win32 is almost 
+completely useless.  If the thread expecting to receive a message ever 
+creates a window, in all likelihood, the thread messages will be dequeued 
+by the window and discarded before the thread's main message pump.  The 
+problem lies in DispatchMessage() which simply discards messages with  a 
+NULL hWnd.
+
+In your application, you say that you do not create a window, so you think 
+you would  be safe from this problem.  However, I believe that the windows 
+socket implementation creates a hidden window for its own message passing. 
+ I bet that is where your thread messages are going.
+
+After many hours of frustration I have eschewed PostThreadMessage() from my 
+vocabulary.  If I need  to pass messages to a thread, I create a hidden 
+window.
+
+---Noel
+
+----------
+From:  Siemens, TA[SMTP:siemens@inet.uni-c.dk]
+Sent:  Wednesday, December 18, 1996 8:14 AM
+To:  mfc-l
+Subject:  Communication between threads... Intercepting thread messages
+
+Environment: VC++ 4.0, Windows95
+
+Problem statement:
+I want to post a message to a thread of my own derived CWinThread class in
+order to tell it to self-terminate.
+Although the thread is a CWinThread-derived one, it does not own a window,
+and thus I use ::PostThreadMessage() to communicate with it. I use
+CWinThread because it is able to process messages which is needed for the
+CSocket objects, that it owns. I could, of course, create a class derived
+from CCommandTarget but that is not the issue here.
+
+I post a WM_COMMAND type message along with an ID but it won't work! The
+message arrives perfectly at the thread's PreTranslateMessage() ( it is not
+included in the sample below, but I have testet for it), but never reaches
+the handler for which it is destined. The only way that
+I see a solution to this problem is to use the PreTranslateMessage()
+function, but I feel that this is an incorrect behaviour in MFC. Is there
+an alternative to it?
+
+My code looks like this:
+
+// ServerThread.h : header file
+//
+#ifndef __SERVERTHREAD_H__
+#define __SERVERTHREAD_H__
+
+#include "listensocket.h"
+
+#define ID_KILL_SERVER_THREAD 100 // Command ID
+////////////////////////////////////////////////////////////////////////  
+////
+/
+// CSvrThread thread
+
+class CServerThread : public CWinThread
+{
+	DECLARE_DYNCREATE(CServerThread)
+protected:
+	CServerThread();           // protected constructor used by dynamic
+creation
+	
+	
+
+// Attributes
+public:
+	CListenSocket* m_pListenSocket;
+	int	m_nPort;
+
+// Operations
+public:
+
+// Overrides
+	// ClassWizard generated virtual function overrides
+	//{{AFX_VIRTUAL(CServerThread)
+	public:
+	virtual BOOL InitInstance();
+	virtual int ExitInstance();
+//}}AFX_VIRTUAL
+
+// Implementation
+public:
+	CServerThread(int nPort);
+
+public:
+	virtual ~CServerThread();
+
+	// Generated message map functions
+	//{{AFX_MSG(CServerThread)
+		afx_msg void OnKillServerThread();
+	//}}AFX_MSG
+
+	DECLARE_MESSAGE_MAP()
+};
+
+////////////////////////////////////////////////////////////////////////  
+////
+/
+#endif
+
+// ServerThread.cpp : implementation file
+//
+
+#include "listensocket.h"
+#include "stdafx.h"
+#include "Control.h"
+#include "ServerThread.h"
+
+#ifdef _DEBUG
+#define new DEBUG_NEW
+#undef THIS_FILE
+static char THIS_FILE[] = __FILE__;
+#endif
+
+////////////////////////////////////////////////////////////////////////  
+////
+/
+// CServerThread
+
+IMPLEMENT_DYNCREATE(CServerThread, CWinThread)
+
+CServerThread::CServerThread()
+{
+}
+
+
+CServerThread::CServerThread(int nPort) : m_nPort(nPort)
+{
+}
+
+
+CServerThread::~CServerThread()
+{
+}
+
+
+BOOL CServerThread::InitInstance()
+{
+	// Try to establish a server socket (listen socket)
+	m_pListenSocket=NULL;
+	try
+	{
+		m_pListenSocket = new CListenSocket;
+	}
+	catch (CMemoryException* e)
+	{
+		e->Delete();
+		return FALSE;
+	}
+
+	if( m_pListenSocket->Create(m_nPort) )
+	{
+		if ( m_pListenSocket->Listen(1) )
+			return TRUE;				
+	}
+	return FALSE;
+}
+
+
+int CServerThread::ExitInstance()
+{
+	if(m_pListenSocket) delete m_pListenSocket;
+	return CWinThread::ExitInstance();
+}
+
+
+BEGIN_MESSAGE_MAP(CServerThread, CWinThread)
+	//{{AFX_MSG_MAP(CServerThread)
+		ON_COMMAND(ID_KILL_SERVER_THREAD,OnKillServerThread)
+	//}}AFX_MSG_MAP
+END_MESSAGE_MAP()
+
+////////////////////////////////////////////////////////////////////////  
+////
+/
+// CServerThread message handlers
+
+afx_msg void CServerThread::OnKillServerThread()
+{
+	AfxEndThread(1);
+}
+
+// end of file ServerThread.cpp
+
+As you probably can see, I've implemented the message as a WM_COMMAND
+message; I perform the following to try to end the thread:
+::PostThreadMessage(m_pSvrThreadID,WM_COMMAND,ID_KILL_SERVER_THREAD;NULL);
+and then a ::WaitForSingleObject on the thread to allow time for it to
+terminate.
+
+
+Thanks for your time,
+
+Mike Thomas Jakobsen
+Siemens@inet.uni-c.dk
+Siemens A/S
+Borupvang 3
+DK-2750 Ballerup
++45 4477 4477
+
+
+
+
+-----From: "Kenneth A. Argo" <argo@rias.COM>
+
+There is a tech note on thread messages.  Basically thread messages will =
+not be able to use the default message routing available to MFC.   There =
+is a procedure on making it work in the tech note.  If I remember =
+correctly it has to do with an overload of OnPretranslateMessage() and =
+looking at the HWND parameter of the MSG structure which will be NULL =
+for a thread message (the cause of the problem ).
+
+Ken
+
+
+
+----------
+From:  Siemens, TA[SMTP:siemens@inet.uni-c.dk]
+Sent:  Wednesday, December 18, 1996 11:14 AM
+To:  mfc-l
+Subject:  Communication between threads... Intercepting thread messages
+
+Environment: VC++ 4.0, Windows95
+
+Problem statement:
+I want to post a message to a thread of my own derived CWinThread class =
+in
+order to tell it to self-terminate.
+Although the thread is a CWinThread-derived one, it does not own a =
+window,
+and thus I use ::PostThreadMessage() to communicate with it. I use
+CWinThread because it is able to process messages which is needed for =
+the
+CSocket objects, that it owns. I could, of course, create a class =
+derived
+from CCommandTarget but that is not the issue here.
+
+I post a WM_COMMAND type message along with an ID but it won't work! The
+message arrives perfectly at the thread's PreTranslateMessage() ( it is =
+not
+included in the sample below, but I have testet for it), but never =
+reaches
+the handler for which it is destined. The only way that
+I see a solution to this problem is to use the PreTranslateMessage()
+function, but I feel that this is an incorrect behaviour in MFC. Is =
+there
+an alternative to it?=20
+
+My code looks like this:
+
+// ServerThread.h : header file
+//
+#ifndef __SERVERTHREAD_H__
+#define __SERVERTHREAD_H__
+
+#include "listensocket.h"
+
+#define ID_KILL_SERVER_THREAD 100 // Command ID
+/////////////////////////////////////////////////////////////////////////=
+///
+/
+// CSvrThread thread
+
+class CServerThread : public CWinThread
+{
+	DECLARE_DYNCREATE(CServerThread)
+protected:
+	CServerThread();           // protected constructor used by dynamic
+creation
+=09
+=09
+
+// Attributes
+public:
+	CListenSocket* m_pListenSocket;
+	int	m_nPort;
+
+// Operations
+public:
+
+// Overrides
+	// ClassWizard generated virtual function overrides
+	//{{AFX_VIRTUAL(CServerThread)
+	public:
+	virtual BOOL InitInstance();
+	virtual int ExitInstance();
+//}}AFX_VIRTUAL
+
+// Implementation
+public:
+	CServerThread(int nPort);
+
+public:
+	virtual ~CServerThread();
+
+	// Generated message map functions
+	//{{AFX_MSG(CServerThread)
+		afx_msg void OnKillServerThread();
+	//}}AFX_MSG
+
+	DECLARE_MESSAGE_MAP()
+};
+
+/////////////////////////////////////////////////////////////////////////=
+///
+/
+#endif
+
+// ServerThread.cpp : implementation file
+//
+
+#include "listensocket.h"
+#include "stdafx.h"
+#include "Control.h"
+#include "ServerThread.h"
+
+#ifdef _DEBUG
+#define new DEBUG_NEW
+#undef THIS_FILE
+static char THIS_FILE[] =3D __FILE__;
+#endif
+
+/////////////////////////////////////////////////////////////////////////=
+///
+/
+// CServerThread
+
+IMPLEMENT_DYNCREATE(CServerThread, CWinThread)
+
+CServerThread::CServerThread()
+{
+}
+
+
+CServerThread::CServerThread(int nPort) : m_nPort(nPort)
+{
+}
+
+
+CServerThread::~CServerThread()
+{
+}
+
+
+BOOL CServerThread::InitInstance()
+{
+	// Try to establish a server socket (listen socket)
+	m_pListenSocket=3DNULL;
+	try
+	{
+		m_pListenSocket =3D new CListenSocket;
+	}
+	catch (CMemoryException* e)
+	{
+		e->Delete();
+		return FALSE;
+	}
+
+	if( m_pListenSocket->Create(m_nPort) )=20
+	{
+		if ( m_pListenSocket->Listen(1) )
+			return TRUE;			=09
+	}
+	return FALSE;
+}
+
+
+int CServerThread::ExitInstance()
+{
+	if(m_pListenSocket) delete m_pListenSocket;
+	return CWinThread::ExitInstance();
+}
+
+
+BEGIN_MESSAGE_MAP(CServerThread, CWinThread)
+	//{{AFX_MSG_MAP(CServerThread)
+		ON_COMMAND(ID_KILL_SERVER_THREAD,OnKillServerThread)
+	//}}AFX_MSG_MAP
+END_MESSAGE_MAP()
+
+/////////////////////////////////////////////////////////////////////////=
+///
+/
+// CServerThread message handlers
+
+afx_msg void CServerThread::OnKillServerThread()
+{
+	AfxEndThread(1);
+}
+
+// end of file ServerThread.cpp
+
+As you probably can see, I've implemented the message as a WM_COMMAND
+message; I perform the following to try to end the thread:
+::PostThreadMessage(m_pSvrThreadID,WM_COMMAND,ID_KILL_SERVER_THREAD;NULL)=
+;
+and then a ::WaitForSingleObject on the thread to allow time for it to
+terminate.
+
+
+Thanks for your time,
+
+Mike Thomas Jakobsen
+Siemens@inet.uni-c.dk
+Siemens A/S
+Borupvang 3
+DK-2750 Ballerup
++45 4477 4477
+
+-----From: Mike Blaszczak <mikeblas@nwlink.com>
+
+At 20:22 12/19/96 -0600, Richard Braley wrote:
+
+>Use the PostThreadMessage method of CWinThread to post a message to your 
+>thread and the ON_THREAD_MESSAGE macro to map the call to the 
+>appropriate message handler within your thread.
+
+The original poster said that he was using VC++ 4.0, and therefore
+MFC 4.0. MFC 4.0 doesn't have these features. They appeared in MFC 4.2.
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+I'm afraid I've become some sort of speed freak.
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

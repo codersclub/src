@@ -1,0 +1,375 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+How to call the correct OnDraw() function?
+</B></FONT>
+<BR>
+<PRE>
+<B>
+junping li -- <A HREF="mailto:junping@infolytica.qc.ca">junping@infolytica.qc.ca</A>
+Friday, August 09, 1996
+</B>
+Environment: VC++4.1/Win95
+
+Hi,
+I have an application which has several types of views derived
+from CView. After I
+used the following code to find the current active view from 
+the main frame,
+     CMDIChildWnd* pWnd = MDIGetActive();
+     CView* theView = pWnd->GetActiveView();
+I want to call theView's OnDraw() function. If CView's OnDraw()
+is a public method, I would get the correct derived view class'
+OnDraw() function called since OnDraw() is a virtual function.
+However, CView's OnDraw() is a protected method which prevents
+me calling it from the main frame. The reason I want to call
+the OnDraw() is that I want to pass a memory DC which has 
+a CBitmap selected in it so that the GDI calls performed in the
+view's OnDraw() are actually drawn to the CBitmap. I don't want
+to use the isKindOf() testing to find the correct view class
+since I assume the views are not known beforehand.
+
+Does anybody know the way to get around the problem? 
+
+I greatly appreciate the answers.
+ 
+Thank you in advance!
+
+Have a nice day!
+
+Junping   
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:MICHAEL@datatree.com">MICHAEL@datatree.com</A>
+Monday, August 12, 1996
+</B>
+[Mini-digest: 6 responses]
+
+Create a user-defined message in your CView class that
+calls OnDraw().  (See ON_MESSAGE.)
+
+Then call the user-defined message from your main frame.
+
+>Environment: VC++4.1/Win95
+>
+> CView's OnDraw() is a protected function, which prevents
+>me calling it from the main frame.
+
+Michael Thal        michael@datatree.com                              
+Data Tree Corp.     http://www.datatree.com
+
+
+-----From: Mario Contestabile
+
+>     CMDIChildWnd* pWnd = MDIGetActive();
+>     CView* theView = pWnd->GetActiveView();
+>I want to call theView's OnDraw() function. If CView's OnDraw()
+>is a public method, I would get the correct derived view class'
+>OnDraw() function called since OnDraw() is a virtual function.
+
+Perhaps pWnd->Invalidate() is what you are looking for.
+mcontest@universal.com
+
+-----From: ppbillc@srv2.sj.ablecom.net
+
+
+> However, CView's OnDraw() is a protected method which prevents
+> me calling it from the main frame. The reason I want to call
+> the OnDraw() is that I want to pass a memory DC which has 
+> a CBitmap selected in it so that the GDI calls performed in the
+> view's OnDraw() are actually drawn to the CBitmap. I don't want
+> to use the isKindOf() testing to find the correct view class
+> since I assume the views are not known beforehand.
+> 
+> Does anybody know the way to get around the problem? 
+> 
+> Junping   
+> 
+JunPing
+
+ Derive a class and create a public function that calls OnDraw
+
+class CMyView  :  public  CView
+{
+ public:
+    Draw() { 
+                     Create your Bitmap and DC
+                     OnDraw(NEWDC);
+                 }
+};
+
+Bill
+
+ 
+-----From: "petter.hesselberg" <petter.hesselberg@ac.com>
+
+Create a common abstract baseclass for all your views, e.g.,
+CMyViewBase, in turn derived from CView or a derivative.
+In CMyViewBase, declare a virtual public function
+(e.g., OnPublicDraw), which in turn calls the protected
+OnDraw function.
+
+This does strike me as architecturally convoluted--have you
+considered other solutions?
+
+Regards,
+Petter
+-----From: "Lee, Benny" <blee@filenet.com>
+
+
+Junping,
+
+You can send the CView a WM_PAINT message.
+
+Benny
+-----From: glachape@spherenet.com
+
+You are not supposed to call the OnDraw function from outside the object
+first because it is protected and second because I do not think this is in
+the MFC objects philosophy. I would push the use of
+CDocument::UpdateAllViews function. In this function, you can pass different
+parameters and specially a CObject* hint pointer. This pointer could be your
+CDC pointer. Inside your CView derived object, the OnUpdate function will be
+called and could handle this properly. 
+
+Hope this could help...
+
+Ghis
+ 
+////////////////////////////////////////////////////
+Ghislain Lachapelle         (glachape@spherenet.com)
+          .                            .                      .
+  .                  .             -)------+====+       .
+                           -)----====    ,'   ,'   .                 .
+              .                  `.  `.,;___,'                .
+                                   `, |____l_\
+                    _,.....------c==]""______ |,,,,,,.....____ _
+    .      .       "-:______________  |____l_|]'''''''''''       .     .
+                                  ,'"",'.   `.
+         .                 -)-----====   `.   `.              LS
+                     .            -)-------+====+       .            .
+             .                               .
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Yury Kosov -- <A HREF="mailto:Yury@msn.com">Yury@msn.com</A>
+Tuesday, August 13, 1996
+</B>
+[Mini-digest: 5 responses]
+
+	I don't think this is possible, but here is my solution for the same problem:
+How draw into private DC.
+
+	This is not a standard situation, but sometimes it is needed for the CView to 
+draw into own DC, not the one provided by MFC. This would be easy if  
+CView::OnDraw would be a public virtual method, but it is not. One of the 
+workaround for this problem is to use the CView::OnUpdate() method.
+
+1. Create the private DC member for the CMyView() to draw into.
+ class CMyView : public CView 
+ {
+	...
+	CDC *m_DrawDC;
+ };
+2. Override OnDraw method to perform the drawing:
+	void CMyView::OnDraw(CDC *pDC)
+	{
+		if(m_DrawDC) {
+			// perform the required drawing
+		} else {
+			// draw into default pDC
+		}
+	}
+3. Now the trick is to set up the right destination DC for the View without 
+worrying about the kind of the view, so that application can support different 
+kinds of the view. The best way is to use CView::OnUpdate():
+	void	CMyView::OnUpdate(CView *sender, LPARAM lHint, CObject *pHint)
+	{
+		switch (lHint) {
+			case UPDATE_DC:
+				m_DrawDC = (CDC)pHint;
+				break;
+			..........
+			default:
+				ASSERT(FALSE);
+		}
+	}
+4. Now the high level code should not care about the kind of the view it's 
+dealing with and actually should not care to call OnDraw() method of the 
+view.:
+	CDC *OutputDC = new CDC();
+	OutputDC->CreateCompatibleDC(0);
+	OutputDC->SelectObject(myBitmap);
+	// Do anything else to setup the destination DC
+	// Update a particular View, for example Active MDI View:
+	CMDIChildWnd *pWnd = MDIGetActive();
+	ASSERT(pWnd);
+	CView *pView = pWnd->GetACtiveView();
+	ASSERT(pView);
+	pView->OnUpdate(0,UPDATE_DC,(CObject *)OutputDC);
+	// Or update All Views if necessary:
+	CDocument *pDocument = GetMyDocument(); // depends where you are
+	ASSERT(pDocument);
+	pDocument->UpdateAllViews(0,UPDATE_DC,(CObject *)OutputDC);
+NOTE:  I haven't discuss here anything about memory management and ownership 
+of the DrawDC. That depends upon  the application logic.
+
+	Yury Kosov,
+	CoreTek, Inc.
+	yury@msn.com
+
+
+-----From: PP mail system <LAWSONW@sydney.ccur.com>
+
+Hi Junping!
+I guess I really don't understand.  Per broadcast eMail from
+mfc-l/glachape@spherenet.com, the usual procedure is, within
+
+        CMyView::OnUpdate(...)
+
+to set up drawing with
+
+    CClientDC dc(this);
+    OnPrepareDC(&dc);
+
+It's no different in VIEWCORE.CPP (see line 186 for 4.1):
+
+    // CView drawing support
+
+    void CView::OnPaint()
+    {
+        //  standard paint routine
+        CPaintDC dc(this);
+        OnPrepareDC(&dc);
+        OnDraw(&dc);
+    }
+
+so, the way I see it, you can
+
+    (i)  supply your own DC instead of "this" in OnUpdate(), which seems
+         a fairly likely route;
+
+or (ii)  do whatever you want to "dc" during OnPrepareDC(): attack the
+         supplied m_hDC and m_hAttribDC  --  whatever.
+
+Having forced the sequence with an Invalidate(), I can't see why you
+can't get OnDraw() to use the DC that you want.  What am I missing?
+
+Yours in puzzlement,
+Jim LW
+
+-----From: Deepak Saxena <Deepak_Saxena@ccm.ch.intel.com>
+
+What you want to do can most easilly be accomplished by a user defined message 
+that is sent to the view and with the WPARAM as the pointer to the DC.  Then 
+just add a message handler to the views that you want to support this operation.
+
+Basically:
+
+#define WM_MYDRAW (WM_USER + 1)
+
+     CMDIChildWnd* pWnd = MDIGetActive();
+     CView* theView = pWnd->GetActiveView();
+     theView->SendMessage( WM_MYDRAW, (WPARAM)pMemoryDc);
+
+the handler:
+
+CMyView::OnMyDraw(WPARAM wParam, LPARAM lParam)
+{
+        CDC *pDC = (CDC*)wParam;
+
+        // Do stuff to DC to prepare it
+
+        OnDraw(pDC);
+}
+
+Now, one thing you can do is to make a base view class(we'll call it CMyView) 
+and have it handle this.  Then you can just derive all your classes from here.  
+however, since you might have different view classes(ScrollViews, FormViews, 
+CtrlViews, etc...) I advise to just take this function and put it directly into 
+the MFC source for the CView class.  That way you'll always have this feature 
+available for use.
+
+Deepak
+
+-----From: Clarence Chiang <clarence@spiderisland.com>
+
+> Hi Li!
+>  adding
+> CRect rect;
+>     pWnd->GetClientRect(&rect);
+>     pWnd->Invalidate(&rect);
+>     pWnd->ShowWindow(SW_SHOW);
+
+> Regards,
+> Jim LW
+
+I guess the problem with the original question is that s/he wants to pass 
+OnDraw a different DC than the one automatically passes in by the 
+framework. 
+
+Clarence
+
+
+-----From: David.Lowndes@bj.co.uk
+
+> Try adding
+    CRect rect;
+    pWnd->GetClientRect(&rect);
+    pWnd->Invalidate(&rect);
+    pWnd->ShowWindow(SW_SHOW);
+<
+
+Woudn't this be better?
+
+	pWnd->Invalidate();
+	pWnd->UpdateWindow();
+
+Dave Lowndes
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

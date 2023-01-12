@@ -1,0 +1,166 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как изменить размер шрифта в Windows NT и
+    перезагрузить её.</h3>
+    <p>Автор: <a href="mailto:arnonm@avt-inc.com">Arnon Mathias</a>.</p>
+    <p>Компилятор: Visual C++ 6</p>
+    <p>Иногда необходимо, программным путём сделать
+    некоторые действия в операционной системе,
+    которые обычные пользователи делают чуть ли не
+    ежедневно.</p>
+    <p>Итак, прольём немного света на
+    недокументированные возможности.</p>
+    <p>Изменение больших шрифтов на маленькие и
+    обратно в Windows NT делается при помощи функции
+    SetupChangeFontSize в SysSetup.dll:</p>
+    <pre>DWORD WINAPI SetupChangeFontSize( HANDLE HWindow, 
+                                  LPCWSTR lpszFontSize)</pre>
+    <p>Возвращаемые значения следующие:</p>
+    <pre>ERROR_SUCCESS   ( Value == 0    )  Операция завершена успешно.
+ERROR_CANCELLED ( Value == 1223 )  Операция была прервана пользователем.
+</pre>
+    <hr>
+    <pre>#include &quot;windows.h&quot;
+///////////////////////////////////////////////////////////////
+/// Arnon Mathias 13-Mar-2002
+///////////////////////////////////////////////////////////////
+
+DWORD  _MyExitWindows(UINT ExitFlags)
+{
+/// Из документации MSDN по функции ExitWindowsEx
+  
+  HANDLE            hToken; 
+  TOKEN_PRIVILEGES  tkp;
+  DWORD             dwRetVal;
+ 
+/// Получаем маркер (token) для этого процесса. 
+  if (!OpenProcessToken(GetCurrentProcess(), 
+      TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &amp;hToken))
+  {
+     ::MessageBox (NULL,&quot;Open Process Token&quot;,&quot;Exit Windows&quot;,MB_OK);
+     return (GetLastError());
+  }
+
+/// Получаем LUID для привелегии выключения (shutdown).
+  LookupPrivilegeValue(NULL, SE_SHUTDOWN_NAME, 
+                       &amp;tkp.Privileges[0].Luid); 
+
+  tkp.PrivilegeCount = 1;  // устанавливаем привелегию &quot;один&quot;
+  tkp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED; 
+
+/// Получаем привелегию выключения (shutdown) для этого процесса.
+  	AdjustTokenPrivileges(hToken, FALSE, &amp;tkp, 0, 
+                          (PTOKEN_PRIVILEGES)NULL, 0);
+
+/// Не получилось проверить возвращённое значение AdjustTokenPrivileges.
+  if ( (dwRetVal = GetLastError()) != ERROR_SUCCESS) 
+  {
+     ::MessageBox (NULL,&quot;AdjustTokenPrivileges&quot;,&quot;Exit Windows&quot;,MB_OK); 
+     return dwRetVal;
+  }
+/// Выключаем или перезагружаем в соответствие с ExitFlags
+  ::MessageBox ( NULL,
+                 &quot;Restarting Windows&quot;,
+                 &quot;System settings has changed&quot;,
+                 MB_OK); 
+  if (!ExitWindowsEx(ExitFlags, 0)) 
+  {
+     ::MessageBox (NULL,
+                   &quot;Error While trying to exit&quot;,
+                   &quot;Exit Windows&quot;,
+                   MB_OK); 
+     return (GetLastError());
+  }
+
+  return ERROR_SUCCESS;
+}
+
+
+DWORD  MyRestartWindows()
+{
+  return _MyExitWindows(EWX_LOGOFF|EWX_REBOOT);
+}
+
+
+DWORD   _MyChangeFontSize(unsigned short* lpszFontSize)
+{ 
+  // строка размера шрифта должна быть в формате unicode
+  HMODULE hModule;
+  hModule = LoadLibrary(&quot;syssetup.dll&quot;);
+  if (hModule == NULL) 
+  {
+     return (GetLastError());
+  }
+
+  typedef DWORD  (WINAPI* MYPROC) (HANDLE,LPWSTR);
+    MYPROC ProcAdd; 
+
+    ProcAdd = (MYPROC) GetProcAddress(hModule,
+                                      &quot;SetupChangeFontSize&quot;); 
+    if (ProcAdd == NULL) 
+  {
+     return (GetLastError());
+  }
+
+//////////////////////////////////////////////////////////////////
+/// Изменение размера шрифта:
+/// SetupChangeFontSize имеет на входе два параметра:
+///     Дескриптор (Handle) вызывающего окна (я использую NULL)
+///     строка размера шрифта в формате unicode:
+///     L&quot;120&quot; для больших (Large) шрифтов
+///     L&quot;96&quot;  для маленьких (Small) шрифтов
+///  SetupChangeFontSize вернёт 0 если операция прошла успешно.
+  DWORD dwRetVal;
+  dwRetVal = (ProcAdd) (NULL,lpszFontSize); 
+  if (dwRetVal != ERROR_SUCCESS)
+  {
+     return dwRetVal;
+  }
+////////////////////////////////////////////////////////////////
+
+  if ( !(FreeLibrary(hModule)) )
+  {
+     return (GetLastError()); 
+  }
+  return ERROR_SUCCESS;
+}
+
+
+void   Change2LargeFonts()
+{
+  DWORD  dwRetVal = _MyChangeFontSize(L&quot;120&quot;);
+  if (dwRetVal == ERROR_SUCCESS)
+  {
+     MyRestartWindows();
+  }
+}
+
+
+void   Change2SmallFonts()
+{
+  DWORD	dwRetVal = _MyChangeFontSize(L&quot;96&quot;);
+  if (dwRetVal == ERROR_SUCCESS)
+  {
+     MyRestartWindows();
+  }
+}
+
+
+int main(int argc, char* argv[])
+{
+  //  Change2LargeFonts();
+  Change2SmallFonts();
+  return 0;
+}</pre>
+    <p><br>
+    <br>
+    <br>
+    </td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

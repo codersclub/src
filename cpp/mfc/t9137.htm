@@ -1,0 +1,249 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+WebBrowser Control
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Paul Verrier -- <A HREF="mailto:paul.verrier@bbsrc.ac.uk">paul.verrier@bbsrc.ac.uk</A>
+Tuesday, January 21, 1997
+</B>
+Environment: VC++4.2b, Win95
+
+When the IE3.0 WebBrowser Control is inserted into my project using the
+Developer Studio, as expected the wrapper class is created, in my case
+CWebBrowser.cpp / .h. I get some strange comments from Developer Studio placed
+in the wrapper code - Some functions are not emitted because of incompatible
+bits - see extract below
+
+	// method 'QueryInterface' not emitted because of invalid return type
+or parameter type
+	unsigned long AddRef();
+	unsigned long Release();
+	// method 'GetTypeInfoCount' not emitted because of invalid return type
+or parameter type
+	// method 'GetTypeInfo' not emitted because of invalid return type or
+parameter type
+	// method 'GetIDsOfNames' not emitted because of invalid return type or
+parameter type
+	// method 'Invoke' not emitted because of invalid return type or
+parameter type
+	void GoBack();
+	void GoForward();
+
+Now, I know that there has been comment that ActiveX and VC++4.2b has problems,
+but how can I get a call into QueryInterface() without the wrapper being
+completed. Is there a way of doing the job properly? Anyone know what should be
+there?
+
+Apart from these little problems, everything else seems to work in OK with my
+MFC based app.
+
+Any help gratefully received.
+
+Paul.verrier@bbsrc.ac.uk
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:ens@ORION.cb.att.com">ens@ORION.cb.att.com</A>
+Thursday, January 23, 1997
+</B>
+[Mini-digest: 2 responses]
+
+broswer.GetControlUnknown->QueryInterface(...)
+
+Ed Schiebel
+AT&T Network and Computing Services
+eschiebel@att.com
+
+>----------
+>From: 	Paul Verrier[SMTP:paul.verrier@bbsrc.ac.uk]
+>Sent: 	Tuesday, January 21, 1997 4:44 AM
+>To: 	mfc-l@netcom.com
+>Subject: 	WebBrowser Control
+>
+>Environment: VC++4.2b, Win95
+>
+>When the IE3.0 WebBrowser Control is inserted into my project using the
+>Developer Studio, as expected the wrapper class is created, in my case
+>CWebBrowser.cpp / .h. I get some strange comments from Developer Studio
+>placed
+>in the wrapper code - Some functions are not emitted because of incompatible
+>bits - see extract below
+>
+>	// method 'QueryInterface' not emitted because of invalid return type
+>or parameter type
+>	unsigned long AddRef();
+>	unsigned long Release();
+>	// method 'GetTypeInfoCount' not emitted because of invalid return type
+>or parameter type
+>	// method 'GetTypeInfo' not emitted because of invalid return type or
+>parameter type
+>	// method 'GetIDsOfNames' not emitted because of invalid return type or
+>parameter type
+>	// method 'Invoke' not emitted because of invalid return type or
+>parameter type
+>	void GoBack();
+>	void GoForward();
+>
+>Now, I know that there has been comment that ActiveX and VC++4.2b has
+>problems,
+>but how can I get a call into QueryInterface() without the wrapper being
+>completed. Is there a way of doing the job properly? Anyone know what should
+>be
+>there?
+>
+>Apart from these little problems, everything else seems to work in OK with my
+>MFC based app.
+>
+>Any help gratefully received.
+>
+>Paul.verrier@bbsrc.ac.uk
+>
+>
+-----From: "Mike Lechner" <Mike_Lechner@msn.com>
+
+
+
+----------
+From: 	owner-mfc-l@majordomo.netcom.com on behalf of Paul Verrier
+Sent: 	Tuesday, January 21, 1997 2:44 AM
+To: 	mfc-l@netcom.com
+Subject: 	WebBrowser Control
+[snip]
+>>>how can I get a call into QueryInterface() without the wrapper being
+completed. Is there a way of doing the job properly? Anyone know what should 
+be
+there?<<<
+
+Here's what I do...Note that fBrowser is a CWebBrowser.
+
+	LPDISPATCH disp = fBrowser.GetDocument ();
+	if (disp) {
+		LPOLECOMMANDTARGET target;
+		HRESULT result = 
+			disp->QueryInterface (IID_IOleCommandTarget, (void **) &target);
+		disp->Release ();
+		if (result == S_OK)
+			target->Exec...
+		else if (result == E_NOINTERFACE)
+			TRACE ("Interface not supported.\n");
+		target->Release ();	
+	}
+Mike
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Saturday, January 25, 1997
+</B>
+At 09:44 1/21/97 +0000, Paul Verrier wrote:
+>Environment: VC++4.2b, Win95
+
+>When the IE3.0 WebBrowser Control is inserted into my project using the
+>Developer Studio, as expected the wrapper class is created, in my case
+>CWebBrowser.cpp / .h. I get some strange comments from Developer Studio
+placed
+>in the wrapper code - Some functions are not emitted because of incompatible
+>bits - see extract below
+
+I can't reproduce the problem you describe.
+
+I have IE 3.01 installed, though, and not IE 3.00.
+
+The IDE is just ripping through the type library built into the object.  It
+emits code based on the parameter lists and data types found in the type
+library, which is intended to let the object describe itself to other
+programs at runtime--exactly what the IDE needs.
+
+It seems strange that functions named QueryInterface() and Invoke() and
+GetIDsOfNames() would be a part of the dispatch interface implemented
+by the control.  They're a part of the IDispatch implementation, not a
+part of the exposed methods.  It seems like you might have an outdated or
+corrupt copy of the control.
+
+The wrapper class given to you is intended to wrap the IDispatch interface
+of the control, not the IUnknown of the control.
+
+>Now, I know that there has been comment that ActiveX and VC++4.2b has
+problems,
+>but how can I get a call into QueryInterface() without the wrapper being
+>completed. Is there a way of doing the job properly? Anyone know what
+should be
+>there?
+
+If you want to diddle with the underlying OLE object directly, you need to do
+get a pointer to it by calling GetControlUnkown().  Then, do whatever you'd
+like
+against that IUnknown pointer:
+
+	CWebBrowser* pBrowser = (CWebBrowser*) GetDlgItem(IDC_EXPLORER1);
+	ASSERT(pBrowser != NULL);
+	LPUNKNOWN pUnk = pBrowser->GetControlUnknown();
+	LPFOO pFoo = NULL; // the IFoo interface
+	if (SUCCEEDED(m_pUnk->QueryInterface(IID_IFoo, (LPVOID*)&pFoo)))
+	{
+		pFoo->party();
+		pFoo->Release(); // maybe later
+	}
+
+
+
+
+
+
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>      <-- trip report central!
+95 Honda VFR-750F / 88 Yamaha FZ-700 (damaged) / 94 Mazda RX-7
+Serial #00050!    /      AMA - HRC - VFROC     / Wang Dang Wankel
+         I am bored of this talk. It is time now for the dancing!
+These words are my own - I do not speak on behalf of Microsoft.
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

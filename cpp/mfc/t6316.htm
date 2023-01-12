@@ -1,0 +1,176 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+COleDropTarget::Register crash band-aided by RICHED32.DLL
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Randy Taylor -- <A HREF="mailto:drt@ebt.com">drt@ebt.com</A>
+Friday, August 16, 1996
+</B>
+Environment: VC++ 4.2, NT 3.51 SP4, Win95
+
+Any help with a mysterious crash related to COleDropTarget would be greatly
+appreciated!
+
+(Note there is an interesting and very hackish "fix" to this problem: By
+creating a
+CRichEditCtrl and parenting it to my CListCtrl derivative, I can make this
+crash go
+away - but at the cost of unnecessarily loading RICHED32.DLL!)
+
+We have a CListCtrl derivative with a COleDropTarget datamember.
+In the MyListCtrl::OnCreate, I register my COleDropTarget like this:
+
+int MyListCtrl::OnCreate (LPCREATESTRUCT lpcs)
+{
+   if (CListCtrl::OnCreate(lpcs) == -1)
+	 return -1;
+
+#ifdef _DEBUG
+        // HACKISH WAY TO AVOID CRASH!
+	CRichEditCtrl richedit;
+	VERIFY(richedit.Create(ES_MULTILINE, CRect(0,0,0,0), this, 0xE998));
+#endif
+
+   // ENABLE OLE DRAG & DROP SUPPORT
+   m_dropTarget.Register(this); 
+   // snip-snip
+}
+
+
+The crash occurs inside COleDropTarget::Register on the call to
+RegisterDragDrop which
+looks like this in the MFC source:
+
+BOOL COleDropTarget::Register(CWnd* pWnd)
+{
+	ASSERT_VALID(this);
+	ASSERT(m_hWnd == NULL);     // registering drop target twice?
+	ASSERT_VALID(pWnd);
+
+	LPUNKNOWN lpUnknown = (LPUNKNOWN)GetInterface(&IID_IUnknown);
+	ASSERT(lpUnknown != NULL);
+
+	// the object must be locked externally to keep LRPC connections alive
+	if (CoLockObjectExternal(lpUnknown, TRUE, FALSE) != S_OK)
+		return FALSE;
+
+	// connect the HWND to the IDropTarget implementation
+	if (RegisterDragDrop(pWnd->m_hWnd,
+		(LPDROPTARGET)GetInterface(&IID_IDropTarget)) != S_OK)
+
+        // snip-snip
+}
+
+On Windows NT 4.0 Beta 2, the call to CoLockObjectExternal fails so the crash
+does not occur but drag and drop does not get enabled due to the return.
+The crash occurs on both NT 3.51 SP4 and Windows 95. I've verified that
+the call to GetInterface does return a valid LPDROPTARGET, and that the
+pWnd->m_hWnd is valid.
+
+Thanks for reading,
+
+Randy Taylor
+randy_taylor@ebt.com
+Electronic Book Technologies, Inc.
+
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Doug Persons -- <A HREF="mailto:persons@esca.com">persons@esca.com</A>
+Wednesday, August 28, 1996
+</B>
+I was able to reproduce this behavior by removing the call to AfxOleInit from my
+application class's InitInstance - I would guess that it is called in RICHED32
+and that you have forgotten to call it in you CWinApp subclass
+ 
+    // Initialize OLE libraries
+    if (!AfxOleInit())
+    {
+        AfxMessageBox(IDP_OLE_INIT_FAILED);
+        return FALSE;
+    }
+
+-- 
+Doug Persons                206-822-6800    persons@esca.com
+Cegelec ESCA Corporation    Bellevue, WA    http://www.esca.com
+
+
+ 
+Randy Taylor wrote:
+>
+> Environment: VC++ 4.2, NT 3.51 SP4, Win95
+>
+> Any help with a mysterious crash related to COleDropTarget would be greatly
+> appreciated!
+>
+> (Note there is an interesting and very hackish "fix" to this problem: By
+> creating a
+> CRichEditCtrl and parenting it to my CListCtrl derivative, I can make this
+> crash go
+> away - but at the cost of unnecessarily loading RICHED32.DLL!)
+>
+> We have a CListCtrl derivative with a COleDropTarget datamember.
+> In the MyListCtrl::OnCreate, I register my COleDropTarget like this:
+
+<snip>
+
+> On Windows NT 4.0 Beta 2, the call to CoLockObjectExternal fails so the crash
+> does not occur but drag and drop does not get enabled due to the return.
+> The crash occurs on both NT 3.51 SP4 and Windows 95. I've verified that
+> the call to GetInterface does return a valid LPDROPTARGET, and that the
+> pWnd->m_hWnd is valid.
+>
+> Thanks for reading,
+>
+> Randy Taylor
+> randy_taylor@ebt.com
+> Electronic Book Technologies, Inc.
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

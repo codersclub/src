@@ -1,0 +1,192 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CArchive, CSocket and ReadObject
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Chris Patterson -- <A HREF="mailto:cmp@ix.netcom.com">cmp@ix.netcom.com</A>
+Saturday, February 24, 1996
+</B>
+I am developing an application in 4.0 that connects two PC's over the 
+Internet using a CSocket/CSocketFile/CArchive combination in a manner 
+similar to the chat server example included with MFC.  While the example 
+demonstrates how to create a session for a single object type, I'm wanting 
+to send various CObject-derived types over the session.
+
+The problem I'm encountering is that the receiver doesn't know the object 
+type before the object arrives.  So I'm attempting to use a 
+CArchive::ReadObject() with a NULL CRuntimeClass pointer so that the object 
+type will be determined, an object created, the data read into the object 
+and the object returned for inspection via the IsKindOf() function.
+
+I can't seem to get it to work.  I'm always getting a NULL pointer returned 
+from the ReadObject(NULL) function, and because there is still data ready 
+in the archive buffer, it tends to loop for an eternity.
+
+I'm trying to avoid giving each class type a unique ID and sending it over 
+the connection as a WORD to tell the receiver what type of object to expect 
+and read from the network connection.  That just seems to break the benefit 
+of run-time class information.  However, if it's is found that this type of 
+communication isn't possible, I'll accept it.
+
+Any easy answers to the problem or anything saying that "it just doesn't 
+work that way" would be appreciated.  A solution would be superb.
+
+Chris Patterson
+Software Engineer, CIS Technologies, Inc.
+cmp@ix.netcom.com
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mukesh Prasad Development Contractor -- <A HREF="mailto:mukesh@everest.XAIT.Xerox.COM">mukesh@everest.XAIT.Xerox.COM</A>
+Monday, February 26, 1996
+</B>
+[Mini-digest: 3 responses]
+
+I would suggest, in increasing order of difficulty:
+
+1)  Check to make sure that the class of interest
+    is common to both sides of connection.
+
+2)  Make sure the IMPLEMENT_SERIAL macro has
+    been executed on both sides of connection
+    for the class of interest.
+
+3)  Confirm again that the order of writing is
+    matched exactly by the order of reading.
+    
+4)  Run the receiver in debug mode, and watch the trace.
+    (It is a bit surprising that you are not getting an
+    assertion failure, actually.)
+
+5)  In the receiver, set a breakpoint in
+    the file \msdev\mfc\src\arcobj.cpp at
+    CArchive::ReadObject.  If you step through, you
+    will find it reads the class name as text, and
+    then looks it up in its map (hash-table) of all
+    class names.   Obviously, the class must be
+    available in its map of classes, which means the
+    class must be available and the appropriate
+    RUNTIME macros etc should have been used/invoked.
+
+
+-----From: Gerry Sweeney <gerry@hornbill.com>
+
+
+Chris,
+
+I have done something similar using 16bit MFC so I didn't use CSocket ect. 
+The principle should be the same. I derived a class from CMemFile and added 
+a member function called 'GetBuffer' which returns me a pointer to the 
+memory that the memory file uses to store its data. I serialize my object(s) 
+into a CArchive which is associated with the CMemFile derived class. To send 
+this across the network I use the Winsock API and just send a small header 
+which has a message ID(tells me what it is in the client), and the length of 
+the data to follow. then I send the contents of the CMemFile's buffer. In 
+the client when I get notified that data is available I wait until there is 
+enough bytes to be a 'header'. When I have this I create a CMemFile and set 
+its length to the expected data length, get the pointer to the buffer and 
+receive the outstanding data form the network. I then create a CArchive and 
+serialize my object to recover the data.
+
+This does work but it still requires you to know what object you are 
+receiving. As far as I know there is no way to automate that. After all as a 
+minimum you need a pointer to your object so you should know what to expect. 
+This is where the initial message in the header becomes useful.
+
+I hope this helps
+
+Gerry Sweeney
+gerry@hornbill.com 
+-----From: Peter Olesen <peter.olesen@mailbox.swipnet.se>
+
+I think you _must_ have the runtime class to be able to serialize the object
+back. But you don't need to give each class a magic number, they allready
+have - the runtime class name.
+
+You could send the runtime class name first as a zero terminated string
+(allways ANSI even in a UNICODE app.) and then call a function to find the
+runtime class:
+
+CRuntimeClass * GetRuntimeClass(LPCSTR pszClassName)
+{
+	CRuntimeClass * pRTC = NULL;
+
+	// just walk through the simple list of registered classes
+	AFX_CORE_STATE * pCoreState = AfxGetCoreState();
+	for (CRuntimeClass * pRuntimeClass = pCoreState->m_pFirstClass;
+		pRuntimeClass != NULL;
+		pRuntimeClass = pRuntimeClass->m_pNextClass)
+	{
+		// class name must match
+		if ( strcmp(pRuntimeClass->m_lpszClassName, pszClassName) == 0 )
+		{
+			pRTC = pRuntimeClass;
+			break;
+		}
+	}
+
+        return pRTC;
+}
+
+This only work if you have the same version of the object on both sides.
+
+I do this in my own app. where I OLE drag and drop several different
+CObject-dervived classes. I also have the object size and version to check
+so I don't use different versions of application to drag between (excluded
+here).
+
+Hope this help
+//------------------------------------------------------------//
+// Peter Olesen                                               //
+// (peter.olesen@mailbox.swipnet.se)                          //
+//                                                            //
+// "Support the Blue Ribbon Campaign for free speech online." //
+//------------------------------------------------------------//
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

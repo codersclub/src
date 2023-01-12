@@ -1,0 +1,403 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Extention dll loading order question
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Ash Williams -- <A HREF="mailto:ash@digitalworkshop.co.uk">ash@digitalworkshop.co.uk</A>
+Monday, January 27, 1997
+</B>
+Environment: Win95, VC++ 4.2b
+
+Hi,
+
+I'm writing a microsoft extention dll called CommonComponent which 
+among other things, registers class names in a static Registry 
+instance, which is declared in my Registry class:
+
+class Registry
+{
+    public: static Registry theRegistry;
+    public: void registerClass( some parameters );
+    .
+    .
+    .
+};
+
+since I need only one of these ever.
+
+Secondly to do automatic registering, I've created a Registering object 
+which you create statically in classes of your choice, which ultimately 
+calls Registry::theRegistry.registerClass().
+
+The problem is that I can't guarrentee that Registry::theRegistry is 
+the first static to be created, which I must have for the static 
+Registering objects not to cause an access violation.
+
+For now I've made the following class definition:
+
+class Registry
+{
+    public: static Registry* pTheRegistry;
+    .
+    .
+    .
+};
+
+on the basis that the first Registering object that gets created turns 
+on the lights so to speak, ie news up pTheRegistry, by testing if it is 
+null.
+
+However this will create maintainance problems since any additional 
+types of static objects in the future which call any member functions 
+of Registry::pTheRegistry will have to remember to new it up.
+
+Finally to my question then: I noticed that static Registering objects 
+in a client dll of CommonComponent always get constructed after those 
+in CommonComponent, so I would like to use this property, since I can 
+guarrentee that CommonComponent is the client of no other dll.
+
+But am I right in inferring this property - I can't find it in any 
+documentation, and I won't assume it to be true in case one day another 
+maintainance programmer compiling the code in a different environment 
+will get puzzling access violations due to the CommonComponent dll not 
+being loaded first and its statics therefore left dangling when first 
+required.
+
+If anyone could confirm or deny the truth of this property or even 
+suggest an alternative method for forcing the order of static member 
+construction, I would be ecstatic.
+
+Cheers, Ash
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Ken Nicolson -- <A HREF="mailto:kenn@owl.co.uk">kenn@owl.co.uk</A>
+Tuesday, January 28, 1997
+</B>
+[Mini-digest: 3 responses]
+
+On Mon, 27 Jan 1997 08:12:05 +0000,  Ash Williams
+<ash@digitalworkshop.co.uk> wrote:
+
+>Environment: Win95, VC++ 4.2b
+>
+>Hi,
+>
+>I'm writing a microsoft extention dll called CommonComponent which=20
+>among other things, registers class names in a static Registry=20
+>instance, which is declared in my Registry class:
+>
+>class Registry
+>{
+>    public: static Registry theRegistry;
+>    public: void registerClass( some parameters );
+>    .
+>    .
+>    .
+>};
+>
+>since I need only one of these ever.
+>
+>Secondly to do automatic registering, I've created a Registering object=20
+>which you create statically in classes of your choice, which ultimately=20
+>calls Registry::theRegistry.registerClass().
+>
+>The problem is that I can't guarrentee that Registry::theRegistry is=20
+>the first static to be created, which I must have for the static=20
+>Registering objects not to cause an access violation.
+
+This is a perfect job for the Singleton design pattern, from the =
+essential
+book Design Patterns, by Erich Gamma et al, published by Addison-Wesley,
+ISBN 0-201-63361-2. Basically, add the following code to your class:
+
+class Registry
+{
+public:
+    static Registry * Instance()
+    {
+        if ( m_instance =3D=3D NULL )
+            m_instance =3D new Registry;
+        return m_instance;
+    }
+protected:
+    Registry(); // Stop anyone else creating it
+private:
+    static Registry * m_instance;
+
+    // ...
+};
+
+// in .cpp file
+Registry * Registry::m_instance =3D NULL;
+
+You use it like so:
+
+   Registry::Instance()->registerClass();
+
+Thus, you need never worry about order of creation of object, as one will
+appear as soon as you need it. If you use this technique with a number of
+classes, you can write a template class to implement this.
+
+Buy the Design Patterns book - it's one of the few books that should be =
+on
+every OO developer's bookshelf, full of useful techniques like this one.
+
+>Cheers, Ash
+
+Ken
+
+PS: Never rely on order of construction of objects - C++ doesn't =
+guarantee
+anything, and the next version of the soruce code, compiler or operating
+system will change it anyway!
+-----From: hou@tfn.com (Bing Hou)
+
+
+Ash,
+
+Alternatively, you can use a global free function(non-memeber function) or a 
+static function that each of Registry class users calls to obtain a pointer to 
+the object. The free functio can do something like this.
+        Registry* GetRegistryClass()
+        {
+                static Registry theRegistry;
+                return &theRegistry;
+        }
+
+First time the function is called, it creates an object, successive calls will 
+return a pointer to the object.
+
+Bing Hou
+hou@tfn.com
+=======================================================================
+  Be like a postage stamp - stick to one thing until you get there.
+                                            - Margaret Carty
+=======================================================================
+
+
+______________________________ Reply Separator _________________________________
+Subject: Extention dll loading order question
+Author:  Ash Williams <ash@digitalworkshop.co.uk> at Internet
+Date:    1/27/97 8:12 AM
+
+
+Environment: Win95, VC++ 4.2b
+     
+Hi,
+     
+I'm writing a microsoft extention dll called CommonComponent which 
+among other things, registers class names in a static Registry 
+instance, which is declared in my Registry class:
+     
+class Registry
+{
+    public: static Registry theRegistry;
+    public: void registerClass( some parameters ); 
+    .
+    .
+    .
+};
+     
+since I need only one of these ever.
+     
+Secondly to do automatic registering, I've created a Registering object 
+which you create statically in classes of your choice, which ultimately 
+calls Registry::theRegistry.registerClass().
+     
+The problem is that I can't guarrentee that Registry::theRegistry is 
+the first static to be created, which I must have for the static 
+Registering objects not to cause an access violation.
+     
+For now I've made the following class definition:
+     
+class Registry
+{
+    public: static Registry* pTheRegistry; 
+    .
+    .
+    .
+};
+     
+on the basis that the first Registering object that gets created turns 
+on the lights so to speak, ie news up pTheRegistry, by testing if it is 
+null.
+     
+However this will create maintainance problems since any additional 
+types of static objects in the future which call any member functions 
+of Registry::pTheRegistry will have to remember to new it up.
+     
+Finally to my question then: I noticed that static Registering objects 
+in a client dll of CommonComponent always get constructed after those 
+in CommonComponent, so I would like to use this property, since I can 
+guarrentee that CommonComponent is the client of no other dll.
+     
+But am I right in inferring this property - I can't find it in any 
+documentation, and I won't assume it to be true in case one day another 
+maintainance programmer compiling the code in a different environment 
+will get puzzling access violations due to the CommonComponent dll not 
+being loaded first and its statics therefore left dangling when first 
+required.
+     
+If anyone could confirm or deny the truth of this property or even 
+suggest an alternative method for forcing the order of static member 
+construction, I would be ecstatic.
+     
+Cheers, Ash
+     
+-----From: Jerry Weiler <JWeiler@unlimitedsolutions.com>
+
+As far as I know, there is no way to order the creation of global/static
+objects. Here's an alternative, somewhat based on the Singleton pattern
+in Design Patterns (highly recommended for a lot of neat tricks like
+this):
+
+class Registry
+{
+    protected: Registry() { }
+    public: static Registry* GetInstance();
+    public: static void registerClass( some parameters );
+    private: void _registerClass( some parameters );
+};
+
+Registry* Registry::GetInstance()
+{
+    static Registry instance;
+
+    return &instance;
+}
+
+void Registry::registerClass( parameters )
+{
+    GetInstance()->_registerClass( parameters );
+}
+
+void Registry::_registerClass( parameters )
+{
+    // do stuff here
+}
+
+modify to suit your purposes.
+
+>----------
+>From: 	Ash Williams[SMTP:ash@digitalworkshop.co.uk]
+>Sent: 	Monday, January 27, 1997 3:12 AM
+>To: 	mfc-l@netcom.com
+>Cc: 	ash@digitalworkshop.co.uk
+>Subject: 	Extention dll loading order question
+>
+>Environment: Win95, VC++ 4.2b
+>
+>Hi,
+>
+>I'm writing a microsoft extention dll called CommonComponent which 
+>among other things, registers class names in a static Registry 
+>instance, which is declared in my Registry class:
+>
+>class Registry
+>{
+>    public: static Registry theRegistry;
+>    public: void registerClass( some parameters );
+>    .
+>    .
+>    .
+>};
+>
+>since I need only one of these ever.
+>
+>Secondly to do automatic registering, I've created a Registering object
+>
+>which you create statically in classes of your choice, which ultimately
+>
+>calls Registry::theRegistry.registerClass().
+>
+>The problem is that I can't guarrentee that Registry::theRegistry is 
+>the first static to be created, which I must have for the static 
+>Registering objects not to cause an access violation.
+>
+>For now I've made the following class definition:
+>
+>class Registry
+>{
+>    public: static Registry* pTheRegistry;
+>    .
+>    .
+>    .
+>};
+>
+>on the basis that the first Registering object that gets created turns 
+>on the lights so to speak, ie news up pTheRegistry, by testing if it is
+>
+>null.
+>
+>However this will create maintainance problems since any additional 
+>types of static objects in the future which call any member functions 
+>of Registry::pTheRegistry will have to remember to new it up.
+>
+>Finally to my question then: I noticed that static Registering objects 
+>in a client dll of CommonComponent always get constructed after those 
+>in CommonComponent, so I would like to use this property, since I can 
+>guarrentee that CommonComponent is the client of no other dll.
+>
+>But am I right in inferring this property - I can't find it in any 
+>documentation, and I won't assume it to be true in case one day another
+>
+>maintainance programmer compiling the code in a different environment 
+>will get puzzling access violations due to the CommonComponent dll not 
+>being loaded first and its statics therefore left dangling when first 
+>required.
+>
+>If anyone could confirm or deny the truth of this property or even 
+>suggest an alternative method for forcing the order of static member 
+>construction, I would be ecstatic.
+>
+>Cheers, Ash
+>
+>
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,263 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CDialog::PreCreateWindow is never called
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Claus Michelsen -- <A HREF="mailto:cmi@cri.dk">cmi@cri.dk</A>
+Wednesday, January 29, 1997
+</B>
+Environment: VC++ 4.2-flat, Win 95
+
+I have created a CDialog-derived class with ClassWizard and have overriden
+PreCreateWindow but it is never called. How is that?
+
+I have tried to start the dialog box with both DoModal and Create.
+
+Thanks!
+
+
+Best regards,
+Claus Michelsen
+CRI A/S, Denmark
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dinesh Jindal -- <A HREF="mailto:dinesh@XOX.com">dinesh@XOX.com</A>
+Thursday, January 30, 1997
+</B>
+[Mini-digest: 4 responses]
+
+I think this issue has already been discussed on this list couple of 
+weeks ago.
+Anyway, the reason PreCreateWindow is not called for Dialog boxes is
+that this function is not in response to any WM_XXXX message. This is
+simply a overridable function provided by MFC classes derived from CWnd 
+and gets called by MFC directly whenever it creates a window. CView,
+CFrameWnd etc gets created by framework and PreCreateWindow gets called
+before actual creation. Other windows ( controls, dialog box or
+window created by CreateWindow...) get created directly by WINDOWS
+without any involvement of MFC, so MFC never gets a chance to call this 
+function.
+This behavior is not at all unexpected. You need to know about 
+PreCreateWindow only when some window is getting created behind the
+scene. I don't understand why anybody needs PreCreateWindow if
+application is directly creating a window explicitly. You may 
+very well change anything you want in CREATESTRUCT or by changing the 
+arguements to CreateWindow..
+
+Cheers!
+Dinesh Jindal
+
+Claus Michelsen wrote:
+> 
+> Environment: VC++ 4.2-flat, Win 95
+> 
+> I have created a CDialog-derived class with ClassWizard and have overriden
+> PreCreateWindow but it is never called. How is that?
+> 
+> I have tried to start the dialog box with both DoModal and Create.
+> 
+> Thanks!
+> 
+> Best regards,
+> Claus Michelsen
+> CRI A/S, Denmark
+
+-----From: stas <stas@goldnet.net.il>
+
+Hi Claus,
+ PreCreateWindow is not supposed to be called because Dialog is initialized from a resource 	template.
+ Use InitDialog instead.
+Regards,
+Stas.
+----------
+From: 	Claus Michelsen
+Sent: 	Wednesday, January 29, 1997 8:53 AM
+To: 	mfc-l@netcom.com
+Subject: 	CDialog::PreCreateWindow is never called
+
+Environment: VC++ 4.2-flat, Win 95
+
+I have created a CDialog-derived class with ClassWizard and have overriden
+PreCreateWindow but it is never called. How is that?
+
+I have tried to start the dialog box with both DoModal and Create.
+
+Thanks!
+
+
+Best regards,
+Claus Michelsen
+CRI A/S, Denmark
+
+
+-----From: Pal_Sukhram/svoa0008@ssb.com
+
+----------
+>> From: owner-mfc-l; cmi
+>> To: mfc-l
+>> Subject: CDialog::PreCreateWindow is never called
+>> Date: Wednesday, January 29, 1997 1:53AM
+
+>> Environment: VC++ 4.2-flat, Win 95
+
+>> I have created a CDialog-derived class with ClassWizard and have overriden
+>> PreCreateWindow but it is never called. How is that?
+
+Claus,
+
+The function PreCreateWindow() is only get called for those windows 
+which are created by
+MFC. If you are creating any control or dialog exists on the resource 
+template, then MFC
+does not create it. In this case, MFC only creates the dialog template. 
+Windows will not call
+PreCreateWindow () (Which is a MFC function of CWnd class) because 
+dialog is created by
+Windows implicitly.
+
+---To understand more clearly,
+You can create a CEdit Box in a window using MFC Create function and 
+override the PreCreateWidnow () for this CEdit (CMyEdit, as an example) 
+class then it will get called. However, if you override PreCreateWindow 
+for any Edit control, which is defined in the dialog template resource, 
+this overriden function will not be called, by MFC. The reason for this is
+already explained in the previous paragraph.
+----
+
+>> I have tried to start the dialog box with both DoModal and Create.
+
+If you were doing this to change the dialog style, then either change 
+directly in the dialog resouce
+template or use functions GetWindowStyle () & SetWindowStyle () to set 
+the proper style bits.
+
+>> Thanks!
+>> Best regards,
+>> Claus Michelsen
+>> CRI A/S, Denmark
+
+Hope this will help you.
+
+Thanks,
+Sukhram
+
+//--------------------------------------------------------------------
+----------------------------------------
+Sukhram Pal
+	Senior Systems Analyst,
+	State Street Bank & Trust Company,
+	P.O.Box. 1713,
+	Boston, MA 02105-1713
+Tel. 	(617) 985.1348
+EMail	sukhram_pal@ssb.com
+//--------------------------------------------------------------------
+----------------------------------------
+
+-----From: Roma <roma@neonet.lv>
+
+Claus Michelsen wrote:
+> 
+> Environment: VC++ 4.2-flat, Win 95
+> 
+> I have created a CDialog-derived class with ClassWizard and have overriden
+> PreCreateWindow but it is never called. How is that?
+> 
+> I have tried to start the dialog box with both DoModal and Create.
+> 
+> Thanks!
+> 
+  PreCreateWindow(CREATESTRUCT &) is called from inside MFC code
+(CWnd::Create, CWnd::CreateEx 
+and derived) to give you an opportunity to change some of the window
+creation parameters.
+In case of dialog creation you can (and you have to) change this stuff
+in Resource 
+Editor. That's why CDialog::Create() doesn't call PreCreateWindow.
+
+Here is a list of CREATESTRUCT members, which you can change in the
+overriden PreCreateWindow, 
+and how you can do that for CDialog-derived class:
+
+member		 Description
+--------------------------------------------------------------------
+lpCreateParams   Points to data to be used for creating the window. 
+   You can add some members to the derived class to pass initialization
+   data to youre dialog  
+
+hInstance        Identifies the module that owns the new window. 
+   I believe you don't want to change that.
+
+hMenu  		Identifies the menu to be used by the new window. 
+   Usually dialogs doesn't have menus
+
+hwndParent       obvious
+  You pass that to you CDialog constructor.
+
+cy
+cx
+y
+x		
+style 		Specifies the style for the new window. 
+lpszName	Points to a null-terminated string that specifies the name of
+the new window. 
+dwExStyle	Specifies the extended style for the new window. 
+
+  These parameters of the dialog could be changed in resource editor
+
+lpszClass	Points to a null-terminated string that specifies the class
+name of the window. 
+  This thing is fixed for the dialogs.
+
+> Best regards,
+> Claus Michelsen
+> CRI A/S, Denmark
+
+HTH
+-Roma
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

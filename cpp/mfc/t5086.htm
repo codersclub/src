@@ -1,0 +1,434 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Activating a previous instance of an app revisited - Does it
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Eric Raymond -- <A HREF="mailto:RAYMOND@btw.com">RAYMOND@btw.com</A>
+Wednesday, May 08, 1996
+</B>
+
+Environment:  Visual C++ 4.1   with  Win95 and WinNT, (Win32s?)
+
+So the obvious question is, does this code work in Windows NT, Win 95 , and 
+Win32s?  Most of the approaches fail in one of the three OS's.
+
+Any hope that MFC will ahve this "common requested" feature built-in?
+
+ ----------
+> From: owner-mfc-l
+> To: MFC-L
+> Subject: Activating a previous instance of an app revisited
+> Date: Friday, May 03, 1996 1:49PM
+>
+> Environment:  Visual C++ 4.1   with  Win95 and WinNT
+>
+> Ever wonder why the question of how to limit an application to a single
+> instance and activate the original instance comes up so often? Having had 
+to
+> implement this functionality myself this week, I now know why. The sample
+> programs don't work, the knowledgebase articles and faq are out of date, 
+and
+> the answers I've seen posted to this list were incomplete or wouldn't work 
+
+> in
+> all cases. Here's a slightly different way to solve the problem.
+>
+> Actually there are two questions to answer:
+>
+> 1) How to detect a previous instance of a program.
+> 2) How to activate the first instance, or request it to do something.
+>
+> The first question has been discussed on the list in detail recently with
+> several good approaches suggested.  I used the approach that creates and
+> checks a named mutex in the InitInstance call.
+>
+> The second question is, I think, the harder one: how to get the handle of
+> the main window of the first instance. The common answer is to use
+> FindWindow or EnumWindow, however, I prefer not to use those functions.
+> EnumWindow is somewhat inefficient and using FindWindow pretty much 
+requires
+> me to register my own class (another task for which a *complete* example
+> is lacking).
+>
+> The technique I used is to create a shared data segment in the 
+application's
+> EXE, declare a global handle variable in the shared segment, and store the
+> window handle of the first instance's frame window in the global variable.
+> Subsequent instances of the application can get the handle from the global
+> variable and use it to manipulate the first instance.
+>
+>
+> If you haven't used shared data segments in an EXE before here's how:
+>
+> In the cpp file for the CWinApp object create a shared data segment like
+> this:
+>
+>     #pragma data_seg (".MYAPP_SHARED" )
+>     // We will set this to the main window handle in CWinApp's
+> ActivateFrame.
+>     HWND gAppHwnd = 0;  // Must be initialized, or it won't be in shared
+> memory
+>     #pragma data_seg () // End the shared segment.
+>
+>
+> In the cpp file for CMainFrame, declare the shared global variable as
+> extern:
+>
+>     extern HWND gAppHwnd;
+>
+>
+> Override the ActivateFrame member function in CMainFrame and save the
+> app's handle.
+>
+>     // Save the app's handle in shared global memory.
+>     if ( gAppHwnd == 0 )
+>         gAppHwnd = AfxGetMainWnd()->GetSafeHwnd();
+>
+>
+> At the beginning of CWinApp's InitInstance, check for a previous instance
+> with
+> a couple of helper functions:
+>
+>     // Allow one and only one instance of this application to run.
+>     if ( FoundPrevInstance() )
+>     {
+>         UsePrevInstance();
+>         return FALSE;
+>     }
+>
+>
+> FoundPrevInstance looks like this:
+>
+> //
+> 
+ ----------------------------------------------------------------------------
+> //  FoundPrevInstance
+> //
+> //  We want only one instance of this app to run at a time.  This function 
+
+> //  determines whether the app is already running.
+> //
+> //  Returning FALSE from this routine indicates that another instance of 
+the
+> //  app is *not* running.
+> //  Returning TRUE indicates that another instance of the app is running.
+> //
+> 
+ ----------------------------------------------------------------------------
+>
+> BOOL COneinstApp::FoundPrevInstance()
+>
+> {
+>     BOOL bFound = FALSE;
+>
+>     // Handle to mutex that indicates another instance is running.
+>     HANDLE hMutexOneInstance = NULL;
+>
+>     // The first instance of the app will successfully create this mutex. 
+
+> When
+>     // later instances try to create the mutex, they will fail because it
+>     // already exists, indicating to us that a previous instance is 
+running.
+>
+>     const char szMutex[] = "PreventSecondInstanceOfThisApp";
+>     hMutexOneInstance = CreateMutex( NULL, TRUE, szMutex );
+>     if( GetLastError() == ERROR_ALREADY_EXISTS )
+>     {
+>         bFound = TRUE;
+>     }
+>
+>     if ( hMutexOneInstance )
+>     {
+>         ReleaseMutex( hMutexOneInstance );
+>     }
+>
+>     return bFound;
+> }
+>
+>
+> UsePrevInstance looks like this:
+>
+> //
+> 
+ ----------------------------------------------------------------------------
+> //  UsePrevInstance
+> //
+> //  This function tells an already running instance of GWLIS to prompt for 
+
+> //  login info for all registered applications.
+> //
+> 
+ ----------------------------------------------------------------------------
+>
+> void COneinstApp::UsePrevInstance()
+>
+> {
+>     //
+>     // The original instance of this program saved its main frame window
+>     // in a global variable in shared memory. Now we are going to use that
+>     // handle to activate the first instance.
+>     //
+>
+>     // Associate the CWnd object with the handle of the original instance
+>     // so we can use MFC functions on the window.
+>
+>     CWnd FirstInst;
+>     FirstInst.Attach( gAppHwnd );
+>
+>     if(FirstInst.IsIconic())
+>     {
+>         FirstInst.ShowWindow(SW_SHOWNORMAL);
+>     }
+>     FirstInst.BringWindowToTop();
+>     FirstInst.GetLastActivePopup()->BringWindowToTop();
+>
+>     // Detach the handle from the CWnd or die.
+>     FirstInst.Detach();
+>
+>     // If we wanted to ask the original instance to do something specific
+>     // we could define a user-defined message, implement a handler for the
+>     // user defined message in CMainFrame, and use code like this:
+>
+>     #ifdef TELL_THE_FIRST_INSTANCE_SOMETHING
+>
+>     ::PostMessage( gAppHwnd, WM_SOME_USER_DEFINED_MSG, 0, 0 );
+>
+>     #endif
+> }
+>
+>
+>
+> Lastly, You need to add a .DEF file to the project that looks like this:
+>
+> 
+;////////////////////////////////////////////////////////////////////////////
+> //
+> NAME      APPNAME
+> CODE      PRELOAD MOVEABLE DISCARDABLE
+> DATA      PRELOAD MOVEABLE MULTIPLE
+> HEAPSIZE  1024
+>
+> SECTIONS
+>     .MYAPP_SHARED READ WRITE SHARED
+>
+> 
+;////////////////////////////////////////////////////////////////////////////
+> //
+>
+>
+> I hope someone finds this technique useful.
+> Al Margheim
+> 
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Andi Giri -- <A HREF="mailto:agiri@ctiis.com">agiri@ctiis.com</A>
+Friday, May 10, 1996
+</B>
+
+>Environment:  Visual C++ 4.1   with  Win95 and WinNT, (Win32s?)
+
+>So the obvious question is, does this code work in Windows NT, Win 95 , and
+>Win32s?  Most of the approaches fail in one of the three OS's.
+
+The following code uses FindWindow(), assumes the code uses MFC,
+and works for all of the above.  I have not tested this for Win32s, but
+I do not see any reason why it would not work.
+Assume that the app is called PrevInst.
+
+Andi Giri
+
+***************************************
+Add following to mainfrm.cpp, after using ClassWizard to insert it:
+
+BOOL CMainFrame::PreCreateWindow(CREATESTRUCT& cs) 
+{
+	cs.style &= ~(LONG) FWS_ADDTOTITLE;	
+	return CFrameWnd::PreCreateWindow(cs);
+}
+
+Add following to the beginning of CPrevInstApp::InitInstance()
+
+BOOL CPrevInstApp::InitInstance()
+{
+	// Detect another instance of our app
+	BOOL bFound = FALSE;
+	HANDLE hMutex = NULL;
+
+#ifdef _WIN32
+	hMutex = CreateMutex (NULL, TRUE, "PreventSecondInstance");
+	if (GetLastError() == ERROR_ALREADY_EXISTS)	
+		bFound = TRUE;
+#else
+	if (m_hPrevInstance != NULL)
+		bFound = TRUE;
+#endif
+	
+	if (bFound)
+	{
+		CWnd* pFirstWnd;
+		// Try to switch to the other instance
+		if (pFirstWnd = CWnd::FindWindow (NULL, m_pszAppName))
+		{
+			// restore the window if it's iconified
+			if (pFirstWnd->IsIconic())
+				pFirstWnd->ShowWindow (SW_SHOWNORMAL);
+
+			// bring the window to the top of the Z-order
+			pFirstWnd->BringWindowToTop();
+
+			// if the window has an open dialog, this will 
+			// bring it to the top too
+			pFirstWnd->GetLastActivePopup()->BringWindowToTop();
+
+		}
+		// exit this instance of the application
+		return FALSE;
+	}
+	// Standard initialization
+		.
+		.
+		.
+		.
+		.
+#ifdef _WIN32
+	if (hMutex)
+		ReleaseMutex (hMutex);
+#endif
+	return TRUE;
+}
+
+
+
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dan Kirby -- <A HREF="mailto:dkirby@accessone.com">dkirby@accessone.com</A>
+Tuesday, May 14, 1996
+</B>
+[Mini-digest: 3 responses]
+
+Use SetForegroundWindow instead of BringWindowToTop on Win32 otherwise you may run into situations where the application is not activated.
+
+--dan
+
+-----From: "Frederic Steppe" <FredericS@msn.com>
+
+ > You're right.  Thank you for the clear explaination.  I'll refer to the 
+ > response you gave some days ago about the same subject,  (using one thread 
+ > waiting for two objects).
+
+You'll find a sample app that does this in the second edition of my book.
+
+ > Please thake this as a real 'thank you' message.  I mean it.  You deserve 
+it.
+
+Well, thanks!  That was actually sincere, and it was only fifty-some 
+characters more than "TIA".
+
+.B ekiM
+TCHAR szParty[] = _T("I don't speak for -- heeey, these cheese things are 
+_delicious_!");
+
+
+-----From: "Mike Blaszczak" <mikeblas@msn.com>
+
+----------
+From: 	owner-mfc-l@netcom.com on behalf of Eric Raymond
+Sent: 	Monday, May 13, 1996 12:00
+
+ > Clearly this is desirable behavior for many programs.
+ > Clearly this is not a simple/obvious thing to do correctly.
+
+ > Seems like this is good criteria for deciding what to put into MFC (or any 
+ > library).
+
+If it were as easy as writing the code, maybe we'd add it.  But it's really 
+tremendously expensive to add features to MFC.  You need to do lots of stuff:
+
+1) write the code.  Make it as generic and reusable as possible.
+2) Debug it.
+3) Figure out what to do about the Macintosh.  Are threads even supported over 
+there?
+4) Figure out what to do about other platforms, like the MIPS and Alpha.  Are 
+they goofy in any way?
+5) Talk someone into documenting it.  You have to read and edit two or three 
+versions of the documentation to make sure the description made by the writer 
+are accurate and clear.
+6) Get someone to test it.  Maybe you need to go back to step 2).
+7) Think about Wizard support for it.  Have a meeting with the Wizard guys.
+8) Write a sample that shows what the hell you're talking about.
+9) Show some marketing guy how it works so he can later beg you for a demo.
+10) Make sure the Setup guys know about YourNewFile.CPP and get it copied.
+11) Justify why your 1700 extra bytes of code are really important and bloat 
+MFC*.DLL to be bigger.
+12) Knock out the demo you promised in step #9 to get the marketing guy to go 
+away.
+13) Did you write the code so it would work in Japan?
+
+Most of people think people at Microsoft sit around all day and do #1.  Maybe, 
+if you're working at a small software company, you can get away with doing 
+only #1 and blow off the Macintosh and ignore people who can't figure out 
+what's going on from your README.TXT file and skip some of the other steps.  
+We can't; we need to do them all.
+
+There's lots more criteria than "boy, that'd be useful and it isn't easy to 
+do".  Maybe the QA guys are too busy with something else that's important.  
+Maybe _you're_ too busy with something that's more important.  Maybe the 
+writer is burnt out from you returning edits at the last minute and has taken 
+a vacation.
+
+.B ekiM
+TCHAR sz[] = _T("Just what I said: I threw it out.");
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

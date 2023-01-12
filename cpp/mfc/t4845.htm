@@ -1,0 +1,235 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CPropertySheet,Win32s, & Custom Controls
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Kent Van Ness -- <A HREF="mailto:KVanNess@symantec.com">KVanNess@symantec.com</A>
+Monday, April 22, 1996
+</B>
+     I have a custom virtual list box control that I am using 
+     in both a property page and in a page of a cpropertysheet 
+     based wizard.  This control works fine under Win95, but 
+     does not work under Win32s in a property sheet or property 
+     sheet wizard.  It does,however, work fine in a regular 
+     modal dialog.  I am developing using MSVC 4.0.
+     
+     I created the control using the resource editor and
+     put "vlistbox" (without the quotes) as the windows class. 
+     I register this class using AfxRegisterClass in
+     the application's initinstance function and I have 
+     verified that this function does indeed work by calling 
+     the GetClassInfo function for vlistbox.  I then subclass 
+     this control in my initdialog handler for this page of 
+     the wizard.
+     
+     This control is on the 4th page of my wizard, and basically 
+     what happens is that I keep scrolling through the 1st 
+     three pages of the wizard as I press the next button.  When I do a 
+     GetPage
+     on this page, the page is returned but has a null m_hWnd.  Under 
+     Win95, the page does not have a null m_hWnd member at this point.  The 
+     initdialog 
+     handler for this page never gets called.
+     
+     Here's some sample code of OnWizardNext override:
+     
+     LRESULT CWizardPage::OnWizardNext()
+     {
+        m_nButton = ID_WIZNEXT;
+        CWizardSheet *pWizardSheet = (CWizardSheet *)GetParent(); 
+        INT nPage = pWizardSheet->OnNext(); //see below
+        if ( nPage >= 0 )
+        {
+           CPropertyPage *pPage = pWizardSheet->GetPage( nPage );  <-Null 
+     handle here
+           return( (LRESULT)pPage->m_psp.pResource );
+        }
+        else
+           return( -1 );
+     }
+     
+     
+     int CWizardSheet::OnNext()
+     {
+        INT activeIndex = GetActiveIndex();
+        SetActivePage( ++activeIndex );
+     
+        if ( activeIndex >= m_endPage /*GetPageCount() - 1*/ ) 
+        {
+           // For the last page disable the Next button 
+           SetWizardButtons( PSWIZB_BACK | PSWIZB_FINISH ); 
+           if ( m_wizardStyle & WS_NEXT_AND_FINISH )
+           {
+              GetDlgItem(ID_WIZNEXT)->ShowWindow( SW_SHOW ); 
+              GetDlgItem(ID_WIZNEXT)->EnableWindow( FALSE );
+           }
+        }
+        else
+           if ( activeIndex >= m_psh.nStartPage ) 
+           {
+              // When moving away from the first page enable the Back 
+     button
+              SetWizardButtons( PSWIZB_BACK | PSWIZB_NEXT ); 
+              if ( m_wizardStyle & WS_NEXT_AND_FINISH )
+                 GetDlgItem(ID_WIZFINISH)->ShowWindow( SW_SHOW );
+           }
+     
+        // We may need to re-enable the finish button 
+        if ( m_wizardStyle & WS_NEXT_AND_FINISH )
+           GetDlgItem(ID_WIZFINISH)->EnableWindow( (activeIndex >= 
+              ((m_nExternalFirstPage == -1) ? m_nFirstPageToEnableFinish : 
+              m_nExternalFirstPage)) );
+     
+        return( activeIndex );
+     }
+     
+     
+     Here is the code to register the class:
+     
+        INT result;
+        WNDCLASS wndcls;
+     
+      // Check to see if class is already registered
+     if((result = ::GetClassInfo(AfxGetInstanceHandle(), VLB_CLASS_NAME, 
+     &wndcls)) != TRUE) 
+     {
+           ClassName = VLB_CLASS_NAME; // VLB_CLASS_NAME = "vlistbox"
+     
+              wndcls.style         = CS_HREDRAW | CS_VREDRAW | CS_DBLCLKS | 
+     CS_GLOBALCLASS;
+                wndcls.lpfnWndProc   = (WNDPROC) ::DefWindowProc; 
+                wndcls.cbClsExtra    = 0;
+                wndcls.cbWndExtra    = 0;
+                wndcls.hInstance     = AfxGetInstanceHandle(); 
+                wndcls.hIcon         = NULL;
+                wndcls.hCursor       = ::LoadCursor(NULL, IDC_ARROW); 
+                wndcls.hbrBackground = NULL;
+                wndcls.lpszMenuName  = NULL;
+                wndcls.lpszClassName = ClassName;
+     
+           if (!(result = AfxRegisterClass(&wndcls)))
+                   AfxThrowResourceException();
+        }   
+     
+     
+     Any help with this problem would be greatly appreciated.
+     
+     Kent P. Van Ness
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Borenstein Andrei -- <A HREF="mailto:boren@actcom.co.il">boren@actcom.co.il</A>
+Tuesday, April 23, 1996
+</B>
+[Mini-digest: 2 responses]
+
+
+On Mon, 22 Apr 1996, Kent Van Ness wrote:
+
+>    I have a custom virtual list box control that I am using 
+>    in both a property page and in a page of a cpropertysheet 
+>    based wizard.  This control works fine under Win95, but 
+>    does not work under Win32s in a property sheet or property 
+>    sheet wizard.  It does,however, work fine in a regular 
+>    modal dialog.  I am developing using MSVC 4.0.
+>    
+> 
+We have a lot of problems trying to run VC++ 4.0 application on Win32S .
+for a comprehensive list of problems , see Microsoft Knowledge Base .
+
+Regards.
+
+Andrei.
+
+-----From: Dan Kirby <dkirby@accessone.com>
+
+But wait! It gets better.  If you're using the propertysheet in wizard mode 
+and you get to the last property page and you are doing DDX in your 
+property page, notice that none of the information in the controls gets 
+transfered to your   member variables.  There is a bug in Win32s that 
+causes the OnKillActive member function to never get called and thus the 
+DDX stuff never takes place.  Basically, wizard mode under Win32s has some 
+problems.  Because Win32s is kinda frozen for eternity, don't expect this 
+to be fixed. You may want to create your own wizard implementation.
+
+--dan
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+David W. Gillett -- <A HREF="mailto:DGILLETT@expertedge.com">DGILLETT@expertedge.com</A>
+Thursday, April 25, 1996
+</B>
+> But wait! It gets better.  If you're using the propertysheet in
+> wizard mode and you get to the last property page and you are
+> doing DDX in your property page, notice that none of the
+> information in the controls gets transfered to your   member
+> variables.  There is a bug in Win32s that causes the OnKillActive
+> member function to never get called and thus the DDX stuff never
+> takes place.  Basically, wizard mode under Win32s has some
+> problems.  Because Win32s is kinda frozen for eternity, don't
+> expect this to be fixed. You may want to create your own wizard
+> implementation. 
+
+  A lot of MS-supplied wizards seem to have a final page that 
+contains no interactive controls, just a message telling the user to 
+click the "Finish" button to end the process, and the "Back" button 
+is disabled.
+  It seems that it is easy to change the "Next" button to a "Finish" 
+button, but harder to change it back if the user were to try to go 
+"Back" after that has been done....
+
+  It seems that a final page that offers only "Finish" (commit/apply) 
+or "Cancel" (and optionally "Help") must be recommended as a style 
+guideline for wizards.  This should avoid both problems.
+
+Dave
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

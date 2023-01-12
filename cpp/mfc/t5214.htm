@@ -1,0 +1,240 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+ISAPI How to maintain conenction between client and web serv
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Mark A Gregory -- <A HREF="mailto:m.gregory@rmit.edu.au">m.gregory@rmit.edu.au</A>
+Friday, May 17, 1996
+</B>
+[Moderator's note: Environment completely unknown, and I still don't
+see why this is an MFC question, but I'm tired of dealing with this.]
+
+----------
+Hi,
+
+I would like to know how long a connection to a Web server is
+maintained from the point when a client first accesses one of the pages
+on the server.
+
+I want to allow the client to do a number of things, and to store the
+result of these actions in a temp file.  I need to access the file
+every time the client sends a new request.
+
+I want to know if I can use the HCONN connID member of the
+EXTENSION_CONTROL_BLOCK for this purpose and how long does it remain
+valid.
+
+thank you Mark A Gregory
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Steve Dunn -- <A HREF="mailto:steved@globalnet.co.uk">steved@globalnet.co.uk</A>
+Sunday, May 19, 1996
+</B>
+Mark A Gregory wrote:
+
+> I would like to know how long a connection to a Web server is
+> maintained from the point when a client first accesses one of the pages
+> on the server.
+> 
+> I want to allow the client to do a number of things, and to store the
+> result of these actions in a temp file.  I need to access the file
+> every time the client sends a new request.
+> 
+> I want to know if I can use the HCONN connID member of the
+> EXTENSION_CONTROL_BLOCK for this purpose and how long does it remain
+> valid.
+
+As I understand, you simply call the ISAPI app and it remains
+permanently 'connected' (ie. does not re-instantiate itself, just
+starts another thread) every time it is called. Stick your code in
+C(whateverclass)::Default(CHttpServerContext* pCtxt)
+
+Remember to call Enter/Leave CriticalSection as it is possible for more
+than one thread to access shared resources at the same time.
+
+Hope this was of help. (PS. Files (ie. counters) need only be written
+once when the ISAPI app shuts down)
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Larry Helber -- <A HREF="mailto:lhelber@targetvision.com">lhelber@targetvision.com</A>
+Monday, May 20, 1996
+</B>
+> I would like to know how long a connection to a Web server is
+> maintained from the point when a client first accesses one of the pages
+> on the server.
+
+The length of time you are connected to a Web server is the amount of time 
+required to transfer the request. For example to receive a full HTML document 
+with graphics the process looks like this:
+  client connects to server and request an html file, the server then sends the 
+file to the client and terminates the connection.  The client then parses through 
+the html document looking for graphic links and repeats the process for each 
+grpahic.
+
+ 
+> I want to allow the client to do a number of things, and to store the
+> result of these actions in a temp file.  I need to access the file
+> every time the client sends a new request.
+
+This is the problem of a lot of Webmasters. The most common way of handling this 
+task is to include some for of process ID along with the request. If you see a 
+URL that looks like "http://www.shopping.com/computers/system.html?23540-9120354" 
+The long number is a process state for filling a shopping cart.  I have seen 
+several libraries availible to handle this for you or you can try and roll your 
+that handles your own specific needs.
+
+> I want to know if I can use the HCONN connID member of the
+> EXTENSION_CONTROL_BLOCK for this purpose and how long does it remain
+> valid.No.  See above explanation
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mark A Gregory -- <A HREF="mailto:m.gregory@rmit.edu.au">m.gregory@rmit.edu.au</A>
+Tuesday, May 21, 1996
+</B>
+[Mini-digest: 2 responses]
+
+Hi Larry,
+
+you suggested that you knew of a code scheme that would help me with my problem, I
+would really appreciate more info on this.
+
+I  created an ISA extension and changed Default.  I have tried fopen, ofstream, CreateFile, etc.
+and I cannot write to a file, yet two examples that I have which are .exe (from a book, written in
+Visual C++) read/write to a file.
+
+Are you able to help, can you please tell me what is wrong with the code shown here.
+I find that yet again Microsoft has provided a really great tool and have not provided enough info
+for someone to use it.
+
+Thank you
+Mark A Gregory
+------------------------------------------------
+void CTobasketExtension::Default(CHttpServerContext* pCtxt)
+{
+	StartContent(pCtxt);
+	WriteTitle(pCtxt);
+
+	*pCtxt << _T("This default message was produced by the Internet");
+	*pCtxt << _T(" Server DLL Wizard. Edit your CTobasketExtension::Default()");
+	*pCtxt << _T(" implementation to change it.\r\n");
+	EndContent(pCtxt);
+	
+	char szArgs[1024];
+	char szFileName[1024];
+	strcpy (szArgs, "This is a test");
+	strcpy (szFileName, "ABC.TMP");
+	ofstream *pfileout;
+	pfileout = new ofstream(szFileName,ios::app);
+	*pfileout << szArgs <<"\n";
+	delete pfileout;
+	FILE* log=fopen("ABC.LOG","a");
+	fprintf(log,szArgs);
+    fprintf(log,"\n");
+	fclose (log);
+}
+
+-----From: "David W. Gillett" <DGILLETT@expertedge.com>
+
+> > I would like to know how long a connection to a Web server is
+> > maintained from the point when a client first accesses one of the pages
+> > on the server.
+> 
+> The length of time you are connected to a Web server is the amount
+> of time required to transfer the request. For example to receive a
+> full HTML document with graphics the process looks like this:
+>   client connects to server and request an html file, the server
+> then sends the file to the client and terminates the connection. 
+> The client then parses through the html document looking for
+> graphic links and repeats the process for each graphic.
+
+  This is a concept that many people find difficult.  Once the client 
+has received the "page", that connection is closed.
+
+
+> > I want to allow the client to do a number of things, and to store the
+> > result of these actions in a temp file.  I need to access the file
+> > every time the client sends a new request.
+> 
+> This is the problem of a lot of Webmasters. The most common way of
+> handling this task is to include some for of process ID along with
+> the request. If you see a URL that looks like
+> "http://www.shopping.com/computers/system.html?23540-9120354" The
+> long number is a process state for filling a shopping cart.  I
+> have seen several libraries availible to handle this for you or
+> you can try and roll your that handles your own specific needs.
+
+  This perhaps needs to be elaborated upon just a little.  In sending 
+back the initial "page", you want to insert some context info into 
+(some of) the links on the page, so that a subsequent request 
+(generated by the user following one of those links) carries enough 
+context with it to either re-attach-to or re-create the previous 
+context.  (And understand that the user you just sent a page to might 
+not come back for more, so saved contexts should have a limited 
+lifetime.  If you need to establish a long-term context for this 
+user, consider using a cookie instead.)
+
+> > I want to know if I can use the HCONN connID member of the
+> > EXTENSION_CONTROL_BLOCK for this purpose and how long does it remain
+> > valid.
+>
+> No.  See above explanation
+
+Dave
+
+ 
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

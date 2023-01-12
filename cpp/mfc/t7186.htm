@@ -1,0 +1,308 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+unresolved externals when using RUNTIME_CLASS
+</B></FONT>
+<BR>
+<PRE>
+<B>
+<A HREF="mailto:kellyw@mailgate.seer.com">kellyw@mailgate.seer.com</A>
+Friday, October 11, 1996
+</B>
+Environment: NT4.0/VC4.2
+
+I am getting the following unresolved externals: 
+------------------------------------------------------------------------------ 
+ADWB.obj : error LNK2001: unresolved external symbol "public: static struct 
+CRuntimeClass const  doc::classdoc"(?classdoc@doc@@2UCRuntimeClass@@B) ADWB.obj 
+: error LNK2001: unresolved external symbol "public: static struct CRuntimeClass
+const  frame::classframe"(?classframe@frame@@2UCRuntimeClass@@B) ADWB.obj : 
+error LNK2001: unresolved external symbol "public: static struct CRuntimeClass 
+const  view::classview"(?classview@view@@2UCRuntimeClass@@B) Debug/ADWB.exe : 
+fatal error LNK1120: 3 unresolved externals 
+------------------------------------------------------------------------------
+
+
+The unresolved externals occur whenever doc, frame, and view are exported from 
+another dll:
+------------------------------------------------------------------------------  
+pDocTemplate = new CMultiDocTemplate(  resID,
+RUNTIME_CLASS(doc),
+RUNTIME_CLASS(frame),
+RUNTIME_CLASS(view));
+------------------------------------------------------------------------------
+
+
+Here's the DllMain of my DLL containing doc, frame, and view: 
+------------------------------------------------------------------------------ 
+static AFX_EXTENSION_MODULE CmnDLL = { NULL, NULL };
+extern "C" int APIENTRY
+DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved) {
+if (dwReason == DLL_PROCESS_ATTACH)
+{
+TRACE0("CMN.DLL Initializing!\n");
+
+// Extension DLL one-time initialization AfxInitExtensionModule(CmnDLL, 
+hInstance);
+
+// Insert this DLL into the resource chain new CDynLinkLibrary(CmnDLL);
+}
+else if (dwReason == DLL_PROCESS_DETACH) {
+TRACE0("CMN.DLL Terminating!\n");
+}
+return 1;   // ok
+}
+-------------------------------------------------------------------------------
+
+
+Thanks for any help
+Kelly
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+David Little -- <A HREF="mailto:dlittle@communique.net">dlittle@communique.net</A>
+Monday, October 14, 1996
+</B>
+[Mini-digest: 2 responses]
+
+Anybody that is upgrading (or has upgraded) to 4.2 that gets unresolveds =
+should CHECK ALL YOUR INCLUDE PATHS FOR DUPLICATE HEADER =
+FILES!!!!!!!!!!!!!
+
+----------
+From: 	kellyw@mailgate.seer.com[SMTP:kellyw@mailgate.seer.com]
+Sent: 	Friday, October 11, 1996 1:18 PM
+To: 	mfc-l@netcom.com
+Subject: 	unresolved externals when using RUNTIME_CLASS
+
+Environment: NT4.0/VC4.2
+
+I am getting the following unresolved externals:=20
+-------------------------------------------------------------------------=
+-----=20
+ADWB.obj : error LNK2001: unresolved external symbol "public: static =
+struct=20
+CRuntimeClass const  doc::classdoc"(?classdoc@doc@@2UCRuntimeClass@@B) =
+ADWB.obj=20
+: error LNK2001: unresolved external symbol "public: static struct =
+CRuntimeClass
+const  frame::classframe"(?classframe@frame@@2UCRuntimeClass@@B) =
+ADWB.obj :=20
+error LNK2001: unresolved external symbol "public: static struct =
+CRuntimeClass=20
+const  view::classview"(?classview@view@@2UCRuntimeClass@@B) =
+Debug/ADWB.exe :=20
+fatal error LNK1120: 3 unresolved externals=20
+-------------------------------------------------------------------------=
+-----
+
+
+The unresolved externals occur whenever doc, frame, and view are =
+exported from=20
+another dll:
+-------------------------------------------------------------------------=
+----- =20
+pDocTemplate =3D new CMultiDocTemplate(  resID,
+RUNTIME_CLASS(doc),
+RUNTIME_CLASS(frame),
+RUNTIME_CLASS(view));
+-------------------------------------------------------------------------=
+-----
+
+
+Here's the DllMain of my DLL containing doc, frame, and view:=20
+-------------------------------------------------------------------------=
+-----=20
+static AFX_EXTENSION_MODULE CmnDLL =3D { NULL, NULL };
+extern "C" int APIENTRY
+DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved) {
+if (dwReason =3D=3D DLL_PROCESS_ATTACH)
+{
+TRACE0("CMN.DLL Initializing!\n");
+
+// Extension DLL one-time initialization AfxInitExtensionModule(CmnDLL,=20
+hInstance);
+
+// Insert this DLL into the resource chain new CDynLinkLibrary(CmnDLL);
+}
+else if (dwReason =3D=3D DLL_PROCESS_DETACH) {
+TRACE0("CMN.DLL Terminating!\n");
+}
+return 1;   // ok
+}
+-------------------------------------------------------------------------=
+------
+
+
+Thanks for any help
+Kelly
+
+
+-----From: Dave_Rabbers@Quinton-Eng.CCMAIL.CompuServe.COM
+
+It appears you may not have exported the class interface properly.
+
+In your .h file defining your classes, you need to do something like the 
+following:
+
+#if defined something_only_defined_when_compiling_the_dll
+#define this_dll_export         __declspec( dllexport )
+#else
+#define this_dll_export         __declspec( dllimport )
+#endif
+
+where the two symbols, one tested, the other defined, are named uniquely to your
+dll.  Then define your classes as:
+
+class this_dll_export MyClassName : public CDocument
+
+(or whatever).
+
+You need to "dllexport" when compiling all source files from the DLL containing 
+your exported class.  You need to "dllimport" when compiling any other DLL or 
+EXE.  Since some DLLs will dllexport their own stuff while dllimport'ing stuff 
+from other DLLs, you need to be careful in your naming, as suggested above.
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Joseph Jones -- <A HREF="mailto:jjones@FrontofficeTech.com">jjones@FrontofficeTech.com</A>
+Monday, October 14, 1996
+</B>
+[Mini-digest: 2 responses]
+
+Are you sure you declared the neccessary IMPLEMENT_XXX Macros in your
+Dll? These macros are what provide the RuntimeClass Information for MFC.
+
+joe
+
+
+>-----Original Message-----
+>From:	kellyw@mailgate.seer.com [SMTP:kellyw@mailgate.seer.com]
+>Sent:	Friday, October 11, 1996 7:18 PM
+>To:	mfc-l@netcom.com
+>Subject:	unresolved externals when using RUNTIME_CLASS
+>
+>Environment: NT4.0/VC4.2
+>
+>I am getting the following unresolved externals: 
+>------------------------------------------------------------------------
+>------ 
+>ADWB.obj : error LNK2001: unresolved external symbol "public: static
+>struct 
+>CRuntimeClass const  doc::classdoc"(?classdoc@doc@@2UCRuntimeClass@@B)
+>ADWB.obj 
+>: error LNK2001: unresolved external symbol "public: static struct
+>CRuntimeClass
+>const  frame::classframe"(?classframe@frame@@2UCRuntimeClass@@B)
+>ADWB.obj : 
+>error LNK2001: unresolved external symbol "public: static struct
+>CRuntimeClass 
+>const  view::classview"(?classview@view@@2UCRuntimeClass@@B)
+>Debug/ADWB.exe : 
+>fatal error LNK1120: 3 unresolved externals 
+>------------------------------------------------------------------------
+>------
+>
+>
+>The unresolved externals occur whenever doc, frame, and view are
+>exported from 
+>another dll:
+>------------------------------------------------------------------------
+>------  
+>pDocTemplate = new CMultiDocTemplate(  resID,
+>RUNTIME_CLASS(doc),
+>RUNTIME_CLASS(frame),
+>RUNTIME_CLASS(view));
+>------------------------------------------------------------------------
+>------
+>
+>
+>Here's the DllMain of my DLL containing doc, frame, and view: 
+>------------------------------------------------------------------------
+>------ 
+>static AFX_EXTENSION_MODULE CmnDLL = { NULL, NULL };
+>extern "C" int APIENTRY
+>DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved) {
+>if (dwReason == DLL_PROCESS_ATTACH)
+>{
+>TRACE0("CMN.DLL Initializing!\n");
+>
+>// Extension DLL one-time initialization AfxInitExtensionModule(CmnDLL,
+>
+>hInstance);
+>
+>// Insert this DLL into the resource chain new CDynLinkLibrary(CmnDLL);
+>}
+>else if (dwReason == DLL_PROCESS_DETACH) {
+>TRACE0("CMN.DLL Terminating!\n");
+>}
+>return 1;   // ok
+>}
+>------------------------------------------------------------------------
+>-------
+>
+>
+>Thanks for any help
+>Kelly
+>
+-----From: "Sanjay Chouksey" <sanjay@mediaway.com>
+
+Hi, 
+You need to export the message map too.
+Generate the .map file and look for the message
+map name mangled function names, and then
+export them from the .DEF file. "Inside Visual C++"
+by Kuglinski is an excellent source for more info,
+on this. (You are writing an MFC extension DLL,
+I suppose)
+
+Sanjay
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

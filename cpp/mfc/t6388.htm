@@ -1,0 +1,419 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Floating toolbar hide/unhide message
+</B></FONT>
+<BR>
+<PRE>
+<B>
+<A HREF="mailto:jshao@pluto.dspt.com">jshao@pluto.dspt.com</A>
+Thursday, August 22, 1996
+</B>
+
+Environment: VC++ 4.0, Win95
+
+In the project I am working, I created a floating toolbar in the MainFrm.cpp
+OnCreate() function:
+
+int CMainFrame::ONCreate()
+{
+..
+
+m_PaletteBar.Create(this, WS_CHILD|WS_VISIBLE|CBRS_SIZE_FIXED|
+                    CBRS_FLOATING|CBRS_TOOLTIPS,IDW_PALLETE_BAR)
+...
+}
+
+where m_paletteBar is an object of a class CPaleetebar -- derived 
+from CToolBar.
+
+The floatingbar works fine accept one thing:
+
+I would like to capture the message whenever one clicks on the top-right 
+kill the window button (cross button -- not minimize or maximize window 
+buttons) and perform some processing.
+
+I have tried several methods such as to overwrite OnClose, OnDestroy ... 
+of the CpaletteBar class, but none of them successful.
+
+Anyone in the net can solve this problem?
+
+James Shao
+DSP Technology
+
+ 
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Jim McCabe -- <A HREF="mailto:jmccabe@mail.portup.com">jmccabe@mail.portup.com</A>
+Monday, August 26, 1996
+</B>
+[Mini-digest: 5 responses]
+
+Hi James,
+
+>I would like to capture the message whenever one clicks on the top-right 
+>kill the window button (cross button -- not minimize or maximize window 
+>buttons) and perform some processing.
+
+Try capturing WM_SYSCOMMAND, wParam should be SC_CLOSE.  I don't know if the
+toolbars function this way, but ordinary windows do.
+
+Jim
+jmccabe@mail.portup.com  -  http://www.portup.com/~jmccabe
+-----From: Mario Contestabile
+
+It isn't killed or closed. It is hidden. You can check that by putting a 
+breakpoint in the 
+CpaletteBar DTOR. Write a handler for OnWindowPosChanged(), and you
+can determine if indeed it is being hidden.
+
+void CpaletteBar::OnWindowPosChanged(WINDOWPOS FAR* lpwndpos) 
+{
+ CToolBar::OnWindowPosChanged(lpwndpos);
+ 
+ if( (lpwndpos->flags & SWP_HIDEWINDOW) && (lpwndpos->flags & SWP_NOREDRAW) ){
+  CString title;
+  GetWindowText(title);
+  TRACE1("CpaletteBar::OnWindowPosChanged() Palette Bar closing %s\n", title);
+  CMainFrame* pMDIFrame = (CMainFrame*)AfxGetMainWnd();
+  if(pMDIFrame)
+   pMDIFrame->AlarmBarClosing(title);
+ }
+}
+
+mcontest@universal.com
+
+-----From: Mike Blaszczak <mikeblas@nwlink.com>
+
+Simply overriding these functions isn't enough. You need to hook up a
+message map entry that says your OnClose() or OnDestroy() function handles
+WM_CLOSE or WM_DESTROY.  Or did you mean to say that you did make a message
+map and get everything hooked up like that and you're still not getting the
+calls?
+
+.B ekiM
+http://www.nwlink.com/~mikeblas   <--- trip report central
+1995 Honda VFR750F (Serial number 00050!)  4 Corners 1996!
+1987 Yamaha FZ700 (damaged)                AMA, HRC, VFROC
+     These words are my own: I do not speak for Microsoft.
+
+-----From: WnDBSoft@aol.com
+
+Sure.  I have an idea which might help, though I'm not sure.  Have
+ClassWizard add a message handler for WM_SYSCOMMAND to your message map.
+ Now, go to wincore.cpp and find CWnd::OnSysCommand( ), if it's there.  Once
+you find CWnd::OnSysCommand( ), copy (do not cut) the entire body of the
+function to the Clipboard. 
+
+Then, in the CPaletteBar::OnSysCommand( ) handler, select the comments in the
+body and then paste the Clipboard contents over the selection.  NOTE: Change
+over all the calls to CWnd::OnSysCommand( ) to CToolBar::OnSysCommand( ).
+
+In OnSysCommand( ), there is a switch(nID & 0xFF0) { } series, with case:
+SC_* in it.
+Let all of the case: SC_* fall through, except for case: SC_CLOSE.   Then,
+write a function which does your close processing, then call the base class
+OnSysCommand( ).
+
+You see, clicking the close button on the titlebar send WM_SYSCOMMAND with a
+wParam of SC_CLOSE.
+
+For example:
+
+void CPalletteBar::DoCloseProcessing( )
+{
+           // ...
+           // TODO: Add code here to do processing on close
+           // ...
+}
+
+// WM_SYSCOMMAND handler
+void CPalletteBar::OnSysCommand(UINT nID, LPARAM lParam )
+{
+      if (AfxGetMainWnd( )->m_bHelpMode)
+      {
+            //...
+            //...
+            // help processing...
+            //...
+            //...
+      }
+      else
+      {
+            // switch/case on nID & 0xFF0, or something like that, I'm not
+sure         
+            switch (nID & 0xFF0)
+            {
+                      case SC_CLOSE:
+                             DoCloseProcessing( );
+                             CToolBar::OnSysCommand(nID, lParam);
+                             break;
+
+                      // let's put a default here for brevity
+                      default:
+                              // call base class for all other system
+commands
+                              CToolBar::OnSysCommand(nID, lParam);
+                              break;
+             }
+       }
+       return;
+} 
+-----From: Mark Conway <mrc@mfltd.co.uk>
+
+James,
+Two things to note about the close button on the CToolBar:
+1) The toolbar is inside a frame window MFC creates - the undocumented
+CMiniDockFrameWnd class. When a control bar is floated, this is created
+dynamically by the frame work, and your toolbar is parented off it. 
+2) The default action for this close button on the frame window is to
+just to hide the control bar, so you won't get close/destroy messages.
+
+It is possible to replace the CMiniDockFrameWnd class yourself - MFC
+provides a hook (more of a loophole really) for doing this:
+CFrameWnd::m_pFloatingFrameClass points to a runtime class structure for
+the class to create for a floating frame. Derive from CMiniDockFrameWnd,
+and slot your own class in here. Although not quite what you want,
+download MRCEXT from
+http://ourworld.compuserve.com/homepages/mrconway/mrcext.htm and you'll
+find some source code that uses this technique for something a bit more
+drastic.
+
+You can also hook into your toolbars WM_WINDOWPOSCHANGED/CHANGING
+messages, and when you receive them workout whether it's visible or not.
+The toolbar gets these messages when the toolbar is being floated,
+docked, hidden or shown, as well as in more normal circumstances. This
+is an indirect way, and more problematic, but you may prefer it.
+
+Hope this helps
+Mark.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Shane -- <A HREF="mailto:shane_trenary@penmetrics.com">shane_trenary@penmetrics.com</A>
+Tuesday, August 27, 1996
+</B>
+
+     Two people below hit upon your solution--however, the last person 
+     below also has an additional solution you may want to use.
+     
+       -- Shane
+
+
+______________________________ Reply Separator _________________________________
+Subject: Re: Floating toolbar hide/unhide message 
+Author:  mfc-l@netcom.com at Internet
+Date:    8/27/96 9:34 AM
+
+
+Received: by ccmail
+Received:  from bashir by penmetrics.com (UUPC/extended 1.11) with UUCP;
+           Tue, 27 Aug 1996 09:31:50 PDT
+Received: from majordomo.netcom.com (listless.netcom.com [206.217.29.105]) by 
+bas hir.peak.org (8.7.3/8.7.3) with ESMTP id JAA07331; Tue, 27 Aug 1996 09:25:37
+-070 0 (PDT)
+Received: by majordomo.netcom.com (8.7.5/8.7.3/(NETCOM MLS v1.01)) id IAA16774; 
+T ue, 27 Aug 1996 08:55:41 -0700 (PDT)
+From: jmccabe@mail.portup.com (Jim McCabe) 
+X-ccAdmin: postmaster@bashir
+To: mfc-l@netcom.com
+Subject: Re: Floating toolbar hide/unhide message 
+Date: Mon, 26 Aug 1996 08:32:37 -0400
+Message-ID: <322198be.460434@mail.portup.com>
+References: <Pine.3.85.9608220910.A7184-0100000@pluto.dspt.com> 
+In-Reply-To: <Pine.3.85.9608220910.A7184-0100000@pluto.dspt.com> 
+X-Mailer: Forte Agent .99e/32.227
+Sender: owner-mfc-l@majordomo.netcom.com 
+Errors-To: owner-mfc-l@majordomo.netcom.com 
+Precedence: bulk
+Reply-To: mfc-l@netcom.com 
+[Mini-digest: 5 responses]
+     
+Hi James,
+     
+>I would like to capture the message whenever one clicks on the top-right 
+>kill the window button (cross button -- not minimize or maximize window 
+>buttons) and perform some processing.
+     
+Try capturing WM_SYSCOMMAND, wParam should be SC_CLOSE.  I don't know if the 
+toolbars function this way, but ordinary windows do.
+     
+Jim
+jmccabe@mail.portup.com  -  http://www.portup.com/~jmccabe 
+-----From: Mario Contestabile
+     
+It isn't killed or closed. It is hidden. You can check that by putting a 
+breakpoint in the 
+CpaletteBar DTOR. Write a handler for OnWindowPosChanged(), and you 
+can determine if indeed it is being hidden.
+     
+void CpaletteBar::OnWindowPosChanged(WINDOWPOS FAR* lpwndpos) 
+{
+ CToolBar::OnWindowPosChanged(lpwndpos);
+     
+ if( (lpwndpos->flags & SWP_HIDEWINDOW) && (lpwndpos->flags & SWP_NOREDRAW) ){
+  CString title;
+  GetWindowText(title);
+  TRACE1("CpaletteBar::OnWindowPosChanged() Palette Bar closing %s\n", title); 
+  CMainFrame* pMDIFrame = (CMainFrame*)AfxGetMainWnd();
+  if(pMDIFrame)
+   pMDIFrame->AlarmBarClosing(title);
+ }
+}
+     
+mcontest@universal.com
+     
+-----From: Mike Blaszczak <mikeblas@nwlink.com>
+     
+Simply overriding these functions isn't enough. You need to hook up a 
+message map entry that says your OnClose() or OnDestroy() function handles 
+WM_CLOSE or WM_DESTROY.  Or did you mean to say that you did make a message 
+map and get everything hooked up like that and you're still not getting the 
+calls?
+     
+.B ekiM
+http://www.nwlink.com/~mikeblas   <--- trip report central 
+1995 Honda VFR750F (Serial number 00050!)  4 Corners 1996! 
+1987 Yamaha FZ700 (damaged)                AMA, HRC, VFROC
+     These words are my own: I do not speak for Microsoft.
+     
+-----From: WnDBSoft@aol.com
+     
+Sure.  I have an idea which might help, though I'm not sure.  Have 
+ClassWizard add a message handler for WM_SYSCOMMAND to your message map.
+ Now, go to wincore.cpp and find CWnd::OnSysCommand( ), if it's there.  Once
+you find CWnd::OnSysCommand( ), copy (do not cut) the entire body of the 
+function to the Clipboard. 
+     
+Then, in the CPaletteBar::OnSysCommand( ) handler, select the comments in the 
+body and then paste the Clipboard contents over the selection.  NOTE: Change 
+over all the calls to CWnd::OnSysCommand( ) to CToolBar::OnSysCommand( ).
+     
+In OnSysCommand( ), there is a switch(nID & 0xFF0) { } series, with case: 
+SC_* in it.
+Let all of the case: SC_* fall through, except for case: SC_CLOSE.   Then, 
+write a function which does your close processing, then call the base class 
+OnSysCommand( ).
+     
+You see, clicking the close button on the titlebar send WM_SYSCOMMAND with a 
+wParam of SC_CLOSE.
+     
+For example:
+     
+void CPalletteBar::DoCloseProcessing( ) 
+{
+           // ...
+           // TODO: Add code here to do processing on close 
+           // ...
+}
+     
+// WM_SYSCOMMAND handler
+void CPalletteBar::OnSysCommand(UINT nID, LPARAM lParam ) 
+{
+      if (AfxGetMainWnd( )->m_bHelpMode)
+      {
+            //...
+            //...
+            // help processing...
+            //...
+            //...
+      }
+      else
+      {
+            // switch/case on nID & 0xFF0, or something like that, I'm not
+sure         
+            switch (nID & 0xFF0)
+            {
+                      case SC_CLOSE:
+                             DoCloseProcessing( );
+                             CToolBar::OnSysCommand(nID, lParam); 
+                             break;
+     
+                      // let's put a default here for brevity 
+                      default:
+                              // call base class for all other system
+commands
+                              CToolBar::OnSysCommand(nID, lParam); 
+                              break;
+             }
+       }
+       return;
+} 
+-----From: Mark Conway <mrc@mfltd.co.uk>
+     
+James,
+Two things to note about the close button on the CToolBar:
+1) The toolbar is inside a frame window MFC creates - the undocumented 
+CMiniDockFrameWnd class. When a control bar is floated, this is created 
+dynamically by the frame work, and your toolbar is parented off it. 
+2) The default action for this close button on the frame window is to 
+just to hide the control bar, so you won't get close/destroy messages.
+     
+It is possible to replace the CMiniDockFrameWnd class yourself - MFC 
+provides a hook (more of a loophole really) for doing this: 
+CFrameWnd::m_pFloatingFrameClass points to a runtime class structure for 
+the class to create for a floating frame. Derive from CMiniDockFrameWnd, 
+and slot your own class in here. Although not quite what you want, 
+download MRCEXT from
+http://ourworld.compuserve.com/homepages/mrconway/mrcext.htm and you'll 
+find some source code that uses this technique for something a bit more 
+drastic.
+     
+You can also hook into your toolbars WM_WINDOWPOSCHANGED/CHANGING 
+messages, and when you receive them workout whether it's visible or not. 
+The toolbar gets these messages when the toolbar is being floated, 
+docked, hidden or shown, as well as in more normal circumstances. This 
+is an indirect way, and more problematic, but you may prefer it.
+     
+Hope this helps
+Mark.
+     
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,284 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+modeless vs modal dialog boxes
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Gene Sewell -- <A HREF="mailto:genes@fast.net">genes@fast.net</A>
+Friday, May 31, 1996
+</B>
+Environment: WinNT(Version 3.51 - build 1057: Service Pack 4) and VC++ 4.1  32Mb
+
+I have a problem....
+
+I am part of a small development team.  I implemented a modeless dialog box
+that was rather complex.  (I don't think that has anything to do with the
+problem....)
+
+My problem is that after completing the task, I merged the working code with
+the programming team.  I am sure that the merge didn't affect any of my
+dialog box code.  Yet, during testing, my dialog box no longer was created.
+What happens is that the main application loses focus (the caption bar is no
+longer colored as top window), but no new window comes to the top.  
+
+To prove the dialog code still was working, I converted the call to generate
+a modal dialog box.  As soon as I did that the dialog appeared and worked
+just fine.  I have left it modal for the time being, but it has to become
+modeless quickly.
+
+What I seem unable to figure out is just why I no longer can get my dialog
+box code to work as a modeless box.  It worked fine at one point, but now no
+longer works.  I do not believe the reason has anything to do with memory or
+resource shortages.  During testing, this is the first box I bring up.
+
+Can anyone suggest leads for me to investigate?  As an aside, I would wish
+that a future MFC would take some of the mystery out of dialog boxes.  I
+would like to have the switch between modal and modeless be a simple style
+bit or a member variable option, rather than requiring substantially
+different code.
+
+Here's the code for invoking the box:
+
+#ifndef NONMODALWORKS
+// this is what I'm using now - it works fine
+	LibCardDialog myDlg;
+	myDlg.DoModal();
+#else
+	if ( (mx_LibCardDialog = new LibCardDialog ) )
+		if( ! mx_LibCardDialog->Create() )
+		{
+			delete mx_LibCardDialog;
+			mx_LibCardDialog = NULL;
+		}
+#endif
+
+In my dialog box code:
+
+I used the method suggested by Kruglinski (mx_LibCardDialog->Create() )
+
+BOOL LibCardDialog::Create()
+{
+    return CDialog::Create(LibCardDialog::IDD);
+}
+
+
+Thanks,
+
+Gene
+
+----
+If it weren't for the last minute, nothing would ever get done.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Venkateswara Sunkara -- <A HREF="mailto:Venkateswara_Sunkara@countrywide.com">Venkateswara_Sunkara@countrywide.com</A>
+Sunday, June 02, 1996
+</B>
+[Mini-digest: 13 responses]
+
+In case if you have not used the visible style( WS_VISIBLE ) in the dialogbox 
+template you should use ShowWindow to make it appear. Try calling 
+mx_LibCardDialog->ShowWindow(SW_SHOW) after creating the dialog. Hope this 
+helps.
+
+Venkateswara Sunkara
+-----From: "John W. Podlogar Jr." <podlogar@telerama.lm.com>
+
+
+The first thing that I would do is check your app with Spy++ to
+see if the window is even being created. If you see it in the list
+then check it's geometry values (you may just need to call CenterWindow).
+
+If it doesn't show up in the Spy++ list then check your call to
+"Create" make sure you are passing is a valid template resource.
+
+If you seem to be then step into the Create function and see what
+it's doing.
+
+You can never beat stepping into the MFC source to see what's happening.
+You can debug most problems by doing this.
+
+John W. Podlogar Jr.    The wise man doesn't pose the right answers, 
+podlogar@lm.com                         he asks the right questions. 
+http://www.lm.com/~podlogar
+
+-----From: Dean McCrory <deanm@microsoft.com>
+
+It sounds like your dialog box is hidden.  Perhaps it doesn't have
+WS_VISIBLE in the resource?  Your best be to these kind of problems is
+to *debug the code*.  You can use Spy++ to see if the window for the
+dialog is there.  You can use the debugger to verify if your
+OnInitDialog is being called, what the Create call is returning, etc.
+
+// Dean
+
+-----From: Marty Fried <mfried@linex.com>
+
+What does the app do after creating your dialog?  Does it continue to
+process its messages?  Does it close its main window (m_pMainWnd)?  Doing
+that signals the framework to stop processing messages, I believe.
+
+Since your code works as a modal dialog, I'd look at the main app's code
+for the problem.
+
+-----From: "Hampton-Smith, Paul" <PHamSmit@sitgtrc1.telecom.com.au>
+
+I'm not sure about the modal/modeless difference, but I have had an occasion 
+when a dialog box, developed on a hi res screen, was simply off-screen on 
+the target 640x480 machine.  If this is the problem, alt-tab should get the 
+system menu for the box up, at which time you should be able to move it into 
+view.  If so, you'd be able to fix the problem with a centre_window method.
+
+Paul Hampton-Smith
+-----From: antony@cauchy.miel.mot.com (ANTONISAMY A[MIEL])
+
+	When you merged your application, if you had created the dialog
+	resource againg instead of copying from the test app, make sure
+	you have the VISIBLE style box checked. Modeless dialogs are
+	popuped only if WS_VISIBLE style is used. Otherwise explicit
+	ShowWindow(SW_SHOW) has to be used.
+	Otherwise I see no problem why your modeless dialog works for
+	your test app and not for your main app.
+
+- Antony
+antony@miel.mot.com
+-----From: Sunitha Kumar <suni@cyberspace.org>
+
+
+Probably, you have not made the window visible. That is, in the resource, 
+the styles is invisible. Probably, if you look into the resource, you 
+might find some answer.
+Hope this helps.		Sunitha KumarOn Fri, 31 May 1996, Gene Sewell wrote:
+
+-----From: Kjell Gunnar Tenstad <kjellg@albatross.no>
+
+I think you must do a call to make the dialog visible, here is what
+I do :
+
+BOOL CAlarmPageDlg::DoModeLess(CWnd* pParent)
+{
+	BOOL bs=CDialog::Create(CAlarmPageDlg::IDD,pParent);
+	if(bs)
+	    ShowWindow(SW_SHOW);
+	return bs;
+}
+
+------------------------------oO00Oo-------------------------------
+kjellg@albatross.no     Kjell Gunnar Tenstad,
+------------------------------oO00Oo-------------------------------
+-----From: Gene Sewell <genes@fast.net>
+
+Thanks for the great input.  You hit the nail right on the head!
+
+I guess what happened is that during the merge, my dialog template lost the
+visible style bit (I checked and it's not there.)  Initially, it was there,
+so everything worked.
+
+Adding the ShowWindow(SW_SHOW) fixed it right away.  I've since added the
+visible style bit again in the resource editor.
+
+Thanks again!
+
+Gene
+----
+"It is one of the most beautiful compensations of this life that no man 
+can sincerely try to help another without helping himself."
+
+	>>>Ralph Waldo Emerson
+
+-----From: Mike Martonfi <mikem@abelcomputers.com>
+
+Is the WS_VISIBLE style set in the dialog template?
+---------------------
+Mike Martonfi
+mikem@abelcomputers.com
+
+-----From: Mario Contestabile
+
+I believe the problem resides in the fact that you are calling 
+CDialog::Create() from
+YourDialog::Create(). 
+
+Try:
+mx_LibCardDialog = new LibCardDialog;
+LibCardDialog.Create(LibCardDialog::IDD);
+
+//dlg ctor
+LibCardDialog::LibCardDialog() : CDialog(LibCardDialog::IDD){
+}
+
+and make sure the dialog has the WS_VISIBLE style.
+
+mcontest@universal.com
+-----From: Paolo Savelli <paolo@entire.com>
+
+that delete line is wherein lies your problem.  In a modal dialog 
+box, you can delete after calling .DoModal(), since your application 
+is stuck in the dialog box procedure.  In a modeless dialog box, the 
+Create() function is executed, bringing up the window, then your 
+program returns from the Create() call and goes on to execute the 
+following lines of code, to eventually return control to the main 
+message proc. So, in your code you are bringing up the modeless box, 
+and then destroying it before you actually see it.
+
+Hope this helps. 
+
+Paolo
+-----From: "Peter A. Vanvliet" <pvanvlie@neosoft.com>
+
+Just a thought...
+
+Have you tried doing a ShowWindow(SW_SHOWNA) on the mx_LibCardDialog?
+
+
+Peter A. Vanvliet    Houston, Texas    pvanvlie@neosoft.com 
+System Analyst, NanoSoft Corporation (http://www.special-events.com)
+HALPC C++ SIG Leader 
+WWW home page (http://www.special-events.com/cppsig)
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

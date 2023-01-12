@@ -1,0 +1,283 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CRichEditCtrl in a dialog box
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Randy Sales -- <A HREF="mailto:rsc@halcyon.com">rsc@halcyon.com</A>
+Tuesday, September 10, 1996
+</B>
+Environment: MSVC 4.1, NT 3.51
+
+BTW, thanks Mike B. for your recent answer regarding CopyElements
+helper function.  I had not started using 4.2 yet and should
+have look there first.  Your answer was, as usual, clear,
+consise and humbling.
+
+I am attempting to use a CRichEditCtrl as part of a dialog box.
+I created the dialog template using the Developer Studio and
+then added a member variable for the edit control.  I then
+went into the code and made the CEdit into a CRichEditCtrl.
+Then, in my OnInitDialog I make calls againt the member
+variable like this:
+
+    m_CRichEditCtrl.SetSelectionCharFormat(cf);
+
+Based on the contents of the cf structure, these calls should
+change the color of any subsequently added text.  The calls
+succeed with no errors but the text color is unchanged.  The
+same code works fine if I create the rich edit control manually
+using Create, but then I must also manually place the control.
+This must be a common use of the CRichEditCtrl, but I can't seem
+to get it to work.  Even if I call SubclassDlgItem() on the rich
+edit control like this:
+
+    m_CRichEditCtrl.SubclassDlgItem(IDC_EDIT1, this);
+
+it seems to make no difference.  I searched the MFC archives
+for a solution and came across an entry that suggested calling
+InitCommonControls() and LoadLibrary(_T("RICHED32.DLL")) from
+the application's InitInstance().  Also doesn't seem to help.
+
+I don't think this matters, but this is all being done from
+a COM object instantiated by a DLL inproc server, just incase
+this has any bearing on the problem.
+
+Thanks,
+Randy Sales
+
+-- 
+RS Consulting
+1521 1/2 Cedar Street
+Everett, WA 98201
+
+Phone   206-259-1056
+Fax     206-259-1315
+email   rsc@halcyon.com
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Erik Funkenbusch -- <A HREF="mailto:chucks@isd.net">chucks@isd.net</A>
+Wednesday, September 11, 1996
+</B>
+[Mini-digest: 3 responses]
+
+I believe your problem stems from your Dialog resource.  By adding an edit
+control to the Dialog resource, when the Dialog is created it will create
+an edit control, not a RichEdit.  I do not believe resources currently
+support rich edit functionality.
+
+You will need to create the control manually.
+
+----------
+> From: Randy Sales <rsc@halcyon.com>
+> To: mfc-l@netcom.com
+> Subject: CRichEditCtrl in a dialog box
+> Date: Tuesday, September 10, 1996 9:08 AM
+> 
+> Environment: MSVC 4.1, NT 3.51
+> 
+> BTW, thanks Mike B. for your recent answer regarding CopyElements
+> helper function.  I had not started using 4.2 yet and should
+> have look there first.  Your answer was, as usual, clear,
+> consise and humbling.
+> 
+> I am attempting to use a CRichEditCtrl as part of a dialog box.
+> I created the dialog template using the Developer Studio and
+> then added a member variable for the edit control.  I then
+> went into the code and made the CEdit into a CRichEditCtrl.
+> Then, in my OnInitDialog I make calls againt the member
+> variable like this:
+> 
+>     m_CRichEditCtrl.SetSelectionCharFormat(cf);
+> 
+> Based on the contents of the cf structure, these calls should
+> change the color of any subsequently added text.  The calls
+> succeed with no errors but the text color is unchanged.  The
+> same code works fine if I create the rich edit control manually
+> using Create, but then I must also manually place the control.
+> This must be a common use of the CRichEditCtrl, but I can't seem
+> to get it to work.  Even if I call SubclassDlgItem() on the rich
+> edit control like this:
+> 
+>     m_CRichEditCtrl.SubclassDlgItem(IDC_EDIT1, this);
+> 
+> it seems to make no difference.  I searched the MFC archives
+> for a solution and came across an entry that suggested calling
+> InitCommonControls() and LoadLibrary(_T("RICHED32.DLL")) from
+> the application's InitInstance().  Also doesn't seem to help.
+> 
+> I don't think this matters, but this is all being done from
+> a COM object instantiated by a DLL inproc server, just incase
+> this has any bearing on the problem.
+> 
+> Thanks,
+> Randy Sales
+> 
+> -- 
+> RS Consulting
+> 1521 1/2 Cedar Street
+> Everett, WA 98201
+> 
+> Phone   206-259-1056
+> Fax     206-259-1315
+> email   rsc@halcyon.com
+-----From: Ed Ball <ed@logos.com>
+
+It sounds like you are trying to subclass an edit control into a rich
+edit control, but since they are two completely different controls, that
+is impossible. One way to solve the problem is to create a rich edit
+control with the same flags and dimensions and Z-order as the edit
+control and then destroy the edit control (I've seen sample code for
+this method somewhere...). Another way is to put a "custom control" in
+the dialog template instead of an edit control, specifying class
+"RichEdit" and the appropriate 32-bit style (you'll have to look at the
+values of the style constants in winuser.h & richedit.h and bitwise-OR
+them yourself) -- then subclassing will work as in your example. (You
+might also have to call AfxOleInit in InitInstance for the latter
+solution; I'm not sure.)
+
+- Ed
+-----From: Yury Peskin <YPeskin@vendorsystems.com>
+
+First, the RichEdit Box does not exist in the component galley, what you are 
+inserting is a normal CEdit. With this CEdit, set the properties you want
+and then: 
+// Grab the rect and the style of the CEdit Ctrl 
+DWORD dwStyle; 
+CRect rectRichEdit; 
+CWnd *pCtl = GetDlgItem(IDC_EDIT); 
+dwStyle = GetWindowLong(pCtl->m_hWnd, GWL_STYLE);
+pCtl->GetWindowRect(&rectRichEdit); 
+ScreenToClient(&rectRichEdit);
+pCtl->DestroyWindow(); 
+// Create the Rich edit 
+m_RichEdit.Create(dwStyle, rectRichEdit,this,IDC_EDIT); 
+// m_RichEdit is a member of CFormView Good Luck.
+
+This answer came from one of the news groups and should be attributed to
+wagner@ma.ultranet.com (Wagner Alcocer)
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+pjn -- <A HREF="mailto:pjn@indigo.ie">pjn@indigo.ie</A>
+Monday, September 16, 1996
+</B>
+On Tue, 10 Sep 1996 15:08:43 +0100, you wrote:
+
+>Environment: MSVC 4.1, NT 3.51
+>
+>BTW, thanks Mike B. for your recent answer regarding CopyElements
+>helper function.  I had not started using 4.2 yet and should
+>have look there first.  Your answer was, as usual, clear,
+>consise and humbling.
+>
+>I am attempting to use a CRichEditCtrl as part of a dialog box.
+>I created the dialog template using the Developer Studio and
+>then added a member variable for the edit control.  I then
+>went into the code and made the CEdit into a CRichEditCtrl.
+>Then, in my OnInitDialog I make calls againt the member
+>variable like this:
+>
+>    m_CRichEditCtrl.SetSelectionCharFormat(cf);
+>
+>Based on the contents of the cf structure, these calls should
+>change the color of any subsequently added text.  The calls
+>succeed with no errors but the text color is unchanged.  The
+>same code works fine if I create the rich edit control manually
+>using Create, but then I must also manually place the control.
+>This must be a common use of the CRichEditCtrl, but I can't seem
+>to get it to work.  Even if I call SubclassDlgItem() on the rich
+>edit control like this:
+>
+>    m_CRichEditCtrl.SubclassDlgItem(IDC_EDIT1, this);
+>
+>it seems to make no difference.  I searched the MFC archives
+>for a solution and came across an entry that suggested calling
+>InitCommonControls() and LoadLibrary(_T("RICHED32.DLL")) from
+>the application's InitInstance().  Also doesn't seem to help.
+>
+>I don't think this matters, but this is all being done from
+>a COM object instantiated by a DLL inproc server, just incase
+>this has any bearing on the problem.
+>
+>Thanks,
+>Randy Sales
+>
+>-- 
+>RS Consulting
+>1521 1/2 Cedar Street
+>Everett, WA 98201
+>
+>Phone   206-259-1056
+>Fax     206-259-1315
+>email   rsc@halcyon.com
+>
+
+
+You might want to try SetDefaultCharFormat in preference to
+SetSelectionCharFormat. This should do the trick for you.
+
+
+                             '''	   
+                             @ @
++========================ooO-(_)-Ooo=================================+
+|                                           PJ Naughter              |
+|                                                                    |
+| Software Developer                   Email: pjn@indigo.ie          |
+| Softech Telecom                      Tel:   +353-1-2958384         |
+|                                      Fax:   +353-1-2956290         |
+| Author of DTime - A Collection       URL:   <A HREF="http://indigo.ie/~pjn">http://indigo.ie/~pjn</A>  |
+| of Date & Time classes for MFC                                     |
+|                                                                    |
+|                  Addr: 7 Woodford, Brewery Road, Stillorgan,       |
+|                        Blackrock, Co. Dublin, Republic of Ireland  |
++====================================================================+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

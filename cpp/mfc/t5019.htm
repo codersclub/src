@@ -1,0 +1,164 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Help with CToolTipCtrl callbacks
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Glen Okita -- <A HREF="mailto:go@svpal.org">go@svpal.org</A>
+Wednesday, May 01, 1996
+</B>
+Environment: Win95, SC++ 7.2, MFC 3.2
+
+I'm trying to use a CToolTipCtrl with some controls.  The problem is
+that I'm not getting notification messages for callback tool tips.
+The non-callback tool tips work just fine.
+
+I've duplicated my problem with a (relatively) simple test case described 
+below.  I know this message is a little long -- but I hope to err on the 
+side of completeness and avoid confusion.
+
+1. I create a default SDI app with the AppExpress (the wizard-equivalent).
+
+2. I create a simple derived button class that forwards mouse messages
+   to the tool tip RelayEvent():
+      class CTTButton : public CButton
+      {
+      public:
+          static CToolTipCtrl* sm_pTT;
+      protected:
+          virtual BOOL PreTranslateMessage( MSG* pMsg);
+      };
+      
+      BOOL CTTButton::PreTranslateMessage( MSG* pMsg)
+      {
+          BOOL rv = CButton::PreTranslateMessage( pMsg);
+          // Forward any mouse messages.
+          if ( ! rv
+              && pMsg->message >= WM_MOUSEFIRST
+              && pMsg->message <= WM_MOUSELAST)
+                  sm_pTT->RelayEvent( pMsg);
+          return rv;
+      }
+
+3. In my view's OnCreate() I create a couple of test buttons and the
+   tool tip control:
+      int CttView::OnCreate(LPCREATESTRUCT lpCreateStruct)
+      {
+          if (CView::OnCreate(lpCreateStruct) == -1)
+              return -1;
+      
+          // to do: Add your specialized creation code here
+      
+          m_btnTT.Create( "Ordinary", BS_PUSHBUTTON | WS_VISIBLE, CRect(2, 2, 80, 26), this, 600);
+          m_btnTTCallback.Create( "Callback", BS_PUSHBUTTON | WS_VISIBLE, CRect(2, 28, 80, 52), this, 601);
+      
+          m_toolTip.Create( this);
+          m_toolTip.AddTool( &m_btnTT, "Ordinary Tip");
+          m_toolTip.AddTool( &m_btnTTCallback, LPSTR_TEXTCALLBACK);
+      
+          CTTButton::sm_pTT = &m_toolTip;
+          
+          return 0;
+      }
+
+4. The view also has a PreTranslate override to forward mouse messages
+   to the tool tip control.
+
+5. The view has a message map entry:
+      ON_MESSAGE(WM_NOTIFY,OnNotify)
+
+   And the message handler looks like:
+      LONG CttView::OnNotify( UINT wParam, LONG lParam)
+      {
+          TOOLTIPTEXT* pTTT = (TOOLTIPTEXT*) lParam;
+          if ( pTTT->hdr.code == TTN_NEEDTEXT)
+          {
+              TRACE1( " view notify %x\n", pTTT->hdr.idFrom);
+              pTTT->hinst = NULL;
+              pTTT->lpszText = "Callback Tip";
+          }
+          return TRUE;
+      }
+
+6. The message handler never gets called.  I've tried other variations
+   like putting the message map on the frame and on the derived button,
+   adding an OnChildNotify(), and looking for WM_NOTIFY in the
+   PreTranslate override.
+      From documentation and looking at MFC code, it seems to me that
+   the view should be the window that receives the notification.
+
+Would appreciate any explanation of what I'm missing, or perhaps a
+snippet/sample of working code.  None of the MFC examples that come
+with the compiler use a CToolTipCtrl.
+                                                               Glen Okita
+ti desrever sediT -- Tides reversed it                         go@svpal.org
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Glen Okita -- <A HREF="mailto:go@svpal.org">go@svpal.org</A>
+Friday, May 10, 1996
+</B>
+I submitted the following query:
+
+>Environment: Win95, SC++ 7.2, MFC 3.2
+>
+>I'm trying to use a CToolTipCtrl with some controls.  The problem is
+>that I'm not getting notification messages for callback tool tips.
+>The non-callback tool tips work just fine.
+> ... rest deleted for brevity...
+
+The solution is to override the the virtual function:
+   OnNotify(WPARAM wParam, LPARAM lParam, LRESULT* pResult)
+   (the base class OnNotify is also called).
+
+I was trying to handle the WM_NOTIFY message in a message map and
+it don't work that way...
+                                                               Glen Okita
+ti desrever sediT -- Tides reversed it                         go@svpal.org
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

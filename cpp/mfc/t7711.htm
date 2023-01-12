@@ -1,0 +1,554 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Resizing MDI child windows
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Svetlana Guljajeva -- <A HREF="mailto:svetlana@assert.ee">svetlana@assert.ee</A>
+Wednesday, November 13, 1996
+</B>
+Environment: VC++ 4.2-flat , Win95
+
+Hello!
+
+I have an MDI application and want my child windows to have the size of
+Main MDI Frame client area(not maximized MDI child!).
+I tried the following:(override the OnCreate function)
+
+int CChildFrame::OnCreate(LPCREATESTRUCT lpCreateStruct) 
+{	
+	CRect rctClient;
+                   CMainFrame * pMainFrame = (CMainFrame *)GetMDIFrame();
+                   pMainFrame->GetClientRect(&rctClient);
+
+                       //as I understand the following coords in
+LPCREATESTRUCT are
+                        //relative to parent's client area???
+
+                  lpCreateStruct->x = rctClient.left;
+                   lpCreateStruct->y = rctClient.top;
+                    lpCreateStruct->cx = rctClient.right;
+                    lpCreateStruct->cy = rctClient.bottom;
+
+                if (CMDIChildWnd::OnCreate(lpCreateStruct) == -1)
+		return -1;
+	return 0;
+}
+
+But window still appears with the default size.
+Where did I go wrong??
+
+Svetlana Guljajeva
+-----------------------------------------
+**svetlana@assert.ee**
+//**Assert Ltd.**\\
+//****Tallinn****\\
+//****Estonia****\\
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Severino Delaurenti -- <A HREF="mailto:del@alpha.ico.olivetti.com">del@alpha.ico.olivetti.com</A>
+Thursday, November 14, 1996
+</B>
+[Mini-digest: 7 responses]
+
+Hi Svetlana,
+
+Try to replace the line 
+                   CMainFrame * pMainFrame = (CMainFrame *)GetMDIFrame();
+with
+                   CMainFrame * pMainFrame = (CMainFrame *) AfxGetMainWnd ();
+
+With the first line you obtain a pointer to your CChildFrame window and not to the application main frame.
+
+Bye
+				Severino Delaurenti
+				del@alpha.ico.olivetti.com
+				Olivetti Lexikon Spa
+				Italy
+			
+----------
+From: 	Svetlana Guljajeva[SMTP:svetlana@assert.ee]
+Sent: 	13 November 1996 14:25
+To: 	mfc-l@netcom.com
+Subject: 	Resizing MDI child windows
+
+Environment: VC++ 4.2-flat , Win95
+
+Hello!
+
+I have an MDI application and want my child windows to have the size of
+Main MDI Frame client area(not maximized MDI child!).
+I tried the following:(override the OnCreate function)
+
+int CChildFrame::OnCreate(LPCREATESTRUCT lpCreateStruct) 
+{	
+	CRect rctClient;
+                   CMainFrame * pMainFrame = (CMainFrame *)GetMDIFrame();
+                   pMainFrame->GetClientRect(&rctClient);
+
+                       //as I understand the following coords in
+LPCREATESTRUCT are
+                        //relative to parent's client area???
+
+                  lpCreateStruct->x = rctClient.left;
+                   lpCreateStruct->y = rctClient.top;
+                    lpCreateStruct->cx = rctClient.right;
+                    lpCreateStruct->cy = rctClient.bottom;
+
+                if (CMDIChildWnd::OnCreate(lpCreateStruct) == -1)
+		return -1;
+	return 0;
+}
+
+But window still appears with the default size.
+Where did I go wrong??
+
+Svetlana Guljajeva
+-----------------------------------------
+**svetlana@assert.ee**
+//**Assert Ltd.**\\
+//****Tallinn****\\
+//****Estonia****\\
+
+-----From: "Tony Headford" <tony@ktgroup.co.uk>
+
+We ran into similar problems.
+Check out the MSJ #12(Dec) 1995 C/C++ Q&A on the MSDN.
+Basically you use CDocTemplate::InitialUpdateFrame to call
+CFrameWnd::InitialUpdateFrame in your CMDIChildWnd derivation to resize
+itself, then it all works ok. We found the MFC resizes the window AFTER
+OnCreate etc.
+
+Hope this helps!
+Tony.
+
+======================
+Tony Headford
+Software Developer
+
+tony@rms.co.uk
+======================
+
+-----From: berbece@itls.com
+
+Try to change the size of your MDI child in ActivateFrame().
+QUOTED DOCUMENTATION
+Override this member function to change how a frame is activated. For
+example, you can force MDI child windows to be maximized. Add the
+appropriate functionality, then call the base class version with an
+explicit nCmdShow.
+QUOTED DOCUMENTATION
+If you have a look at MFC implementation of CMDIChildWnd::OnCreate, 
+you'll notice that it uses only the create parameters and the context 
+from the CREATESTRUCT. So changing the x, y, cx, cy in your override 
+of OnCreate() is useless because they are never used.
+Maybe you can find more information from MSDN ( I have oct 96 ):
+FAQ: Changing the Styles of a Window Created by MFC.
+
+I hope this will help you.
+
+Ioan Berbece,
+Software Engineer,
+InterTrans Logistics Solutions
+-----From: "Underwood,Roger M." <RUNDEWOOD@cerner.com>
+
+The CChildFrame class is of type CMDIChildWnd, I assume.  When you call
+GetMDIFrame(), it returns the grandparent of the child frame, which is
+the main MDI frame window for your application.  What you want is the
+parent - the window of class MDICLIENT (you can see this using the Spy
+utility).  To get this window, just call GetParent(), and use this
+window to call GetClientRect().
+
+-----From: Pesce Roberto <roberto.pesce@elsag.it>
+
+Environment: VC++ 4.2-flat , Win95
+
+You can try to override the CChildFrame::PreCreateWindow() in this way 
+:
+
+BOOL CChildFrame::PreCreateWindow(CREATESTRUCT& cs)
+{
+	CRect rctClient;
+	CRect rctTB, rctSB;
+
+	CMainFrame *pMainFrame = (CMainFrame *) AfxGetMainWnd();
+            // get MainFrame Client Area Rectangle
+	pMainFrame->GetClientRect(&rctClient);
+
+            // if you have Toolbar and/or Status Bar you should set 
+them as
+            // public: in the class and not protected:, and then get 
+the
+            // WindowRect
+	pMainFrame->m_wndStatusBar.GetWindowRect(&rctSB);
+	pMainFrame->m_wndToolBar.GetWindowRect(&rctTB);
+
+            // Set Child Window Coordinates according to the 
+previously got sizes
+
+	cs.x = rctClient.top;
+	cs.y = rctClient.left;
+	cs.cx = rctClient.Width();
+	cs.cy = rctClient.Height() - rctTB.Height() - rctSB.Height();
+
+	return CMDIChildWnd::PreCreateWindow(cs);
+}
+
+This should work.
+
+Roberto Pesce
+roberto.pesce@elsag.it
+
+-----From: Dave_Rabbers@Quinton-Eng.CCMAIL.CompuServe.COM
+
+     Instead of overriding OnCreate (which is too late), override 
+     PreCreateWindow as follows:
+     
+     BOOL CYourMDIChildWnd::PreCreateWindow(CREATESTRUCT& cs) 
+     {
+        cs . style = WS_CHILD
+                                  | WS_VISIBLE
+                                  | WS_OVERLAPPED
+                                  | WS_CAPTION
+                                  | WS_SYSMENU
+                                  | WS_THICKFRAME
+                                  | WS_MINIMIZEBOX
+                                  | WS_MAXIMIZEBOX
+                                  | FWS_ADDTOTITLE;
+     
+        CMDIFrameWnd* pMainFrame = STATIC_DOWNCAST( CMDIFrameWnd, 
+     AfxGetMainWnd() );
+        CRect rectFrameWnd;
+        pMainFrame -> RepositionBars( 0, (UINT) -1, AFX_IDW_PANE_FIRST, 
+     reposQuery, &rectFrameWnd );
+     
+        cs . x = 0;
+        cs . y = 0;
+        cs . cx = rectFrameWnd . Width();
+        cs . cy = rectFrameWnd . Height();
+     
+        return CMDIChildWnd::PreCreateWindow(cs);
+     }
+     
+
+
+-----From: Peter.Walker@ubs.com
+
+Read CWnd::OnCreate....
+Note   This member function is called by the framework to allow your application
+to handle a Windows message. The parameters passed to your function reflect the 
+parameters received by the framework when the message was received. If you call 
+the base-class implementation of this function, that implementation will use the
+parameters originally passed with the message and not the parameters you supply 
+to the function.
+Try overidding CWnd::PreCreateWindow
+
+Peter Walker
+Peter Walker@ubs.com
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Roma -- <A HREF="mailto:roma@neonet.lv">roma@neonet.lv</A>
+Sunday, March 16, 1997
+</B>
+[Mini-digest: 4 responses]
+
+Hi!
+
+Ken Sutherland wrote:
+> 
+> Environment: VC++ 4.2b, Win NT 4.0
+> (Note: I'm using Japanese versions)
+> 
+> I'm sorry if this has been discussed here before.
+> 
+> I am trying to resize MDI child windows. The windows are suppose to
+> display .BMP files, so I want to make the size of the window the same
+> as the .BMP image. But the windows are always opened with the default
+> size.
+> 
+> My OnInitUpdate() looks like this:
+> 
+>   void CMyView::OnInitialUpdate()
+>   {
+>         CView::OnInitialUpdate();
+> 
+>         CMyDoc* pDoc = GetDocument();
+>         RECT rect;
+>         GetWindowRect(&rect);
+>         MoveWindow(rect.left, rect.right, pDoc->Width, pDoc->Height, TRUE);
+>   }
+> 
+
+This code will move view window itself. What you need is to move parent
+frame window.
+Like this:
+   void CMyView::OnInitialUpdate()
+   {
+         CView::OnInitialUpdate();
+ 
+         CMyDoc* pDoc = GetDocument();
+         RECT rect;
+         GetWindowRect(&rect);
+         GetParentFrame()->MoveWindow(rect.left, rect.right,
+pDoc->Width, pDoc->Height, TRUE);
+   }
+
+  Note, that this will affect whole parent frame - with caption and
+borders, so you
+probably have to increase Width/Heigth so the client area of the frame
+window (which
+is actuaslly occupied by your view) will be of desired size.
+
+
+[snip]
+> I don't want to user to be able to re-size the window, so I am
+> calling:
+> 
+>         ModifyStyle(WS_THICKFRAME, 0);
+> 
+> But this style also seems to be getting over-ridden, along with the
+> window size.
+Again, by calling ModifyStyle() from View member function you are
+changing style
+of the view itself, but you have to do that to parent frame.
+
+> 
+> - Clueless in Sapporo
+> 
+> ------------------------------- Ken Sutherland J-MAC SYSTEM, Inc.
+> ken@j-mac.co.jp <A HREF="http://www.j-mac.co.jp/">http://www.j-mac.co.jp/</A> http://www.voicenet.co.jp/~ken
+HTH,
+-Roma
+roma@neonet.lv
+-----From: "John Bundgaard" <piano_boxer@post1.com>
+
+U need to resize the Parent frame of the View, which actually controls
+the size of the view.
+
+void CMyView::OnInitialUpdate()
+{
+ 	CMyDoc* pDoc = GetDocument();
+	GetParentFrame()->SetWindowPos(NULL, 0, 0, pDoc->Width, pDoc->Height,
+SWP_NOZORDER|SWP_NOMOVE);
+}
+
+And U'r other question:
+
+U need to create a new Frame class, inherited from the CMDIFrameWnd class.
+Override the PreCreateWindow function. In this function, clear the
+WS_THICKFRAME flag, in
+CREATESTRUCT.style, and call the baseclass PreCreateFunction.
+
+NOTE: Be sure to register the view, to use the new frame window class.
+
+> I am trying to resize MDI child windows. The windows are suppose to
+> display .BMP files, so I want to make the size of the window the same
+> as the .BMP image. But the windows are always opened with the default
+> size.
+> 
+> 
+> Also,
+> 
+> I don't want to user to be able to re-size the window, so I am
+> calling:
+> 
+> 	ModifyStyle(WS_THICKFRAME, 0);
+> 
+> But this style also seems to be getting over-ridden, along with the
+> window size.
+
+-----From: CADS Software Developer <jonathan@pindar.com>
+
+The sizing of a CView derivative class must occur in the CMDIChildWnd class
+that you use.
+You can put sizing code in the PreCreateWindow member function of this
+class and it will
+size the window accordingly.
+
+This is be your CMDIChildWnd is the frame for the view (ie. the title bar,
+system menu, etc and border). The CView is the client bit in the middle.
+
+Hope this helps.
+
+@:-) Jonathan Cox (jonathan@pindar.com)
+
+----------
+> From: Ken Sutherland <ken@j-mac.co.jp>
+> To: mfc-l@netcom.com
+> Subject: Resizing MDI Child Windows
+> Date: 12 March 1997 05:47
+> 
+> Environment: VC++ 4.2b, Win NT 4.0
+> (Note: I'm using Japanese versions)
+> 
+> I'm sorry if this has been discussed here before.
+> 
+> I am trying to resize MDI child windows. The windows are suppose to
+> display .BMP files, so I want to make the size of the window the same
+> as the .BMP image. But the windows are always opened with the default
+> size.
+> 
+> My OnInitUpdate() looks like this:
+> 
+>   void CMyView::OnInitialUpdate() 
+>   {
+> 	CView::OnInitialUpdate();
+> 
+> 	CMyDoc* pDoc = GetDocument();
+> 	RECT rect;
+> 	GetWindowRect(&rect);
+> 	MoveWindow(rect.left, rect.right, pDoc->Width, pDoc->Height, TRUE);
+>   }
+> 
+> If I call GetWindowRect(), the size seems to be set correctly. My guess
+> is that MFC is setting the window size again, *after* OnIntialUpdate().
+> Should I be doing this from another over-ridable function?
+> 
+> I tried doing this from PreCreateWindow() and Create(), but I can't
+> call GetDocument() because the document class has not been created at
+> that point, so it throws a nasty exception. I've also just tried
+> hard-coding the sizes, but nothing seems to have any effect.
+> 
+> I have also tried SetWindowPos() without much improvement.
+> 
+> I have also tried moving CView::OnInitialUpdate() to the end of the
+> CMyView::OnIntialUpdate().
+> 
+> Also,
+> 
+> I don't want to user to be able to re-size the window, so I am
+> calling:
+> 
+> 	ModifyStyle(WS_THICKFRAME, 0);
+> 
+> But this style also seems to be getting over-ridden, along with the
+> window size.
+> 
+> - Clueless in Sapporo
+> 
+> ------------------------------- Ken Sutherland J-MAC SYSTEM, Inc.
+> ken@j-mac.co.jp <A HREF="http://www.j-mac.co.jp/">http://www.j-mac.co.jp/</A> http://www.voicenet.co.jp/~ken
+> 
+> 
+-----From: Josue Andrade Gomes <jgomes@lserver.cits.br>
+
+Ken Sutherland wrote:
+> 
+> Environment: VC++ 4.2b, Win NT 4.0
+> (Note: I'm using Japanese versions)
+> 
+> I'm sorry if this has been discussed here before.
+> 
+> I am trying to resize MDI child windows. The windows are suppose to
+> display .BMP files, so I want to make the size of the window the same
+> as the .BMP image. But the windows are always opened with the default
+> size.
+> 
+> My OnInitUpdate() looks like this:
+> 
+>   void CMyView::OnInitialUpdate()
+>   {
+>         CView::OnInitialUpdate();
+> 
+>         CMyDoc* pDoc = GetDocument();
+>         RECT rect;
+>         GetWindowRect(&rect);
+>         MoveWindow(rect.left, rect.right, pDoc->Width, pDoc->Height, TRUE);
+>   }
+> 
+> If I call GetWindowRect(), the size seems to be set correctly. My guess
+> is that MFC is setting the window size again, *after* OnIntialUpdate().
+> Should I be doing this from another over-ridable function?
+> 
+> I tried doing this from PreCreateWindow() and Create(), but I can't
+> call GetDocument() because the document class has not been created at
+> that point, so it throws a nasty exception. I've also just tried
+> hard-coding the sizes, but nothing seems to have any effect.
+> 
+> I have also tried SetWindowPos() without much improvement.
+> 
+> I have also tried moving CView::OnInitialUpdate() to the end of the
+> CMyView::OnIntialUpdate().
+> 
+> Also,
+> 
+> I don't want to user to be able to re-size the window, so I am
+> calling:
+> 
+>         ModifyStyle(WS_THICKFRAME, 0);
+> 
+> But this style also seems to be getting over-ridden, along with the
+> window size.
+> 
+> - Clueless in Sapporo
+> 
+> ------------------------------- Ken Sutherland J-MAC SYSTEM, Inc.
+> ken@j-mac.co.jp <A HREF="http://www.j-mac.co.jp/">http://www.j-mac.co.jp/</A> http://www.voicenet.co.jp/~ken
+
+Hi,
+
+I ran in the same problem some months ago. All MDI children windows are
+created
+the same way (using the same styles) even if you try to change the
+style.
+The solution is create the MDI client windows with style
+MDIS_ALLCHILDSTYLES
+(0x0001). This way you can create the children with any style. 
+Windows won't use its default styles for the children.
+This is pretty easy using the API. I guess this could be a little tricky
+in
+MFC.
+
+-- 
+Josue Andrade Gomes           jgomes@labplus.com.br
+Analista de Sistemas            Hotsoft Informatica
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+    <A HREF="http://www.digiday.com/mfcpro/joinmfcl.htm">Become an MFC-L member</A>
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

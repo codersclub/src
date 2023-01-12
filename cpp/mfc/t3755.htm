@@ -1,0 +1,372 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Accelerators for Dialog Buttons?
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Ivo Rothschild -- <A HREF="mailto:ivo@amber.hasc.ca">ivo@amber.hasc.ca</A>
+Wednesday, January 31, 1996
+</B>
+
+Hello All:
+
+I've looked in the books, the kb, and even asked Microsoft tech  
+support and I've been unable to come up with a satisfactory answer.
+
+I have a button in a modeless dialog that I want to be pressed when  
+the key F3 is pressed.  (In fact I don't care if the button is  
+actually pressed - I just need a message sent to my CDialog  
+subclass.)  I can have multiple instances of these dialogs around.
+
+I tried:
+
+1. adding an entry in the accelerator table which didn't work.
+
+2. Making a menu item with accelerator F3 and mapping it to my dialog.
+
+3. Making a menu item with accelerator F3 and mapping it to my  
+MainFrame. Then mapping the message OnSetFocus() and OnKillFocus()  
+in my dialog, and from there telling the MainFrame which dialog has  
+focus.  This was suggested by Microsoft tech support and it doesn't  
+work because the Dialog doesn't get the OnSetFocus and OnKillFocus  
+messages.
+
+4. Similar to 2 but mapping OnActivate() in the dialog. This  
+doesn't work either because when the user clicks on the menu, my  
+dialog loses activation.
+
+Is there a simple way to do this?  Is there any nice way to do this?
+Do I have to keep an ordered list of all my dialog instances so I  
+can dispatch the F3 key message to the right one?
+
+Thanks,
+-ivo
+ivo@hasc.ca
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+John Simmons -- <A HREF="mailto:jms@connectnet.com">jms@connectnet.com</A>
+Thursday, February 01, 1996
+</B>
+[Mini-digest: 2 responses]
+
+At 07:51 PM 1/31/96 -0500, you wrote:
+>
+>Hello All:
+>
+>I've looked in the books, the kb, and even asked Microsoft tech  
+>support and I've been unable to come up with a satisfactory answer.
+>
+>I have a button in a modeless dialog that I want to be pressed when  
+>the key F3 is pressed.  (In fact I don't care if the button is  
+>actually pressed - I just need a message sent to my CDialog  
+>subclass.)  I can have multiple instances of these dialogs around.
+>
+>I tried:
+>
+>1. adding an entry in the accelerator table which didn't work.
+>
+>2. Making a menu item with accelerator F3 and mapping it to my dialog.
+>
+>3. Making a menu item with accelerator F3 and mapping it to my  
+>MainFrame. Then mapping the message OnSetFocus() and OnKillFocus()  
+>in my dialog, and from there telling the MainFrame which dialog has  
+>focus.  This was suggested by Microsoft tech support and it doesn't  
+>work because the Dialog doesn't get the OnSetFocus and OnKillFocus  
+>messages.
+>
+>4. Similar to 2 but mapping OnActivate() in the dialog. This  
+>doesn't work either because when the user clicks on the menu, my  
+>dialog loses activation.
+>
+>Is there a simple way to do this?  Is there any nice way to do this?
+>Do I have to keep an ordered list of all my dialog instances so I  
+>can dispatch the F3 key message to the right one?
+>
+
+I had to pre-capture keypressed PGUP, PGDN, and F1 in an app I did, and this
+is the code I used to do it (whittled down to accomodate your needs).  Hope
+it helps.
+
+put this in the header file where the dialog box class is defined:
+
+const UINT KEY_F3 = 250; // arbitrary number, any value will do...
+
+class CMyDialog
+{
+ private:
+  FARPROC lpfnFilterProc;  
+  static HHOOK HookID;
+  HINSTANCE hInst;
+  static DWORD CALLBACK KeystrokeHook(int nCode, WORD wParam, LONG lParam);
+...
+};
+
+
+put this in the cpp file where the class is implemented:
+
+BEGIN_MESSAGE_MAP(CFamilyDlg, CDialog)
+  //{{AFX_MSG_MAP(CFamilyDlg)
+  ON_MESSAGE(WM_KEYSTROKE,OnKeystroke)
+  ...
+  ...
+  ... other message map functions here
+  ...
+  ...
+  //}}AFX_MSG_MAP
+END_MESSAGE_MAP()
+
+HHOOK CMyDialog::HookID=0;
+
+//-----------------------------------------------------------------------------/
+BOOL CMyDialog::OnInitDialog() 
+{
+  CDialog::OnInitDialog();
+
+  LPDWORD processid = 0;
+  HookID = SetWindowsHookEx(WH_MSGFILTER, 
+                            (HOOKPROC)CMyDialog::KeystrokeHook, 
+                            theApp.m_hInstance, 
+                            GetWindowThreadProcessId(m_hWnd, processid));
+  ...
+  ...
+  ... other dialog box initialization here (if needed)
+  ...
+  ...
+  return TRUE;  
+}
+            
+LONG CMyDialog::OnKeystroke(UINT wParam, LONG lParam)
+{
+  switch (toupper(wParam))
+  {
+    case KEY_F3   : OnPressedF3(); return 1L;
+    default : break;
+  }
+  return 1L;
+}
+
+DWORD CALLBACK CMyDialog::KeystrokeHook(int nCode, WORD wParam, LONG lParam)
+{
+  if (nCode < 0)
+    return CallNextHookEx((HHOOK) HookID, nCode, wParam, lParam);
+  if (nCode == MSGF_DIALOGBOX)
+  {
+    MSG FAR *ptrMsg = (MSG FAR *)lParam; 
+    if (WM_KEYDOWN == ptrMsg->message)
+    { 
+      switch (ptrMsg->wParam)
+      {
+        case VK_F3:
+          ::PostMessage(::GetParent(ptrMsg->hwnd),
+                        WM_KEYSTROKE,KEY_F3,lParam);
+          return 1L;
+      }
+    }
+  }
+  return 0L;
+}
+
+void CMyDialog::OnPressedKeyF3()
+{
+  ...
+  ...
+  ... code to handle F3 key being pressed
+  ...
+  ...
+}
+
+/=========================================================\
+| John Simmons (Redneck Techno-Biker)                     |
+|    jms@connectnet.com                                   |
+| Home Page                                               |
+|    www2.connectnet.com/users/jms/                       |
+|---------------------------------------------------------|
+| ViewPlan, Inc. home page (my employer)                  |
+|    www.viewplan.com/index.html                          |
+|---------------------------------------------------------|
+| IGN #3 American Eagle Motorsports Zerex Ford	          |
+|    Teammates - Steve Stevens (#13 Hooters Ford and      |
+|                               1995 IGN Points Champ)    |
+|                Pat Campbell (#95 Dr. Pepper Ford)       |
+| American Eagle Motorsports Team Page                    | 
+|    www2.connectnet.com/users/jms/ignteam                |
+|---------------------------------------------------------|
+| Competitor - Longest Signature File On The Net          |
+\=========================================================/
+
+-----From: "Nick Gall" <nick_gall@usemail.com>
+
+On 31 Jan 96 at 19:51, Ivo Rothschild wrote:
+
+> 
+> Hello All:
+> 
+> I've looked in the books, the kb, and even asked Microsoft tech  
+> support and I've been unable to come up with a satisfactory answer.
+> 
+> I have a button in a modeless dialog that I want to be pressed when  
+> the key F3 is pressed.  (In fact I don't care if the button is  
+> actually pressed - I just need a message sent to my CDialog  
+> subclass.)  I can have multiple instances of these dialogs around.
+
+Is the following KB article what you are looking for? I found it by
+doing a search for "Accelerators and Modeless" with the VC++ 4.0
+Infoviewer.
+
+-- Nick
+
+Using Accelerators with an MFC Modeless Dialog Box
+PSS ID Number: Q117500
+Article last modified on 05-25-1995
+
+1.00 1.50 1.51 1.52 | 1.00 2.00 2.10
+
+WINDOWS             | WINDOWS NT
+
+
+----------------------------------------------------------------------
+The information in this article applies to:
+
+ - The Microsoft Foundation Classes (MFC) included with:
+    - Microsoft Visual C++ for Windows, versions 1.0, 1.5, 1.51, and
+      1.52
+    - Microsoft Visual C++ 32-bit Edition, version 1.0, 2.0, and 2.1
+----------------------------------------------------------------------
+
+SUMMARY
+=======
+
+To use accelerators with a modeless dialog box, override the function
+"PreTranslateMessage()" in your derived CDialog class.
+
+MORE INFORMATION
+================
+
+To use accelerators with your modeless dialog box, perform the
+following steps:
+
+1. Create a modeless dialog box. For additional information, please
+see the
+   following article in the Microsoft Knowledge Base:
+
+      ARTICLE-ID: Q103788
+      TITLE     : Creating a Modeless Dialog Box with MFC Libraries
+
+2. Insert this sample code into the files listed above the code:
+
+   // .H file with your derived CDialog class
+   class CModeless : public CDialog
+   {
+      .
+    public:
+      virtual BOOL PreTranslateMessage(MSG*);
+      .
+   };
+
+   //.CPP file
+   BOOL CModeless::PreTranslateMessage(MSG* pMsg)
+   {
+      HACCEL hAccel =
+             ((CMainFrame*)AfxGetApp()->m_pMainWnd)->GetAccelTable();
+      if(!(hAccel && ::TranslateAccelerator(m_hWnd, hAccel, pMsg)))
+         return CDialog::PreTranslateMessage(pMsg);
+      else
+         return TRUE;
+   }
+
+   // MAINFRM.H file, where CMainFrame is the main window class
+   HACCEL CMainFrame::GetAccelTable() { return m_hAccelTable; }
+
+3. Create the accelerators with App Studio. The accelerators should be
+in
+   the IDR_MAINFRAME accelerator table. They should also have the same
+   ID as the controls or menu items with which they are associated.
+
+Additional reference words: kbinf 1.00 1.50 1.51 1.52 2.00 2.10 2.50
+2.51 2.52 3.00 3.10 KBCategory: kbprg KBSubcategory: MfcUI
+
+======================================================================
+
+Copyright Microsoft Corporation 1995.
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+David W. Gillett -- <A HREF="mailto:DGILLETT@expertedge.com">DGILLETT@expertedge.com</A>
+Friday, February 02, 1996
+</B>
+> I've looked in the books, the kb, and even asked Microsoft tech  
+> support and I've been unable to come up with a satisfactory answer.
+> 
+> I have a button in a modeless dialog that I want to be pressed when  
+> the key F3 is pressed.  (In fact I don't care if the button is  
+> actually pressed - I just need a message sent to my CDialog  
+> subclass.)  I can have multiple instances of these dialogs around.
+
+
+  Things may have changed since MFC 2.x, but in that version there 
+were four or maybe five implementations of PreTranslateMessage() in 
+the source (which you have...).  The version supplied by CDialog for 
+modeless dialogs was the only one that did not implement 
+accelerators.
+
+  So what I did when I ran into a version of this problem was overide 
+that function in my CDialog-derived class, stealing the code from the 
+source and adding the one or two lines needed, stolen from one of the 
+other versions in the source.
+
+  [I don't *think* there was any private implementation-only detail 
+in the code I borrowed, but this sort of thing needs documenting as a 
+possible issue in porting to future versions....]
+
+Dave
+
+ 
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

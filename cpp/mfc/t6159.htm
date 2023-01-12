@@ -1,0 +1,363 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+VC4.2 & C2664 problem
+</B></FONT>
+<BR>
+<PRE>
+<B>
+<A HREF="mailto:Dave_Chestnutt@keyfile.com">Dave_Chestnutt@keyfile.com</A>
+Tuesday, August 06, 1996
+</B>
+Environment: VC 4.2, NT 3.51 SP4
+
+We're using CTypedPtr<> templates.  With VC 4.1, our code compiled and
+ran ok.  With 4.2, however, in a few places it fails with this
+compile error:
+
+  C:\MSDEV\mfc\include\afxtempl.h(1561) : error C2664: 
+    'struct __POSITION *CObList::AddHead(class CObject *)' : 
+    cannot convert parameter 1 from 'class KConnectorModel *' 
+    to 'class CObject *' (new behavior; please see help)
+
+Some (hopefully) relevant lines from our .h file:
+
+--Our class is based on CObject..
+
+  class KConnectorModel : public CObject {...};
+
+--and elsewhere, inside a class definition:
+
+  CTypedPtrList<CObList, class KConnectorModel *> m_listInputConnectors;
+
+I believe that the line above is the offending one, causing
+CTypedPtrList to barf.
+
+I've read the release notes on C2664 (and "Technote: Improved
+Conformance to ANSI C++"), but don't see how they apply to this case.
+
+Anyone have any ideas or hints?
+
+Thanks!
+-Dave
+
+ ========================================================================
+ | Dave Chestnutt  |         /  |  Windows NT, Exchange and MAPI, whew! |
+ | Keyfile Corp.   |        /   |                      (ex-Lotus Notes) |
+ | Nashua NH USA   |     /\/    |            dave_chestnutt@keyfile.com |
+ |-----------------|    /       |              72764.304@compuserve.com |
+ | (603) 883-3800  |   *        |             Yes, He really DOES save! |
+ ========================================================================
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Stephen Wolstenholme -- <A HREF="mailto:steve@tropheus.demon.co.uk">steve@tropheus.demon.co.uk</A>
+Friday, August 09, 1996
+</B>
+[Mini-digest: 5 responses]
+
+On Tue, 06 Aug 96 16:51:12 EDT, you wrote:
+
+>Environment: VC 4.2, NT 3.51 SP4
+>
+>We're using CTypedPtr<> templates.  With VC 4.1, our code compiled and
+>ran ok.  With 4.2, however, in a few places it fails with this
+>compile error:
+>
+>  C:\MSDEV\mfc\include\afxtempl.h(1561) : error C2664: 
+>    'struct __POSITION *CObList::AddHead(class CObject *)' : 
+>    cannot convert parameter 1 from 'class KConnectorModel *' 
+>    to 'class CObject *' (new behavior; please see help)
+>
+
+I hit this problem when I first recompiled with 4.2 and discovered
+that it is no longer possible to use forward declarations for
+CTyped... classes. My code has "evolved" from the scribble tutorial
+that also used foward declarations. The scribble example has now been
+changed but the associated documentation has not. MS must be assuming
+that all the 4.2 users no longer need a tutorial.
+
+
+-----From: Lance Lovette <Lovette@iftech.com>
+
+Dave,
+
+>> C:\MSDEV\mfc\include\afxtempl.h(1561) : error C2664: 'struct
+>> __POSITION *CObList::AddHead(class CObject *)' :  cannot convert
+>> parameter 1 from 'class KConnectorModel *' to 'class CObject *'
+>> (new behavior; please see help)
+
+I had a similar sounding problem with CTypedPtrArray (although I don't
+remember the exact error message so it may have been another problem).
+My problem was that I was defining the template before defining the
+objects the template was storing. For example,
+
+CTypedPtrList<CObList, class KConnectorModel *> m_listInputConnectors;
+
+class KConnectorModel
+{
+};
+
+This worked in 4.1 but because of some template changes, it did not
+work in 4.2. I solved the problem by moving the class definition
+before the CTypedPtrList.
+
+Lance
+lovette@iftech.com
+
++-------------------------------------------------------------------+
+Interface Technologies, Inc.
+
+For a collection of free tutorials covering a variety of programming
+and computer-related topics such as Visual C++, MFC, and Windows NT
+check out the ITI On-line Training Center at http://www.iftech.com.
+
+-----From: "Michael Thayer" <mthayer@ix.netcom.com>
+
+Usually this just means that you have do do an explicit cast:
+
+The compiler used to do this for you, and now you have to stick in a
+(COBject*)
+cast.  Frankly this is one area where the standrds groups has made C++ even
+weirder than it's C heritage requires.
+
+Michael
+
+-----From: Deepak Saxena <Deepak_Saxena@ccm.ch.intel.com>
+
+
+Text item: 
+
+I was having the same problem just a few days ago.  My problem was that I had 
+used declared the class a CObject derived class but had used 
+DECLARE_DYNAMIC(CMyClass, CMyOtherClass).  Fixing my DECLARE_DYNAMIC() macro 
+fixed this problem.
+
+Deepak
+
+-----From: Mike Blaszczak <mikeblas@nwlink.com>
+
+At 04:51 PM 8/6/96 EDT, Dave_Chestnutt wrote:
+
+>We're using CTypedPtr<> templates.  With VC 4.1, our code compiled and
+>ran ok.  With 4.2, however, in a few places it fails with this
+>compile error:
+
+In MFC 4.2, I tightened up the type checking on several
+typesafe template class member functions because they were either
+not protected or poorly protected.
+
+>  C:\MSDEV\mfc\include\afxtempl.h(1561) : error C2664: 
+>    'struct __POSITION *CObList::AddHead(class CObject *)' : 
+>    cannot convert parameter 1 from 'class KConnectorModel *' 
+>    to 'class CObject *' (new behavior; please see help)
+
+This message is pretty unfortunate.  The error message is from
+the compiler, and the compiler doesn't (can't) know anything about
+the context in which you're using it.  The "new behaviour" applies
+_ONLY_ only OnLY  ohhhhnulee to the compiler's interpretation
+and implemnetation of the ANSI not-yet-standard.  The message
+implies that the compiler knows that you're playing with some
+other part of the package (eg, the runtimes or the STL or MFC)
+that changed and that the error you're getting is because of
+some "new behaviour" of something other than the compiler.
+
+>Some (hopefully) relevant lines from our .h file:
+
+>--Our class is based on CObject..
+>  class KConnectorModel : public CObject {...};
+
+Since KConnectorModel derives from CObject, you should always
+be able to convert from a KConnectorModel* to a CObject*.
+
+The only situation where you wouldn't is if you had an incomplete
+(that is, forward) declaration of KConnectorModel and then tried
+to declare the template.
+
+If the compiler sees
+
+  class KConnectorModel : public CObject {...};
+  CTypedPtrList<CObList, class KConnectorModel *> m_listInputConnectors;
+
+you're just fine: the compiler knows that KConnectorModel "is-a"
+CObject.  But if the compiler doesn't see that information:
+
+  class KConnectorModel;  // forward decl
+  CTypedPtrList<CObList, class KConnectorModel *> m_listInputConnectors;
+
+you'll get an error message like you describe.
+
+.B ekiM
+http://www.nwlink.com/~mikeblas   <--- trip report central
+1995 Honda VFR750F (Serial number 00050!)
+1987 Yamaha FZ700 (damaged)                AMA, HRC, VFROC
+These words are my own: I do not speak for Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Monday, August 12, 1996
+</B>
+At 10:37 AM 8/9/96 GMT, Stephen Wolstenholme wrote:
+
+>The scribble example has now been
+>changed but the associated documentation has not. MS must be assuming
+>that all the 4.2 users no longer need a tutorial.
+
+Or, maybe it was just an honest oversight. Maybe, just this once, there
+_isn't_ a conspiracy.
+
+Of course, I'm assuming you don't have anything to back up this flippant,
+abrasive little quip.  That's probably wrong; who would use words like
+"must" without any real evidence?
+
+.B ekiM
+http://www.nwlink.com/~mikeblas/
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:hsusc@nt.com">hsusc@nt.com</A>
+Friday, August 09, 1996
+</B>
+>We're using CTypedPtr<> templates.  With VC 4.1, our code compiled and
+>ran ok.  With 4.2, however, in a few places it fails with this
+>compile error:
+>
+>  C:\MSDEV\mfc\include\afxtempl.h(1561) : error C2664: 
+>    'struct __POSITION *CObList::AddHead(class CObject *)' : 
+>    cannot convert parameter 1 from 'class KConnectorModel *' 
+>    to 'class CObject *' (new behavior; please see help)
+>
+>Some (hopefully) relevant lines from our .h file:
+>
+>--Our class is based on CObject..
+>
+>  class KConnectorModel : public CObject {...};
+>
+>--and elsewhere, inside a class definition:
+>
+>  CTypedPtrList<CObList, class KConnectorModel *> m_listInputConnectors;
+
+I ran into the same problem during upgrade from VC 4.1 to 4.2.  If in your case, m_listInputConnectors is
+a stored as a member variable, then I believe we have the same problem.  So you should have the 
+following:
+
+// MyClass header file
+
+
+// forward declarations
+class KConnectorModel;  <======= this needs to be modified to a #include "KConnectorModel.h"
+
+class MyClass {
+	.
+	.
+	.
+  CTypedPtrList<CObList, KConnectorModel *> m_listInputConnectors;
+        // template is instantiated at this point.  So the compiler needs the #include in order to trace
+        // KConnectorModel's class hierarchy all the way now to CObject.  For details see ANSI C++ draft,
+        // 14.3.2, Template Point of instantiation
+	
+}
+ 
+
+The workaround is to #include "KConnectorModel.h" instead of using a class forward declaration.  And
+I believe the reason that the error code C2664 points you to the technote about VC 4.2's "Improved
+Conformance to ANSI C++" is because with the new version of the compiler, templates of this type are
+instantiated in the header file.  And that also explains why the error is telling you it cannot convert
+KConnectorModel to CObject.  In your use, CTypedPtrList has CObList as the Base class, however,
+CObList requires KConnectorModel to be of CObject type.  But with a forward declaration, the compiler
+is not able to find the header file of the KConnectorModel to trace the class hierarchy; thus the error.Hope this shed some lights.
+
+
+- Stan
+
+Nortel - Mission Park
+Software Engineer
+hsusc@nt.com
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Wednesday, August 14, 1996
+</B>
+At 04:43 PM 8/9/96 +0100, hsusc@nt.com wrote:
+
+>The workaround is to #include "KConnectorModel.h" instead of
+>using a class forward declaration. 
+
+This isn't a workaround--it's a fix. There's no problem in the product
+in this area; the problem is in your code, which is making use of a class
+without having a complete definition for it.
+
+>And I believe the reason that the error code C2664 points you
+>to the technote about VC 4.2's "Improved Conformance to ANSI C++" is
+because >with the new version of the compiler,
+
+As I explained in a previous note with this subject line, this has nothing
+to do with a compiler change. The templated collection wrapper classes,
+like CTypedPtrList, were enhanced in MFC 4.2 to more carefully typecheck
+their parameters.
+
+>But with a forward declaration, the compiler
+>is not able to find the header file of the KConnectorModel
+>to trace the class hierarchy; thus the error.
+
+Right.  This an error, though, no matter which version of the compiler
+you're using.
+
+.B ekiM
+http://www.nwlink.com/~mikeblas/
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

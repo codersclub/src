@@ -1,0 +1,696 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+dynamic_cast and const problem
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Guy G. Piggford -- <A HREF="mailto:ggp@informix.com">ggp@informix.com</A>
+Friday, March 07, 1997
+</B>
+Environment:  Windows NT 3.51, VC++ 4.2b
+
+I have the following problem trying to use dynamic_cast on a const object
+pointer, bearing in mind that I'm not tying to change the const-ness of the
+object I'm rather puzzled.
+
+
+class ClassA : public CObject
+{
+	.....
+};
+class ClassB : public ClassA
+{
+	......
+};
+
+const ClassA * pA = somefunc();
+const ClassB * pB = dynamic_cast<const ClassB *>(pA);
+
+The line with the dynamic_cast generates the following error.
+
+error C2682: cannot use dynamic_cast to convert from 'const class ClassA *'
+to 'const class ClassB *'
+
+if I change the last two lines to
+
+ClassA * pA = const_cast<ClassA * >(somefunc());
+ClassB * pB = dynamic_cast<ClassB *>(pA);
+
+then it compiles fine.
+
+Have I misunderstood something here?
+
+Guy
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Guy G. Piggford -- <A HREF="mailto:ggp@informix.com">ggp@informix.com</A>
+Monday, March 10, 1997
+</B>
+Environment:  Windows NT 3.51, VC++ 4.2b
+
+I'm having the following problem, now whilst I know it's not strictly an
+MFC problem, this did seem the most likely place to ask considering the
+expertise here.
+
+I have the following problem trying to use dynamic_cast on a const object
+pointer, bearing in mind that I'm not tying to change the const-ness of the
+object I'm rather puzzled.
+
+
+class ClassA : public CObject
+{
+	.....
+};
+class ClassB : public ClassA
+{
+	......
+};
+
+const ClassA * pA = somefunc();
+const ClassB * pB = dynamic_cast<const ClassB *>(pA);
+
+The line with the dynamic_cast generates the following error.
+
+error C2682: cannot use dynamic_cast to convert from 'const class ClassA *'
+to 'const class ClassB *'
+
+if I change the last two lines to
+
+ClassA * pA = const_cast<ClassA * >(somefunc());
+ClassB * pB = dynamic_cast<ClassB *>(pA);
+
+then it compiles fine.
+
+Have I misunderstood something here?
+
+Guy
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Erik Funkenbusch -- <A HREF="mailto:chucks@isd.net">chucks@isd.net</A>
+Monday, March 10, 1997
+</B>
+Though this has nothing to do with MFC, i'll still answer this.
+
+[Moderator's note:  Fire the moderator!  Fire the... um...]
+
+You cannot convert your A point to a B pointer because A is *NOT* a B.  =
+You can dynamic_cast a B to an A because B is derived from A, but you =
+can't dynamic_cast an A to a B.
+
+This is like saying a poodle is a dog, therefore all dogs are poodles.  =
+It doesn't work.
+
+So yes, you are missing something.
+
+-----Original Message-----
+From:	Guy G. Piggford [SMTP:ggp@informix.com]
+Sent:	Friday, March 07, 1997 11:27 AM
+To:	mfc-l@netcom.com
+Subject:	dynamic_cast and const problem
+
+Environment:  Windows NT 3.51, VC++ 4.2b
+
+I have the following problem trying to use dynamic_cast on a const =
+object
+pointer, bearing in mind that I'm not tying to change the const-ness of =
+the
+object I'm rather puzzled.
+
+
+class ClassA : public CObject
+{
+	.....
+};
+class ClassB : public ClassA
+{
+	......
+};
+
+const ClassA * pA =3D somefunc();
+const ClassB * pB =3D dynamic_cast<const ClassB *>(pA);
+
+The line with the dynamic_cast generates the following error.
+
+error C2682: cannot use dynamic_cast to convert from 'const class ClassA =
+*'
+to 'const class ClassB *'
+
+if I change the last two lines to
+
+ClassA * pA =3D const_cast<ClassA * >(somefunc());
+ClassB * pB =3D dynamic_cast<ClassB *>(pA);
+
+then it compiles fine.
+
+Have I misunderstood something here?
+
+Guy
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:ktm@ormec.com">ktm@ormec.com</A>
+Friday, March 14, 1997
+</B>
+On mfc-l, chucks@isd.net wrote:
+> Though this has nothing to do with MFC, i'll still answer this.
+> [Moderator's note:  Fire the moderator!  Fire the... um...]
+
+Moderator: well, if you insist. :-)
+
+> You cannot convert your A point to a B pointer because A is *NOT* a B.
+> You can dynamic_cast a B to an A because B is derived from A, but you
+> can't dynamic_cast an A to a B.
+> 
+> This is like saying a poodle is a dog, therefore all dogs are poodles.
+> It doesn't work.
+> 
+> So yes, you are missing something.
+
+You're wrong. This is a *dynamic* cast, so you're allowed to do 
+downcasting. You end up getting a NULL pointer back if you do a cast
+that isn't allowed. See the online help for dynamic_cast for details.
+
+In the specific example 
+>Guy G. Piggford [SMTP:ggp@informix.com] wrote:
+>> const ClassA * pA = somefunc();
+>> const ClassB * pB = dynamic_cast<const ClassB *>(pA);
+
+the missing function somefunc() is no doubt something along the 
+lines of:
+
+classA* somefunc() {
+  return new classB; // classB IsA classA, so this is OK
+}
+
+So, it's OK to cast the result back to a classB.
+
+In any case, the problem Guy is having is due to a known bug in the
+VC++4.2 compiler, see KB article Q150576, available online at
+  <<A HREF="http://www.microsoft.com/kb/articles/q150/5/76.htm>">http://www.microsoft.com/kb/articles/q150/5/76.htm></A>
+
+  Katy
+-- 
+Katy Mulvey                    <<A HREF="mailto:ktm@ormec.com>">mailto:ktm@ormec.com></A>
+Software Development Engineer
+ORMEC Systems
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Guy G. Piggford -- <A HREF="mailto:ggp@informix.com">ggp@informix.com</A>
+Monday, March 17, 1997
+</B>
+[Mini-digest: 5 responses]
+
+At 11:08  3/10/97 -0600, you wrote:
+>Though this has nothing to do with MFC, i'll still answer this.
+>
+>[Moderator's note:  Fire the moderator!  Fire the... um...]
+>
+>You cannot convert your A point to a B pointer because A is *NOT* a B.  =
+>You can dynamic_cast a B to an A because B is derived from A, but you =
+>can't dynamic_cast an A to a B.
+>
+>This is like saying a poodle is a dog, therefore all dogs are poodles.  =
+>It doesn't work.
+>
+>So yes, you are missing something.
+
+No, the point is that by using dynamic_cast you are testing the dog to see
+if it's a poodle.
+
+You need to read what dynamic_cast actually does and find out why and how
+it differs from the other casting mechanisms offered by C++.
+
+Just to follow up on the original question that I placed.  This turns out
+to be a know problem with the VC++ 4.x compiler (don't know if it's fixed
+in VC++ 5.0 yet) so I should have checked out the knowledge base more
+thoroughly.
+
+See KB article Q150576 
+  <<A HREF="http://www.microsoft.com/kb/articles/q150/5/76.htm>">http://www.microsoft.com/kb/articles/q150/5/76.htm></A>
+
+Thanks for all the follow ups - Guy
+
+>
+>-----Original Message-----
+>From:	Guy G. Piggford [SMTP:ggp@informix.com]
+>Sent:	Friday, March 07, 1997 11:27 AM
+>To:	mfc-l@netcom.com
+>Subject:	dynamic_cast and const problem
+>
+>Environment:  Windows NT 3.51, VC++ 4.2b
+>
+>I have the following problem trying to use dynamic_cast on a const =
+>object
+>pointer, bearing in mind that I'm not tying to change the const-ness of =
+>the
+>object I'm rather puzzled.
+>
+>
+>class ClassA : public CObject
+>{
+>	.....
+>};
+>class ClassB : public ClassA
+>{
+>	......
+>};
+>
+>const ClassA * pA =3D somefunc();
+>const ClassB * pB =3D dynamic_cast<const ClassB *>(pA);
+>
+>The line with the dynamic_cast generates the following error.
+>
+>error C2682: cannot use dynamic_cast to convert from 'const class ClassA =
+>*'
+>to 'const class ClassB *'
+>
+>if I change the last two lines to
+>
+>ClassA * pA =3D const_cast<ClassA * >(somefunc());
+>ClassB * pB =3D dynamic_cast<ClassB *>(pA);
+>
+>then it compiles fine.
+>
+>Have I misunderstood something here?
+>
+>Guy
+>
+>
+-----From: Erik Funkenbusch <chucks@isd.net>
+
+
+Look, I've gotten a lot of flack over this, so let me explain a little =
+clearer.
+
+dynamic_cast operates in two ways depending on your environment.
+
+1:  dynamic_cast will operate the way you say *IF* RTTI is enabled.  =
+This is not the default and the included text makes no reference to A* =
+pointing to an actual instance of a B. =20
+
+2:  dynamic_cast can be used for upcasting at compile time in the =
+default environment.
+
+Given the circumstantial evidence I assumed that the poster was simply =
+trying to use dynamic_cast as an upcast, but had made a mistake.
+
+I hope this stops some of the insulting and hateful email i've been =
+recieving over this.
+
+----------
+From: 	ktm@ormec.com
+Sent: 	Friday, March 14, 1997 10:32 AM
+To: 	mfc-l@netcom.com; chucks@isd.net
+Subject: 	RE: dynamic_cast and const problem
+
+On mfc-l, chucks@isd.net wrote:
+> Though this has nothing to do with MFC, i'll still answer this.
+> [Moderator's note:  Fire the moderator!  Fire the... um...]
+
+Moderator: well, if you insist. :-)
+
+> You cannot convert your A point to a B pointer because A is *NOT* a B.
+> You can dynamic_cast a B to an A because B is derived from A, but you
+> can't dynamic_cast an A to a B.
+>=20
+> This is like saying a poodle is a dog, therefore all dogs are poodles.
+> It doesn't work.
+>=20
+> So yes, you are missing something.
+
+You're wrong. This is a *dynamic* cast, so you're allowed to do=20
+downcasting. You end up getting a NULL pointer back if you do a cast
+that isn't allowed. See the online help for dynamic_cast for details.
+
+In the specific example=20
+>Guy G. Piggford [SMTP:ggp@informix.com] wrote:
+>> const ClassA * pA =3D somefunc();
+>> const ClassB * pB =3D dynamic_cast<const ClassB *>(pA);
+
+the missing function somefunc() is no doubt something along the=20
+lines of:
+
+classA* somefunc() {
+  return new classB; // classB IsA classA, so this is OK
+}
+
+So, it's OK to cast the result back to a classB.
+
+In any case, the problem Guy is having is due to a known bug in the
+VC++4.2 compiler, see KB article Q150576, available online at
+  <<A HREF="http://www.microsoft.com/kb/articles/q150/5/76.htm>">http://www.microsoft.com/kb/articles/q150/5/76.htm></A>
+
+  Katy
+--=20
+Katy Mulvey                    <<A HREF="mailto:ktm@ormec.com>">mailto:ktm@ormec.com></A>
+Software Development Engineer
+ORMEC Systems
+
+
+-----From: David Noble <dsn@eps.inso.com>
+
+Dynamic casting is absolutely intended for such usage! Specifically, it =
+is intended to provide type checking at runtime to assure that you have =
+safely cast up, down, or across in a class hierarchy.=20
+
+By "casting safely" I mean that if you dynamically cast up or down from =
+an expression that evaluates to a pointer to some object, then that =
+object better fit into the class hierarchy indicated by the dynamic_cast =
+expression. If it does not, a bad_cast exception is thrown.
+
+Regarding your specific example, all I can say without spending more =
+time than I presently have  is that C++ forces you to be really, really =
+careful about matching up the const-ness of your objects.
+
+DavidN
+
+-----Original Message-----
+From:	Lior Messinger [SMTP:100274.2607@compuserve.com]
+Sent:	Sunday, March 16, 1997 3:57 AM
+To:	MFC Mailing List
+Subject:	Re: dynamic_cast
+
+Hi,
+
+I still don't understand why on the second compilation it still compiled =
+fine.
+There also the casting was from A to B. And, isn't dynamic caasting =
+intended for
+such usages?
+
+Thanks,
+Lior.
+
+
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D
+
+You cannot convert your A point to a B pointer because A is *NOT* a B.  =
+=3D
+You can dynamic_cast a B to an A because B is derived from A, but you =
+=3D
+can't dynamic_cast an A to a B.
+
+This is like saying a poodle is a dog, therefore all dogs are poodles.  =
+=3D
+It doesn't work.
+
+So yes, you are missing something.
+
+-----Original Message-----
+From:	Guy G. Piggford [SMTP:ggp@informix.com]
+Sent:	Friday, March 07, 1997 11:27 AM
+To:	mfc-l@netcom.com
+Subject:	dynamic_cast and const problem
+
+Environment:  Windows NT 3.51, VC++ 4.2b
+
+I have the following problem trying to use dynamic_cast on a const =3D
+object
+pointer, bearing in mind that I'm not tying to change the const-ness of =
+=3D
+the
+object I'm rather puzzled.
+
+
+class ClassA : public CObject
+{
+	.....
+};
+class ClassB : public ClassA
+{
+	......
+};
+
+const ClassA * pA =3D3D somefunc();
+const ClassB * pB =3D3D dynamic_cast<const ClassB *>(pA);
+
+The line with the dynamic_cast generates the following error.
+
+error C2682: cannot use dynamic_cast to convert from 'const class ClassA =
+=3D
+*'
+to 'const class ClassB *'
+
+if I change the last two lines to
+
+ClassA * pA =3D3D const_cast<ClassA * >(somefunc());
+ClassB * pB =3D3D dynamic_cast<ClassB *>(pA);
+
+then it compiles fine.
+
+
+-----From: "Folbrecht, Paul B" <Paul.B.Folbrecht@jci.com>
+
+
+
+
+
+
+
+That's absolutely untrue.
+
+The purpose of dynamic_cast is to *test* if A points to an object of class
+B. If it doesn't, dynamic_cast returns NULL (or throws an exception if you
+cast a reference).  Of course, it's good OO practice to make limited use of
+this.
+
+As for the second part of your statement.. there is no need to "cast" a
+pointer to B to a pointer to A at any time.. by the definition of public
+inheritence in C++, a pointer to B "ISA" pointer to A for all purposes and
+can be used in place of a pointer to A 100% of the time.
+
+I don't have an answer for the original question dealing with constness.
+
+-Paul Folbrecht
+Compuware Corp.
+
+
+
+========================================================
+
+You cannot convert your A point to a B pointer because A is *NOT* a B.  =
+You can dynamic_cast a B to an A because B is derived from A, but you =
+can't dynamic_cast an A to a B.
+
+This is like saying a poodle is a dog, therefore all dogs are poodles.  =
+It doesn't work.
+
+So yes, you are missing something.
+
+-----Original Message-----
+From:     Guy G. Piggford [SMTP:ggp@informix.com]
+Sent:     Friday, March 07, 1997 11:27 AM
+To:  mfc-l@netcom.com
+Subject:  dynamic_cast and const problem
+
+Environment:  Windows NT 3.51, VC++ 4.2b
+
+I have the following problem trying to use dynamic_cast on a const =
+object
+pointer, bearing in mind that I'm not tying to change the const-ness of =
+the
+object I'm rather puzzled.
+
+
+class ClassA : public CObject
+{
+ .....
+};
+class ClassB : public ClassA
+{
+ ......
+};
+
+const ClassA * pA =3D somefunc();
+const ClassB * pB =3D dynamic_cast<const ClassB *>(pA);
+
+The line with the dynamic_cast generates the following error.
+
+error C2682: cannot use dynamic_cast to convert from 'const class ClassA =
+*'
+to 'const class ClassB *'
+
+if I change the last two lines to
+
+ClassA * pA =3D const_cast<ClassA * >(somefunc());
+ClassB * pB =3D dynamic_cast<ClassB *>(pA);
+
+then it compiles fine.
+
+
+-----From: "Tomasz Pawlowski" <tomasz@ashtech.COM>
+
+     Hello,
+     
+     dynamic_cast as a name suggests is for dynamic casting. It is used for 
+     conversion of polymorphic types.
+     Both of you are wrong.
+     Please compile and analyze following program (I did it on NT4.0 with 
+     VC++5.0):
+     
+class   A { virtual void f() {}; };
+class   B: public A { virtual void f() {}; };
+class   C: public A { virtual void f() {}; };
+class   D { virtual void f() {}; };
+class   E: public B, public C, public D { virtual void f() {}; };
+
+class   X {};
+class   Y: public X {};
+
+void
+f1(D *pd)
+{
+        E       *pe = dynamic_cast<E *> (pd);
+        B       *pb = pe;
+        A       *pa = pb;
+}
+
+void
+f2(D *pd)
+{
+        B       *pb = dynamic_cast<B *> (pd);
+        A       *pa = pb;
+}
+
+int
+main()
+{
+        f1(new E);
+        f1(new D);
+        f2(new D);
+        f2(new E);
+        Y       *y = new Y;
+        X       *x = y; // don't need dynamic_cast
+//      X       *xx = dynamic_cast<Y *> (y); // error !!!
+        A       *a = new B;
+        A       *a1 = dynamic_cast<B *> (a); // a1!=NULL !!!
+        A       *a2 = dynamic_cast<C *> (a); // a2==NULL !!!
+        return 0;
+}
+
+______________________________ Reply Separator _________________________________
+Subject: Re: dynamic_cast
+Author:  mfc-l@netcom.com at internet
+Date:    3/16/97 3:57 AM
+
+
+Hi,
+     
+I still don't understand why on the second compilation it still compiled fine. 
+There also the casting was from A to B. And, isn't dynamic caasting intended for
+such usages?
+     
+Thanks,
+Lior.
+     
+     
+========================================================
+     
+You cannot convert your A point to a B pointer because A is *NOT* a B.  = 
+You can dynamic_cast a B to an A because B is derived from A, but you = 
+can't dynamic_cast an A to a B.
+     
+This is like saying a poodle is a dog, therefore all dogs are poodles.  = 
+It doesn't work.
+     
+So yes, you are missing something.
+     
+-----Original Message-----
+From: Guy G. Piggford [SMTP:ggp@informix.com] 
+Sent: Friday, March 07, 1997 11:27 AM
+To: mfc-l@netcom.com
+Subject: dynamic_cast and const problem
+     
+Environment:  Windows NT 3.51, VC++ 4.2b
+     
+I have the following problem trying to use dynamic_cast on a const = 
+object
+pointer, bearing in mind that I'm not tying to change the const-ness of = 
+the
+object I'm rather puzzled.
+     
+     
+class ClassA : public CObject
+{
+ .....
+};
+class ClassB : public ClassA
+{
+ ......
+};
+     
+const ClassA * pA =3D somefunc();
+const ClassB * pB =3D dynamic_cast<const ClassB *>(pA);
+     
+The line with the dynamic_cast generates the following error.
+     
+error C2682: cannot use dynamic_cast to convert from 'const class ClassA = 
+*'
+to 'const class ClassB *'
+     
+if I change the last two lines to
+     
+ClassA * pA =3D const_cast<ClassA * >(somefunc()); 
+ClassB * pB =3D dynamic_cast<ClassB *>(pA);
+     
+then it compiles fine.
+     
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+    <A HREF="http://www.digiday.com/mfcpro/joinmfcl.htm">Become an MFC-L member</A>
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

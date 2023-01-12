@@ -1,0 +1,264 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CListCtrl missing LVN_ROWCLICK
+</B></FONT>
+<BR>
+<PRE>
+<B>
+<A HREF="mailto:MICHAEL@datatree.com">MICHAEL@datatree.com</A>
+Monday, June 03, 1996
+</B>
+Environment: VC++ 4.1 and Windows 95
+
+The CListCtrl class has a notification message
+called LVN_COLUMNCLICK.Why no LVN_ROWCLICK?
+
+Because of this omission, there is no simple
+way to detect user clicks on a row. I'm left
+wondering if my only choice is to to use the
+LVN_ITEMCHANGED instead - ugh!
+
+This notification message can occur multiple
+times for a given "row click".
+------------------------------
+Michael L. Thal
+Data Tree Corporation
+voice: (619) 231-3300
+fax:   (619) 231-3301
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:MICHAEL@datatree.com">MICHAEL@datatree.com</A>
+Monday, June 10, 1996
+</B>
+I was able to solve this myself, so I'll post
+the solution for general consumption.
+
+ Using HitTest() is much better than handling
+LVN_ITEMCHANGED notifications to detect
+which row has been selected in a CListCtrl.
+
+Also, I can more easily process right clicks,
+left clicks and double clicks in a CListCtrl.
+(See the notifications NM_CLICK, NM_RCLICK
+and NM_DBCLK.)
+
+Here is sample code for processing a single
+click in a CListCtrl row.
+
+MYVIEW.H
+--------
+class CMyView : public CView
+CListCtrl m_ListCtrl;
+
+MYVIEW.CPP
+----------
+LRESULT CMyView::NotifyHandler(UINT, WPARAM wParam, LPARAM lParam) 
+{
+    LV_HITTESTINFO lvHitTestInfo;
+    POINT pt;
+    LV_DISPINFO *pLvdi = (LV_DISPINFO *)lParam;
+    
+    if (wParam != ID_LISTVIEW)
+        return (LRESULT)0;
+
+    switch(pLvdi->hdr.code)
+    {
+
+        case NM_CLICK:
+            ::GetCursorPos((LPPOINT)&pt);
+            ::ScreenToClient(m_ListCtrl.m_hWnd, &pt);
+             lvHitTestInfo.pt = pt;
+             m_ListCtrl.HitTest(&lvHitTestInfo);
+ 
+            // iItem is the index into the CListCtrl row
+            if (lvHitTestInfo.iItem != -1)
+            {
+                // Do nothing - this is samle code
+                MessageBeep(0);
+            }
+            break;
+
+        default:
+            break;
+    }
+    return (LRESULT)0;
+}
+
+Note: My app only allows single selections,
+as I added the LVS_SINGLESEL to my Create()
+function. 
+
+>
+>Michael L. Thal wrote:
+>> The CListCtrl class has a notification message
+>> called LVN_COLUMNCLICK.Why no LVN_ROWCLICK?
+>> 
+>> Because of this omission, there is no simple
+>> way to detect user clicks on a row. I'm left
+>> wondering if my only choice is to to use the
+>> LVN_ITEMCHANGED instead - ugh!
+>> 
+>> This notification message can occur multiple
+>> times for a given "row click".
+>
+>
+
+
+>Environment: VC++ 4.1 and Windows 95
+>
+>The CListCtrl class has a notification message
+>called LVN_COLUMNCLICK.Why no LVN_ROWCLICK?
+>
+>Because of this omission, there is no simple
+>way to detect user clicks on a row. I'm left
+>wondering if my only choice is to to use the
+>LVN_ITEMCHANGED instead - ugh!
+>
+>This notification message can occur multiple
+>times for a given "row click".
+------------------------------
+Michael L. Thal
+Data Tree Corporation
+voice: (619) 231-3300
+fax:      (619) 231-3301
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Roger Onslow -- <A HREF="mailto:Roger_Onslow@compsys.com.au">Roger_Onslow@compsys.com.au</A>
+Tuesday, June 11, 1996
+</B>
+[Mini-digest: 3 responses]
+
+>Environment: VC++ 4.1 and Windows 95
+>
+>The CListCtrl class has a notification message
+>called LVN_COLUMNCLICK.Why no LVN_ROWCLICK?
+>
+>Because of this omission, there is no simple
+>way to detect user clicks on a row. I'm left
+>wondering if my only choice is to to use the
+>LVN_ITEMCHANGED instead - ugh!
+>
+>This notification message can occur multiple
+>times for a given "row click".
+
+LVN_COLUMNCLICK is for when you click on a
+column heading (this is the hook to do sorting
+by a given column).
+
+LButton click will (usually) select the given row
+so you can simply get the selected item. (in
+the handler for the click after calling the base
+class which should do the selection for you).
+
+Roger
+
+
+-----From: Alex Sevugan <asevugan@csci.csc.com>
+
+Hi guys,
+
+There is an easier way to do this, i think. Call the function GetNextItem to 
+get the index of the current row.
+
+     m_ListCtrl.GetNextItem(-1,LVNI_SELECTED)
+     
+     returns the index of the currently selected row.
+
+Alaks
+CSC Intelicom
+
+
+-----From: "Gary MacDougall" <gary@willowpond.com>
+
+[Moderator's note: Please, when you have new questions, ask them
+in a new thread.  I have a habit of terminating threads when I
+feel the original question has been answered.]
+
+Hi,
+
+On a related note with CListCtrl's.  I have a sort of dilema.  I want
+to be able to select a single row in the CListCtrl and have it select
+the corresponding columns of that row (like a list box).  How can
+this be done? I basically wanna treat every row in the ListCtrl, like
+a line in a list box (i.e. Return the row selected when the HITTEST is
+done for anywhere in the row...).
+
+Thanks,
+Gary
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:Kevin_L_McCarthy.IACNET@ngate.zis.ziff.com">Kevin_L_McCarthy.IACNET@ngate.zis.ziff.com</A>
+Wednesday, June 12, 1996
+</B>
+>Hi,
+>
+>On a related note with CListCtrl's.  I have a sort of dilema.  I want
+>to be able to select a single row in the CListCtrl and have it select
+>the corresponding columns of that row (like a list box).  How can
+>this be done? I basically wanna treat every row in the ListCtrl, like
+>a line in a list box (i.e. Return the row selected when the HITTEST is
+>done for anywhere in the row...).
+>
+>Thanks,
+>Gary
+
+VC 4.1 has a sample called ROWLIST which draws the selection highlight 
+over the entire row, and, I think, allows you to select a row by clicking 
+anywhere
+within it.
+
+Kevin
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

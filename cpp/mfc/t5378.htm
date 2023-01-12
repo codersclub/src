@@ -1,0 +1,161 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+messages for combo box in a toolbar
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Rob Gue -- <A HREF="mailto:rob.gue@gtri.gatech.edu">rob.gue@gtri.gatech.edu</A>
+Sunday, June 02, 1996
+</B>
+NT 3.51, VC++ 2.1
+
+I inserted a combo box in my frame's toolbar as described in the MFC sample
+CTRLBARS (in a nutshell: reserve a space in the CToolBar instance for the
+combo box with a separator and then create a CComboBox child window of the
+toolbar in the reserved space).  Everything worked OK except for two things:
+
+1) Enter and Escape don't work as they should when the combo box has the
+focus (i.e. nothing happens when the user types in the edit portion of the
+combo box and presses either one, nor do they hide the list box when it
+displayed and the user presses either key).
+   
+2) The up and down arrow keys did not scroll the entries in the combo box.
+
+Problem 2 was a result of there being accelerator keys defined for the
+arrows keys (for scrolling the view).  To solve this, I overrode
+PreTranslateMessage for my CComboBox-derived class, and check to see if the
+message is WM_KEYDOWN with the vkey being either VK_UP or VK_DOWN.  If it
+is, I call SendMessage to give myself the message, and then return TRUE (so
+that processing of the key will stop).  Is this the best way to handle this
+problem?
+
+I am having more difficulty solving Problem 1.  The Enter and Escape keys
+also seem to be processed by CMainFrame::PreTranslateMessage, although I
+have not defined any accelerators for these keys.  So I tried the same
+solution as for Problem 2 (i.e. overriding PreTranslateMessage and calling
+SendMessage when receiving these messages), but this does not seem to work.
+Does someone know what I need to do to accomplish this?.  I think that are
+some points about MFC command routing and/or combo box controls that I am
+not taking into consideration or am not aware of.
+
+Thanks in advance (to everyone except Mike B., whom I shall thank after the
+fact in the event of a reply :-),
+
+rob.gue@gtri.gatech.edu
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Greg D. Tighe -- <A HREF="mailto:gdt@eng.aisinc.com">gdt@eng.aisinc.com</A>
+Thursday, June 06, 1996
+</B>
+[Mini-digest: 2 responses]
+
+> I inserted a combo box in my frame's toolbar as described in the MFC sample
+> CTRLBARS (in a nutshell: reserve a space in the CToolBar instance for the
+> combo box with a separator and then create a CComboBox child window of the
+> toolbar in the reserved space).  Everything worked OK except for two things:
+> 
+> 1) Enter and Escape don't work as they should when the combo box has the
+> focus (i.e. nothing happens when the user types in the edit portion of the
+> combo box and presses either one, nor do they hide the list box when it
+> displayed and the user presses either key).
+>    
+> Does someone know what I need to do to accomplish this?
+> 
+Rob,
+	You need to subclass the edit control contained within the combobox, 
+then override PreTranslateMessage() for the edit control.
+To subclass the edit control, do something like this:
+
+CWnd	*pEditWnd = pComboBox->GetWindow (GW_CHILD);
+
+ if (NULL != pEditWnd)
+  {
+  m_CBoxEdit.SubclassWindow (pEditWnd->m_hWnd);
+  }
+
+m_CBoxEdit is a member variable CEdit-derived class.  From within 
+this class you can override PreTranslateMessage() and check for 
+WM_KEYDOWN keys where (wParam == VK_RETURN) ||
+(wParam == VK_ESCAPE)
+
+	-Greg Tighe
+	Applied Intelligent Systems, Inc.
+	Ann Arbor, MI
+	gdt@aisinc.com
+-----From: Dave Blatt/Newcastle/Computer Systems Australia/AU <Dave_Blatt@compsys.com.au>
+
+We do this slightly differently, and it works fine.  We just store the value 
+when
+we get a CBN_KILLFOCUS so that the enter key is not even necessary - this
+is better for situations like when the user just clicks elsewhere on the screen
+instead of pressing enter.  (Same behaviour as the Find combo box in
+Developer Studio itself).  Then, to handle the enter key, we just pick it up in
+the WMKEYDOWN handler and SendMessage a killfocus followed by a
+setfocus.
+
+If you also write a handler for CBN_SETFOCUS consisting of the one line
+ SetEditCell(0,-1)
+this will highlight the contents as the focus arrives.
+
+Can send code snippets if above unclear,
+Cheers
+   DaveB and RogerO
+
+PS Also, to see what is going wrong with your method, have you tried turning on
+the Tools|MFC Tracer  main message dispatch to see what's actually happening?
+
+
+PPS Your solution to (2) may not be the best way to go ... there's a KB article,
+can't find it at the moment, will send more info.  I think there are other 
+problems
+to watch, like what happens when user presses delete key whilst in the combo.
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

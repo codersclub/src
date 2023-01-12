@@ -1,0 +1,683 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Sending data with WM_USER+100 messages
+</B></FONT>
+<BR>
+<PRE>
+<B>
+<A HREF="mailto:peter@cavena.se">peter@cavena.se</A>
+Monday, February 05, 1996
+</B>
+This confuses me.
+
+(VC++ 2.0, NT 3.51 sp 2)
+
+I have created a CDialog based application and converted the CDialog to a=20
+CPropertySheet.
+>From this program I create a number of CWinThreads. These threads may post=20
+WM_USER+100 messages with wParam and lParam data to the main window dialog=20
+which in turn will route the message to another of it's threads.
+=20
+My problem is that 1. messages sometimes dissapear and 2. Data sometimes=20
+becomes invalid.
+
+1. I know that if there are several WM_TIMER messages in a message queue, t=
+hey=20
+will be merged into one. Does WM_USER messages behave the same way? It seem=
+s=20
+that if I delay posting of certain  duplicated messages that messages does=20=
+not=20
+disappear anymore?
+
+2. On the developer CD I find information that one should not post data to=20
+another window process because of adress space problems. Does this apply to=
+ my=20
+application which uses one window with many CWInThreads? If so, must I use=20
+COPYDATASTRUCT to solve it or is there some other solution? The data I send=
+ are=20
+objects of a CObject class I created and sometimes a CString.
+
+Should I not use CWinThreads for multithreading in my application since I o=
+nly=20
+use one window? Each thread must sometimes open it's own CDialog (which it=20=
+does=20
+by creating another thread so it does not eat up WM_USER messages, I fouled=
+ up=20
+on that one already! :-)
+
+Appreciate any help out there!
+------------------------------------------------------------
+Peter Sj=F6str=F6m, Senior Engineer       email: peter@cavena.se
+Cavena Image Products AB                tel: +46-8-473 0515
+Box 47, Nytorpsv=E4gen 26                 fax: +46-8-473 0215
+S-183 21 T=E4by, Sweden
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@interserv.com">mikeblas@interserv.com</A>
+Tuesday, February 06, 1996
+</B>
+On Mon,  5 Feb 1996, peter@cavena.se wrote:
+>(VC++ 2.0, NT 3.51 sp 2)
+
+Thanks.
+
+>I have created a CDialog based application and converted the CDialog to a 
+>CPropertySheet.
+>>From this program I create a number of CWinThreads. These threads may post 
+>WM_USER+100 messages with wParam and lParam data to the main window dialog 
+>which in turn will route the message to another of it's threads.
+
+Why are you using WM_USER+100?  That's kind of a hack.  Shouldn't you be 
+using a registered message?
+ 
+>My problem is that 1. messages sometimes dissapear and 2. Data sometimes 
+>becomes invalid.
+>
+>1. I know that if there are several WM_TIMER messages in a message queue, 
+>they 
+>will be merged into one. Does WM_USER messages behave the same way? It seems 
+>that if I delay posting of certain  duplicated messages that messages does 
+>not  disappear anymore?
+
+WM_USER messages are not collapsed into one like WM_TIMER or WM_PAINT 
+messages.  The system doesn't know what they mean, and therefore can't 
+collapse them.  (Then again, maybe some part of the system _thinks_ they know 
+what they mean--if you were using a registered message, you'd be sure.  Since 
+you're using WM_USER, you could be stepping on someone else's toes.)
+
+I don't know how many "several" is, but you could also be overflowing the 
+message queue.  If you're doing that, then messages will just disappear and 
+that's that.
+
+>2. On the developer CD I find information that one should not post data to 
+>another window process because of adress space problems. Does this apply to 
+>my 
+>application which uses one window with many CWInThreads? If so, must I use 
+>COPYDATASTRUCT to solve it or is there some other solution? The data I send 
+>are  objects of a CObject class I created and sometimes a CString.
+
+A process isn't the same as a thread.  A thread may live in only one process. 
+ A process may have many threads.  A system may have many processes.  Since 
+threads share the same address space (that is, they share the same process) 
+you can send things from thread to thread.
+
+>Should I not use CWinThreads for multithreading in my application since I 
+>only use one window?
+
+Only threads that ever call PeekMessage() get message queues.  This shouldn't 
+matter, though, since you're sending messages always _from_ the subordinate 
+threads to one main thread, and that main thread has a window, right?
+
+>Each thread must sometimes open it's own CDialog (which it >does
+>by creating another thread so it does not eat up WM_USER messages, I 
+>fouled up  on that one already! :-)
+
+That sounds pretty convoluted (that is, unnecessary)
+
+>Appreciate any help out there!
+
+Why not thank people _after_ they've taken the time to answer you?
+
+.B ekiM
+--
+TCHAR szZZTop[] = _T("I don't mind when you spend money, or bring your 
+girlfriends with you.");
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dan King -- <A HREF="mailto:dank@btw.com">dank@btw.com</A>
+Wednesday, February 07, 1996
+</B>
+[Mini-digest: 3 responses]
+
+In response to another question, Mike B wrote:
+>Why are you using WM_USER+100?  That's kind of a hack.
+>Shouldn't you be using a registered message?
+
+I've wondered this myself. What should we be doing? The documentation for   
+RegisterWindowsMessage() says:
+
+Only use RegisterWindowMessage when more than one application must   
+process the same message. For sending private messages within a window   
+class, an application can use any integer in the range WM_USER through   
+0x7FFF. (Messages in this range are private to a window class, not to an   
+application. For example, predefined control classes such as BUTTON,   
+EDIT, LISTBOX, and COMBOBOX may use values in this range.)
+
+I'm not particularly fond of just #defining arbritrary numbers for my   
+messages, but the documentation seems to suggest that that's the way it   
+should be.
+
+Is this incorrect? Should we be using RegisterWindowMessage() more often?
+
+Thanks,
+dank
+
+
+
+-----From: "Hill, Les" <Les.Hill@FMR.Com>
+
+>On Mon,  5 Feb 1996, peter@cavena.se wrote:
+>>Should I not use CWinThreads for multithreading in my application since I
+>>only use one window?
+>
+>Only threads that ever call PeekMessage() get message queues.  This 
+shouldn't
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>matter, though, since you're sending messages always _from_ the subordinate 
+
+>threads to one main thread, and that main thread has a window, right?
+
+I don't think this can be correct -- if it is so, think of the following:
+
+A creates B
+ B is created
+A now does things
+ B is initializing (lots to do)
+A send B WM_DOTHIS (and it is dropped)
+ B finally calls PeekMessage()
+
+It is my understanding that threads have message queues, whether they use
+them is another thing :)
+
+As to using CWinThreads without a window, as long as you post messages
+to the thread with PostThreadMessages() the windowless-CWinThread can
+pick them up in its message loop.
+
+Les
+-----From: postmaster@cavena.se
+
+I found the bug that caused my problems soon after posting. To me, it seems=
+ as=20
+a Visual C++ 2.0 bug. I will show the bug further down, first let me reply=20=
+to=20
+Mike...
+
+>On Mon,  5 Feb 1996, peter@cavena.se wrote:
+>>I have created a CDialog based application and converted the CDialog to a=
+=20
+>>CPropertySheet.
+>>>From this program I create a number of CWinThreads. These threads may po=
+st=20
+>>WM_USER+100 messages with wParam and lParam data to the main window dialo=
+g=20
+>>which in turn will route the message to another of it's threads.
+>
+>Why are you using WM_USER+100?  That's kind of a hack.  Shouldn't you be=20
+>using a registered message?
+
+Yeah, but I don't see any problem except for WM_USER to WM_USER+99 when usi=
+ng a=20
+CDialog?
+
+>>My problem is that 1. messages sometimes dissapear and 2. Data sometimes=20
+>>becomes invalid.
+>>
+>>1. I know that if there are several WM_TIMER messages in a message queue,=
+=20
+>>they=20
+>>will be merged into one. Does WM_USER messages behave the same way? It se=
+ems=20
+>>that if I delay posting of certain  duplicated messages that messages doe=
+s=20
+>>not  disappear anymore?
+>
+>WM_USER messages are not collapsed into one like WM_TIMER or WM_PAINT=20
+>messages.  The system doesn't know what they mean, and therefore can't=20
+>collapse them.  (Then again, maybe some part of the system _thinks_ they k=
+now=20
+>what they mean--if you were using a registered message, you'd be sure.  Si=
+nce=20
+>you're using WM_USER, you could be stepping on someone else's toes.)
+
+Can I step on another application's (process) messages?
+
+>I don't know how many "several" is, but you could also be overflowing the=20
+>message queue.  If you're doing that, then messages will just disappear an=
+d=20
+>that's that.
+
+I recently learned from an American that we Europeans often think the engli=
+sh=20
+word "several" means many. He said several means 2-4 or so. In my case, 2=20
+messages, occasionally a few more. :-)
+
+>>Should I not use CWinThreads for multithreading in my application since I=
+=20
+>>only use one window?
+>
+>Only threads that ever call PeekMessage() get message queues.  This should=
+n't=20
+>matter, though, since you're sending messages always _from_ the subordinat=
+e=20
+>threads to one main thread, and that main thread has a window, right?
+
+Well, plus the main window posts messages down again.
+
+>>Each thread must sometimes open it's own CDialog (which it >does
+>>by creating another thread so it does not eat up WM_USER messages, I=20
+>>fouled up  on that one already! :-)
+>
+>That sounds pretty convoluted (that is, unnecessary)
+
+This proved very necessary. The reason is that I use PreTranslateMessage(),=
+ I=20
+did not use the macros for messages callback (or whatever it is called). So=
+ the=20
+opened CDialog will eat the WM_USER messages I now send the thread. I learn=
+ed=20
+this while digging into docs after building the application and I will rewr=
+ite=20
+it when I get time for it. :-)
+
+>>Appreciate any help out there!
+>
+>Why not thank people _after_ they've taken the time to answer you?
+
+Two Thank Yous are more than one...
+
+Thanks! :-)
+
+Ok, now the Visual C++ 2.0 bug!
+My code looks (simplified) like this:
+
+class Event : public CObject
+{
+...
+}
+
+class DdeProcess
+{
+...
+    virtual void   DoCommand()=3D0;
+...
+};
+
+class   Request :public DdeProcess=20
+{
+    Event *EvData;
+    void            DoCommand();
+...
+};
+
+// EvData is received as a wParam in a message sent from another thread
+// before calling DoCommand()
+
+/////////////////////////// version 1
+void Request::DoCommand()
+{
+...
+    Event *okevent =3D new Event; // first declaration
+    *okevent =3D *EvData;
+... [modify okevent data] ...
+    m_MainWnd->PostMessage(WM_USER_FILEACK, (WPARAM)okevent);  =20
+    Event *okevent =3D new Event; // declaration duplicated. Compiles fine!=
+!!
+    *okevent =3D *EvData;
+...
+    m_MainWnd->PostMessage(WM_USER_FILEEND, (WPARAM)EvData);  =20
+    delete okevent;
+}
+
+/////////////////////////// version 2
+void Request::DoCommand()
+{ // version 2
+    Event *okevent; // declare here and the bug does not happen.
+...
+    okevent =3D new Event;
+    *okevent =3D *EvData;
+... [modify okevent data] ...
+    m_MainWnd->PostMessage(WM_USER_FILEACK, (WPARAM)okevent);  =20
+    okevent =3D new Event;
+    *okevent =3D *EvData;
+...
+    m_MainWnd->PostMessage(WM_USER_FILEEND, (WPARAM)EvData);  =20
+    delete okevent;
+}
+
+Now, in version 1 there is what should be a compiler error (I think);
+duplicate declarations of okevent. Now since the compiler does not give an=20
+error or warning, even at level 4 reporting, the code compiles fine and a=20
+bug appears. When the first message posted reaches it's receiver it is empt=
+y,=20
+that is
+the pointer points to non-valid data. This is what I asked about in point 2=
+=20
+above.
+The second version of the code works fine and the bug disappears.
+
+Does anyone know if this is a VC++ 2.0 bug and why the behaviour becomes=20
+what it becomes?
+-----------------------------------------------------------
+Cavena Image Products AB              email: info@cavena.se
+Box 47, Nytorpsv=E4gen 26                 tel: +46-8-473 0515
+S-183 21 T=E4by, Sweden                   fax: +46-8-473 0215
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Seth Goldstein -- <A HREF="mailto:seth@mathworks.com">seth@mathworks.com</A>
+Thursday, February 08, 1996
+</B>
+[Mini-digest: 5 responses]
+
+An obscure article in the SDK Knowledge Base (Q86835) called 
+"Defining Private Messages for Application Use" may be 
+relevant to your problem.
+
+The gist of it is that you should use WM_APP instead of WM_USER 
+as the base of your application messages.  The WM_APP range 
+(0x8000-0xBFFF) used to be reserved for Windows, but has 
+been redefined for use with applications for just this 
+purpose.
+
+The problem is that many of the common controls use WM_USER+x 
+messages for their internal messaging, so they can interfere 
+with you if you use WM_USER+x messages in their proximity 
+(handwaving intentional).
+
+Before V4.0, you had to use RegisterWindowMessage to get a 
+guaranteed unique message ID, but that was overkill (it's 
+guaranteed unique for the whole system).  The WM_APP range 
+(0x8000-0xBFFF) is now guaranteed not to be used by the system.
+
+Hope this helps,
+Seth
+-- 
++------------------------------------------------------+
+|   Seth Goldstein         email: seth@mathworks.com   |
+|   The Mathworks, Inc.    http://www.mathworks.com    |
+|                          info: info@mathworks.com    |
+|------------------------------------------------------|
+| PGP Public Key on server                             |
+|   http://www-swiss.ai.mit.edu/~bal/pks-toplev.html   |
++------------------------------------------------------+
+-----From: Jim Lavin <ooptech@Onramp.NET>
+
+It sounds like your running to the thread local storage problem that is
+common with multi-threading.  There are several ways you can send data
+between threads as long as the data originates from a controlling process or
+thread; i.e. the data is created by the thread which created the worker
+thread.  If you are creating the data inside the worker-thread you're going
+to have a hard time passing out side of it.  I can't remember if there is a
+way around this, anybody else know?  Your best place to start searching is
+to look into thread local storage in the docs or on the MSDN.
+
+Jim Lavin
+OOP Technologies
+http://emporium.turnpike.net/~jlavin
+http://rampages.onramp.net/~ooptech
+
+I've seen programmers who couldn't be passed by reference or by value!
+
+-----From: mikeblas@interserv.com
+
+On Wed, 07 Feb 96, Dan King <dank@btw.com> wrote:
+>-----From: "Hill, Les" <Les.Hill@FMR.Com>
+
+>I don't think this can be correct -- if it is so, think of the following:
+>
+>A creates B
+> B is created
+>A now does things
+> B is initializing (lots to do)
+>A send B WM_DOTHIS (and it is dropped)
+> B finally calls PeekMessage()
+>
+>It is my understanding that threads have message queues, whether they use
+>them is another thing :)
+
+I used to agree with this, but I've read otherwise.  Now that I've 
+regurgitated what I read, I'm not capable of remembering where I read what I 
+thought I read.
+
+It _can_ be correct--it's quite possible that the WM_DOTHIS just does fall on 
+the floor... though I agree it would stink.
+
+.B ekiM
+--
+TCHAR szDisc[] = _T("These words are my own; I do not speak for Microsoft.");
+
+-----From: mikeblas@interserv.com
+
+On Wed, 07 Feb 96, Dan King <dank@btw.com> wrote:
+>In response to another question, Mike B wrote:
+>>Why are you using WM_USER+100?  That's kind of a hack.
+>>Shouldn't you be using a registered message?
+>
+>I've wondered this myself. What should we be doing? The documentation for   
+>RegisterWindowsMessage() says:
+>
+>Only use RegisterWindowMessage when more than one application must   
+>process the same message. For sending private messages within a window   
+>class, an application can use any integer in the range WM_USER through   
+>0x7FFF. (Messages in this range are private to a window class, not to an   
+>application. For example, predefined control classes such as BUTTON,   
+>EDIT, LISTBOX, and COMBOBOX may use values in this range.)
+
+It's right in that you can just post WM_USER+something-based messages within 
+your own process.  The problem is that doing this is no guarantee that you 
+won't pick a WM_USER that's used by someone else.  If you GREP the Windows 
+headers, you'll quickly notice that all sorts of WM_USER constants are used 
+by Windows itself for notification messages from controls, among other 
+things.
+
+I'm not sure about the text that says that "messages in this range are 
+private to a window class, not to an application".  There doesn't seem to be 
+any way for Windows to guarantee this.
+
+Because only of my lack of faith in this advice, I usually use 
+RegisterWindowMessage() when I need my own message number.  I'll ask around 
+and see if I can get more details.
+
+.B ekiM
+--
+TCHAR szDisc[] = _T("These words are my own; I do not speak for Microsoft.");
+
+-----From: mikeblas@interserv.com
+
+>-----From: postmaster@cavena.se
+
+>Yeah, but I don't see any problem except for WM_USER to WM_USER+99 when usi=
+>ng a=20 CDialog?
+
+It can also cause problems when you send the messages to a popup window which 
+ owns controls... like a CCtrlView, for example.
+
+>Can I step on another application's (process) messages?
+
+No.  If you find a way, Windows will terminate you.
+
+>I recently learned from an American that we Europeans often think the
+>engli=sh=20 word "several" means many. He said several means 2-4
+>or so. In my case, 2=20
+>messages, occasionally a few more. :-)
+
+To me, "several" is very relative.  I might say that I've had "several" jobs, 
+even though I've only had four.  I might say that I've gone to "several" 
+hockey games, even though I've probably been to about two hundred. (I quit 
+counting when I found out I couldn't deduct beer on my taxes.)
+
+>/////////////////////////// version 1
+>void Request::DoCommand()
+>{
+>...
+>    Event *okevent =3D new Event; // first declaration
+>    *okevent =3D *EvData;
+>... [modify okevent data] ...
+>    m_MainWnd->PostMessage(WM_USER_FILEACK, (WPARAM)okevent);  =20
+>    Event *okevent =3D new Event; // declaration duplicated. Compiles fine!=
+>!!
+>    *okevent =3D *EvData;
+>...
+>    m_MainWnd->PostMessage(WM_USER_FILEEND, (WPARAM)EvData);  =20
+>    delete okevent;
+>}
+>
+>/////////////////////////// version 2
+>void Request::DoCommand()
+>{ // version 2
+>    Event *okevent; // declare here and the bug does not happen.
+>...
+>    okevent =3D new Event;
+>    *okevent =3D *EvData;
+>... [modify okevent data] ...
+>    m_MainWnd->PostMessage(WM_USER_FILEACK, (WPARAM)okevent);  =20
+>    okevent =3D new Event;
+>    *okevent =3D *EvData;
+>...
+>    m_MainWnd->PostMessage(WM_USER_FILEEND, (WPARAM)EvData);  =20
+>    delete okevent;
+>}
+
+
+The bug here is yours, not the compiler's.  You're allocating some memory:
+
+>    okevent =3D new Event;
+
+and then populating it
+
+>    *okevent =3D *EvData;
+
+and then _post_ing a message with that data:
+
+>    m_MainWnd->PostMessage(WM_USER_FILEEND, (WPARAM)EvData);  =20
+
+Posting is asynchronous.  That is, Windows takes a note of what you meant to 
+post and then places that information in the other application's (or 
+thread's) message queue.  Then, it returns to you.
+
+>    delete okevent;
+
+And you delete the data.
+
+In the mean time, a pointer to that data is still sitting around in the 
+queue.  Eventually, the receiving thread or application processes it, but the 
+information it carries is bogus because you've already gone and deleted the 
+data.
+
+If you want this to work, you need to use SendMessage() instead of 
+PostMessage().
+
+.B ekiM
+--
+TCHAR szDisc[] = _T("These words are my own; I do not speak for Microsoft.");
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@interserv.com">mikeblas@interserv.com</A>
+Tuesday, February 13, 1996
+</B>
+On Fri, 09 Feb 96, mikeblas@interserv.com wrote:
+>On Wed, 07 Feb 96, Dan King <dank@btw.com> wrote:
+>>-----From: "Hill, Les" <Les.Hill@FMR.Com>
+
+[ I said something about a thread not having a message queue until it calls a 
+message-queue related function, like PeekMessage().]
+
+>
+>>I don't think this can be correct -- if it is so, think of the following:
+
+It turns out that it is certainly correct.
+
+>>A creates B
+>> B is created
+>>A now does things
+>> B is initializing (lots to do)
+>>A send B WM_DOTHIS (and it is dropped)  // step 5
+>> B finally calls PeekMessage()
+
+That's exactly what will happen.  First, the message in Step 5 isn't sent, it 
+is posted.  Thread messages are _always_ posted.  If you look up 
+PostThreadMessage(), you'll see that it returns a BOOL.  If the queue in the 
+target thread hasn't been created, it PostThreadMessage() will return FALSE. 
+If it returns FALSE in this circumstance, GetLastError() will be 
+ERROR_INVALID_THREAD_ID.
+
+You can't, by the way, make this happen with AfxCreateThread() because the 
+code in AfxCreateThread() immediately creates a large message queue (see the 
+implementation of AfxInitThread()).  You can't make it happen with 
+AfxCreateThread() even if you ask AfxCreateThread() to create a thread 
+suspended, it doesn't--the thread runs to initialize itself and tell MFC 
+about itself, and _then_ MFC suspends it.  By then, though the queue has 
+already been created.
+
+>>It is my understanding that threads have message queues, whether they use
+>>them is another thing :)
+>
+>I used to agree with this, but I've read otherwise.  Now that I've 
+>regurgitated what I read, I'm not capable of remembering where I read what I 
+>thought I read.
+
+I finally found it: if you look in VC++ 4.0 documentation at this topic:
+
+SDKs
+   Win32 SDK
+      Win32
+         Overviews
+            Window Management
+               Messages and Message Queues
+                  About Messages and Message Queues
+                     Message Routing
+
+you'll find a few paragraphs that talk about the existance of the queue.  If 
+you don't have VC++ 4.0, you can find the same article in the Win32 SDK help 
+file from the MSDN.
+
+.B ekiM
+--
+TCHAR szDisc[] = _T("These words are my own; I do not speak for Microsoft.");
+TCHAR szMine[] = _T("(C) Copyright 1996 Mike Blaszczak");
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

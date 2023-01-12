@@ -1,0 +1,416 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Serialization & Inheritance
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Chris Eaton -- <A HREF="mailto:eatonc@srnet.com">eatonc@srnet.com</A>
+Wednesday, August 07, 1996
+</B>
+Enviroment: VC++ 4.1 and Windows NT 3.51
+
+How does one handle serialization and levels of inheritance?
+
+I need each level to take care of itself and handle a different version at each level. Here is 
+what I had planned on doing.
+
+Based on the threads I have seen here I think this will not work can someone suggest the 
+correct way to handle levels of inheritance and Serialization.
+
+
+class CMyBase : public CObject
+{
+};
+class CMyDerived: public CMyBase
+{
+};
+IMPLEMENT_SERIAL( CMyBase, CObject, VERSIONABLE_SCHEMA | MY_BASE_VERSION_3 )
+void CMyBase::Serialize( CArchive &ar )
+{
+	CObject::Serialize( ar );
+	if( ar.IsStoring() )
+		{
+		...
+		}
+	else
+		{
+                int schema = archive.GetObjectSchema();
+                switch( schema ) 
+			{
+			case MY_BASE_VERSION_1:
+			...
+			case MY_BASE_VERSION_2:
+			...
+			case MY_BASE_VERSION_3:		
+			...
+			}
+		}
+}
+IMPLEMENT_SERIAL( CMyDerived, CMyBase, VERSIONABLE_SCHEMA | MY_DERIVED_VERSION_2 )
+void CMyDerived::Serialize( CArchive &ar )
+{
+	CMyBase::Serialize( ar );	// explicit call - no version info?
+	if( ar.IsStoring() )
+		{
+		...
+		}
+	else
+		{
+                int schema = archive.GetObjectSchema();
+                switch( schema ) 
+			{
+			case MY_DERIVED_VERSION_1:
+			...
+			case MY_DERIVED_VERSION_2:
+			...
+			}
+		}
+}
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Niels Ull Jacobsen -- <A HREF="mailto:nuj@kruger.dk">nuj@kruger.dk</A>
+Monday, August 12, 1996
+</B>
+At 07:39 07-08-96 -0400, you wrote:
+>Enviroment: VC++ 4.1 and Windows NT 3.51
+>
+>How does one handle serialization and levels of inheritance?
+>
+>I need each level to take care of itself and handle a different version =
+at
+each level. Here is=20
+>what I had planned on doing.
+>
+>Based on the threads I have seen here I think this will not work can
+someone suggest the=20
+>correct way to handle levels of inheritance and Serialization.
+[...]=20
+Correct. This will not work, as you are calling GetObjectSchema several
+times per object.
+
+I have previously posted an article on the pitfalls of CArchive.
+In case you missed it, here it is again:
+
+A few caveats for those using CArchives and serializing. These are not bu=
+gs
+in MFC, but maybe something which could have been documented a bit better.
+
+1. Read the documentation on CArchive::SerializeClass! And beware when
+Serialize is called directly (like in the default OnOpenDocument).
+
+There are two common places where you're likely to call Serialize directl=
+y:
+when serializing members and when serializing base classes:
+
+void CDerived::Serialize(CArchive& ar)
+{
+	CBase::Serialize(ar);
+	m_Member.Serialize(ar); // Always there
+    if (ar.IsLoading())
+    {
+        switch(GetObjectSchema())
+        {
+            default:
+                 AfxThrowArchiveException(CArchiveException::badSchema);
+            case 0:
+                  // .... read version 0 ...
+                  break;
+            case 1:
+                 // ... read version 1 ....
+                m_NewMember.Serialize(ar);=20
+                break;
+        }   =20
+           =20
+    } else
+    {=20
+       ... write latest version
+    }
+}
+
+Note that unlike the MFC documentation, I prefer calling CBase::Serialize
+*first*, as the base class may contain some
+information I need in order to know what to read.
+
+Unfortunately, GetObjectSchema returns the schema of CDerived.  Even when=
+ it
+is called from CBase::Serialize, m_Member.Serialize and
+m_NewMember.Serialize. This breaks any versioning you may have in these c=
+lasses.
+
+The correct way to do it would be:=20
+
+void CDerived::Serialize(CArchive& ar)
+{
+	UINT nSchema =3D ar.IsLoading() ? ar.GetObjectSchema() : 0;
+
+	ar.SerializeClass(RUNTIME_CLASS(CBase));
+	CBase::Serialize(ar);
+
+	ar.SerializeClass(m_Member.GetRuntimeClass());
+	m_Member.Serialize(ar); // Always there
+
+	if (ar.IsLoading())
+	{
+		switch(nSchema)
+		{
+			default:
+				AfxThrowArchiveException(CArchiveException::badSchema);
+			case 0:
+				// .... read version 0 ...
+				break;
+     	case 1:
+				// ... read version 1 ....
+				ar.SerializeClass(m_NewMember.GetRuntimeClass());
+				m_NewMember.Serialize(ar);=20
+				break;
+		} =20
+	} else
+	{=20
+		... write latest version
+	}
+}
+
+
+Alternatively, you can call SerializeClass() at the head of every Seriali=
+ze
+function implementation for versionable classes, if you don't mind a bit =
+of
+overhead for pointers to these types (when serialising a pointer, the
+information stored by SerializeClass will already have been written once).
+This will ensure that it works in all cases - e.g. also when you are call=
+ed
+from the framework (e.g. in OnOpenDocument), and is probably better OO de=
+sign.
+
+// global helper function
+UINT SerializeSchema(CArchive &ar, const CRuntimeClass* pClass)
+{
+	UINT nSchema;
+	ASSERT(pClass->m_wSchema !=3D 0xFFFF); // is serializable
+	ASSERT((pClass->m_wSchema & VERSIONABLE_SCHEMA) !=3D 0); // Versionable
+	if (ar.IsStoring())
+	{
+		ar.WriteClass(pClass);
+		nSchema =3D pClass->m_wSchema & ~VERSIONABLE_SCHEMA;
+	}
+	else
+	{
+	#if _MFC_VER < 0x0410
+                // MapObject(NULL) to avoid an error in MFC 4.0, where
+m_pLoadArray possibly isn't initialised
+                // if the first thing read is a class
+ 	      ar.MapObject(NULL);=20
+	#endif
+        	ar.ReadClass(pClass, &nSchema);
+	};
+	return nSchema;
+};
+
+void CDerived::Serialize(CArchive& ar)
+{
+	UINT nSchema =3D SerializeSchema(ar, RUNTIME_CLASS(CDerived));
+
+	CBase::Serialize(ar);
+	m_Member.Serialize(ar);
+	if (ar.IsLoading())
+	{
+		switch(nSchema)
+		{
+			default:
+				AfxThrowArchiveException(CArchiveException::badSchema);
+			case 0:
+				// .... read version 0 ...
+				break;
+			case 1:
+				// ... read version 1 ....
+				m_NewMember.Serialize(ar);=20
+				break;
+		};
+	}=20
+	else
+	{
+		... store latest version ...
+	};=20
+};
+=09
+
+2. Read up on MapObject. Beware of pointers to members. A small example:
+
+class CFoo : public CObject=20
+{=20
+	DECLARE_SERIAL(CFoo);
+	...
+}
+
+class CBar : public CObject
+{
+		DECLARE_SERIAL(CBar);
+ 	public:
+		CFoo m_Foo;
+		CFoo* m_pFoo;
+	...
+}
+
+...
+
+CBar::Serialize(CArchive &ar)
+{
+	// [I've left out the versioning problems discussed above]=20
+	m_Foo.Serialize(ar);
+	if (ar.IsLoading())
+		ar >> m_pFoo;
+	else
+		ar << m_pFoo;
+}
+
+
+...
+
+	CBar * pB1 =3D new CBar;
+	CBar * pB2 =3D new CBar;
+
+	pB1->m_pFoo =3D & (pB2->m_Foo);
+	pB2->m_pFoo =3D & (pB1->m_Foo);
+...
+
+
+
+Now, as far as I can tell, without some further data structures there's n=
+o
+simple way we can safely serialize pB1 and pB2 to an archive *and* read t=
+hem
+back in, even when using MapObject at various places.
+
+The problem is that due to the depth-first nature of archives, we will
+create an extra CFoo when reading them back in, as the archive can't see
+that *(pB1->m_pFoo) is actually a part of another CBar. The only way to r=
+ead
+them correctly is to first create both b1 and b2, MapObject their m_Foo
+members and *then* serialize them in. This requires that they areserialis=
+ed
+as part of a separate data structure, so that they can be constructed bef=
+ore
+they're read. Of course, when writing, MapObject should also be called
+before the actual serialization.
+
+
+In spite of the above problems, I still think CArchives are great - you j=
+ust
+have to understand what they do, how they do it and what pitfalls they pr=
+esent.
+
+--
+Niels Ull Jacobsen, Kruger A/S
+
+Niels Ull Jacobsen, Kr=FCger A/S (nuj@kruger.dk)
+Everything stated herein is THE OFFICIAL POLICY of the entire Kruger=20
+group and should be taken as legally binding in every respect.=20
+Pigs will grow wings and fly.
+
+
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Andrew Gilbert -- <A HREF="mailto:agilbert@csci.csc.com">agilbert@csci.csc.com</A>
+Wednesday, August 14, 1996
+</B>
+You may also want to read Alan Holub's article
+"Roll Your Own Persistence Implementation to Go Beyond the MFC Frontier"
+in MSJ Jun 1996, available on the July MSDN.
+
+---------------------------------------------------
+Andrew Gilbert
+Computer Sciences Corporation
+Champaign, IL
+(217) 351-8250 x2139
+agilbert@csci.csc.com
+
+"Power is the relation of a given person to other
+ individuals, in which the more this person expresses
+ opinions, predictions, and justifications of the collective
+ action that is performed, the less is his participation in that action."
+	-- Leo Tolstoy from War and Peace
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Niels Ull Jacobsen -- <A HREF="mailto:nuj@kruger.dk">nuj@kruger.dk</A>
+Tuesday, August 20, 1996
+</B>
+At 09:10 14-08-96 CDT, you wrote:
+>You may also want to read Alan Holub's article
+>"Roll Your Own Persistence Implementation to Go Beyond the MFC Frontier"
+>in MSJ Jun 1996, available on the July MSDN.
+
+Note that the persistence implementation outlined there *doesn't* handle
+circular data structures. I.e. if you have several pointers to an object,=
+=20
+it will get stored several times and recreated as several distinct object=
+s.
+
+You will definitely need to add this to get a decent persistence implemen=
+tation.
+You can of course look to CArchive for inspiration.
+
+>Andrew Gilbert
+Niels Ull Jacobsen, Kr=FCger A/S (nuj@kruger.dk)
+Everything stated herein is THE OFFICIAL POLICY of the entire Kruger=20
+group and should be taken as legally binding in every respect.=20
+Pigs will grow wings and fly.
+
+
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

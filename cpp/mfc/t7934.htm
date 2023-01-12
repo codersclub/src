@@ -1,0 +1,229 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Annoying problem displaying SDI MainFrame window with splash
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Bryan Schilling -- <A HREF="mailto:brsclv@execpc.com">brsclv@execpc.com</A>
+Sunday, November 24, 1996
+</B>
+Environment: VC++ 4.1, Win 95
+
+I am experiencing an annoying problem when starting my application. 
+While my splash screen is still being displayed, I can see the title bar
+and frame of the MainFrame window.  I don't want to see this until after
+the splash screen disappears, at which time the entire MainFrame window
+should display.
+
+
+Background info:
+
+-- I am not displaying the splash screen in the manner implemented by
+the splash screen component (i.e. waiting to display it until the
+OnCreate of the MainFrame class and killing it when a timer goes off). 
+Instead, I display the splash screen at the beginning of the
+InitInstance for the application class and then killing it myself at the
+end of the InitInstance.
+
+-- I am resizing the MainFrame window (using MoveWindow) in the OnCreate
+so that it displayed the same way that it appeared in the previous
+execution.
+
+
+What I have tried:
+
+-- I have tried to set the style of the MainFrame window by changing the
+structure in the PreCreate.. for the class.  I tried using ~WS_VISIBLE,
+WS_MINIMIZE, and even WS_ICONIC (all with no success) and then after the
+splash screen is removed, "unhidding" or "restoring" the MainFrame
+window with ShowWindow(SW_SHOW) or ShowWindow(SW_RESTORE).  Using these
+methods, I either get the same results or a tiny window displayed that
+seems to be disabled and the application is locked.
+
+-- I can get the desired results in an MDI application because the
+MainFrame window is instanciated after and separately from the document
+template class.  This method accepts my style change of ~WS_VISIBLE and
+keeps the main frame window hidden until I show it with
+ShowWindow(SW_SHOW).
+
+How can I get the MainFrame window to stay completely hidden with the
+SDI document template class and then display it again only after I kill
+the splash screen?
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Duncan Edwards -- <A HREF="mailto:Duncan@wallingford-software.co.uk">Duncan@wallingford-software.co.uk</A>
+Thursday, November 28, 1996
+</B>
+I'm forced to reply to you directly, as I can't remember how to post
+things
+to the MFC mailing list. Anyway - I have a similar problem with
+my splash screen.
+
+My app should always be maximized - but you should be able to apply this
+in some form anyway.
+
+In InitInstance of the app, it makes the main window and, shortly before
+returning TRUE,  it has these lines
+
+	pMainFrame->ShowWindow(m_nCmdShow);
+	pMainFrame->UpdateWindow();
+
+Knock these out - and it won't appear.
+Now make a quick change to the splash component:
+
+void CSplashWnd::HideSplashScreen()
+{
+	CWnd* pWnd = GetParent();
+
+	// Destroy the window, and update the mainframe.
+
+	if (NULL != pWnd)
+	{
+		pWnd->SendMessage(WM_SYSCOMMAND,SC_MAXIMIZE,0);
+	}
+	DestroyWindow();
+	AfxGetMainWnd()->UpdateWindow();
+}
+
+Change the method as above, and the destroyed splash screen should
+maximize the mainframe for you.
+
+Hope it works (it did for me) ... I don't *think* I've made any other
+changes
+to my app, which would be required - so this should be enough.
+(If you've not fixed it by now anyway)
+
+
+
+
+
+Duncan Edwards
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Bryan Schilling -- <A HREF="mailto:brsclv@execpc.com">brsclv@execpc.com</A>
+Monday, December 02, 1996
+</B>
+Bryan Schilling wrote:
+> 
+> Environment: VC++ 4.1, Win 95
+> 
+> I am experiencing an annoying problem when starting my application.
+> While my splash screen is still being displayed, I can see the title bar
+> and frame of the MainFrame window.  I don't want to see this until after
+> the splash screen disappears, at which time the entire MainFrame window
+> should display.
+> 
+> Background info:
+> 
+> -- I am not displaying the splash screen in the manner implemented by
+> the splash screen component (i.e. waiting to display it until the
+> OnCreate of the MainFrame class and killing it when a timer goes off).
+> Instead, I display the splash screen at the beginning of the
+> InitInstance for the application class and then killing it myself at the
+> end of the InitInstance.
+> 
+> -- I am resizing the MainFrame window (using MoveWindow) in the OnCreate
+> so that it displayed the same way that it appeared in the previous
+> execution.
+> 
+> What I have tried:
+> 
+> -- I have tried to set the style of the MainFrame window by changing the
+> structure in the PreCreate.. for the class.  I tried using ~WS_VISIBLE,
+> WS_MINIMIZE, and even WS_ICONIC (all with no success) and then after the
+> splash screen is removed, "unhidding" or "restoring" the MainFrame
+> window with ShowWindow(SW_SHOW) or ShowWindow(SW_RESTORE).  Using these
+> methods, I either get the same results or a tiny window displayed that
+> seems to be disabled and the application is locked.
+> 
+> -- I can get the desired results in an MDI application because the
+> MainFrame window is instanciated after and separately from the document
+> template class.  This method accepts my style change of ~WS_VISIBLE and
+> keeps the main frame window hidden until I show it with
+> ShowWindow(SW_SHOW).
+> 
+> How can I get the MainFrame window to stay completely hidden with the
+> SDI document template class and then display it again only after I kill
+> the splash screen?
+
+
+*** comment to the moderator ***
+
+I wanted to respond to the various possible solutions that I received
+and comment on what worked and did not work.  Please format this as you
+see fit to post.
+
+*** end of comment ***
+
+
+Thanks to everyone who responded to this question.  I was finally able
+to rectify my particular problem with the solution provided by Brodie
+Thiesfield (unfortunately, I no longer had his response to attach this
+reply to).
+
+The two proposed solutions of directing the mainframe window to be
+hidden in either the PreCreateWindow or the OnCreate did not seem to
+work in this situation.
+
+Duncan Edwards made reference to lines in his applications InitIntance
+of:	pMainFrame->ShowWindow(m_nCmdShow);
+	pMainFrame->UpdateWindow();
+He stated to move after the destruction of the splash screen in the
+HideSplashScreen() function.  I believe this would work for an MDI
+application, however for my SDI app, these lines do not appear (I think
+they are performed within the SDI doc/view template setup.
+
+What did work was to set the variable m_nCmdShow equal to SW_HIDE before
+the command line is parsed and processed (in InitInstance), and then use
+the ShowWindow(SW_SHOW) immediately after destroying the splash screen
+at the end of the InitInstance.
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

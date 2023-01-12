@@ -1,0 +1,504 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+How can I use sockets without callbacks?
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Cash GEDNY -- <A HREF="mailto:ccoyne@equityny.ml.com">ccoyne@equityny.ml.com</A>
+Thursday, March 27, 1997
+</B>
+Environment: NT 3.51 Visual C++ 4.0
+
+In using sockets, I want to be able to have a DLL that handles socket 
+communications for my apps.  One of the things I want this DLL to be able 
+to do is to have a send method that the app calls and then the send method 
+would return the results of my socket send (i.e. from the Receive), so that 
+the app does not have to provide a callback function.  Everything I've 
+tried so far just seems to hang up the system (using regular callbacks, 
+response time is instantaneous).
+
+Does anyone have any suggestions about how to go about this or can point me 
+in the right direction?
+
+TIA,
+
+C Coyne
+ccoyne@gedny.ml.com
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Paul Gerhart -- <A HREF="mailto:pgerhart@voicenet.com">pgerhart@voicenet.com</A>
+Friday, March 28, 1997
+</B>
+[Mini-digest: 2 responses]
+
+Coyne, Cash ( GEDNY) wrote:
+> 
+> Environment: NT 3.51 Visual C++ 4.0
+> 
+> In using sockets, 
+
+
+I have two sample sockets, MFC 4.0, VC++ 4.0, Win95 programs that are
+Freeware. They live at
+<A HREF="http://www.voicenet.com/~pgerhart/_shware.html">http://www.voicenet.com/~pgerhart/_shware.html</A>
+
+Neither uses a hand-crafted DLL - you make no claim as to why that is of
+benefit. Also, neither uses CSocket. Both are tutorials that I wrote for
+my own benefit.
+
+The first example is called SockTest and it is at
+<A HREF="http://www.voicenet.com/~pgerhart/socktst2.zip">http://www.voicenet.com/~pgerhart/socktst2.zip</A>
+It features a CWnd derived class wrapper around the sockets API. Donald
+C. Asonye wrote that class as freeware. SockTest is a client that lets
+you ping, get HTML source etc. from a server.
+
+The second example is called MiniFTP and it is at
+<A HREF="http://www.voicenet.com/~pgerhart/miniftp1.zip">http://www.voicenet.com/~pgerhart/miniftp1.zip</A>
+It uses the API directly (not Donald's class wrapper) in the
+Asynchronous fashion (i.e. driven by the Windows message pump). It is an
+actual FTP client done as a tutorial. Don't expect to tolerate every
+wacky condition imaginable but it will let you up/down load ASCII or
+binary files.
+
+Both are simple CView apps - while they are 32 bit, no Win32 common
+controls are used.
+
+If you want to stay a 4.0 then these may be of help. 
+
+Hope this helps.
+
+
+
+I want to be able to have a DLL that handles socket
+> communications for my apps.  One of the things I want this DLL to be able
+> to do is to have a send method that the app calls and then the send method
+> would return the results of my socket send (i.e. from the Receive), so that
+> the app does not have to provide a callback function.  Everything I've
+> tried so far just seems to hang up the system (using regular callbacks,
+> response time is instantaneous).
+> 
+> Does anyone have any suggestions about how to go about this or can point me
+> in the right direction?
+> 
+> TIA,
+> 
+> C Coyne
+> ccoyne@gedny.ml.com
+
+
+
+
+-- 
+#########################
+# Paul Gerhart          #
+# pgerhart@voicenet.com #
+#########################
+-----From: Dean Grimm <dean@cortron.com>
+
+Use select() instead of WSAAsyncSelect() to check when data is ready at the socket.
+I use the following code to check for data on my non-blocking socket (m_s is the 
+socket descriptor)
+
+void CBsdStreamSocket::WaitForRecvReady()
+{
+	fd_set rfds;
+	int nResponse;
+	struct timeval tv = {0,0};
+	
+	do
+	{
+		FD_ZERO(&rfds);
+		FD_SET(m_s, &rfds);
+		if((nResponse = select(m_s+1,&rfds, 0,0,&tv)) == SOCKET_ERROR)
+		{
+			ErrorLog("CBsdStreamSocket::WaitForRecvReady: Select Error");
+		}
+	}
+	while(!(nResponse !=0 && FD_ISSET(m_s,&rfds)));
+}
+
+Hope this helps.
+Dean Grimm
+Software Engineer / Cortron Corp.
+
+----------
+From: 	Coyne, Cash ( GEDNY)
+Sent: 	Thursday, March 27, 1997 5:13 AM
+To: 	'mfc-l@netcom.com'
+Subject: 	How can I use sockets without callbacks?
+
+Environment: NT 3.51 Visual C++ 4.0
+
+In using sockets, I want to be able to have a DLL that handles socket 
+communications for my apps.  One of the things I want this DLL to be able 
+to do is to have a send method that the app calls and then the send method 
+would return the results of my socket send (i.e. from the Receive), so that 
+the app does not have to provide a callback function.  Everything I've 
+tried so far just seems to hang up the system (using regular callbacks, 
+response time is instantaneous).
+
+Does anyone have any suggestions about how to go about this or can point me 
+in the right direction?
+
+TIA,
+
+C Coyne
+ccoyne@gedny.ml.com
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+John Moulder -- <A HREF="mailto:jm@wg.icl.co.uk">jm@wg.icl.co.uk</A>
+Tuesday, April 01, 1997
+</B>
+Take a look at WSAAsyncSelect(). This allows you to register a user defined
+message (WM_USER + xxx) that is sent to your window's message handler when
+a specific socket event, or events occur.
+
+The trick is to set some flags in your window's message handler according
+to each socket notification, and check these flags in a message loop within
+your DLL's send/receive function.
+
+The example below is in C pseudo code.
+
+switch (message)
+{
+	case WM_SOCKET_NOTIFY :
+	{
+            switch (WSAGETSELECTEVENT(lParam))
+            {
+                	case FD_READ : bCanRead = TRUE; break;
+			case FD_WRITE : bCanWrite = TRUE;
+			case FD_CONNECT : bConnecting = FALSE;
+
+			default : ...
+		}
+	}
+}
+
+When reading and writing, you need to await the appropriate socket
+notification before calling recv() or send().
+
+bCanWrite = FALSE;
+
+if (SOCKET_ERROR != WSAAsyncSelect(sd, hwnd, WM_SOCKET_NOTIFY, FD_READ |
+FD_CLOSE))
+{
+        /*
+         * MESSAGE LOOP
+         * 
+         * await the asynchronous notification message
+         * and allow other applications to run. 
+         */
+        while (GetMessage(&msg, NULL, 0, 0))
+        {       
+                /* handle the message normally */
+                TranslateMessage(&msg);
+                
+                /* Send it to our window */
+                DispatchMessage(&msg);
+                
+                if (bCanWrite)
+                {    
+                    /* cancel the asynchronous select */   
+                    WSAAsyncSelect(_sd, _hwnd, 0, 0);
+		        
+			  break;
+		    }
+        } /* while */
+	
+	// now do the send()
+	send(...);
+}
+
+Repeat the above with FD_READ notifications to do the recv(). 
+
+Of course, the error management is omitted from this example for clarity!
+And if your code is in a DLL, your should consider if you will have
+multiple, concurrent calling applications, and so require the state
+information (bCanWrite etc) per task or per socket connection. You may be
+able to get some advantage from C++ and MFC's classes; I don't know as I
+did it in raw C and WinSock calls. 
+
+----------
+> From: Coyne, Cash ( GEDNY) <ccoyne@equityny.ml.com>
+> To: 'mfc-l@netcom.com'
+<IMCEAX400-c=US+3Ba=+20+3Bp=ML+3Bo=EQUITYNY+3Bdda+3ASMTP=mfc-l+40netcom+2Eco
+m+3B@exchange.ml.com>
+> Subject: How can I use sockets without callbacks?
+> Date: 27 March 1997 14:13
+> 
+> Environment: NT 3.51 Visual C++ 4.0
+> 
+> In using sockets, I want to be able to have a DLL that handles socket 
+> communications for my apps.  One of the things I want this DLL to be able
+
+> to do is to have a send method that the app calls and then the send
+method 
+> would return the results of my socket send (i.e. from the Receive), so
+that 
+> the app does not have to provide a callback function.  Everything I've 
+> tried so far just seems to hang up the system (using regular callbacks, 
+> response time is instantaneous).
+> 
+> Does anyone have any suggestions about how to go about this or can point
+me 
+> in the right direction?
+> 
+> TIA,
+> 
+> C Coyne
+> ccoyne@gedny.ml.com
+> 
+> 
+> 
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Andrew L. Snow -- <A HREF="mailto:als@fl.net.au">als@fl.net.au</A>
+Wednesday, April 02, 1997
+</B>
+[Mini-digest: 2 responses]
+
+> From: Coyne, Cash ( GEDNY) <ccoyne@equityny.ml.com>
+> Subject: How can I use sockets without callbacks?
+> Date: 27 March 1997 14:13
+
+> Environment: NT 3.51 Visual C++ 4.0
+> In using sockets, I want to be able to have a DLL that handles socket 
+> communications for my apps.  One of the things I want this DLL to be able
+> to do is to have a send method that the app calls and then the send method 
+> would return the results of my socket send (i.e. from the Receive), so that 
+> the app does not have to provide a callback function.  Everything I've 
+> tried so far just seems to hang up the system (using regular callbacks, 
+> response time is instantaneous).
+
+Once again, the Visual C++ online help :-)  
+
+If using MFC is OK (you don't specifically state it isn't) then check out
+CSocket.  It makes your life easier by blocking (ie. the calls to
+read/write/connect don't return unless something has actually happened).
+
+So what I have done is start a thread which will handle all your
+communications,
+then:
+
+	CSocket mysocket;
+	mysocket.Create();
+	mysocket.Connect(address, port);  // address can be name or IP number
+	
+The last function returns 0 if theres an error.
+After it has connected, you can either use mysocket.Send() and
+mysocket.Receive()
+or use a CSocketFile to trick yourself into thinking its a file you're
+reading/writing to, not a socket.
+
+But for send ::Send() and ::Receive(), the examples are:
+	char buf[]="Hmmm... ";
+	mysocket.Send(buf, strlen(buf) );
+the call returns 0 or SOCKET_ERROR if there's a problem.
+
+and to receive 128 bytes,
+	char buf[128];
+	mysocket.Receive(buf, 128);
+the call returns the number of bytes read, SOCKET_ERROR if there's an error,
+or zero if the other end closed.
+
+Again, see the online help for details. The help says that if you use CSocket,
+your messages are still pumped so in theory you don't have to create a thread.
+In practice a thread may be a better idea, so your interface is more
+responsive.
+
+
+
+The "Windows Sockets: Sequence of operations" article is particularly useful.
+-----From: "Jay F." <James.H.Ferguson@hrb.com>
+
+Or you may just want to consider using threads and turn off
+notifications.
+Just make sure your socket is blocking.
+With threads there is no reason to worry about using AsyncSelect calls,
+
+or using a notification when messages come in.
+When a message arrives, the  socket unblocks, you read it , stick it on
+a queue, and block again.
+--
+Jay Ferguson (Because the Best Things in The Net are FREE)
+<A HREF="http://www.cse.psu.edu/~ferguson">http://www.cse.psu.edu/~ferguson</A>
+jhf@hrb.com
+
+John Moulder wrote:
+
+  Take a look at WSAAsyncSelect(). This allows you to register a user
+  defined
+  message (WM_USER + xxx) that is sent to your window's message
+  handler when
+  a specific socket event, or events occur.
+
+  The trick is to set some flags in your window's message handler
+  according
+  to each socket notification, and check these flags in a message loop
+  within
+  your DLL's send/receive function.
+
+  The example below is in C pseudo code.
+
+  switch (message)
+  {
+          case WM_SOCKET_NOTIFY :
+          {
+              switch (WSAGETSELECTEVENT(lParam))
+              {
+                          case FD_READ : bCanRead = TRUE; break;
+                          case FD_WRITE : bCanWrite = TRUE;
+                          case FD_CONNECT : bConnecting = FALSE;
+
+                          default : ...
+                  }
+          }
+  }
+
+  When reading and writing, you need to await the appropriate socket
+  notification before calling recv() or send().
+
+  bCanWrite = FALSE;
+
+  if (SOCKET_ERROR != WSAAsyncSelect(sd, hwnd, WM_SOCKET_NOTIFY,
+  FD_READ |
+  FD_CLOSE))
+  {
+          /*
+           * MESSAGE LOOP
+           *
+           * await the asynchronous notification message
+           * and allow other applications to run.
+           */
+          while (GetMessage(&msg, NULL, 0, 0))
+          {
+                  /* handle the message normally */
+                  TranslateMessage(&msg);
+
+                  /* Send it to our window */
+                  DispatchMessage(&msg);
+
+                  if (bCanWrite)
+                  {
+                      /* cancel the asynchronous select */
+                      WSAAsyncSelect(_sd, _hwnd, 0, 0);
+
+                            break;
+                      }
+          } /* while */
+
+          // now do the send()
+          send(...);
+  }
+
+  Repeat the above with FD_READ notifications to do the recv().
+
+  Of course, the error management is omitted from this example for
+  clarity!
+  And if your code is in a DLL, your should consider if you will have
+  multiple, concurrent calling applications, and so require the state
+  information (bCanWrite etc) per task or per socket connection. You
+  may be
+  able to get some advantage from C++ and MFC's classes; I don't know
+  as I
+  did it in raw C and WinSock calls.
+
+  ----------
+  > From: Coyne, Cash ( GEDNY) <ccoyne@equityny.ml.com>
+  > To: 'mfc-l@netcom.com'
+  <IMCEAX400-c=US+3Ba=+20+3Bp=ML+3Bo=EQUITYNY+3Bdda+3ASMTP=mfc-l+40netcom+2Eco
+
+  m+3B@exchange.ml.com>
+  > Subject: How can I use sockets without callbacks?
+  > Date: 27 March 1997 14:13
+  >
+  > Environment: NT 3.51 Visual C++ 4.0
+  >
+  > In using sockets, I want to be able to have a DLL that handles
+  socket
+  > communications for my apps.  One of the things I want this DLL to
+  be able
+
+  > to do is to have a send method that the app calls and then the
+  send
+  method
+  > would return the results of my socket send (i.e. from the
+  Receive), so
+  that
+  > the app does not have to provide a callback function.  Everything
+  I've
+  > tried so far just seems to hang up the system (using regular
+  callbacks,
+  > response time is instantaneous).
+  >
+  > Does anyone have any suggestions about how to go about this or can
+  point
+  me
+  > in the right direction?
+  >
+  > TIA,
+  >
+  > C Coyne
+  > ccoyne@gedny.ml.com
+  >
+  >
+  >
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+    <A HREF="http://www.digiday.com/mfcpro/joinmfcl.htm">Become an MFC-L member</A>
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

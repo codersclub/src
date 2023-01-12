@@ -1,0 +1,222 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+ToolTips sometimes don't work
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Jim Adams -- <A HREF="mailto:sasjaa@unx.sas.com">sasjaa@unx.sas.com</A>
+Tuesday, October 15, 1996
+</B>
+Environment: VC++ 4.2 / NT 4.0
+
+I have created a subclass of the CToolBar class which catches the
+TTN_NEEDTEXTW and TTN_NEEDTEXTA messages. The reason I have overridden
+this message is that I allow the user to add their own tools to my
+toolbar. The tooltip is thus a user entered string and not a resource
+in the string table. The toolbar resides in a frame that is in a
+CDialogBar so that it can be docked much like the tool palette in the
+VC++ Dialog Editor.
+
+My problem is that the tooltip does not always display. Sometimes it
+is there and sometimes it just flashes. I have put a breakpoint in the
+code and see that it breaks here twice when there going to be no
+tooltip. when there is one it keeps breaking over and over again. I
+can find no clue as to why it suddenly starts working. I have to open
+another MDIChild window or click on the owning frame or something. It
+doesn't always work. 
+
+I am puzzled. I have used Spy++ to watch for timer messages that I may
+not know about but there are only the flyby timers and one to update
+the clock in the status bar.
+
+I am looking for clues. I have looked in the July 96 MSDN and found
+nothing.
+
+-- 
++--------------------------------+-------------------------------------+
+|James Adams                     |  Something's better than nothing    |
+|  sasjaa@unx.sas.com            |  but nothing's better than          |
+| Bari - RTP General Assembly    |  more more more                     |
+|        Barbershop Chorus       |                                     |
+|  <A HREF="http://members.aol.com/rtpbbs">http://members.aol.com/rtpbbs</A> |                                     |
++--------------------------------+-------------------------------------+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Randy Taylor -- <A HREF="mailto:drt@ebt.com">drt@ebt.com</A>
+Wednesday, October 16, 1996
+</B>
+Environment: VC++ 4.2 / NT 4.0
+
+Part of the key to tooltips is in the implementation of 
+BOOL CFrameWnd::OnToolTipText(UINT msg, NMHDR* pNMHDR, LRESULT* pResult).
+
+You should create this message map entries for your CMDIChildWnd
+and your CMDIFrameWnd:
+
+ON_NOTIFY_EX_RANGE(TTN_NEEDTEXTA, 0, 0xFFFF, OnToolTipText)
+
+Then in your implemention of your CMDIFrameWnd::OnToolTipText you can
+send the TTN_NEEDTEXT message to the CMDIChildWnd which happens to
+be active. Make sure that you copy the code from the MFC's
+CFrameWnd::OnToolTipText
+that you may need...
+
+Below is my code.
+
+randy_taylor@ebt.com
+
+BOOL SmWebDisplayFrame::OnToolTipText(UINT msg, NMHDR* pNMHDR, LRESULT* pResult)
+{
+	ASSERT(pNMHDR->code == TTN_NEEDTEXTA || pNMHDR->code == TTN_NEEDTEXTW);
+
+	*pResult = 0;
+
+	// allow top level routing frame to handle the message
+	if (GetRoutingFrame() != NULL)
+		return FALSE;
+	
+	TOOLTIPTEXTA* pTTTA = (TOOLTIPTEXTA*)pNMHDR;
+
+	UINT nID = pNMHDR->idFrom;
+	if (pTTTA->uFlags & TTF_IDISHWND) {
+		// idFrom is actually the HWND of the tool
+		nID = _AfxGetDlgCtrlID((HWND)nID);
+		if (nID == AFX_IDW_TOOLBAR)
+			;     // message handled below
+		else {
+			CWnd* wnd =  CWnd::FromHandlePermanent((HWND)pNMHDR->idFrom);
+			TCHAR *pText = NULL;
+			POINT pt = GetCurrentMessage()->pt;
+			wnd->SendMessage(WMSM_TTNEEDTEXT, (WPARAM)&pt, (LPARAM) &pText);
+			if (pText) {
+				_tcsncpy(pTTTA->szText, pText, sizeof pTTTA->szText);
+				return TRUE;
+			}
+			else
+				return FALSE;
+		}
+	}
+
+	//**************************************************************
+	// THE CODE BELOW IS COPIED VERBATIM FROM CFrameWnd::OnToolTipText()
+	//***************************************************************
+
+
+.... code ommitted here....
+
+}
+
+
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Jim Adams -- <A HREF="mailto:sasjaa@unx.sas.com">sasjaa@unx.sas.com</A>
+Thursday, October 17, 1996
+</B>
+Environment: VC++ 4.2 / NT 4.0
+
+> I have created a subclass of the CToolBar class which catches the
+> TTN_NEEDTEXTW and TTN_NEEDTEXTA messages. The reason I have overridden
+> this message is that I allow the user to add their own tools to my
+> toolbar. The tooltip is thus a user entered string and not a resource
+> in the string table. The toolbar resides in a frame that is in a
+> CDialogBar so that it can be docked much like the tool palette in the
+> VC++ Dialog Editor.
+>
+> My problem is that the tooltip does not always display. Sometimes it
+> is there and sometimes it just flashes. I have put a breakpoint in the
+> code and see that it breaks here twice when there going to be no
+> tooltip. when there is one it keeps breaking over and over again. I
+> can find no clue as to why it suddenly starts working. I have to open
+> another MDIChild window or click on the owning frame or something. It
+> doesn't always work. 
+>
+> I am puzzled. I have used Spy++ to watch for timer messages that I may
+> not know about but there are only the flyby timers and one to update
+> the clock in the status bar.
+>
+> I am looking for clues. I have looked in the July 96 MSDN and found
+> nothing.
+>
+I hate to answer my own question but it turned out to be really
+simple. The code I used to put the string in the tool tip was taken
+from the online doc(Programming with MFC:ToolTips). It has lines like:
+
+TOOLTIPTEXT *pTTT = (TOOLTIPTEXT*) pNMHDR;
+if (pTTT->uFlags & TTF_IDISHWND)
+  nID = ::GetDlgCtrlId((HWND)nID);
+
+My problem was that was using the TTN_NEEDTEXTA and TTN_NEEDTEXTW
+messages which don't pass in data in the same format. In particular,
+the uFlags datum is in different places in the two structures. I was
+looking at a pointer instead of a flag value and sometimes the pointer
+was an odd value and sometimes even. To work the code needed to be
+more like:
+
+TOOLTIPTEXTA* pTTTA = (TOOLTIPTEXTA*)pNMHDR;
+TOOLTIPTEXTW* pTTTW = (TOOLTIPTEXTW*)pNMHDR;
+if (((pNMHDR->code == TTN_NEEDTEXTA) && 
+     (pTTTA->uFlags & TTF_IDISHWND)    ) ||
+    ((pNMHDR->code == TTN_NEEDTEXTW) &&
+     (pTTTW->uFlags & TTF_IDISHWND)    ))
+  nID = ::GetDlgCtrlId((HWND)nID);
+
+-- 
++--------------------------------+-------------------------------------+
+|James Adams                     |  Something's better than nothing    |
+|  sasjaa@unx.sas.com            |  but nothing's better than          |
+| Bari - RTP General Assembly    |  more more more                     |
+|        Barbershop Chorus       |                                     |
+|  <A HREF="http://members.aol.com/rtpbbs">http://members.aol.com/rtpbbs</A> |                                     |
++--------------------------------+-------------------------------------+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

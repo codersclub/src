@@ -1,0 +1,484 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Strange about Dump() function.
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Ola Theander -- <A HREF="mailto:olathean@kajen.com">olathean@kajen.com</A>
+Monday, January 20, 1997
+</B>
+Environment: MSVC 4.2b Windows NT 4.0 
+
+Hello all!
+
+I experimented a bit with overriding the Dump() function. I never botherd
+to use this possibility before, but now i find it rather nice. Although i
+have a little problem. When i get the ordinary object dump after a memory
+leak, my override of the Dump() wasn't called. Here is what i've done.
+
+I created a ordinary MFC MDI project, with the default options. Then i
+added a bit of code to test the Dump() override.
+
+1)
+Made the app class a friend of the view class (so i could create an
+instance of the view in the app class).
+
+class CTestView : public CView
+{
+	friend class CTestApp;
+........
+.......
+.........
+};
+
+2)
+Then i added this code to the Dump override of the View class.
+
+void CTestView::Dump(CDumpContext& dc) const
+{
+	CView::Dump(dc);
+
+	dc << "Testing, testing!!!";
+}
+
+3)
+
+I created an instance of the CTestView class in the InitInstance function
+of the app class, which i skip to delete on purporse. Like this.
+
+BOOL CTestApp::InitInstance()
+{
+	// Standard initialization
+	// If you are not using these features and wish to reduce the size
+	//  of your final executable, you should remove from the following
+	//  the specific initialization routines you do not need.
+
+#ifdef _AFXDLL
+	Enable3dControls();			// Call this when using MFC in a shared DLL
+........
+........
+........
+.......
+	//***This is my test.********************************************
+
+	CTestView *p_TestView;
+	p_TestView =new CTestView;
+
+	//*****************************************************************
+
+	return TRUE;
+}
+
+4)
+
+Then i compiled the project and run it. When it started, i just quited it
+right off. Then i automaticly recived a object dump in the developer studio
+output window. It looked like this.
+
+Detected memory leaks!
+Dumping objects ->
+C:\Kjellkod\Vc32\Test\Test.cpp(97) : {116} client block at 0x00412ED0,
+subtype 0, 68 bytes long.
+a CTestView object at $00412ED0, 68 bytes long
+Object dump complete.
+The program 'C:\Kjellkod\Vc32\Test\Debug\Test.exe' has exited with code 0
+(0x0).
+
+No sign of the output text "Testing, testing!!!" here. This is what i think
+is very strange. Here, if any, is the place where you is interested in the
+dump output.
+I hope this explains what i'm after.
+
+Kind regards, Ola Theander
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Bing Hou -- <A HREF="mailto:hou@tfn.com">hou@tfn.com</A>
+Wednesday, January 22, 1997
+</B>
+Ola,
+
+The 'Detected memory leaks! Dumping objects->' block is outputed by the 
+AFX_EXITDUMP class's dtor, it has nothing to do with dumping your CView 
+derived class. In order for your overriden Dump function to be called, you 
+need to insert the code:
+        #ifdef _DEBUG
+           afxDump<<(CObject*)p_TestView;
+        #endif
+right after the object is created and before the app exits.
+
+Bing Hou
+hou@tfn.com
+=========================
+  Jambalaya Baby!!!
+=========================
+
+
+______________________________ Reply Separator 
+_________________________________
+Subject: Strange about Dump() function.
+Author:  "Ola Theander" <olathean@kajen.com> at Internet
+Date:    1/20/97 8:13 PM
+
+
+Environment: MSVC 4.2b Windows NT 4.0 
+
+Hello all!
+
+I experimented a bit with overriding the Dump() function. I never botherd 
+to use this possibility before, but now i find it rather nice. Although i 
+have a little problem. When i get the ordinary object dump after a memory 
+leak, my override of the Dump() wasn't called. Here is what i've done.
+     
+I created a ordinary MFC MDI project, with the default options. Then i 
+added a bit of code to test the Dump() override.
+     
+1)
+Made the app class a friend of the view class (so i could create an 
+instance of the view in the app class).
+     
+class CTestView : public CView
+{
+        friend class CTestApp;
+........
+.......
+.........
+};
+     
+2)
+Then i added this code to the Dump override of the View class.
+     
+void CTestView::Dump(CDumpContext& dc) const 
+{
+        CView::Dump(dc);
+     
+        dc << "Testing, testing!!!";
+}
+     
+3)
+     
+I created an instance of the CTestView class in the InitInstance function 
+of the app class, which i skip to delete on purporse. Like this.
+     
+BOOL CTestApp::InitInstance()
+{
+        // Standard initialization
+        // If you are not using these features and wish to reduce the size 
+        //  of your final executable, you should remove from the following 
+        //  the specific initialization routines you do not need.
+     
+#ifdef _AFXDLL
+        Enable3dControls();                     // Call this when using MFC in a
+shared DLL
+........
+........
+........
+.......
+        //***This is my test.********************************************
+     
+        CTestView *p_TestView;
+        p_TestView =new CTestView;
+     
+        //*****************************************************************
+     
+        return TRUE;
+}
+     
+4)
+     
+Then i compiled the project and run it. When it started, i just quited it 
+right off. Then i automaticly recived a object dump in the developer studio 
+output window. It looked like this.
+     
+Detected memory leaks!
+Dumping objects ->
+C:\Kjellkod\Vc32\Test\Test.cpp(97) : {116} client block at 0x00412ED0, 
+subtype 0, 68 bytes long.
+a CTestView object at $00412ED0, 68 bytes long 
+Object dump complete.
+The program 'C:\Kjellkod\Vc32\Test\Debug\Test.exe' has exited with code 0 
+(0x0).
+     
+No sign of the output text "Testing, testing!!!" here. This is what i think 
+is very strange. Here, if any, is the place where you is interested in the 
+dump output.
+I hope this explains what i'm after.
+     
+Kind regards, Ola Theander
+     
+     
+     
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Friday, January 24, 1997
+</B>
+[Mini-digest: 3 responses]
+
+At 20:13 1/20/97 +0100, Ola Theander wrote:
+>Environment: MSVC 4.2b Windows NT 4.0 
+
+>Then i compiled the project and run it. When it started, i just quited it
+>right off. Then i automaticly recived a object dump in the developer studio
+>output window. It looked like this.
+
+>Detected memory leaks!
+>Dumping objects ->
+>C:\Kjellkod\Vc32\Test\Test.cpp(97) : {116} client block at 0x00412ED0,
+>subtype 0, 68 bytes long.
+>a CTestView object at $00412ED0, 68 bytes long
+>Object dump complete.
+>The program 'C:\Kjellkod\Vc32\Test\Debug\Test.exe' has exited with code 0
+>(0x0).
+
+>No sign of the output text "Testing, testing!!!" here. This is what i think
+>is very strange. Here, if any, is the place where you is interested in the
+>dump output.
+>I hope this explains what i'm after.
+
+MFC won't dump objects after a memory leak unless you ask it to.  You need
+to alter the dump context object that MFC's managing for you.  If you,
+early in your CWinApp::InitInstance(), add this line of code:
+	
+	afxDump.SetDepth(1);
+
+you'll have MFC dump both memory leaks _and_ call the Dump() members of 
+objects which have leaked.
+
+By default, the depth is zero.  That's just because it's pedantically more
+conservative.
+
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+Why does the "new" Corvette look like a 1993 RX-7?
+These words are my own. I do not speak on behalf of Microsoft.
+
+-----From: "Ola Theander" <olathean@kajen.com>
+
+
+
+----------
+> Fr=E5n: Bing Hou <hou@tfn.com>
+> Till: Mfc -mailinglist <mfc-l@netcom.com>; Ola Theander
+<olathean@kajen.com>
+> =C4mne: Re: Strange about Dump() function.
+> Datum: den 22 januari 1997 16:01
+>=20
+> Ola,
+>=20
+> The 'Detected memory leaks! Dumping objects->' block is outputed by the=
+=20
+> AFX_EXITDUMP class's dtor, it has nothing to do with dumping your CView=
+=20
+> derived class. In order for your overriden Dump function to be called,
+you=20
+> need to insert the code:
+>         #ifdef _DEBUG
+>            afxDump<<(CObject*)p_TestView;
+>         #endif
+> right after the object is created and before the app exits.
+>=20
+> Bing Hou
+> hou@tfn.com
+> =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D
+>   Jambalaya Baby!!!
+> =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D
+>=20
+
+Greetings Bing!
+
+Thanks for your answer.
+Ok, but isn't this a bit strange? Say you have an array of object pointer=
+s.
+In this list you add and remove objects along with the execution of the
+program. When you exit the application you recive the information that yo=
+u
+have a memory leak. At this point the pointer to the object may be lost
+since a long time. In this case you don't have any use of the Dump()
+function. This illustrates my point. If you still have the pointer to the
+object and is aware that you haven't deleted it, i don't consider the
+object leaked since you know that you didn't delete it.
+
+Kind regards, Ola Theander
+
+
+-----From: Yeung Chi Kong <cytusso@speednet.net>
+
+Ola,
+
+The 'Detected memory leaks! Dumping objects->' block is outputed by the 
+AFX_EXITDUMP class's dtor, it has nothing to do with dumping your CView 
+derived class. In order for your overriden Dump function to be called, you 
+need to insert the code:
+        #ifdef _DEBUG
+           afxDump<<(CObject*)p_TestView;
+        #endif
+right after the object is created and before the app exits.
+
+Bing Hou
+hou@tfn.com
+=========================
+  Jambalaya Baby!!!
+=========================
+
+
+______________________________ Reply Separator 
+_________________________________
+Subject: Strange about Dump() function.
+Author:  "Ola Theander" <olathean@kajen.com> at Internet
+Date:    1/20/97 8:13 PM
+
+
+Environment: MSVC 4.2b Windows NT 4.0 
+
+Hello all!
+
+I experimented a bit with overriding the Dump() function. I never botherd 
+to use this possibility before, but now i find it rather nice. Although i 
+have a little problem. When i get the ordinary object dump after a memory 
+leak, my override of the Dump() wasn't called. Here is what i've done.
+     
+I created a ordinary MFC MDI project, with the default options. Then i 
+added a bit of code to test the Dump() override.
+     
+1)
+Made the app class a friend of the view class (so i could create an 
+instance of the view in the app class).
+     
+class CTestView : public CView
+{
+        friend class CTestApp;
+........
+.......
+.........
+};
+     
+2)
+Then i added this code to the Dump override of the View class.
+     
+void CTestView::Dump(CDumpContext& dc) const 
+{
+        CView::Dump(dc);
+     
+        dc << "Testing, testing!!!";
+}
+     
+3)
+     
+I created an instance of the CTestView class in the InitInstance function 
+of the app class, which i skip to delete on purporse. Like this.
+     
+BOOL CTestApp::InitInstance()
+{
+        // Standard initialization
+        // If you are not using these features and wish to reduce the size 
+        //  of your final executable, you should remove from the following 
+        //  the specific initialization routines you do not need.
+     
+#ifdef _AFXDLL
+        Enable3dControls();                     // Call this when using MFC in a
+shared DLL
+........
+........
+........
+.......
+        //***This is my test.********************************************
+     
+        CTestView *p_TestView;
+        p_TestView =new CTestView;
+     
+        //*****************************************************************
+     
+        return TRUE;
+}
+     
+4)
+     
+Then i compiled the project and run it. When it started, i just quited it 
+right off. Then i automaticly recived a object dump in the developer studio 
+output window. It looked like this.
+     
+Detected memory leaks!
+Dumping objects ->
+C:\Kjellkod\Vc32\Test\Test.cpp(97) : {116} client block at 0x00412ED0, 
+subtype 0, 68 bytes long.
+a CTestView object at $00412ED0, 68 bytes long 
+Object dump complete.
+The program 'C:\Kjellkod\Vc32\Test\Debug\Test.exe' has exited with code 0 
+(0x0).
+     
+No sign of the output text "Testing, testing!!!" here. This is what i think 
+is very strange. Here, if any, is the place where you is interested in the 
+dump output.
+I hope this explains what i'm after.
+     
+Kind regards, Ola Theander
+     
+     
+     
+
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||                                                          ||
+||   My Home Page address                                   ||
+||	===> <A HREF="http://www.speednet.net/~cytusso/yeung/22.htm">http://www.speednet.net/~cytusso/yeung/22.htm</A>  ||
+||       						    ||
+||   E-mail address 					    ||
+||	=====> Yeung Chi Kong<cytusso@speednet.net>	    ||
+||                                                          ||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

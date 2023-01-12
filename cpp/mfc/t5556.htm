@@ -1,0 +1,233 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Working with CListCtrl headers
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Jeff Galbraith -- <A HREF="mailto:jeffg%picatl@mhs.iqsc.com">jeffg%picatl@mhs.iqsc.com</A>
+Wednesday, June 19, 1996
+</B>
+Environment: MFC 4.0/Win95
+
+I would like to be able to catch a message which tells me the user has
+resized, or is resizing, the header controls in a CListCtrl. I've tried
+many ways to do this, but it's failed each time. I've asked in several
+places without getting a response, so this is my last chance for hope.
+Does anyone know specifically how to do this?
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Roger Onslow -- <A HREF="mailto:Roger_Onslow@compsys.com.au">Roger_Onslow@compsys.com.au</A>
+Saturday, June 22, 1996
+</B>
+[Mini-digest: 2 responses]
+
+>I would like to be able to catch a message which tells me the user has
+>resized, or is resizing, the header controls in a CListCtrl. I've tried
+>many ways to do this, but it's failed each time. I've asked in several
+>places without getting a response, so this is my last chance for hope.
+>Does anyone know specifically how to do this?
+
+Not exactly -- but here are some cluse for you
+
+(1) The header control of the listbox receives a HDN_BEGINTRACK and 
+HDN_ENDTRACK message while resizing. Here's docco from Win32:
+
+================================================================================
+The HDN_BEGINTRACK notification message notifies a header control's parent 
+window that the user has begun dragging a divider in the control (that is, the 
+user has pressed the left mouse button while the mouse cursor is on a divider 
+in the header control). This notification message is sent in the form of a 
+WM_NOTIFY message. 
+  
+HDN_BEGINTRACK 
+phdn = (HD_NOTIFY FAR *) lParam; 
+ 
+Parameters
+phdn
+Pointer to an HD_NOTIFY structure that contains information about the header 
+control and the item whose divider is to be dragged. 
+Return Values
+Returns FALSE to allow tracking of the divider or TRUE to prevent tracking.
+  
+The HDN_ENDTRACK notification message notifies a header control's parent window 
+that the user has finished dragging a divider. This notification message sent 
+in the form of a WM_NOTIFY message. 
+  
+HDN_ENDTRACK 
+phdn = (HD_NOTIFY FAR *) lParam; 
+ 
+Parameters
+phdn
+Pointer to an HD_NOTIFY structure that contains information about the header 
+control and the item whose divider was dragged. 
+Return Values
+================================================================================
+
+(2) You can get a pointer to the header control from the CListCtrl
+Not sure if there is a direct call, but you should be able to enumerate the 
+child windows of hte CListCtrl and test is the GetClassName of the child is 
+"SysHeader32".
+(see KB Q125694 for code that finds header control, but not quite what is 
+required)
+
+(3) Now, just need to subclass this header control window to recive the message 
+and you should be there.
+
+Haven't time to tell you how to do it - (and don't know *exactly*) - so asall 
+the best text books do in these cases "this is left as an exercise for the 
+reader" :-)
+
+Roger Onslow
+Computer Systems Australia.
+
+
+-----From: "Cunningham Graham, IK 23" <Cunningham@tgd.swissptt.ch>
+
+Hi you need to catch the OnNotify message in the CListCtrl
+
+HTH
+
+BOOL CExtListCtrl::OnNotify(WPARAM wParam, LPARAM lParam, LRESULT*
+pResult) 
+{
+	UINT code = ((NMHDR*)lParam)->code;
+	int nColumn;
+	CRect rect;
+
+	switch (code)
+	{
+		case HDN_TRACK:
+		case HDN_TRACKW: //NT Header ctrl uses UNICODE 
+			//YOUR CODE HERE
+			break;
+		default:
+			break;
+	}
+	
+	return CListCtrl::OnNotify(wParam, lParam, pResult);
+}
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Andrew Cordwell -- <A HREF="mailto:andrewc@miles33.co.uk">andrewc@miles33.co.uk</A>
+Tuesday, June 25, 1996
+</B>
+Environment MSVC 4.1, NT 3.51
+
+> I would like to be able to catch a message which tells me the user has
+> resized, or is resizing, the header controls in a CListCtrl. I've tried
+> many ways to do this, but it's failed each time. I've asked in several
+> places without getting a response, so this is my last chance for hope.
+> Does anyone know specifically how to do this?
+
+Try this:
+
+BOOL CListCtrl::OnNotify(WPARAM wParam, LPARAM lParam, LRESULT*
+pResult) 
+{	
+//Apologies for formatting....
+HD_NOTIFY FAR * phdn = (HD_NOTIFY FAR *) lParam; 
+ NMHDR   hdr=phdn->hdr;
+ HD_ITEM FAR* pitem=phdn->pitem; 
+
+ //hrd.code will contain a HDN_xx message from the header control within our CListCtrl
+ //Be careful with UNICODE as different message numbers are sent!  
+//uniquely specifiy both UNICODE and/or Non-UNICODE messages as necessary
+//(see commctrl.h for header messages)
+ switch(hdr.code) 
+{	case HDN_BEGINTRACKA:
+  case HDN_BEGINTRACKW:
+   if (pitem->mask & HDI_WIDTH)
+   {	//Do something!
+   }
+
+   break;
+
+  case HDN_ENDTRACKW:			
+  case HDN_ENDTRACKA:			
+   if (pitem->mask & HDI_WIDTH)
+   {	//Adjust the list view column width!
+   }
+
+   break;
+
+
+ }
+
+ return CListCtrl::OnNotify(wParam, lParam, pResult);
+}
+
+
+Descend a new class from CListCtrl and pick up the start and end 
+track messages which are reflected from the header control within the 
+list control.  (They are refelected by the header control to the 
+parent - in our case the new CListCtrl derived class.  See Visual C++ 
+4 + docs under CListCtrl then pick any of the message reflection 
+sections).
+
+Then take what ever action is necessary!
+This should work! (code was taken from smothing slightly different - 
+which leads me onto a related problem.....
+
+Does anyone know how to scroll a CHeaderCtrl?  EG when I scroll 
+another control, I want my header control to scroll to a  
+position relative to the position in the other control.  I'm 
+relatively new to MFC so maybe there is a better way of doing it?
+
+I have a *real* nasty bodge to this - I stuck the header control as a 
+child of a list box, set extents on the listbox then scrolled that!  
+This is not an aceptable solution, due to the speed and redraw 
+flicking!
+
+Thanks.
+------------------------
+Andy Cordwell
+------------------------
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

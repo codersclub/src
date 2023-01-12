@@ -1,0 +1,267 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Trapping a double click on CListCtrl
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Glenn T. Jayaputera -- <A HREF="mailto:gtj@nunkeen.apana.org.au">gtj@nunkeen.apana.org.au</A>
+Friday, May 03, 1996
+</B>
+Env: VC4.0/Win95
+
+How do I trap which item index (on CListCtrl object) on which the user
+has double clicked.  I can trap the double click notification but how
+do I get the info on which item index was that.  I tried to cast the
+*pNMHDR to NM_LISTVIEW *  as follows
+
+  NM_LISTVIEW *pNMLISTVIEW = (NM_LISTVIEW *) pNMHDR
+
+but the iItem member of pNMLISTVIEW contains some obsecure number...
+
+thanks for your pointers
+glenn tesla
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Norman L Covington -- <A HREF="mailto:doubleM@cris.com">doubleM@cris.com</A>
+Saturday, May 04, 1996
+</B>
+[Mini-digest: 8 responses]
+
+Glenn T. Jayaputera wrote:
+> 
+> Env: VC4.0/Win95
+> 
+> How do I trap which item index (on CListCtrl object) on which the user
+> has double clicked. ...
+
+Glenn:
+
+A method I have used successfully is:
+  int nItem = 
+GetNextItem(-1,LVNI_ALL|LVNI_FOCUSED|LVNI_SELECTED);
+
+Hope it helps,
+
+Norman
+doubleM@concentric.net
+-----From: "Frederic Steppe" <FredericS@msn.com>
+
+Assuming that a double click sets the focus to the clicked item before 
+notification, just call GetNextItem(-1, LVNI_FOCUSED) to get the focused 
+index, which should be the clicked index.
+
+Frederic Steppe (frederics@msn.com)
+-----From: Vincent Mascart <100425.1337@CompuServe.COM>
+
+Glenn,
+
+You can keep track of the currently selected item in a class member using the
+following code :
+
+in message map:
+ON_NOTIFY(LVN_ITEMCHANGED, IDC_LIST, OnItemchangedList)
+
+// m_lvList Listview notification handling
+//
+void CDosListView::OnItemchangedList(NMHDR* pNMHDR, LRESULT* pResult) 
+{
+	NM_LISTVIEW* pNMListView = (NM_LISTVIEW*)pNMHDR;
+
+	if(pNMListView->uNewState & (LVIS_SELECTED | LVIS_FOCUSED))
+	{
+		m_iItem = pNMListView->iItem;
+	}
+	*pResult = 0;
+}
+
+-----From: "asha" <asha@shuttletech.co.in>
+
+void X::OnDblClickList(NMHDR* pNMHDR, LRESULT* pResult) 
+{
+	// TODO: Add your control notification handler code here
+	POINT pt ;
+
+	LV_HITTESTINFO HitTestInfo ;
+
+	::GetCursorPos(&pt) ;
+
+                  // m_List represents your list control
+
+	m_List.ScreenToClient(&pt) ;
+
+	HitTestInfo.pt = pt ; // in client coordinates
+	
+	if(m_List.HitTest(&HitTestInfo) != -1 )
+	{
+     	       // These three flags together determine if the position is over 
+                         // the item 
+                           if(HitTestInfo.flags == (LVHT_ONITEMSTATEICON | 
+                                         LVHT_ONITEMLABEL | 
+                                         LVHT_ONITEMICON  ))
+		{
+			// You can get the item for processing from the HitTestInfo 
+                                                        // structure
+			m_List.GetItemState(HitTestInfo.iItem,LVIS_SELECTED) ;
+                                      }
+	}  // end if hit test is successful
+
+	*pResult = 0;
+}
+
+ 
+-----From: Mario Contestabile <Mario_Contestabile.UOS__MTL@UOSMTL2.universal.com>
+
+yourlistview::OnRButtonDown(UINT nFlags, CPoint point)   
+    or
+yourlistview::OnLButtonDblClk(UINT nFlags, CPoint point) {
+
+ LV_HITTESTINFO lvh; 
+ lvh.pt = point;
+ if(m_ListCtrl.HitTest(&lvh) == -1) return;
+ CString Name = m_ListCtrl.GetItemText(lvh.iItem, 0); // Name contains column 0 
+string
+}
+
+mcontest@universal.com
+
+-----From: Frank McGeough <fm@synchrologic.com>
+
+The only thing that's there is the NMHDR, unfortunately not the 
+NM_LISTVIEW*.
+
+I don't know what the best way is to do this but I solved my problem with
+dealing with Right clicks and double clicks by grabbing the point on 
+button down and then doing an evaluation in the function of interest
+(doubleclick, rightclick) 
+
+// for tree control
+    UINT flags = TVHT_ONITEM;
+    CTreeCtrl& treeCtrl = GetTreeCtrl( );
+
+    // m_pt is a POINT that was set in button down methods
+    HTREEITEM treeItem = treeCtrl.HitTest( m_pt, &flags );
+    if (treeItem != NULL)
+    {
+           // do work
+    }	
+ 
+
+// for list control
+    UINT flags = TVHT_ONITEM;
+    CListCtrl& listCtrl = GetListCtrl( );
+
+    int index = listCtrl.HitTest( m_pt, &flags );
+    if (index != -1)
+    {
+           // do work
+    }
+
+As I had minimal information when I solved the problem in this
+way, I'd appreciate any discussion of other approaches to this
+problem and especially an explanation of why the pointer that I
+really want (NM_TREEVIEW* or NM_LISTVIEW*) isn't passed for a
+right click or double click msg. The NMHDR structure seems
+pretty useless by itself and when I run into things that I
+think are useless that usually means that I'm missing something.
+Explanations?
+__________________________________________________
+Frank McGeough      fm@synchrologic.com
+Synchrologic, Inc. (http://www.synchrologic.com/)
+Voice: 404.876.3209            Fax: 404.876.3809
+-----From: Doug Reese <drrhab@cts.com>
+
+I don't even use the pNMHDR.  Here's a sample from my code; m_ctlResultList
+is a CListCtrl:
+
+        // get selected item
+	int nItem, nFlags;
+	nFlags = LVNI_SELECTED;
+	nItem = m_ctlResultList.GetNextItem(-1, nFlags );
+	if ( nItem != -1 )
+        {
+                // nItem is the 0 based index of the selected item
+        }
+
+Hope this helps
+
+Doug Reese
+
+-----From: erik.heuer@ks-t.no (Erik Heuer)
+
+Try using CListCtrl::HitTest
+
+Erik Heuer, Kongsberg Simulation & Training, 3600 Kongsberg, Norway
+E-mail: erik.heuer@ks-t.no  Phone:(+47) 32735766 Fax:(+47) 32736965
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Frederic Steppe -- <A HREF="mailto:FredericS@msn.com">FredericS@msn.com</A>
+Thursday, May 09, 1996
+</B>
+>Glenn T. Jayaputera wrote:
+>> 
+>> Env: VC4.0/Win95
+>> 
+>> How do I trap which item index (on CListCtrl object) on which the user
+>> has double clicked. ...
+
+> Precisions after reading the "[Mini-digest: 8 responses]"
+
+For those who tried to find the clicked item using GetNextItem(-1, 
+LVNI_SELECTED), just remember that a CListCtrl may have multiple selection, 
+and the users don't always click on the first one.  Using 
+GetNextItem(-1,LVNI_FOCUSED) seems better to me.
+
+By the way, it REALLY seems to be the only simple solution, isn't it ?
+
+Frederic Steppe (frederics@msn.com)
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,188 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+regular DLL dynamically linking MFC => trouble
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Walter Gillett -- <A HREF="mailto:walter@mathworks.com">walter@mathworks.com</A>
+Tuesday, January 23, 1996
+</B>
+The Microsoft VC++ 4.0 doc says unambiguously:
+
+"If your regular DLL [that is, a DLL that exports only a C API] is dynamically
+linked to the shared MFC DLL, functions in your DLL can be called by any Win32
+application, as well as by programs that only use MFC."
+
+In practice, I'm finding that this doesn't work.  If my DLL does a simple
+AfxMessageBox, that fails with the assertion that AfxGetApp is returning NULL.
+If I change the DLL to link the MFC DLL statically, then everything works fine.
+Has anyone else had this problem?  I suppose that it could be specific to my
+application rather than a general problem -- would be useful to know that.
+
+Another question (related to earlier posting): the doc says that a regular DLL
+can export only a C API and an extension DLL is required to export a C++/MFC
+API.  What about a C++ API that doesn't include any MFC-derived classes?  It's
+unclear to me whether this is supposed to work or not.
+
+-Walter Gillett
+
+
+--
+Walter Gillett                     email: walter@mathworks.com
+The Mathworks, Inc.                http://www.mathworks.com
+(508) 647-7344                     info: info@mathworks.com
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+David W. Gillett -- <A HREF="mailto:DGILLETT@expertedge.com">DGILLETT@expertedge.com</A>
+Thursday, January 25, 1996
+</B>
+[Mini-digest: 3 responses]
+
+> The Microsoft VC++ 4.0 doc says unambiguously:
+> 
+> "If your regular DLL [that is, a DLL that exports only a C API] is dynamically
+> linked to the shared MFC DLL, functions in your DLL can be called by any Win32
+> application, as well as by programs that only use MFC."
+
+  I believe that this is likely to be exactly inverted -- if your DLL 
+is *statically* linked to MFC, then nobody else knows or cares that 
+you're using MFC in the implementation.  It's only if it's 
+dynamically linked that you wind up sharing a single MFC DLL with any 
+apps that call you, and so AfxGetApp() needs to change dance partners 
+on the fly.
+ 
+
+> Another question (related to earlier posting): the doc says that a
+> regular DLL can export only a C API and an extension DLL is
+> required to export a C++/MFC API.  What about a C++ API that
+> doesn't include any MFC-derived classes?  It's unclear to me
+> whether this is supposed to work or not.
+
+  A DLL that exports a C++ API will only be usable from apps compiled 
+by the same vendor's C++ compiler -- and it may have to be the same 
+*version*.  [Well, okay, you *can* turn off name mangling, but in 
+that case you're half way to making it a C API anyway....]
+  If you expose MFC as a DLL interface, it must be from a DLL 
+implementation of MFC as above -- and, of course, it must be a C++ 
+interface.
+
+
+> -Walter Gillett
+
+  SNAP!
+
+Dave
+
+ 
+-----From: "Mike Blaszczak" <mikeblas@msn.com>
+
+Walter Gillett wrote:
+
+> In practice, I'm finding that this doesn't work.  If my DLL does a simple
+> AfxMessageBox, that fails with the assertion that AfxGetApp is returning 
+NULL.
+
+Does your DLL have a CWinApp-derived object?  Is it being constructed 
+properly?  Is your DllMain() hooked up with code like the documentation 
+suggests?
+
+> If I change the DLL to link the MFC DLL statically, then everything works 
+fine.
+
+Are you calling the DLL from different threads?
+
+> the doc says that a regular DLL
+> can export only a C API and an extension DLL is
+> required to export a C++/MFC
+> API.  What about a C++ API that doesn't include any MFC-derived
+>classes?  It's unclear to me whether this is supposed to work or not.
+
+You should be able to export C++ classes which don't involve MFC or 
+MFC-derived classes.  (That is, you can't export a class derived from MFC, and 
+you can't expect any function you've written to accept a pointer or a 
+reference or a by-value of any MFC-derived object.)  You _can_ export a C++ 
+class that's entirely your own and has nothing to do with MFC.
+
+There's lots of documentation on this kind of thing.  Some people have even 
+written books about it.
+
+.B ekiM
+TCHAR szDisc[] = _T("These darts are my own; I don't throw triples on behalf 
+of Microsoft.");
+-----From: Brad Wilson <bradw@netnet.net>
+
+Walter Gillett wrote:
+ 
+> Another question (related to earlier posting): the doc says that a regular DLL
+> can export only a C API and an extension DLL is required to export a C++/MFC
+> API.  What about a C++ API that doesn't include any MFC-derived classes?  It's
+> unclear to me whether this is supposed to work or not.
+
+You can export C++ classes from a DLL, but C++ linking is not standardized enough
+yet so that your DLL can be supported over multiple compilers.  In fact, there
+are even differences in the way Borland and Microsoft return structs/classes,
+so anything function that returned a non-simple data type would also fail.
+
+If you want to export a C++ API from your DLL, you'll need to create that DLL
+with every compiler you intend to support and your users must use the one
+built with the compiler they're going to use.  If you and they are restricted
+to Visual C++ only, no problem.  :-)
+
+--
+class CBradWilson : public CWorldWatchProgrammingTeam {
+  public:
+    void GetInetAddr  ( CString& s ) { s = "bradw@exptech.com";      }
+    void GetE164Addr  ( CString& s ) { s = "+1 (810) 620-9803";      }
+    void GetURL       ( CString& s ) { s = "http://www.exptech.com"; }
+    void GetDisclaimer( CString& s ) { s = "All I say is fact :-p";  }
+};
+
+//  QOTW:  "Don't think of yourself as the least intelligent creature in this
+//          room ... if you consider the entire planet, you're smarter than
+//          literally hundreds of people."  - Dogbert to Dilbert
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,425 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Killing a worker thread
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Kalyan -- <A HREF="mailto:chakri@sunserv.cmc.stph.net">chakri@sunserv.cmc.stph.net</A>
+Thursday, October 10, 1996
+</B>
+Environment : Win95, VC++ 4.1
+
+Hi all,
+
+    I have created a worker thread in my application and depending
+    on some status/criteria I would like to kill the thread at any
+    point of time. To do that one has to setup a communication between
+    the threads (worker and main application thread). If the communication
+    is setup using the CEvent objects, the worker thread has to wait for 
+    the event to happen and then can return from the controlling function.
+    But my requirement is to kill the thread at any point of time. Please
+    suggest me any ideas about this scenario.
+
+Thanx in advance,
+Kalyan.V
+---------------------------------------------------------------
+ Kalyana Chakravarthy.V   Ph  : +91-040-259401/259501      
+ Engineer (R&D),          Fax : +91-040-259509
+ CMC Limited,					
+ Hyderabad, A.P.,         Email : chakri@hp735.cmc.stph.net
+ INDIA.			          chakri@sunserv.cmc.stph.net
+---------------------------------------------------------------
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Vikas Patel -- <A HREF="mailto:vjp@wgw.safco.com">vjp@wgw.safco.com</A>
+Friday, October 11, 1996
+</B>
+[Mini-digest: 9 responses]
+
+Use Win32 API
+
+The TerminateThread function terminates a thread.
+BOOL TerminateThread(
+    HANDLE hThread, // handle to the thread
+    DWORD dwExitCode     // exit code for the thread
+   );     
+
+The hThread parameter is the handle of the worker thread which can be 
+accessed by storing the m_hThread member of CWinThread instance of your 
+worker thread. Also refer to the documentation of the TerminateThread API 
+for operating system specific details.
+
+/Vikas Patel
+
+vjp@safco.com
+
+ ----------
+From: owner-mfc-l
+To: mfc-l
+Subject: Killing a worker thread
+Date: Thursday, October 10, 1996 1:17PM
+
+Environment : Win95, VC++ 4.1
+
+Hi all,
+
+    I have created a worker thread in my application and depending
+    on some status/criteria I would like to kill the thread at any
+    point of time. To do that one has to setup a communication between
+    the threads (worker and main application thread). If the communication
+    is setup using the CEvent objects, the worker thread has to wait for
+    the event to happen and then can return from the controlling function.
+    But my requirement is to kill the thread at any point of time. Please
+    suggest me any ideas about this scenario.
+
+Thanx in advance,
+Kalyan.V
+ ---------------------------------------------------------------
+ Kalyana Chakravarthy.V   Ph  : +91-040-259401/259501
+ Engineer (R&D),          Fax : +91-040-259509
+ CMC Limited,
+ Hyderabad, A.P.,         Email : chakri@hp735.cmc.stph.net
+ INDIA.                           chakri@sunserv.cmc.stph.net
+ ---------------------------------------------------------------
+-----From: Mats Manhav <manhav@connectum.skurup.se>
+
+Kalyan,
+
+It sounds to me like you will have to check the signal at any point of time,
+i.e quite often.
+
+Instad of make of using a CEvent you could use a CMutex. In your main
+application construct a CMutex object and CSingleLock object on the CMutex
+object. Let the main application lock the mutex as long as the 
+thread should be running. The worker should have accessibility to the CMutex
+object somehow . Let the worker thread creates a CSingleLock on the CMutex
+as well. It should not try to lock the Mutex.
+
+The worker thread instead use the IsLocked member of the CSingleLock
+function to check if it is time to
+stop.
+
+Mats
+
+Some sample code: // simplified to show the scenario //
+Somewhere_in_your_main_app()
+{
+   CMutex m_Mutex;	
+   CSingleLock m_KeepOn(&m_Mutex, TRUE);  //lock the mutex
+   
+   // make the mutex visible to the worker thread somehow and start the
+thread
+   AfxBeginThread();
+}
+
+inline BOOL keep_on(CSingleLock *Lock)
+{
+   return !Lock->IsLocked();
+}
+
+worker_Thread()
+{
+   CSingleLock Lock(m_pMutex, FALSE);  // not locked
+
+   // loop around the work thread and ckeck each time
+   while (keep_on(&Lock))
+   {
+   }
+
+   // or call keep_on() as many times you like and at any place you like
+using if
+   if (!keep_on(&Lock)
+      // ExitTheThreadNicely
+      goto exit_thread;
+
+exit_thread:
+   clean_up();
+}
+
+Mats
+
+--
+==========================================================================
+Mats Mеnhav (Mats Manhav for 7-bit people)
+email:manhav@connectum.skurup.se   WWW: <A HREF="http://connectum.skurup.se/~manhav">http://connectum.skurup.se/~manhav</A>
+FAX:  (int) 46 (0) 414 243 05      Phone: (int) 46 (0) 414 243 05         
+==========================================================================
+
+-----From: Gabriel Parlea-Visalon <Gabriel@derivs.demon.co.uk>
+
+The best thing to do first, is to make sure that none of the other 
+synchronisation methods, mutexes, critical sections, semaphores, threads, etc 
+can do the job.
+
+If you still want to proceed, call DuplicateHandle() for the thread to be 
+killed, from within the process that owns it, make sure the thread is still 
+alive before doing that, pass it to the appropriate thread, call 
+TerminateThread() on the passed handle.
+
+Bear in mind that the target thread resides in memory until no other copies of 
+its handle exist, its stack is not deallocated, no attached DLLS are notified of 
+its termination either, etc.
+
+It would be a very good idea to read more on the subject before attempting this, 
+starting with the WIN32 SDK entry on TerminateThread().
+
+I hope this will help you,
+
+Gabriel
+
+-- 
+                             Gabriel Parlea-Visalon
+                               Software Engineer
+                           Derivative Trading Systems
+                           gabriel@derivs.demon.co.uk
+
+-----From: "Frank McGeough" <fm@synchrologic.com>
+
+The basic assumption you should enter into when programming threads 
+is that you should always set up some method of communicating to 
+the thread that you wish to terminate. Think of a regular old Windows 
+program, would you rather get a WM_CLOSE message and shut down 
+gracefully or would you rather have someone turn the machine off to 
+close your program? (possibly while you are in the middle of saving 
+a file?). 
+
+Why should you cancel the execution of the running thread at
+predicatable locations in the application code? If you kill a thread
+arbitrarily, it may hold a Mutex that would result in a unrecoverable
+deadlock situation. Even if you're not using Mutex's your run-time
+library or some other library may use them. If the thread performs
+file operations then you leave yourself with untestable restartability
+problems because you have to assume that the thread can exit
+at any point in the code. 
+
+So what you need is to have the thread that is attempting to cancel
+the thread use an Cancellation model. The requesting thread would
+issue a RequestCancellation, and the running threads would call 
+ServiceCancellation at various predictable places in the execution of
+the code (for example, in a database application you might check
+after each transaction is committed). If there are no Cancellations
+waiting then the thread would just continue on its way. If there is
+a Cancellation then the thread could possibly throw an exception
+that would predicatably call all the right destructors for the objects
+in your thread and exit. 
+
+There are a number of good books out on programming with threads.
+Here is one that you might like to check out.
+
+Threads Primer: A Guide to Multithreaded Programming, Bill
+Lewis and Daniel Berg, Sunsoft Press.
+
+Good luck.
+-----From: "Doug Boone" <dboone@fasttax.com>
+
+Does your worker thread have a message pump? Then send it a message and
+tell it to die.
+
+If not, you could have it wait for a semaphore and then release it right
+away. When you want the worker thread to go away just get the semaphore and
+then when the worker thread does its WaitFor*Object() on the semaphore it
+will get a time-out message error code and know that it should terminate. 
+ 
+We commonly just have a Boolean called "m_bKeepRunning" that someone turns
+off to tell the worker threads to exit.
+  
+Two interesting problems we had early on were that 1) we didn't wait for
+the thread to exit so we created memory leaks and 2) low priority threads
+needed to be boosted so they could finish their clean-up in a reasonable
+amount of time.
+
+-----From: Mike Blaszczak <mikeblas@nwlink.com>
+
+At 13:17 10/10/96 IST, Kalyan <chakri@sunserv.cmc.stph.net> wrote:
+>Environment : Win95, VC++ 4.1
+
+>    I have created a worker thread in my application and depending
+>    on some status/criteria I would like to kill the thread at any
+>    point of time. To do that one has to setup a communication between
+>    the threads (worker and main application thread).
+
+Yep.
+
+> If the communication
+> is setup using the CEvent objects, the worker thread has to wait for 
+> the event to happen and then can return from the controlling function.
+
+It doesn't have to wait: it can simply check the status of the CEvent object
+without waiting.  If it's set, it can bail out.  If it isn't set, it can
+keep going.
+
+>    But my requirement is to kill the thread at any point of time. Please
+>    suggest me any ideas about this scenario.
+
+You can't: asynchronously killing a thread is sloppy and bad.  Presumably,
+your worker thread is in some loop doing some work anyway--so that loop
+should be coded to exit when whatever conditions it needs are met, _OR_
+when the event becomes signalled.  If you have lots of loops, you'll have
+to either implement checks in each so that they're all capable of exiting
+or write a state machine that manages the looping in one central place for
+you and also checks the event.
+
+Back in your main thread, when you shut things down, you should probably
+do something like:
+
+        m_pEvent->SetEvent();   // signal that we want to die
+        WaitForSingleObject(m_pThread, INFINITE);    // wait for the worker
+
+Maybe you could also add a priority boost to the worker thread so that
+it, relative to the stopped controlling thread, finishes with great haste.
+You could do that with CWinThread::SetThreadPriority().
+
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+Don't look at my hands: look at my _shoulders_!
+These words are my own. I do not speak on behalf of Microsoft.
+
+-----From: Noel Burton-Krahn <noel@harleystreet.com>
+
+(resisting urge to rant about Win32's brain-damaged thread 
+implementation...)
+
+There is no way to kill a thread cleanly from another.  I handle this 
+problem by creating some state in my program indicating that the thread 
+should terminate and the ignore the thread and let it commit suicide.  By 
+"creating some state" I mean either:
+1) Denying the thread access to a resource it needs
+2) Posting a message to the thread
+3) Setting an event.
+
+Posting WM_QUIT or something like that to a thread is nice since it can 
+either be synchronous or a synchronous.  Remember, though: don't trust 
+PostThreadMessage if your target thread ever causes a window to be 
+displayed (even indirectly!)
+
+--Noel
+
+-----From: "Vaitheeswaran, Venkat (NJAOST)" <VVaitheeswa@NJAOST.ML.com>
+
+	I have the same problem. 
+	I had to slice the worker thread to keep polling to know whether 
+	a request to kill the thread has been made. Depending upon the
+	nature of your worker thread, you may be able to slice it generously
+	and/or at important points.
+
+-----From: Steve Mark <steve@otms.com>
+
+This may or may not help: If you're looping in the thread you can put a
+timeout on the CEvent check so that it returns immediately after
+checking the CEvent.  You can then check the return code/lock status to
+determine if the CEvent was set.  That way you can check during
+processing in the thread whenever you want and cleanup and exit when
+the CEvent is set.  If you find a way to kill a thread external to the
+thread itself, the thread will not be able to cleanup, close files,
+release memory, etc.
+
+_________________________________________________________________
+
+Steven Mark                           E-mail: steve@otms.com
+
+On-The-Mark Systems                   Tel:    510.648.9514
+
+3494 Camino Tassajara Rd., Suite 239  Fax:    510.648.9507
+
+Danville, CA 94506                    Web:    <A HREF="http://www.otms.com">http://www.otms.com</A>
+
+
+     Custom Software Analysis, Design, and Implementation
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Noel Burton-Krahn -- <A HREF="mailto:noel@harleystreet.com">noel@harleystreet.com</A>
+Tuesday, October 15, 1996
+</B>
+TerminateThread is a little too scary to use. It doesn't even deallocate 
+the stack of the terminated thread  Here's an excerpt from the docs:
+
+TerminateThread is used to cause a thread to exit. When this occurs, the 
+target thread has no chance to execute any user-mode code and its initial 
+stack is not deallocated. DLLs attached to the thread are not notified that 
+the thread is terminating.
+TerminateThread is a dangerous function that should only be used in the 
+most extreme cases. You should call TerminateThread only if you know 
+exactly what the target thread is doing, and you control all of the code 
+that the target thread could possibly be running at the time of the 
+termination. For example, TerminateThread can result in the following 
+problems:
+
+
+----------
+From: 	Vikas Patel[SMTP:vjp@wgw.safco.com]
+Sent: 	Friday, October 11, 1996 6:02 AM
+To: 	MFCResp
+Subject: 	RE: Killing a worker thread
+
+[Mini-digest: 9 responses]
+
+Use Win32 API
+
+The TerminateThread function terminates a thread.
+BOOL TerminateThread(
+    HANDLE hThread, // handle to the thread
+    DWORD dwExitCode     // exit code for the thread
+   );
+
+The hThread parameter is the handle of the worker thread which can be
+accessed by storing the m_hThread member of CWinThread instance of your
+worker thread. Also refer to the documentation of the TerminateThread API
+for operating system specific details.
+
+/Vikas Patel
+
+vjp@safco.com
+
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,281 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Subclassing Edit Control and Overwrite Mode
+</B></FONT>
+<BR>
+<PRE>
+<B>
+<A HREF="mailto:MICHAEL@datatree.com">MICHAEL@datatree.com</A>
+Thursday, April 18, 1996
+</B>
+Environment: VC++ 4.1 / Win 95
+
+When I subclass my edit control the text entry mode
+switches from overwrite to insert. See code below.
+
+How do I restore overwrite mode?
+
+----------------------------------------------------------------------------
+---------------------------
+
+/****************************************************
+*
+*        MyPropPage.h
+*
+****************************************************/
+
+CTestEdt m_TestEdt;
+
+/****************************************************
+*
+*        MyPropPage.cpp
+*
+****************************************************/
+
+BOOL CDReqPge::OnInitDialog() 
+{
+    // Subclass edit control
+    m_cpyEdt.SubclassDlgItem(IDC_TEST, this);
+
+    CPropertyPage::OnInitDialog();
+
+    return TRUE;
+}
+
+/****************************************************
+*
+*       SubclassEdit.cpp
+*
+****************************************************/
+// SubclassEdit.cpp
+
+CTestEdt::CTestEdt()
+{
+}
+
+CTestEdt::~CTestEdt()
+{
+}
+
+BEGIN_MESSAGE_MAP(CTestEdt, CEdit)
+    //{{AFX_MSG_MAP(CTestEdt)
+    ON_WM_GETDLGCODE()
+    ON_WM_KEYDOWN()
+    //}}AFX_MSG_MAP
+END_MESSAGE_MAP()
+
+UINT CTestEdt::OnGetDlgCode() 
+{
+    return DLGC_WANTALLKEYS;
+}
+
+void CTestEdt::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags) 
+{
+    if (nChar == VK_RETURN)
+    {       
+        // Process Enter key
+        MessageBeep(0); // Do nothing. This is sample code.
+    }
+    CEdit::OnKeyDown(nChar, nRepCnt, nFlags);
+
+}
+----------------------------------------------------------------------------
+---------------------------
+Michael L. Thal
+Data Tree Corporation
+voice: (619) 231-3300
+fax:      (619) 231-3301
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dan Kirby -- <A HREF="mailto:dkirby@accessone.com">dkirby@accessone.com</A>
+Monday, April 22, 1996
+</B>
+[Mini-digest: 5 responses - This one is weird...]
+
+Hmmm.... I tried this and I got insertion mode  whether subclassing or not. 
+ That is, the edit control is always in Insertion mode.  How are getting 
+the control to perform overwrites.  This is not the default edit control's 
+behavior.
+
+--dan
+
+
+-----From: "michael" <Michael@datatree.com>
+
+I should have been more precise. When an edit control
+is first in the tab order, the default text entry mode is
+OVERWRITE.
+
+-----From: Dan Kirby <dkirby@accessone.com>
+
+This is definitely not the case for me.  I had a property page with an edit 
+control as the first control and I simply don't see what you are seeing. 
+ There is definitely something you're not telling us.  Is this a regular 
+Windows edit control??   Can  you describe the exact steps to reproduce the 
+behavior you are seeing?
+
+--dan
+
+-----From: "michael" <Michael@datatree.com>
+
+Dan:
+
+I appreciate your indulgence in this rather
+unpredictable edit control behaviour.
+
+First of all, when I undo the subclassing the
+overwrite mode reappears.  So I feel the
+bug has been sufficiently isolated. Agreed?
+
+Secondly, in answer to your request here
+are the properties:
+
+Prop. Page Properties - child, thin, titlebar, border
+Edit Control Properties - visible, tab stop, auto hscroll, border
+
+Hope this helps
+
+-----From: "michael" <Michael@datatree.com>
+
+========================================
+To Moderator:
+
+Unfortunately, when I originally posted my problem with edit
+controls and overwrite mode I mistakenly assumed someone
+out there in "MFC-L land" had sureley encountered the same
+problem. I mistakenly failed to anticipate that someone like
+Dan Kirby would actually be so diligent as to try to recreate this.
+I salute his efforts.  Since he has had some difficulty recreating
+the problem, I've updated my original message below to contain
+additional information.  Hopefully, this will shed new light on the
+problem and not add to the confusion as to how to recreate it.
+
+-Michael
+==============================================
+
+Dan,
+
+Try entering text in the subclassed edit control, then tab to the
+next control. Now use shift+tab to return to the subclassed
+edit control. Is your text highlighted? If it is NOT, then you're in
+insert mode and you've recreated my problem.
+
+Thanks again for your efforts.
+
+Michael L. Thal
+Data Tree Corporation
+voice: (619) 231-3300
+fax:      (619) 231-3301
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dan Kirby -- <A HREF="mailto:dkirby@accessone.com">dkirby@accessone.com</A>
+Wednesday, April 24, 1996
+</B>
+[Mini-digest: 2 responses]
+
+Oooooohhhhh.  Since you put it that way.....
+
+The problem is that you need to let IsDialogMessage() know that the control 
+ supports EM_SETSEL.  So your WM_GETDLGCODE handler should OR 
+DLGC_HASSETSEL in the return value. Like this:
+
+UINT CEdit1::OnGetDlgCode()
+{
+    return DLGC_WANTALLKEYS|DLGC_HASSETSEL;
+	
+}
+
+--dan
+
+-----From: "David W. Gillett" <DGILLETT@expertedge.com>
+
+  A brief bit of history may help clarify the question.
+
+  Text-mode word-processing programs often provided two editing 
+modes:  "insert" mode, where new characters are inserted at the 
+cursor position and text to the right of the cursor is "pushed" to 
+make room, and "overwrite" mode, where a new character entered 
+replaces the character previously at the the cursor position. 
+  Note that this overwrite mode relies upon the character-mode cursor 
+semantics, where the cursor lies *on* some character cell, rather 
+than the insertion-point semantics used in GUIs, where the "cursor" 
+lies *between* character cells.
+
+  GUI text-editing systems, including specifically the Windows edit 
+control, are less "mode-oriented" than that.  New characters are 
+inserted at the insertion point; if some text is selected, a new 
+character entered (or text pasted) replaces the selected text, and 
+there is now no text selected.  There is no shift between "modes", 
+and there is nothing that looks very like the text-mode "overwrite" 
+mode.
+
+  [So I'm afraid that *my* initial reaction to the original question 
+was to assume that you were trying to reproduce the text-mode 
+"overwrite" behaviour.  I couldn't understand where you were 
+getting the notion that this was something provided by the default 
+edit control.] 
+
+  It turns out, though, that your *actual* question concerns the 
+setting of the selection when your edit control gets the focus.  
+Since the edit control will receive a WM_SETFOCUS when it receives 
+the focus (and is expected to send a WM_COMMAND|EN_SETFOCUS to its 
+parent...) and implements a handler for EM_SETSEL (and MFC provides 
+wrappers for all of this...), well, setting the selection any way you 
+want it when the edit control receives the focus should only be a 
+matter of a few lines.  [I have this nagging impression that there 
+might be a wee bit more to it than that -- it's not obvious (to me) 
+why your subclass code *changes* the control's default behaviour in 
+this manner.]  
+
+Dave
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

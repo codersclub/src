@@ -1,0 +1,438 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Selecting Items in CTreeCtrl
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Ramaswamy Hari -- <A HREF="mailto:hari@nextwave.com">hari@nextwave.com</A>
+Friday, February 02, 1996
+</B>
+Hi,
+	I have a CTreeCtrl in which I have customized the OnItemExpanded 
+and OnItemExpanding messages. In OnItemExpanding I add child items
+and when that node is collapsed I remove these items rather than keeping
+it in the tree. I want to implement a functionality similar to the
+synchronize contents in the Microsoft Developer Studio. Basically given
+a topic find it in the tree view automatically.
+
+Here is the problem I am facing. I find the handle of a parent item and
+when I try to expand it using m_tree.Expand(hItem, TVE_EXPAND) it does not
+call my customized OnItemExpanding routine. What am I doing wrong here ?
+
+I have attached the code I use to find the item in the tree view as well 
+as the OnExpanding and OnExpanded routines. I would really appreciate it
+if somebody can point out how to fix this problem.
+
+thanks in advance,
+
+-hari
+
+==========================================================================
+
+HTREEITEM CHTView::Synchronize(void *pInfo)  // Recursion limited to 15 levels.
+{
+	static int level = 0;
+
+	// Check whether the item is already selected.
+
+	if (level == 0) {
+		HTREEITEM selected = m_tree.GetSelectedItem();
+		if(selected) {
+			TV_ITEM selItem;
+			selItem.mask = TVIF_HANDLE|TVIF_PARAM;
+			selItem.hItem = selected;
+			m_tree.GetItem(&selItem);
+			if(selItem.lParam == (long)pInfo) {
+				return selected;
+			}
+		}
+	}
+
+	level++;
+	if(level >= 15) {
+		AfxMessageBox("Too many levels of hierarchy.");
+		level--;
+		return NULL;
+	}
+
+	// Keep finding the parent and recursively go down to the root.
+
+	void *parent = GetParent(pInfo);
+
+ 	HTREEITEM hItem = NULL;
+	if(parent) hItem = Synchronize(parent);
+
+	if((hItem = FindItem(hItem, pInfo)) != NULL) {
+		if(level == 1) {
+			if(!m_tree.SelectItem(hItem)) {
+				level--;
+				return NULL;
+			}
+		} else {
+			if(!m_tree.Expand(hItem, TVE_EXPAND)) {  // <===== This is where I expect it to call CHTView::OnItemexpandedHvtree();
+				AfxMessageBox("Unable to expand");
+			}
+		}
+	} else {
+		level--;
+		return NULL;
+	}
+	level--;
+	return hItem;
+}
+
+HTREEITEM CHTView::FindItem(HTREEITEM hParent, void *pInfo)
+{
+	static TV_ITEM itemCheck;
+	itemCheck.mask = TVIF_HANDLE|TVIF_PARAM;
+	BOOL found = FALSE;
+
+	HTREEITEM hItem = (hParent) ? hParent : m_tree.GetRootItem();
+	HTREEITEM hCurrent = m_tree.GetChildItem(hItem);
+	while (hCurrent && !found) {
+		itemCheck.hItem = hCurrent;
+		m_tree.GetItem(&itemCheck);
+		if(itemCheck.lParam == (long)pInfo) {
+			found = TRUE;
+		} else {
+			hCurrent = m_tree.GetNextItem(hCurrent, TVGN_NEXT);
+		}
+	}
+	return hCurrent;
+}
+
+void CHTView::OnItemexpandedHvtree(NMHDR* pNMHDR, LRESULT* pResult) 
+{
+	NM_TREEVIEW* pNMTreeView = (NM_TREEVIEW*)pNMHDR;
+	if(pNMTreeView->action == TVE_COLLAPSE) {
+		m_tree.Expand(pNMTreeView->itemNew.hItem, TVE_COLLAPSE|TVE_COLLAPSERESET); 	
+	}
+	*pResult = 0;
+}
+
+void CHTView::OnItemexpandingHvtree(NMHDR* pNMHDR, LRESULT* pResult) 
+{
+	NM_TREEVIEW* pNMTreeView = (NM_TREEVIEW*)pNMHDR;
+	Populate(pNMTreeView->itemNew.hItem);
+	UpdateWindow();
+	*pResult = 0;
+}
+
+ 
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Ken Freeman -- <A HREF="mailto:kfreeman@viewlogic.com">kfreeman@viewlogic.com</A>
+Monday, February 05, 1996
+</B>
+[Mini-digest: 3 responses]
+
+Ramaswamy Hari wrote:
+> 
+> Here is the problem I am facing. I find the handle of a parent item and
+> when I try to expand it using m_tree.Expand(hItem, TVE_EXPAND) it does not
+> call my customized OnItemExpanding routine. What am I doing wrong here ?
+
+The control does not generate item expanding/expanded messages if you
+send it TVE_EXPAND.  You'll have to either generate the messages 
+yourself or just call the handlers directly.
+
+And no, I have no idea why the tree control was written this way.
+
+Ken
+-----From: Seth Goldstein <seth@mathworks.com>
+
+Well hidden, I must say.  No mention of it in CTreeCtrl::Expand.
+>From the doc on TVM_EXPAND:
+
+"This message does not send the TVN_ITEMEXPANDING and 
+TVN_ITEMEXPANDED notification messages to the parent window."
+
+You should extract the common piece of code from the message 
+handler and call it directly from both places.
+
+Hope this helps,
+Seth
+
+
+
+-- 
++------------------------------------------------------+
+|   Seth Goldstein         email: seth@mathworks.com   |
+|   The Mathworks, Inc.    http://www.mathworks.com    |
+|                          info: info@mathworks.com    |
+|------------------------------------------------------|
+| PGP Public Key on server                             |
+|   http://www-swiss.ai.mit.edu/~bal/pks-toplev.html   |
++------------------------------------------------------+
+-----From: Seth Goldstein <seth@mathworks.com>
+
+Well hidden, I must say.  No mention of it in CTreeCtrl::Expand.
+>From the doc on TVM_EXPAND:
+
+"This message does not send the TVN_ITEMEXPANDING and 
+TVN_ITEMEXPANDED notification messages to the parent window."
+
+You should extract the common piece of code from the message 
+handler and call it directly from both places.
+
+Hope this helps,
+Seth
+
+
+
+-- 
++------------------------------------------------------+
+|   Seth Goldstein         email: seth@mathworks.com   |
+|   The Mathworks, Inc.    http://www.mathworks.com    |
+|                          info: info@mathworks.com    |
+|------------------------------------------------------|
+| PGP Public Key on server                             |
+|   http://www-swiss.ai.mit.edu/~bal/pks-toplev.html   |
++------------------------------------------------------+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Jim Leavitt -- <A HREF="mailto:jimll@halcyon.com">jimll@halcyon.com</A>
+Tuesday, February 06, 1996
+</B>
+> > Here is the problem I am facing. I find the handle of a parent item and
+> > when I try to expand it using m_tree.Expand(hItem, TVE_EXPAND) it does not
+> > call my customized OnItemExpanding routine. What am I doing wrong here ?
+> 
+> The control does not generate item expanding/expanded messages if you
+> send it TVE_EXPAND.  You'll have to either generate the messages
+> yourself or just call the handlers directly.
+
+Hmmm...
+The tree controls in my program do respond to that message... When the 
+message is sent there are no children present for the item, I then 
+look then up and add them just as Hari is trying to do... 
+
+Hari is also using TVE_COLLAPSE_RESET (sp?). Here's what may be going 
+on. The collapse reset message is modifing the TVITEM and setting the 
+number of children to zero. 
+
+The control will not expand a node with no children. Should Hari get 
+the TVITEM structure of a node he's just collapsed - reset and set the 
+hasChildren (once again, perhaps not the right spelling, i'm on my mac 
+at home) to 1, then the message will work or at least it does for me.
+
+I don't know about the documentation, but the expand call as Hari has 
+it works for me. I do set the hasChildren member of TVITEM. I do it to 
+show the little + button next to each node. I'll send some sample code 
+if you'd like.
+Jim Leavitt.
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Ken Freeman -- <A HREF="mailto:kfreeman@viewlogic.com">kfreeman@viewlogic.com</A>
+Thursday, February 08, 1996
+</B>
+[Mini-digest: 2 responses]
+
+Jim Leavitt wrote:
+> <snip>
+> 
+> The control will not expand a node with no children. Should Hari get
+> the TVITEM structure of a node he's just collapsed - reset and set the
+> hasChildren (once again, perhaps not the right spelling, i'm on my mac
+> at home) to 1, then the message will work or at least it does for me.
+> 
+> I don't know about the documentation, but the expand call as Hari has
+> it works for me. I do set the hasChildren member of TVITEM. I do it to
+> show the little + button next to each node. I'll send some sample code
+> if you'd like.
+
+Please do.  Are you talking about the cChildren field?
+-----From: "Roland Pasternack" <rpasternack@MSERVER2.Legato.COM>
+
+I too am having the original problem described below.  The MFC call to 
+CTreeCtrl::Expand() translates to a call to SendMessage() (see Afxcmn.inl), 
+sending the TVM_EXPAND message.  If you look at the documentation for 
+TVM_EXPAND, it explicitly states that it does *not* send the TVN_ITEMEXPANDING 
+and TVN_ITEMEXPANDED notification messages to the parent window.
+
+I also fooled around using the information that Jim provided below, but I 
+couldn't get anything to work this way either.  Jim, it would be very useful 
+at this point if you would send the sample code that you talked about below to 
+clarify exactly what you did.
+
+It appears that the only solution is to do what was described below:
+
+> You'll have to either generate the messages yourself or just call the
+> handlers directly.
+
+Conceptually, it seems better to try and generate the notification yourself, 
+and let the OnItemExpanding() code handle it.  I tried doing this using 
+SendNotifyMessage(TVN_ITEMEXPANDING, 0, (LPARAM)pnmTreeView), but I have not 
+been able to get it to work yet.  I am using a CTreeView derived object, and 
+tried sending the message to both the tree view and the tree control inside of 
+it.  I am kind of stumped at this point, and may try repackaging my 
+OnItemExpanding() code so that it can be called both via the notification, and 
+from other places within my own code.
+
+
+
+Roland
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Jim Leavitt -- <A HREF="mailto:jimll@halcyon.com">jimll@halcyon.com</A>
+Saturday, February 10, 1996
+</B>
+Hello All:
+
+Earlier Hari wrote:
+> Here is the problem I am facing. I find the handle of a parent item =
+and
+> when I try to expand it using m_tree.Expand(hItem, TVE_EXPAND) it does =
+not
+> call my customized OnItemExpanding routine. What am I doing wrong here =
+?
+
+Then I replied:
+> The control will not expand a node with no children. Should Hari get
+> the TVITEM structure of a node he's just collapsed - reset and set the
+> hasChildren (once again, perhaps not the right spelling, i'm on my mac
+> at home) to 1, then the message will work or at least it does for me.
+>>>>>>>I'll send some sample code if you'd like
+
+Which was actually all wet because TVE_EXPAND | TVE_EXPANDRESET does set =
+the cChildren member to 1. At least I think it does, the debugger says =
+so. I do set cChildren to 1 when I populate the tree, perhaps =
+EXPANDRESET is getting the original cChildren member back?
+
+So if I really understand what Hari wants to do... he'd like to navigate =
+the tree inside his code and whenever an item needed to expand and add =
+more children (database search for example), he'd like his =
+OnItemExpanding routine called.
+
+Here's some sample code that does just that. Let's talk about it.=20
+First, I used the CTreeCtrlEx and CTreeCursor classes from the DaoView =
+sample on the VC4 cd. They take a lot of the work out of using tree =
+controls. Those source files are included.=20
+
+Next, I derived my own class ... Ctree that inherited from CTreeCtrlEx. =
+I did so because I wanted some other members and attributes for my own =
+application. That source is included as well. I've pared it down as much =
+as possible so there isn't so much of my junk in it.
+
+Third, I derived some very specific Trees from Ctree. Again, I think it =
+makes sense for my application and it works so I'm happy. I've included =
+one such tree in this sample, again mightily pared down to make it =
+easier to read. Basically I just grabbed some stuff from my application, =
+cut out about two thirds of it and jammed it into this sample. The =
+coding is rough. (disclaimer :-).
+
+Fourth, the Trees sit on a CTabView, derived from CCtrlView. I had to =
+get specific with those too. Theres a base CTabView class here and a =
+more specific view (CLeftView, it occupies the left pane in my =
+application.) But there all really just windows, I don't believe that =
+affects the message passing in MFC or does it ?=20
+
+Fifth, I wondered if you COLLAPSERESET a tree if it really truly freed =
+all its memory. I was assured of this by Microsoft Technical Support. =
+(Just in case anyone wanted to know... I did.).
+
+The sample puts up a static splitter window with two tab views with =
+three tabs each. Each tab has an instance of CDateTree derived as above. =
+Look under the View menu - there an Expand Node and a Collapse Node menu =
+item, they do what they say. The menu item gets the selected node from =
+the Tree, verifies that it can be expanded or collapsed, and then calls =
+Expand. The OnItemExpanding routine catches the message and dutifully =
+obeys. That's my understanding of Hari's question but I feel like I must =
+be missing something here, it was no problem and I hope I'm not off the =
+point!
+
+Watch your debug menu and you'll see a trace everytime the code enters =
+OnItemExpanding. I didn't have to duplicate any of the OnItemExpanding =
+code, it works when you click on the tree or when you choose the menu. =
+I've also tested some tree expansion before windows popped to the screen =
+but it takes too long for my application.
+
+If anyone improves this code (or even looks at it and has some =
+suggestions) please feel free to tell me about it. I hope this sample =
+doesn't miss Hari's mark. It appears to do what he wants to do.=20
+
+DEVELOPED AND TESTED ONLY UNDER WINDOWS 95
+
+On another subject:
+
+On Mon, 05 Feb 1996, Stephan.Jou@Cognos.COM (Jou, Stephan) wrote:
+>Environment:
+> ------------
+>     MSVC 4.0 (with service pack 1 applied)
+>     MFC 4.0
+>     Windows NT 3.51 (not using the new shell)
+
+Thanks.
+
+>     I dynamically create a CListCtrl as a child window of a CTabCtrl.=20
+> (Both are members of the CView-derived object.)  When I close the =
+view, I=20
+>get
+>     "Unhandled exception in Test.exe (COMCTL32.DLL): 0xC0000005:  =
+Access=20
+>Violation."
+>and the debugger plops me in assembly code within COMCTL32.DLL.
+
+I can either assume I'm making the same error or Stephan found a =
+problem. I've placed forms with listViews in my CTabView with no =
+problems under 95. I got the same crash today under NT 3.51 service pack =
+3. Funny, right at the bottom of the call stack, the application had =
+just about exited.
+
+Long winded and tired,
+Jim Leavitt=20
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

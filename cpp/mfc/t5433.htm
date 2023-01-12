@@ -1,0 +1,154 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+MFC opens SHARE_EXCLUSIVE
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Mike Ward -- <A HREF="mailto:mikew@hilgraeve.com">mikew@hilgraeve.com</A>
+Friday, June 07, 1996
+</B>
+Enviroment:Win95/VC++4.1
+
+Here's a more detailed report of a question I asked earlier.
+
+MFC's COleDocument::OnOpenDocument() opens files with the 
+SHARE_EXCLUSIVE flag.  Here's a code snippet from mfc\src\oledoc1.cpp
+
+   else
+   {
+    // open new storage file
+    sc = StgOpenStorage(lpsz, NULL, 
+        STGM_READWRITE|STGM_TRANSACTED|STGM_SHARE_EXCLUSIVE, 
+        0, 0, &lpStorage);
+
+    if (FAILED(sc) || lpStorage == NULL)
+     sc = StgOpenStorage(lpsz, NULL,
+         STGM_READ|STGM_TRANSACTED|STGM_SHARE_DENY_WRITE,
+         0, 0, &lpStorage);
+   }
+   if (FAILED(sc))
+    AfxThrowOleException(sc);
+
+   ASSERT(lpStorage != NULL);
+   m_lpRootStg = lpStorage;
+
+I'ld really like MFC to open the document as STGM_READWRITE |
+STGM_TRANSACTED | STGM_SHARE_DENY_WRITE.  That way, I could have 
+multiple readers of the document but only one writer.  Problem is, 
+there is no clean way (that I can see) to have this happen.  I could 
+override COleDocument::OnOpenDocument() but I'ld have to check my 
+code against every new version of MFC that comes out and it assumes 
+that the source code reflects what is actually in the binary.  I 
+really think MFC blew it on this one.  Why would they not open the 
+doc SHARE_DENY_WRITE by default?  Is there a way to work around this?
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Erik Funkenbusch -- <A HREF="mailto:chucks@isd.net">chucks@isd.net</A>
+Sunday, June 09, 1996
+</B>
+STGM_TRANSACTED is a really nasty can of worms that has to be implemented
+*VERY* carefully for it to work successfully.  Most combinations of
+STGM_TRANSACTED will not work with OLE, I wish I could tell you more but
+I
+no longer have access to the source that I wrote that successfully used
+this.
+
+I can tell you however that MFC probably doesn't use it because there are
+a
+GREAT deal of limitations on STGM transacted, so many that most people
+would
+be better off rolling their own.  One example is that only 20 "opens" are
+allowed on a single Compound file.  
+
+We accomplished this by writing our own file handling scheme.  We call
+this from
+within Serialize.  In so doing, however, we gave up the standard OLE
+embedding
+support and other niceties that you get with Serialize.
+
+----------
+> From: Mike Ward <mikew@hilgraeve.com>
+> To: mfc-l@netcom.com
+> Subject: MFC opens SHARE_EXCLUSIVE
+> Date: Friday, June 07, 1996 2:56 PM
+> 
+> Enviroment:Win95/VC++4.1
+> 
+> Here's a more detailed report of a question I asked earlier.
+> 
+> MFC's COleDocument::OnOpenDocument() opens files with the 
+> SHARE_EXCLUSIVE flag.  Here's a code snippet from mfc\src\oledoc1.cpp
+> 
+>    else
+>    {
+>     // open new storage file
+>     sc = StgOpenStorage(lpsz, NULL, 
+>         STGM_READWRITE|STGM_TRANSACTED|STGM_SHARE_EXCLUSIVE, 
+>         0, 0, &lpStorage);
+> 
+>     if (FAILED(sc) || lpStorage == NULL)
+>      sc = StgOpenStorage(lpsz, NULL,
+>          STGM_READ|STGM_TRANSACTED|STGM_SHARE_DENY_WRITE,
+>          0, 0, &lpStorage);
+>    }
+>    if (FAILED(sc))
+>     AfxThrowOleException(sc);
+> 
+>    ASSERT(lpStorage != NULL);
+>    m_lpRootStg = lpStorage;
+> 
+> I'ld really like MFC to open the document as STGM_READWRITE |
+> STGM_TRANSACTED | STGM_SHARE_DENY_WRITE.  That way, I could have 
+> multiple readers of the document but only one writer.  Problem is, 
+> there is no clean way (that I can see) to have this happen.  I could 
+> override COleDocument::OnOpenDocument() but I'ld have to check my 
+> code against every new version of MFC that comes out and it assumes 
+> that the source code reflects what is actually in the binary.  I 
+> really think MFC blew it on this one.  Why would they not open the 
+> doc SHARE_DENY_WRITE by default?  Is there a way to work around this?
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

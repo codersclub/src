@@ -1,0 +1,210 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Edit Controls in MDI Child
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Ajay P Sathe -- <A HREF="mailto:apsathe@giaspn01.vsnl.net.in">apsathe@giaspn01.vsnl.net.in</A>
+Monday, April 15, 1996
+</B>
+Problem :  
+Edit controls invisible in a MDI Child window, on increasing stacksize.
+Other controls work OK.
+
+
+Environment : VC++ 1.52, Windows 3.1
+
+Other params : 
+1. OLE controls enabled.
+2. VBX controls disabled.
+3. Local heap size is set to MAXVAL in .DEF file.
+
+- App is spread over 50 programs - other than MFC Library.
+- MFC Library is statically linked.
+- Linking Environment needs minimum 200 segments.
+- Memory Model : Large
+
+I have a MDI child window. In OnCreate() I have created 3 edit controls,
+3 combo box controls, 5 bitmap buttons, 1 listbox.
+
+If I set stacksize limit to 16k bytes as it is needed for our application,
+then the 3 edit controls vanish, but other controls do appear.
+
+Instead, if I set stacksize 12k then the edit controls become visible. But 
+then the App is not stable, because it really does require a greater stacksize.
+So, with this kind of random reduction, the App malfunctions at random
+places.
+
+What's going wrong ? Is there inadequate heap space ? How do I increase it ? 
+Or how do I reduce my App's demand on heap space ?
+
+Observation : MFC's edit-control create fails with return value indicating
+              that WINDOWS edit-control create itself failed. 
+
+Window create parameters are correct. When the problem occurs, if I try 
+to open a dialog box, which has 5 edit controls, those edit controls 
+are visible.
+
+What I need help on is :
+1. Different reasons that can cause this type of problem (Is it something to
+   with memory management ?)
+2. How to solve this. 
+
+TIA
+
+- Ajay Sathe, Spectrum
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Graeme Hibbert -- <A HREF="mailto:graeme@grover.delphic.co.nz">graeme@grover.delphic.co.nz</A>
+Friday, April 19, 1996
+</B>
+Ajay P Sathe wrote:
+
+> 
+> Problem :
+> Edit controls invisible in a MDI Child window, on increasing stacksize.
+> Other controls work OK.
+> 
+> Environment : VC++ 1.52, Windows 3.1
+> 
+> Other params :
+> 1. OLE controls enabled.
+> 2. VBX controls disabled.
+> 3. Local heap size is set to MAXVAL in .DEF file.
+> 
+> - App is spread over 50 programs - other than MFC Library.
+> - MFC Library is statically linked.
+> - Linking Environment needs minimum 200 segments.
+> - Memory Model : Large
+> 
+> I have a MDI child window. In OnCreate() I have created 3 edit controls,
+> 3 combo box controls, 5 bitmap buttons, 1 listbox.
+> 
+> If I set stacksize limit to 16k bytes as it is needed for our application,
+> then the 3 edit controls vanish, but other controls do appear.
+> 
+> Instead, if I set stacksize 12k then the edit controls become visible. But
+> then the App is not stable, because it really does require a greater stacksize.
+> So, with this kind of random reduction, the App malfunctions at random
+> places.
+> 
+> What's going wrong ? Is there inadequate heap space ? How do I increase it ?
+> Or how do I reduce my App's demand on heap space ?
+> 
+> Observation : MFC's edit-control create fails with return value indicating
+>               that WINDOWS edit-control create itself failed.
+> 
+> Window create parameters are correct. When the problem occurs, if I try
+> to open a dialog box, which has 5 edit controls, those edit controls
+> are visible.
+> 
+> What I need help on is :
+> 1. Different reasons that can cause this type of problem (Is it something to
+>    with memory management ?)
+> 2. How to solve this.
+> 
+> TIA
+> 
+> - Ajay Sathe, Spectrum
+
+I had a similar problem where edit controls would fail to create themselves
+but my problem was more related to the large numbers of edit controls I required.
+Up to 200+ on any particular MDI child.
+
+I solved this by allocating memory for them off the Global heap after the local
+heap was exhausted; in the derived create function. Basically the code looks
+something like this:
+
+BOOL CMyEdit::Create(DWORD dwStyle, const RECT& rect, CWnd* pParent, UINT nID)
+{
+	// Local heap edits ............
+	if ( CEdit::Create(dwStyle, rect, pParent, nID) )
+		return( TRUE );
+
+        // Global Heap Edits if the local heap is exhausted.
+	// Attempt to allocate memory for the edits from the global heap
+	HWND hWnd;
+
+	hEditDS = (HINSTANCE)::GlobalAlloc( GMEM_MOVEABLE | GMEM_ZEROINIT | GMEM_SHARE, 256L );
+	if (hEditDS == NULL) {
+		// Allocation failed
+		return( FALSE );
+	}
+   
+	// Create the edit control.
+	// Pass the local heap handle in hInstance.
+	if ( ( hWnd = ::CreateWindow( "edit", NULL, dwStyle, rect.left, rect.top, rect.right - rect.left, 
+			rect.bottom - rect.top, pParent->GetSafeHwnd(), (HMENU)nID, hEditDS, NULL) ) == NULL )
+		return( FALSE );
+
+	if ( !Attach( hWnd ) )
+		return( FALSE );
+
+	if ( !SubclassWindow( hWnd ) )
+		return( FALSE );
+
+	return( TRUE );
+}
+
+I hold the hEditDS handle in the instance of the Edit control so I can GlobalFree
+it later. There is a Technical Articlw on Edits which explains it better simply 
+called "Edit Controls" by Kyle Marsh Microsoft Developer Network Technology Group
+on the MSDN CD.
+
+Since you seem to be juggling the local resources this may or may not help you, 
+but its a suggestion.
+
+Cheers
+Graeme Hibbert
+
+======================================================================================
+Delphic Medical Systems Ltd.
+Auckland, New Zealand
+======================================================================================
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

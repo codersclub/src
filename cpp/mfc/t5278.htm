@@ -1,0 +1,255 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CArray with CListCtrl
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Roger Longren -- <A HREF="mailto:rlongren@execpc.com">rlongren@execpc.com</A>
+Wednesday, May 22, 1996
+</B>
+Platform : VC++ 4.0 / NT 3.51 / Win95
+
+My application which utilizes a CListCtrl currently stores the 
+control’s dynamically built data in a C++ style array, and 
+places a fixed upper bound on the number of elements in the 
+array.  I’d like to switch to a dynamically sized CArray, but 
+have run into a problem.
+
+When a CArray grows as the result of performing a SetAtGrow() or 
+an Add(), the existing array elements are copied to a new memory 
+location.  Since I must allow the CListCtrl data to be sorted, 
+using the SortItems() member function, this data relocation 
+causes a problem.  As far as I can determine, the CALLBACK to 
+CListCtrl.SortItems() must utilize two pointers to the array 
+elements to compare.  These LPARAM pointers are stored in the 
+CListCtrl as each item is added, and contain the pointer to a 
+particular array element at that time.
+
+When the CArray grows, these pointers are no longer valid and 
+sorting the CListCtrl data fails.  Does anyone have a way to 
+work around this?
+
+Thanks in advance for any help.
+
+Roger Longren
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:DAVISTOD@gw2k.com">DAVISTOD@gw2k.com</A>
+Tuesday, May 28, 1996
+</B>
+[Mini-digest: 9 responses]
+
+Although I don't do any dynamic re-sizing of my array, this should solve 
+your problem.
+
+The container I use that the LPARAM points to is a simple structure that I 
+create dynamically as I add items to the list control.  
+
+The structure isn'r really tied to the storage array, so you may find 
+yourself with data in two areas.  
+
+You'll probably want to create some kind of "TrashListCtrl" function that 
+empties out the control.  Make sure to call it from WM_DESTROY, as well as 
+whenever you are clearing the control so you can delete these structures.  
+In my example below, CODEINFO is my struct container.
+
+void COrdView::TrashListCtrl()
+{
+	LV_ITEM aLvI;
+
+	aLvI.mask = LVIF_PARAM;
+	aLvI.iSubItem = 0;
+	
+	int size = m_cSuspList.GetItemCount();
+	for (int i = 0; i < size; i++)
+	{
+		aLvI.iItem = i;
+		m_cSuspList.GetItem(&aLvI);
+		CODEINFO* aCodeInfo = (CODEINFO*)aLvI.lParam;
+		delete aCodeInfo;
+	}
+
+	m_cSuspList.DeleteAllItems();
+}
+
+Todd Davis
+Gateway 2000 - Kansas City
+Software Engineer
+
+-----From: Niels Ull Jacobsen <nuj@kruger.dk>
+
+Store the indexes in the lParam, not the pointers. You decide
+what the numbers mean - they don't have to be pointers.
+
+Niels Ull Jacobsen, Kr=FCger A/S (nuj@kruger.dk)
+Everything stated herein is THE OFFICIAL POLICY of the entire Kruger grou=
+p
+and should be taken as legally binding in every respect. Pigs will grow
+wings and fly.
+
+-----From: "Matthias Bohlen" <mattes@logotec.com>
+
+Hello Roger,
+
+the first idea that comes into my mind is: do not pass the pointer to 
+the data as an LPARAM, but pass the array index. This index will not 
+change so it should be valid all the time. The only problem that you 
+will have is: where do you find the array object at callback time?
+
+Is that a feasible solution?
+Matthias
+
+-------------------------------------------------------
+Matthias Bohlen             |  Logotec Software GmbH
+Phone: +49 228 64 80 520    |  Chateauneufstr. 10 
+FAX:   +49 228 64 80 525    |  D-53347 Alfter, Germany
+                            |
+E-mail: mattes@logotec.com  |  CAD systems development
+-------------------------------------------------------
+-----From: "Tim Swetonic (Starwave)" <tims@starwave.com>
+
+You can use any of the CList classes/templates, including CPtrList, 
+CTypedPtrList, etc. These are linked list classes. If you use CTypedPtrList, 
+you can have a linked list of CObject derived objects, and store a pointer 
+to each object as the item data member of the list control. I've done this a 
+lot, and it works great. If you don't want to use a CObject derived class, 
+you could use CStringList, or CPtrList (linked list of void pointers).
+
+-----From: Marcello Perin <Marcello.Perin@bbs.centroin.com.br>
+
+Store the index of the element in the LPARAM.
+
+[]s Marcello Perin
+
+    email: Marcello.Perin@bbs.centroin.com.br
+
+-----From: Jeff_Stong@bio-rad.com
+
+     Have you considered some other data structure other than an array.  
+     How about CList or CMap?  With CList or CMap you can elements to the 
+     collection without the memory being reorganized as you describe.  The 
+     pointer you store as LPARAM in the list ctrl will then remain valid.
+
+-----From: Barry Tannenbaum <barry@dddv.com>
+
+Specify the indicies to your CArray when you create the list element instead
+of the address of the CArray element.  Then reference your CArray in the
+sort routine (or wherever).
+
+        - Barry
+
+--------------------------------------------------------------------------------
+
+3DV Technology, Inc              Phone: (603) 595-2200 X228
+410 Amherst St., Suite 150       Fax:   (603) 595-2228
+Nashua, NH  03063                Net:   barry@dddv.com
+
+-----From: Vincent Mascart <100425.1337@CompuServe.COM>
+
+Why not store the array index of your objects in LPARAM instead of a pointer to
+the object.
+
+Vincent Mascart
+100425.1337@compuserve.com
+
+
+
+
+-----From: Erik van der Goot <erik.van-der-goot@jrc.it>
+
+I don't think I get the question. Are you implying that you are storing the
+pointers to your array elements as you go on?? Can you not refer to the
+elements in the array just when you call the sort?? 
+
+Erik
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Paul Mitchell -- <A HREF="mailto:mitchell.p@britishgas.co.uk">mitchell.p@britishgas.co.uk</A>
+Wednesday, May 29, 1996
+</B>
+[Mini-digest: 2 responses]
+
+> Platform : VC++ 4.0 / NT 3.51 / Win95
+> 
+> When a CArray grows as the result of performing a SetAtGrow() or 
+> an Add(), the existing array elements are copied to a new memory 
+> location.  Since I must allow the CListCtrl data to be sorted, 
+> using the SortItems() member function, this data relocation 
+> causes a problem.  As far as I can determine, the CALLBACK to 
+> CListCtrl.SortItems() must utilize two pointers to the array 
+> elements to compare.  These LPARAM pointers are stored in the 
+> CListCtrl as each item is added, and contain the pointer to a 
+> particular array element at that time.
+> 
+> When the CArray grows, these pointers are no longer valid and 
+> sorting the CListCtrl data fails.  Does anyone have a way to 
+> work around this?
+> 
+
+Either store the array indices in the ListCtrl lParam, or why not get
+rid of the array all together and just use the ListCtrl to keep track of
+the data.
+
+----
+Paul Mitchell
+British Gas Plc
+-----From: Sunitha Kumar <sunithak@m-net.arbornet.org>
+
+Dear Roger,
+Whenever, you use sort on the listcontrol, empty the elements in the =
+CArray and only again re-allocate the pointers in the CArray , such that =
+it reflects the contents of the listcontrol.So, you could avoid sorting =
+the CArray elements.
+Hope this helps.
+				Sunitha Kumar.
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Âåðíóòüñÿ â êîðåíü Àðõèâà</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

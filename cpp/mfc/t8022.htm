@@ -1,0 +1,214 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+STL and VC++ 4.2
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Serge Lalonde -- <A HREF="mailto:serge@infolytica.qc.ca">serge@infolytica.qc.ca</A>
+Wednesday, November 27, 1996
+</B>
+Environment: VC++ 4.2-flat, NT 4.0
+
+Hi there!
+
+I'm trying to mix STL with MFC and have run into a problem that I haven't
+seen mentioned before on this list.
+
+C:\MSDEV\INCLUDE\memory(16) : error C2961: syntax error : 'string' : unexpected token in template declaration
+C:\MSDEV\INCLUDE\memory(16) : error C2961: syntax error : 'int constant' : unexpected token in template declaration
+C:\MSDEV\INCLUDE\memory(19) : error C2988: unrecognizable template declaration/definition
+
+The line in question is
+
+template<class _TYPE> <<<<<<<< here
+   inline void *operator new(size_t _N, ::allocator<_TYPE>& _Al)
+   {return (_ALLOCATE_X(char,
+        allocator<_TYPE>::rebind<char>::other(), _Al, _N)); }
+
+This compiles fine when there is no MFC.
+
+I have made the changes to stl.h that are described in
+<A HREF="http://www.rahul.net/terris/vc42.txt">http://www.rahul.net/terris/vc42.txt</A> and I include the STL stuff after
+the MFC stuff. Defining NOMINMAX made no difference in this particular
+case.
+
+Another annoyance is the #define set Set, which changed a method call
+from set to Set, resulting in another error about Set() not being a 
+method of the class.
+
+Has anyone seen and fixed these before?
+--
+Have a tremendous day!
+    _/_/_/_/ _/_/_/_/ _/_/_/    _/_/_/  _/_/_/_//  300 Leo Parizeau, Suite 2222
+   _/       _/       _/    _/ _/       _/      /  Montreal, PQ, Canada H2W 2P4
+  _/_/_/_/ _/_/_/   _/_/_/_/ _/  _/_/ _/_/_/  /  Voice: (514) 849-8752 x236
+       _/ _/       _/  _/   _/    _/ _/      /__Fax: (514) 849-4239__
+_/_/_/_/ _/_/_/_/ _/    _/   _/_/_/ _/_/_/_/ Lalonde, Infolytica Corp.
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mario Contestabile -- <A HREF="mailto:Mario_Contestabile.UOS__MTL@UOSMTL2.universal.com">Mario_Contestabile.UOS__MTL@UOSMTL2.universal.com</A>
+Monday, December 02, 1996
+</B>
+Stl.h should be corrected to reflect these changes.
+This is what the specified line should read.
+
+<stl.h>
+35:  : deque<_TYPE>, _A>(_Al) {}
+74:  comment it out
+93:  comment it out
+105: class Set : public set<_K, _Pr, allocator<_K> > {
+111: comment it out
+128: comment it out
+144: explicit Vector(const _A& _Al = A())
+182: allocator<_C::value_type> > {
+196: : public queue<_C::value_type, _C, allocator<_C::value_type> > {
+202: : public stack<_C::value_type, _C, allocator<_C::value_type> > {
+
+>Defining NOMINMAX made no difference in this particular
+>case.
+
+That was necessary only for 4.1 when stl wasn't in its own namespace.
+#if _MSC_VER == 1010
+ #define NOMINMAX      // Skip min()/max() macros in <windef.h>
+#endif
+
+Can you post the offending line of code?
+
+mcontest@universal.com
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:Dave_Rabbers@Quinton-Eng.CCMAIL.CompuServe.COM">Dave_Rabbers@Quinton-Eng.CCMAIL.CompuServe.COM</A>
+Monday, December 02, 1996
+</B>
+I've experienced the same problem.  It was caused by the following 
+line of code :
+        #define new DEBUG_NEW
+
+My fix was to change from:
+        #include <memory>
+to:
+        #undef new
+        #include <memory>
+        #define new DEBUG_NEW
+
+I have new defined as DEBUG_NEW for both debug and release compiles.  
+If you have this define for only debug compiles, the fix will be a bit 
+more involved.  I'm sure you can figure it out!
+
+
+______________________________ Reply Separator _________________________________
+Subject: STL and VC++ 4.2
+Author:  INTERNET:serge@infolytica.qc.ca at CSERVE
+Date:    11/29/96 8:40 PM
+
+
+Sender: owner-mfc-l@majordomo.netcom.com
+Received: from majordomo.netcom.com (listless.netcom.com [206.217.29.105]) by 
+dub-img-2.compuserve.com (8.6.10/5.950515)
+     id TAA02360; Fri, 29 Nov 1996 19:37:52 -0500
+Received: by majordomo.netcom.com (8.7.5/8.7.3/(NETCOM MLS v1.01)) id 
+PAA16306; Fri, 29 Nov 1996 15:18:39 -0800 (PST)
+From: Serge Lalonde <serge@infolytica.qc.ca>
+Message-Id: <199611272113.AA19930@infocorp.infolytica.qc.ca> 
+Subject: STL and VC++ 4.2
+To: mfc-l@netcom.com
+Date: Wed, 27 Nov 96 16:13:12 EST
+Cc: serge@infolytica.qc.ca
+Mailer: Elm [revision: 70.85]
+Sender: owner-mfc-l@majordomo.netcom.com 
+Errors-To: owner-mfc-l@majordomo.netcom.com 
+Precedence: bulk
+Reply-To: mfc-l@netcom.com
+
+Environment: VC++ 4.2-flat, NT 4.0
+
+Hi there!
+
+I'm trying to mix STL with MFC and have run into a problem that I haven't 
+seen mentioned before on this list.
+
+C:\MSDEV\INCLUDE\memory(16) : error C2961: syntax error : 'string' : 
+unexpected token in template declaration
+C:\MSDEV\INCLUDE\memory(16) : error C2961: syntax error : 'int constant' : 
+unexpected token in template declaration
+C:\MSDEV\INCLUDE\memory(19) : error C2988: unrecognizable template 
+declaration/definition
+
+The line in question is
+
+template<class _TYPE> <<<<<<<< here
+   inline void *operator new(size_t _N, ::allocator<_TYPE>& _Al) 
+   {return (_ALLOCATE_X(char,
+        allocator<_TYPE>::rebind<char>::other(), _Al, _N)); }
+
+This compiles fine when there is no MFC.
+
+I have made the changes to stl.h that are described in 
+<A HREF="http://www.rahul.net/terris/vc42.txt">http://www.rahul.net/terris/vc42.txt</A> and I include the STL stuff after 
+the MFC stuff. Defining NOMINMAX made no difference in this particular 
+case.
+
+Another annoyance is the #define set Set, which changed a method call 
+from set to Set, resulting in another error about Set() not being a 
+method of the class.
+
+Has anyone seen and fixed these before? 
+--
+Have a tremendous day!
+    _/_/_/_/ _/_/_/_/ _/_/_/    _/_/_/  _/_/_/_//  300 Leo Parizeau, Suite
+2222
+   _/       _/       _/    _/ _/       _/      /  Montreal, PQ, Canada H2W 2P4
+  _/_/_/_/ _/_/_/   _/_/_/_/ _/  _/_/ _/_/_/  /  Voice: (514) 849-8752 x236
+       _/ _/       _/  _/   _/    _/ _/      /__Fax: (514) 849-4239__
+_/_/_/_/ _/_/_/_/ _/    _/   _/_/_/ _/_/_/_/ Lalonde, Infolytica Corp.
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,234 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Count of files in multi-select CFileDialog
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Colin Angus Mackay -- <A HREF="mailto:colin.angus.mackay@dial.pipex.com">colin.angus.mackay@dial.pipex.com</A>
+Thursday, September 05, 1996
+</B>
+Environment: Win95, NT 3.51, VC4.0
+
+Hi,
+
+I need to know the number of files that were selected in a multiple select 
+CFileDialog but I don't know how to get that information easily. For the 
+moment I am using the following code to calculate the number. It is 
+extremely inefficient, especially as the number of files goes up.
+
+	POSITION pos = dlg.GetStartPosition();
+	int nExpectedCount = 0;
+	while(pos)
+	{
+		nExpectedCount++;
+		dlg.GetNextPathName(pos);
+	}
+
+Where dlg is a CFileDialog object
+
+I'm sure there should be an easier way of getting the count, if anyone 
+could help I'd be grateful.
+
+Colin Angus Mackay.
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Lainhart -- <A HREF="mailto:lainhart@kaitain.sp.trw.com">lainhart@kaitain.sp.trw.com</A>
+Friday, September 06, 1996
+</B>
+[Mini-digest: 3 responses]
+
+At 10:23 PM 09/05/96 +-100, you wrote:
+>Environment: Win95, NT 3.51, VC4.0
+>
+>Hi,
+>
+>I need to know the number of files that were selected in a multiple select 
+>CFileDialog but I don't know how to get that information easily. For the 
+>moment I am using the following code to calculate the number. It is 
+>extremely inefficient, especially as the number of files goes up.
+>
+>	POSITION pos = dlg.GetStartPosition();
+>	int nExpectedCount = 0;
+>	while(pos)
+>	{
+>		nExpectedCount++;
+>		dlg.GetNextPathName(pos);
+>	}
+>
+>Where dlg is a CFileDialog object
+>
+>I'm sure there should be an easier way of getting the count, if anyone 
+>could help I'd be grateful.
+>
+>Colin Angus Mackay.
+>
+
+I just put a mulitple selection file dialog into a Win 3.1 application and
+studied the MFC4.2 implementation to see how they did it.  Did not see a
+file count anywhere so it will be up to you to get that from the
+dlg.m_ofn.lpstrFile member somehow.  You could just count the delimiters,
+but there is some Explorer conditional code that you'll need to include to
+determine what the delimiter is.  Seems like a bad idea.  When the
+implementation changes your high performance custom file list counter will
+fail.  It looks like the only performance hit you are taking with the above
+is that the path is parsed from the lpstrFile string on every
+GetNextPathName( ).  It should be able to do that faster n times than it
+takes the user to select n files.
+I didn't run into the problem because I didn't have to tell anyone how many
+files to process only to process files until pos was NULL.
+mike_
+
+-----From: "Ray Frohnhoefer" <rayf@datatree.com>
+
+Colin,
+
+Not a direct answer, but perhaps this will help.  With a multi-selection
+box, the default buffer for holding the selections is only 256 characters
+[_MAX_PATH].  Depending on how long the file path is, that may not leave
+room for many selections.  The following code illustrates how to increase
+that buffer.  At the same time, you have direct access to the buffer, and
+may be able to do something like count the number of blanks which separate
+the files.  BTW, I collect not only the count, but the names of the files
+with GetNextPathName, and it doesn't appear to be too slow.
+
+HTH
+Ray F.
+
+    char BigBuff[25600];
+
+    memset(BigBuff, '\0', sizeof(BigBuff));
+    CFileDialog dlg(TRUE,       // file open
+                    NULL,       // no default ext
+                    NULL,       // no initial filename
+            (DWORD) OFN_ALLOWMULTISELECT|       // flags
+                    OFN_FILEMUSTEXIST|
+                    OFN_PATHMUSTEXIST,
+                    NULL,       // no filter
+                    NULL);      // no parent CWnd pointer
+    dlg.m_ofn.lpstrFile = BigBuff;           // default buffer is one file, so 
+    dlg.m_ofn.nMaxFile = sizeof(BigBuff);    // multi-select needs more space
+
+    if (dlg.DoModal()!=IDOK)
+        return;                 // don't change the file names
+
+
+----------------------------------------------------------------------------
+*  Ray Frohnhoefer                email: rayf@datatree.com, Frohnzie@aol.com
+*  DataTree Corporation           web:   <A HREF="http://www.datatree.com">http://www.datatree.com</A>       
+*  550 West C Street, Ste. 2040   phone: (619) 231-3300 x131            
+*  San Diego, CA  92101           fax:   (619) 231-3301
+*                                  
+
+-----From: Mike Blaszczak <mikeblas@nwlink.com>
+
+At 10:23 PM 9/5/96 +-100, you wrote:
+>Environment: Win95, NT 3.51, VC4.0
+
+>I'm sure there should be an easier way of getting the count, if anyone 
+>could help I'd be grateful.
+
+I don't think there are any easier ways.  What makes you sure there are?
+
+There certainly are _faster_ ways, though, and that seems to really
+be your question.  You're asking MFC to do lots of work that you don't
+really need to do. In particular, you're getting a CString with each file
+name--and that means you're doing a memory allocation (and deallocation)
+for each iteration.
+
+You should party on the raw buffer. If you read the documentation for
+the m_ofn, you can see how the buffer really works and party on it
+directly:
+
+void CCountDlg::OnOK() 
+{
+	CFileDialog fileDlg(TRUE, NULL, NULL,
+		OFN_ALLOWMULTISELECT | OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT);
+
+	char szBigBuffer[4096];
+	fileDlg.m_ofn.lpstrFile = szBigBuffer;
+	fileDlg.m_ofn.nMaxFile = 4096;
+
+	if (IDOK == fileDlg.DoModal())
+	{
+		int nExpectedCount = 0;
+		char *pstrWorker = szBigBuffer;
+		int nExamined = 0;
+
+		while (nExamined < 4096)
+		{
+			if (szBigBuffer[nExamined] == '\0')
+			{
+				nExpectedCount++;
+				nExamined++;
+				if (szBigBuffer[nExamined] == '\0')
+					break;
+			}
+			nExamined++;
+		}
+
+		// don't count path, if supplied
+		if (nExpectedCount > 1)
+			nExpectedCount--;
+
+		TRACE1("Counted %d\n", nExpectedCount);
+	}
+	else
+        	TRACE0("Failed!\n");
+}
+
+As Dean McRory (my hero) always says: you can save lots of time by not doing
+work that you don't need to do.
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

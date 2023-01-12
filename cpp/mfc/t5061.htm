@@ -1,0 +1,522 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+More than 32k in a EDIT ctrl
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Erik Heuer -- <A HREF="mailto:erik.heuer@ks-t.no">erik.heuer@ks-t.no</A>
+Monday, May 06, 1996
+</B>
+Environment:  VC++ 4.0, NT 3.51 SP4
+
+There may be a simple solution to this, but sofar I have not succeeded in
+implementing one.  The problem is quite simple: How to break the 32k limit
+on a multiline Windows EDIT control on Win95/NT? 
+
+My attempts so far have been based on a CEdit derived object.  I have tried
+the SetHandle/GetHandle method, but it does not work unless the edit control
+is contained in a Dialog box (created with the DS_LOCALEDIT style flag).  
+I do not want to use it in a dialog box, and I get the EN_MAXTEXT message 
+after inserting a little less than 32k of text into it.
+
+Ideally, I want a specialized CEdit to behave similary to the output
+window in MSVC's IDE (but without the tab control, etc.). Sofar I have
+almost accomplished that, except overcomming the 32k limit.
+
+Erik Heuer, Kongsberg Simulation & Training, 3600 Kongsberg, Norway
+E-mail: erik.heuer@ks-t.no  Phone:(+47) 32735766 Fax:(+47) 32736965
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Barry Tannenbaum -- <A HREF="mailto:barry@dddv.com">barry@dddv.com</A>
+Thursday, May 09, 1996
+</B>
+[Mini-digest: 3 responses]
+
+At 03:33 PM 5/6/96 +0100, you wrote:
+
+>Environment:  VC++ 4.0, NT 3.51 SP4
+>
+>There may be a simple solution to this, but sofar I have not succeeded in
+>implementing one.  The problem is quite simple: How to break the 32k limit
+>on a multiline Windows EDIT control on Win95/NT? 
+
+Are you using SerializeRaw to read in your file?  I found that it limits the
+size of a file to 1MB.  I simply implemented it myself; stealing the code
+from SerializeRaw and removing the restriction.
+
+        - Barry
+
+--------------------------------------------------------------------------------
+
+3DV Technology, Inc              Phone: (603) 595-2200 X228
+410 Amherst St., Suite 150       Fax:   (603) 595-2228
+Nashua, NH  03063                Net:   barry@dddv.com
+
+
+-----From: Steve Downey <steve.downey@servicing.com>
+
+It's really very simple. Use SetLimitText on your edit control. For example:
+
+	m_Edit.SetLimitText(UINT_MAX); //set size of edit control to as large as
+possible
+
+-----From: John Moulder <jm@wg.icl.co.uk>
+
+I don't know about large edit controls on NT, but this works on Windows 3.1:
+
+/*
+ * CreateEditWindow()
+ *
+ * creates a new window with styles appropriate for wordwrapping
+ *
+ * Allocates a data segment for an edit control.
+ *
+ * Allows up to 64k per edit control.            
+ *
+ * See Microsoft Developer's CDROM, topic GLBEDIT. 
+ *
+ * returns handle of new window
+ *
+ * parameters :
+ *  hwndOwner       window handle of owner
+ *  nID             ID of edit control
+ */
+HWND CreateEditWindow(HWND hwndOwner, int nID)
+{ 
+    char *pFN = "CreateEditWindow";
+    
+    GLOBALHANDLE    ghEditDS;       // global handle to data segment
+    LPVOID          lpPtr;          // pointer to data segment
+    UINT            uDataSegment;   // start address of data segment
+    UINT            uEndAddress;    // end address of data segment
+    DWORD           dwStyle;        // style to create new window
+    HWND            hwndEdit;       // window handle of edit control
+    UINT uInitialSize = 4096;
+    
+    // allocate some global memory for our new data segment         
+    ghEditDS = GlobalAlloc(GMEM_DDESHARE | GMEM_MOVEABLE | GMEM_ZEROINIT,
+uInitialSize); 
+    
+    if (!ghEditDS)
+    {   
+        // cannot allocate any memory
+        return(NULL);
+    }                                           
+    else
+    { 
+        lpPtr = GlobalLock(ghEditDS); 
+
+        uDataSegment = HIWORD((LONG)lpPtr);  
+        
+        // *must* have 16 bytes at start of heap
+        uEndAddress = (UINT)(GlobalSize(ghEditDS) - 16);   
+        
+        // initialise local heap in our data segment 
+        LocalInit(uDataSegment, 0, uEndAddress);
+        
+        // unlock data segment - still locked by our global lock
+        UnlockSegment(uDataSegment);
+        
+        /*
+         * Create the edit control.
+         *
+         * Note that the allocated segment handle is passed
+         * in the CreateWindow call as the hInstance parameter.
+         */
+        hwndEdit = CreateWindow("EDIT",
+                                NULL,
+                                (WS_CHILD | WS_VISIBLE | WS_VSCROLL |
+WS_HSCROLL 
+                                | ES_LEFT | ES_MULTILINE 
+                                | ES_NOHIDESEL | ES_AUTOVSCROLL |
+ES_AUTOHSCROLL) ,
+                                0, 0,
+                                0, 0,
+                                hwndOwner,
+                                nID,
+                                uDataSegment,   // NB not hInst
+                                NULL); 
+        /*
+         * The EM_LIMITTEXT function will allow the edit field to
+         * hold more than 32K. The default for an edit field is
+         * approximately 32K, but by sending a 0, 0L through as
+         * the parameters, the default then becomes all available
+         * memory or 64K which comes first.
+         */
+        if (hwndEdit)
+            SendMessage(hwndEdit, EM_LIMITTEXT, 0, 0L);
+        
+        /*
+         * Stash the data segment in the extra bytes for the MDI child window
+         * owning the edit control. 
+         * This is so that we can free this memory when the edit control is
+* destroyed.
+         */
+        SetWindowWord(hwndOwner, GWW_EDIT_DATASEGMENT, uDataSegment); 
+                                        
+        return(hwndEdit);
+    }
+} /* CreateEditWindow() */
+
+
+Yoy may need to call FreeEditDataSegment() when the window owning
+the edit control receives WM_DESTROY:
+
+void FreeEditDataSegment(UINT uDataSegment) 
+{
+    HGLOBAL hBuffer;    // global handle to buffer
+    DWORD   dw;
+    
+    if (uDataSegment)
+    {                      
+        dw = GlobalHandle(uDataSegment);
+        hBuffer = (HGLOBAL)LOWORD(dw);
+        
+        if (hBuffer) 
+        {
+            GlobalUnlock(hBuffer);
+            GlobalFree(hBuffer);
+        }
+    }
+} /* FreeEditDataSegment() */
+
+The limit in the size of the edit control is discussed in the MSDN, in an
+article entitled edit controls. The storage requirement is roughly 2 bytes
+per line + text size + some fixed overhead.
+
+John
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dan Kirby -- <A HREF="mailto:dkirby@accessone.com">dkirby@accessone.com</A>
+Saturday, May 11, 1996
+</B>
+Windows 95 has a 64K limitation for the edit control.  If you need to get 
+more than that,  one approach is to use the Rich edit control which has no 
+limits.
+
+--dan
+
+
+----------
+From: 	Barry Tannenbaum[SMTP:barry@dddv.com]
+Sent: 	Thursday, May 09, 1996 2:00 PM
+To: 	mfc-l@netcom.com
+Cc: 	erik.heuer@ks-t.no
+Subject: 	Re: More than 32k in a EDIT ctrl
+
+[Mini-digest: 3 responses]
+
+At 03:33 PM 5/6/96 +0100, you wrote:
+
+>Environment:  VC++ 4.0, NT 3.51 SP4
+>
+>There may be a simple solution to this, but sofar I have not succeeded in
+>implementing one.  The problem is quite simple: How to break the 32k limit
+>on a multiline Windows EDIT control on Win95/NT?
+
+Are you using SerializeRaw to read in your file?  I found that it limits 
+the
+size of a file to 1MB.  I simply implemented it myself; stealing the code
+from SerializeRaw and removing the restriction.
+
+        - Barry
+
+------------------------------------------------------------------------  
+--------
+
+3DV Technology, Inc              Phone: (603) 595-2200 X228
+410 Amherst St., Suite 150       Fax:   (603) 595-2228
+Nashua, NH  03063                Net:   barry@dddv.com
+
+
+-----From: Steve Downey <steve.downey@servicing.com>
+
+It's really very simple. Use SetLimitText on your edit control. For 
+example:
+
+	m_Edit.SetLimitText(UINT_MAX); //set size of edit control to as large as
+possible
+
+-----From: John Moulder <jm@wg.icl.co.uk>
+
+I don't know about large edit controls on NT, but this works on Windows 
+3.1:
+
+/*
+ * CreateEditWindow()
+ *
+ * creates a new window with styles appropriate for wordwrapping
+ *
+ * Allocates a data segment for an edit control.
+ *
+ * Allows up to 64k per edit control.
+ *
+ * See Microsoft Developer's CDROM, topic GLBEDIT.
+ *
+ * returns handle of new window
+ *
+ * parameters :
+ *  hwndOwner       window handle of owner
+ *  nID             ID of edit control
+ */
+HWND CreateEditWindow(HWND hwndOwner, int nID)
+{
+    char *pFN = "CreateEditWindow";
+
+    GLOBALHANDLE    ghEditDS;       // global handle to data segment
+    LPVOID          lpPtr;          // pointer to data segment
+    UINT            uDataSegment;   // start address of data segment
+    UINT            uEndAddress;    // end address of data segment
+    DWORD           dwStyle;        // style to create new window
+    HWND            hwndEdit;       // window handle of edit control
+    UINT uInitialSize = 4096;
+
+    // allocate some global memory for our new data segment
+    ghEditDS = GlobalAlloc(GMEM_DDESHARE | GMEM_MOVEABLE | GMEM_ZEROINIT,
+uInitialSize);
+
+    if (!ghEditDS)
+    {
+        // cannot allocate any memory
+        return(NULL);
+    }
+    else
+    {
+        lpPtr = GlobalLock(ghEditDS);
+
+        uDataSegment = HIWORD((LONG)lpPtr);
+
+        // *must* have 16 bytes at start of heap
+        uEndAddress = (UINT)(GlobalSize(ghEditDS) - 16);
+
+        // initialise local heap in our data segment
+        LocalInit(uDataSegment, 0, uEndAddress);
+
+        // unlock data segment - still locked by our global lock
+        UnlockSegment(uDataSegment);
+
+        /*
+         * Create the edit control.
+         *
+         * Note that the allocated segment handle is passed
+         * in the CreateWindow call as the hInstance parameter.
+         */
+        hwndEdit = CreateWindow("EDIT",
+                                NULL,
+                                (WS_CHILD | WS_VISIBLE | WS_VSCROLL |
+WS_HSCROLL
+                                | ES_LEFT | ES_MULTILINE
+                                | ES_NOHIDESEL | ES_AUTOVSCROLL |
+ES_AUTOHSCROLL) ,
+                                0, 0,
+                                0, 0,
+                                hwndOwner,
+                                nID,
+                                uDataSegment,   // NB not hInst
+                                NULL);
+        /*
+         * The EM_LIMITTEXT function will allow the edit field to
+         * hold more than 32K. The default for an edit field is
+         * approximately 32K, but by sending a 0, 0L through as
+         * the parameters, the default then becomes all available
+         * memory or 64K which comes first.
+         */
+        if (hwndEdit)
+            SendMessage(hwndEdit, EM_LIMITTEXT, 0, 0L);
+
+        /*
+         * Stash the data segment in the extra bytes for the MDI child 
+window
+         * owning the edit control.
+         * This is so that we can free this memory when the edit control is
+* destroyed.
+         */
+        SetWindowWord(hwndOwner, GWW_EDIT_DATASEGMENT, uDataSegment);
+
+        return(hwndEdit);
+    }
+} /* CreateEditWindow() */
+
+
+Yoy may need to call FreeEditDataSegment() when the window owning
+the edit control receives WM_DESTROY:
+
+void FreeEditDataSegment(UINT uDataSegment)
+{
+    HGLOBAL hBuffer;    // global handle to buffer
+    DWORD   dw;
+
+    if (uDataSegment)
+    {
+        dw = GlobalHandle(uDataSegment);
+        hBuffer = (HGLOBAL)LOWORD(dw);
+
+        if (hBuffer)
+        {
+            GlobalUnlock(hBuffer);
+            GlobalFree(hBuffer);
+        }
+    }
+} /* FreeEditDataSegment() */
+
+The limit in the size of the edit control is discussed in the MSDN, in an
+article entitled edit controls. The storage requirement is roughly 2 bytes
+per line + text size + some fixed overhead.
+
+John
+
+
+
+
+
+begin 600 WINMAIL.DAT
+M>)\^(BL``0:0" `$```````!``$``0>0!@`(````Y 0```````#H``$(@ <`
+M& ```$E032Y-:6-R;W-O9G0@36%I;"Y.;W1E`#$(`0V ! `"`````@`"``$$
+MD 8`& (```(````,`````P``, ,````+``\.``````(!_P\!````/P``````
+M``"!*Q^DOJ,0&9UN`-T!#U0"`````&UF8RUL0&YE=&-O;2YC;VT`4TU44 !M
+M9F,M;$!N971C;VTN8V]M```>``(P`0````4```!33510`````!X``S !````
+M$0```&UF8RUL0&YE=&-O;2YC;VT``````P`5# $````#`/X/!@```!X``3 !
+M````$P```"=M9F,M;$!N971C;VTN8V]M)P```@$+, $````6````4TU44#I-
+M1D,M3$!.151#3TTN0T]-`````P``.0`````+`$ Z`0````(!]@\!````! ``
+M``````,,`````P``, 0````+``\.`0````(!_P\!````0P````````"!*Q^D
+MOJ,0&9UN`-T!#U0"```!`&5R:6LN:&5U97) :W,M="YN;P!33510`&5R:6LN
+M:&5U97) :W,M="YN;P``'@`", $````%````4TU44 `````>``,P`0```!,`
+M``!E<FEK+FAE=65R0&MS+70N;F\```,`%0P"`````P#^#P8````>``$P`0``
+M`!,```!E<FEK+FAE=65R0&MS+70N;F\```(!"S !````& ```%--5% Z15))
+M2RY(155%4D!+4RU4+DY/``,``#D`````"P! .@`````"`?8/`0````0`````
+M```$OEL!!( !`"$```!213H@36]R92!T:&%N(#,R:R!I;B!A($5$250@8W1R
+M; #2"0$%@ ,`#@```,P'!0`+`!$`) `U``8`4P$!(( #``X```#,!P4`"P`1
+M`"(`- `&`% !`0F `0`A````-C9!1$1&0D(U,D%"0T8Q,3DR,C@T-#0U-3,U
+M-# P,# `"P<!`Y &`- -```4````"P`C```````#`"8```````L`*0``````
+M`P`N```````#`#8``````$ `.0#@F)\=FS^[`1X`< `!````(0```%)%.B!-
+M;W)E('1H86X@,S)K(&EN(&$@141)5"!C=')L``````(!<0`!````%@````&[
+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
+`
+end
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

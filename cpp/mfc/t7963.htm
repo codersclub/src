@@ -1,0 +1,177 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CComboBoxes in CFileDialog problem
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Serge Lalonde -- <A HREF="mailto:serge@infolytica.qc.ca">serge@infolytica.qc.ca</A>
+Monday, November 25, 1996
+</B>
+Environment: VC++ 4.2-flat, NT 4.0
+
+Hi there!
+
+Has anyone run into this problem before?
+
+I am subclassing CFileDialog and using my own resource template.  For
+some reason, the popdown combo boxes in my template lose the strings I
+put in them in the resource editor.  I have to manually reenter them in
+in the code.  The same happens in a CColorDialog subclass that I have,
+but subclasses based on CDialog work fine.
+
+Does anyone have a fix for this?
+--
+Have a tremendous day!
+    _/_/_/_/ _/_/_/_/ _/_/_/    _/_/_/  _/_/_/_//  300 Leo Parizeau, Suite 2222
+   _/       _/       _/    _/ _/       _/      /  Montreal, PQ, Canada H2W 2P4
+  _/_/_/_/ _/_/_/   _/_/_/_/ _/  _/_/ _/_/_/  /  Voice: (514) 849-8752 x236
+       _/ _/       _/  _/   _/    _/ _/      /__Fax: (514) 849-4239__
+_/_/_/_/ _/_/_/_/ _/    _/   _/_/_/ _/_/_/_/ Lalonde, Infolytica Corp.
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+David Little -- <A HREF="mailto:dlittle@equinoxcorp.com">dlittle@equinoxcorp.com</A>
+Wednesday, November 27, 1996
+</B>
+I suspect that you should implement your own message handler as well as
+the custom template.
+
+----------
+From: 	Serge Lalonde[SMTP:serge@infolytica.qc.ca]
+Sent: 	Monday, November 25, 1996 1:00 PM
+To: 	mfc-l@netcom.com
+Cc: 	serge@infolytica.qc.ca
+Subject: 	CComboBoxes in CFileDialog problem
+
+Environment: VC++ 4.2-flat, NT 4.0
+
+Hi there!
+
+Has anyone run into this problem before?
+
+I am subclassing CFileDialog and using my own resource template.  For
+some reason, the popdown combo boxes in my template lose the strings I
+put in them in the resource editor.  I have to manually reenter them in
+in the code.  The same happens in a CColorDialog subclass that I have,
+but subclasses based on CDialog work fine.
+
+Does anyone have a fix for this?
+--
+Have a tremendous day!
+    _/_/_/_/ _/_/_/_/ _/_/_/    _/_/_/  _/_/_/_//  300 Leo Parizeau, Suite 2222
+   _/       _/       _/    _/ _/       _/      /  Montreal, PQ, Canada H2W 2P4
+  _/_/_/_/ _/_/_/   _/_/_/_/ _/  _/_/ _/_/_/  /  Voice: (514) 849-8752 x236
+       _/ _/       _/  _/   _/    _/ _/      /__Fax: (514) 849-4239__
+_/_/_/_/ _/_/_/_/ _/    _/   _/_/_/ _/_/_/_/ Lalonde, Infolytica Corp.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Serge Lalonde -- <A HREF="mailto:serge@infolytica.qc.ca">serge@infolytica.qc.ca</A>
+Friday, December 06, 1996
+</B>
+Hi there!
+
+> 
+> Environment: VC++ 4.2-flat, NT 4.0
+> 
+> Hi there!
+> 
+> Has anyone run into this problem before?
+> 
+> I am subclassing CFileDialog and using my own resource template.  For
+> some reason, the popdown combo boxes in my template lose the strings I
+> put in them in the resource editor.  I have to manually reenter them in
+> in the code.  The same happens in a CColorDialog subclass that I have,
+> but subclasses based on CDialog work fine.
+> 
+> Does anyone have a fix for this?
+>
+Well, I have found the reason for this problem and it is an MFC bug (surprise).
+My thanks to David Little for his suggestion, but the fix turned out to
+be easier.
+
+When subclassing a common dialog with a custom template, make sure to
+initialize the m_lpszTemplateName member variable to be the same value 
+as the lpTemplateName member of the common dialog's structure (i.e.
+m_ofn, m_cc, etc.). Otherwise, when ExecuteDlgInit() gets called to
+initialize the dialog items, it is NULL and nothing gets initialized.
+
+This is an MFC bug, because the common dialogs never initialize the
+m_lpszTemplateName member variable to be the same as their structure's,
+even though other pieces of code in MFC expect that member variable to
+be set.
+
+I think that this is a FAQ candidate. I agonized over this for too long.
+
+Example code:
+
+ImportDialog::IImportDialog
+  (LPCTSTR lpszDefExt, 
+   LPCTSTR lpszFileName,
+   DWORD   dwFlags,
+   LPCTSTR lpszFilter,
+   CWnd    *pParentWnd)
+   : CFileDialog(TRUE, lpszDefExt, lpszFileName, dwFlags, lpszFilter, pParentWnd)
+{
+   m_ofn.Flags|= OFN_ENABLETEMPLATE | OFN_EXPLORER;
+   m_ofn.lpTemplateName= m_lpszTemplateName= MAKEINTRESOURCE(IDD_IMPORT);
+   m_ofn.lpstrTitle= _T("Import");
+
+   return;
+}
+
+--
+Have a tremendous day!
+    _/_/_/_/ _/_/_/_/ _/_/_/    _/_/_/  _/_/_/_//  300 Leo Parizeau, Suite 2222
+   _/       _/       _/    _/ _/       _/      /  Montreal, PQ, Canada H2W 2P4
+  _/_/_/_/ _/_/_/   _/_/_/_/ _/  _/_/ _/_/_/  /  Voice: (514) 849-8752 x236
+       _/ _/       _/  _/   _/    _/ _/      /__Fax: (514) 849-4239__
+_/_/_/_/ _/_/_/_/ _/    _/   _/_/_/ _/_/_/_/ Lalonde, Infolytica Corp.
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

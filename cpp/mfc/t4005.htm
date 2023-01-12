@@ -1,0 +1,470 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Associating splitter views to document?
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Jesper Spring -- <A HREF="mailto:jesper_spring@Merck.Com">jesper_spring@Merck.Com</A>
+Sunday, February 18, 1996
+</B>
+
+Hi there
+
+I have posted this question before, though formulated differently, and 
+probably not understandable - so I'll try again!
+
+Here's my problem. I have a mainframe with a static splitter window. The two 
+panes in the splitter have two different views both derived from CView. My 
+problem is how I can associate the two Views with the mainframe document. In 
+the document template definition I can only add one view to the document. 
+How can I 'tell' the second view that its associated with this document?
+
+Hope this question makes any sense :0)
+
+Regards,
+
+Jesper Honig Spring
+Merck & Co., Inc.
+Denmark
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Terry Peterson -- <A HREF="mailto:petersot@motsat.sat.mot.com">petersot@motsat.sat.mot.com</A>
+Monday, February 19, 1996
+</B>
+
+Have you tried CDocument::AddView(CView* pView)?  This member function attaches
+the view to the document and sets the view's document pointer to the document.
+
+Hope this helps,
+
+Terry Peterson
+petersot@motsat.sat.mot.com
+ 
+> Hi there
+> 
+> I have posted this question before, though formulated differently, and 
+> probably not understandable - so I'll try again!
+> 
+> Here's my problem. I have a mainframe with a static splitter window. The two 
+> panes in the splitter have two different views both derived from CView. My 
+> problem is how I can associate the two Views with the mainframe document. In 
+> the document template definition I can only add one view to the document. 
+> How can I 'tell' the second view that its associated with this document?
+> 
+> Hope this question makes any sense :0)
+> 
+> Regards,
+> 
+> Jesper Honig Spring
+> Merck & Co., Inc.
+> Denmark
+> 
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Chong Zhang -- <A HREF="mailto:cz@dana.ucc.nau.edu">cz@dana.ucc.nau.edu</A>
+Monday, February 19, 1996
+</B>
+[Mini-digest: 2 responses]
+
+On Sun, 18 Feb 1996, Jesper Spring wrote:
+
+> 
+> Hi there
+> 
+> I have posted this question before, though formulated differently, and 
+> probably not understandable - so I'll try again!
+> 
+> Here's my problem. I have a mainframe with a static splitter window. The two 
+> panes in the splitter have two different views both derived from CView. My 
+> problem is how I can associate the two Views with the mainframe document. In 
+> the document template definition I can only add one view to the document. 
+> How can I 'tell' the second view that its associated with this document?
+> 
+> Hope this question makes any sense :0)
+> 
+> Regards,
+> 
+> Jesper Honig Spring
+> Merck & Co., Inc.
+> Denmark
+>
+
+You can only associate one view class to a document through doc template. 
+But you can create your own CCreateContext before creating view so that 
+you can attach what ever view you like to the document.
+-----From: Mats Manhav <manhav@connectum.skurup.se>
+
+-- [ From: Mats Manhav * EMC.Ver #2.5.02 ] --
+
+My first hint for the future is to scan the MFC samples. Most problems I
+have I can find a solution for among the samples. This one I found in the
+viewex sample.
+
+Here the solution that I have been using for my MDI apps.
+
+Derive a class from CMDIChildWnd, add a variable of type CSplitterWnd and
+override the OnCreateClient() function.
+
+In your AddDocTemplate put the CDerivedChildWnd as view class
+
+
+Good Luck!
+Mats
+
+Here are some code for the above as well:
+
+BOOL CMyApp::InitInstance()
+{
+   ...
+   AddDocTemplate(new CMultiDocTemplate(IDR_MASKEDTYPE,
+         RUNTIME_CLASS(CWinMaskDoc),
+         RUNTIME_CLASS(CSplitterMDIFrame),        // splitter MDI child
+frame
+         RUNTIME_CLASS(CWinMaskView)));
+   ...
+}
+
+class CSplitterMDIFrame : public CMdiChildWnd
+{
+   DECLARE_DYNCREATE(CSplitterMDIFrame)
+protected:
+   CSplitterMDIFrame ();        // protected constructor used by dynamic
+creation
+// Attributes
+protected:
+   CSplitterWnd   m_wndSplitter;
+public:
+// Operations
+public:
+// Implementation
+public:
+   virtual ~CSplitterMDIFrame();
+   virtual BOOL OnCreateClient(LPCREATESTRUCT lpcs, CCreateContext* pContext
+);
+   // Generated message map functions
+   //{{AFX_MSG(CMaskFrame)
+   //}}AFX_MSG
+   DECLARE_MESSAGE_MAP()
+#ifdef _DEBUG 
+   virtual void AssertValid() const;
+   virtual void Dump(CDumpContext& dc) const;
+#endif
+};
+
+// Here is the code for the OnCreateClient()
+
+
+BOOL CSplitterMDIFrame::OnCreateClient(LPCREATESTRUCT /*lpcs*/,
+CCreateContext* pContext)
+{
+   // first create the static splitter window with two panes
+   if(!m_wndSplitter.CreateStatic(this, 1, 2, WS_CHILD | WS_VISIBLE |
+WS_VSCROLL| WS_HSCROLL))
+   {
+      TRACE("Failed to CreateStatic Splitter\n");
+      return FALSE;
+   }
+
+   // create the views that are to be connected to the splitter panes
+   // pContext contains the document to be used and in the third parameter
+you 
+   // decide which view class to use for this pane (in this case CFirstView)
+
+   if (!m_wndSplitter.CSplitterWnd::CreateView(0, 0,
+      RUNTIME_CLASS(CFirstView), CSize(60, 30), pContext))
+   {
+      TRACE("Failed to create pane 0,0\n");
+      return FALSE;
+   }
+
+   // the second pane
+   if (!m_wndSplitter.CSplitterWnd::CreateView(0, 1,
+      RUNTIME_CLASS(CSecondView), CSize(35, 30), pContext))
+   {
+      TRACE("Failed to create pane 0,1\n");
+      return FALSE;
+   }
+   return TRUE;
+}
+
+
+-------- REPLY, Original message follows --------
+
+> Date: Sunday, 18-Feb-96 07:00 PM
+> 
+> From: Jesper Spring            \ Internet:    (jesper_spring@merck.com)
+> To:   MFCList                  \ Internet:    (mfc-l@netcom.com)
+> 
+> Subject: Associating splitter views to document?
+> 
+> Hi there
+> 
+> I have posted this question before, though formulated differently, and 
+> probably not understandable - so I'll try again!
+> 
+> Here's my problem. I have a mainframe with a static splitter window. The
+two 
+> panes in the splitter have two different views both derived from CView. My
+
+> problem is how I can associate the two Views with the mainframe document.
+In 
+> the document template definition I can only add one view to the document. 
+> How can I 'tell' the second view that its associated with this document?
+> 
+> Hope this question makes any sense :0)
+> 
+> Regards,
+> 
+> Jesper Honig Spring
+> Merck & Co., Inc.
+> Denmark
+> 
+
+-------- REPLY, End of original message --------
+
+
+--
+==========================================================================
+Mats Mеnhav (Mats Manhav for 7-bit people)
+email:manhav@connectum.skurup.se   WWW: http://connectum.skurup.se/~manhav
+FAX:  (int) 46 (0) 414 243 05      Phone: (int) 46 (0) 414 243 05         
+==========================================================================
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:jeffg@iqpuucp.aa.iqsc.com">jeffg@iqpuucp.aa.iqsc.com</A>
+Tuesday, February 20, 1996
+</B>
+
+     Here is what I have done if you're interested. I have two views as 
+     well, but only register the one:
+     
+     In my windupe.cpp (derived from CWinApp):
+        CMultiDocTemplate* pDocTemplate;
+        pDocTemplate = new CMultiDocTemplate(
+                IDR_WINDUPTYPE,
+                RUNTIME_CLASS(CWindupeDoc),
+                RUNTIME_CLASS(CChildFrame), // custom MDI child frame
+                RUNTIME_CLASS(CWindupeTreeView));
+        AddDocTemplate(pDocTemplate);
+     
+        // create main MDI Frame window
+        CMainFrame* pMainFrame = new CMainFrame;
+        if (!pMainFrame->LoadFrame(IDR_MAINFRAME))
+                return FALSE;
+        m_pMainWnd = pMainFrame;
+     
+     Then, I create the splitter and then add the two views it. This is in 
+     the CChildFrame, but you can just as easily put it into your mainframe 
+     class:
+     
+     BOOL CChildFrame::OnCreateClient( LPCREATESTRUCT /*lpcs*/,
+        CCreateContext* pContext)
+     {
+        CWindupeApp* pApp = (CWindupeApp*)AfxGetApp();
+     
+        CRect rect;
+        CSize size;
+        BOOL bSuccess;
+
+        GetClientRect( &rect );
+
+        bSuccess = m_wndSplitter.CreateStatic( this, 1, 2, 
+                WS_CHILD | WS_VISIBLE, AFX_IDW_PANE_FIRST );
+
+        // calculate the size of the tree view and create
+        size = rect.Size();
+        UINT TreeViewPos = pApp->GetProfileInt( _T("General"), 
+                _T("TreeViewPos"), 333 );
+        size.cx = ( int )(( TreeViewPos*size.cx) / 1000 );
+        bSuccess &= m_wndSplitter.CreateView( 0, 0, RUNTIME_CLASS( 
+                CWindupeTreeView ), size, pContext );
+
+        // calculate the size of the list view and create
+        size = rect.Size();
+        UINT ListViewPos = pApp->GetProfileInt( _T("General"), 
+                _T("ListViewPos"), 667 );
+        size.cx = ( int )(( ListViewPos*size.cx) / 1000 );
+        bSuccess &= m_wndSplitter.CreateView( 0, 1, RUNTIME_CLASS( 
+                CWindupeListView ), size, pContext );
+
+        return bSuccess;
+}
+
+That's all there is to it. You obviously do not need to use the code that calls 
+the GetProfileInt. I store the percentage position of the views based on the 
+overall child window size and restore it when the child window is restore.
+
+______________________________ Reply Separator _________________________________
+Subject: Re: Associating splitter views to document?
+Author:  mfc-l@netcom.com at Internet
+Date:    2/20/96 3:01 PM
+
+
+Have you tried CDocument::AddView(CView* pView)?  This member function attaches 
+the view to the document and sets the view's document pointer to the document.
+     
+Hope this helps,
+     
+Terry Peterson
+petersot@motsat.sat.mot.com
+     
+> Hi there
+> 
+> I have posted this question before, though formulated differently, and 
+> probably not understandable - so I'll try again!
+> 
+> Here's my problem. I have a mainframe with a static splitter window. The two 
+> panes in the splitter have two different views both derived from CView. My 
+> problem is how I can associate the two Views with the mainframe document. In 
+> the document template definition I can only add one view to the document. 
+> How can I 'tell' the second view that its associated with this document? 
+> 
+> Hope this question makes any sense :0) 
+> 
+> Regards,
+> 
+> Jesper Honig Spring
+> Merck & Co., Inc.
+> Denmark
+> 
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Peter Olesen -- <A HREF="mailto:peter.olesen@mailbox.swipnet.se">peter.olesen@mailbox.swipnet.se</A>
+Tuesday, February 20, 1996
+</B>
+At 14:03 1996-02-19 -0700, you wrote:
+>
+>Have you tried CDocument::AddView(CView* pView)?  This member function attaches
+>the view to the document and sets the view's document pointer to the document.
+>
+>Hope this helps,
+>
+>Terry Peterson
+>petersot@motsat.sat.mot.com
+> 
+>> Hi there
+>> 
+>> I have posted this question before, though formulated differently, and 
+>> probably not understandable - so I'll try again!
+>> 
+>> Here's my problem. I have a mainframe with a static splitter window. The two 
+>> panes in the splitter have two different views both derived from CView. My 
+>> problem is how I can associate the two Views with the mainframe document. In 
+>> the document template definition I can only add one view to the document. 
+>> How can I 'tell' the second view that its associated with this document?
+>> 
+>> Hope this question makes any sense :0)
+>> 
+>> Regards,
+>> 
+>> Jesper Honig Spring
+>> Merck & Co., Inc.
+>> Denmark
+>>
+
+Hi, You have to have a derived frame from CFrameWnd and use the
+OnCreateClient to create the splitter - should be a member in the frame -
+and all views.
+
+The view assosieted with the frame and document in the template can you find
+in the CCreateContext but you can use any view in the application for the
+panes. bu using the RUNTIME_CLASS macro or get a CRuntimeClass from the
+document (for dynamic view selection).
+
+I think there is a sample how to use the splitter with different views but
+here is how I use the function:
+
+BOOL ActProgramFrame::OnCreateClient(LPCREATESTRUCT lpcs, CCreateContext*
+pContext) 
+{
+	// if a normal view is created the splitter should have AFX_IDW_PANE_SAVE as ID
+	// create the splitter window (2 rows, 1 col) and fill in the frames (views)
+	if ( ! m_wndSplitter.CreateStatic(this, 2, 1 ) )
+	{
+		TRACE0("Unable to create the splitter in ActProgramFrame\n");
+		return FALSE;
+	}
+
+	// create first pane, allways a ActProgramView
+	if ( ! m_wndSplitter.CreateView(0, 0, RUNTIME_CLASS(ActProgramView),
+		CSize(250, 250), pContext) )
+	{
+		TRACE0("Unable to create a ActProgramView pane\n");
+		return FALSE;
+	}
+
+	// create second pane, allways a ActSymbolView
+	if ( ! m_wndSplitter.CreateView(1, 0, RUNTIME_CLASS(ActSymbolView),
+		CSize(150, 150), pContext) )
+	{
+		TRACE0("Unable to create a ActSymbolView pane\n");
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+Hope this help.
+//------------------------------------------------------------//
+// Peter Olesen                                               //
+// (peter.olesen@mailbox.swipnet.se)                          //
+//                                                            //
+// "Support the Blue Ribbon Campaign for free speech online." //
+//------------------------------------------------------------//
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

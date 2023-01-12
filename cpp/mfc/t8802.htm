@@ -1,0 +1,728 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+AfxSocketInit(), MFC 4.1 (DLL version) - subtle bug
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Bradley V. Pohl -- <A HREF="mailto:brad.pohl@pobox.com">brad.pohl@pobox.com</A>
+Sunday, January 05, 1997
+</B>
+Environment:  MSVC 4.1, Win32s, (complied on Windows NT 4.0)
+
+Greetings, all.
+
+I just filed the following bug report with Microsoft regarding AfxSocketInit() and the DLL
+version of MFC 4.1.  If anyone else out there is having to support Win32s, you may find this interesting.
+
+WARNING:
+If coding hacks make you shudder, turn back now.  This solution is a doozy, although it works nicely.
+;-)
+
+--Brad
+--
+Brad Pohl                          Custom software development & solutions
+brad.pohl@pobox.com               Internet and intranet consulting services
+The Brads' Consulting          Windows NT/Windows 95 software development
+<A HREF="http://www.thebrads.com">http://www.thebrads.com</A>    Web site planning, development and maintenance
+
+Visual C++ 4.1 Bug Report
+=========================
+
+DECRIPTION:
+----------
+MFC 4.1, which supports the creation of executables targeting Win32s, has
+a design bug that prevents a successful WSACleanup() call from occurring 
+when an application terminates after a (successful) call to AfxSocketInit(),
+IF the application is built using Shared MFC (i.e., the DLL version of MFC).
+
+This bug manifests itself only when the executable runs under Win32s;  Windows 95, 
+Windows NT 3.51, and Windows NT 4.0 work as expected.
+
+REPRODUCING THE BUG:
+--------------------
+1. Using Visual C++ 4.1, create a new project with AppWizard.
+2. Accept all defaults, but add MFC socket support.  The only requirements
+   are that:
+   (a.) The application is buit using the DLL version of MFC.
+   (b.) The applicaiton uses MFC socket support (specifically, it calls 
+        AfxSocketInit()).
+3. Compile the executable.
+4. Obtain a second machine running Windows 3.1x with Win32s 1.30.  Use MSDEV's
+   remote debuging facility to execute the application just compiled.
+5. Set a breakpoint on _AFX_SOCK_STATE::~_AFX_SOCK_STATE() in sockcore.cpp.
+6. Exit the running application (on the Win32s machine).
+7. The deugger will break on the dtor from step 5.  Step into the call to WSACleanup().
+   This will take you into AfxThunkWSACleanup().
+8. Step past the call to the SOCKLOAD macro.  This will work okay.
+9. Single-step to execute the indirect call (via function pointer) to WSACleanup().
+   In your debug window you will see a First Chance Exception trace message.
+10. NOTE that the call to WSACleanup still returns 0, even though the call did not
+    actually succeed.
+
+WHAT SEEMS TO BE HAPPENING:
+--------------------------
+Note: The following applies to the DLL version of MFC.  MFC's WinSock "thunking" support
+is bypassed in the statically linked versions.
+
+MFC attempts to automagically call WSACleanup() after a successful call to 
+AfxSocketInit().  This functionality is implemented via MFC's CProcessLocal<> 
+facility (see MFC TechNote #58) in combination with a helper class called 
+_AFX_SOCK_STATE.
+
+An instance of _AFX_SOCK_STATE is placed in process-local storage by AfxSocketInit().
+Process-local items are managed by the CThreadSlotData instance referred to by 
+_afxProcessData.  AfxTlsAddRef() and AfxTlsRelease() are used to control the lifespan
+of MFC's thread-local and process-local data.  When the last DLL contributing to the
+reference count on these items enters its DllMain, AfxTlsRelease() will be called and the
+process- and thread-local data will be cleaned up.
+
+Now consider the following additional facts:
+	(1) Win32s provides automatic thunking of WinSock functions for 32b 
+        applications from WSOCK32.dll down to winsock.dll (16b).
+	(2) No order may be assumed with respect to the unloading of DLLs attached to a process.
+
+It appears that at the point of destruction of the _AFX_SOCK_STATE instance, WSOCK32's automatic
+thunking has already been unhooked.  Hence, the first-chance exception down in the bowels of
+the CRT.
+
+CONCLUSION:
+-----------
+I believe that this must be classified as a bug in MFC.  Although the problem is encountered 
+because of Win32s thunking, the fact remains that MFC chose too late a point in program shutdown
+to perform the cleanup.
+
+ADDITIONAL INFO
+---------------
+This problem is also easily obsevered by the authors of a winsock.dll.  When the 16b winsock.dll
+is unloaded following the shutdown of an MFC application, its WSAStartup()/WSACleanup() reference
+count will be non-zero.  The call stops in the thunk layer (I think).
+
+This bug seems to be mostly benevolent, which is why I think it has not been noticed until now.
+(I found no reference to any such problem in the MSDN knowledge base).  However, depending upon
+the robustness of your 16b WinSock stack, it could have serious repercussions.  To further
+complicate the issue, MFC's CSocket implementation requires a successful call to AfxSocketInit().
+
+SOLUTION
+--------
+Ideally, this would be fixed by a new revision of MFC 4.1, which is the last MFC version
+supporting Win32s.  However, that code has been frozen.
+
+You could also rebuild the DLL version of MFC and provide a cleanup function that could be
+called from your ExitInstance to do the cleanup, or something similar. Rebuilding MFC should probably
+be avoided, if at all possible, however.
+
+Upon examination of sockcore.cpp, it appears that it may be possible to simply call WSAStartup() and
+WSACleanup() directly (from InitInstance and ExitInstance, respectively).  This will fix the Win32s
+problem noted here.  On the down side, the application will have to explicity link to WSOCK32 or
+perform an explicit LoadLibrary, etc.  Additionally, the MFC CSocket routines will still perform
+a LoadLibrary of WSOCK32 even though the application would be statically bound to the DLL.
+
+Because the underlying process-local and thread-local support is so very well encapsulated,
+this problem is _nearly_ impossible to fix.  However, I was able to come up with a workaround
+(albeit a HUGE HACK! ;-).  By adding some code to an MFC application's CWinApp-derived class'
+InitInstance and ExitInstance, proper cleanup can be assured.
+
+THE WORKAROUND:
+--------------
+After picking through the MFC source with a fine-tooth comb, I was able to conjure up the Mother Of 
+All Hacks to bypass the problem and ensure proper cleanup.
+
+The validity of my workaround is dependent upon the internals of MFC 4.1.  However, since MFC 4.1
+is frozen, this is not a major concern.  
+
+==================================================================================
+(1) Add the following to your CWinApp-derived class (in the example, CSockintApp):
+==================================================================================
+#include "wsaclean.h"
+
+/////////////////////////////////////////////////////////////////////////////
+static CSocketCleanupHelper f_CleanupHelper;
+
+/////////////////////////////////////////////////////////////////////////////
+// CSockinitApp initialization
+
+int CSockinitApp::ExitInstance() 
+{
+	f_CleanupHelper.DoSocketCleanup();
+	
+	return CWinApp::ExitInstance();
+
+} // CSockinitApp::ExitInstance
+
+BOOL CSockinitApp::InitInstance()
+{
+	if ( ! Win32sAfxSocketInit( f_CleanupHelper ))
+		{
+		AfxMessageBox(IDP_SOCKETS_INIT_FAILED);
+		return FALSE;
+		} // if
+// the rest of your code here...
+}
+
+==================================================================================
+(2) Add the the following two files to your project:  wsaclean.h and wsaclean.cpp.
+==================================================================================
+/*** wsaclean.h *************************************************************
+
+Author:		Bradley V. Pohl (brad.pohl@pobox.com)
+Date:		Jan 05, 1996
+
+This code will ensure that WSACleanup() is called successfully after
+a (successful) call to AfxSocketInit() when running under Win32s.
+
+Copyright (C) 1996 Bradley V. Pohl
+This code may be used for any purpose, provided that:
+  (1) This copyright is preserved in the code.
+  (2) If this source is redistributed, it must be provided free of charge.
+
+*****************************************************************************/
+#ifndef __WSACLEANUP_H__
+#define __WSACLEANUP_H__
+
+///////////////////////////////////////////////////////////////////////////////
+class _AFX_SOCK_STATE;
+
+///////////////////////////////////////////////////////////////////////////////
+class CSocketCleanupHelper
+{
+friend BOOL Win32sAfxSocketInit( CSocketCleanupHelper& );
+
+private:
+	_AFX_SOCK_STATE*	m_pSockState;
+
+public:
+	CSocketCleanupHelper() : m_pSockState( NULL ) {}
+
+	void DoSocketCleanup( void );
+
+}; // class CSocketCleanupHelper
+
+///////////////////////////////////////////////////////////////////////////////
+BOOL Win32sAfxSocketInit( CSocketCleanupHelper& );
+
+#endif // __WSACLEANUP_H__
+
+===============================================================================
+===============================================================================
+
+/*** wsaclean.cpp *************************************************************
+
+Author:		Bradley V. Pohl (brad.pohl@pobox.com)
+Date:		Jan 05, 1996
+
+This code will ensure that WSACleanup() is called successfully after
+a (successful) call to AfxSocketInit() when running under Win32s.
+
+Copyright (C) 1996 Bradley V. Pohl
+This code may be used for any purpose, provided that:
+  (1) This copyright is preserved in the code.
+  (2) If this source is redistributed, it must be provided free of charge.
+
+ ******************************************************************************/
+#include "stdafx.h"
+
+#include "wsaclean.h"
+
+// We need afximpl.h to use afxData.
+#define _AFX_NO_OLE_SUPPORT
+#include <../src/afximpl.h>
+
+// We need sockimpl.h for _AFX_SOCK_STATE and _afxSockState.
+#include <../src/sockimpl.h>
+
+#ifdef WSACleanup
+	// Sanity check.
+	#pragma message( "->Using MFC's internal WSACleanup thunk macro" )
+#endif
+
+#if 0
+// YOU CAN DELETE THE CODE IN THIS #if block (shown for demonstrative purposes only).
+// This function would be the ideal way to fix the problem (it is not nearly
+// the hack that is required because it would unconditionally be safe:  
+// it is not affected by FreeSlot() calls).  However, it cannot be used 
+// becuase the MFC dlls do not export _afxSockState.
+void IdealEnsureSafeAfxWSACleanup( void )
+{
+	// There is only a problem when running under Win32s:
+	if( afxData.bWin31 )
+		{
+		// See if a call to WSACleanup() is pending.
+		_AFX_SOCK_STATE* const pState = _afxSockState.GetDataNA();
+		if( pState != NULL && pState->m_pfnSockTerm != NULL )
+			{
+			// Yup!  But it will fail at static object destruction time, 
+			// so do it now...
+			WSACleanup();
+
+			// ...and make sure MFC doesn't try it then.
+			pState->m_pfnSockTerm = NULL;
+			} // IF
+		} // if
+
+} // IdealEnsureSafeAfxWSACleanup
+#endif
+
+///////////////////////////////////////////////////////////////////////////////
+// CSocketCleanupHelper Implementation 
+
+void CSocketCleanupHelper::DoSocketCleanup( void )
+{
+	if(		afxData.bWin31 
+		&&	m_pSockState != NULL 
+		&&	m_pSockState->m_hInstSOCK != NULL
+		&&	m_pSockState->m_pfnSockTerm != NULL )
+		{
+		// Do some of the work of _AFX_SOCK_STATE::~_AFX_SOCK_STATE
+		// by calling WSACleanup() now.
+		// NOTE:
+		// (1)  By #include'ing sockimpl.h, this call to WSACleanup will 
+		//      actually be the thunked version used internally by MFC.
+		// (2)  This method should be called from you APPLICATION's 
+		//      CWinApp::ExitInstance() override.  WSACleanup() can
+		//      successfully be thunked down to winsock.dll from wsock32.dll
+		//      at that point.
+		TRACE( "[CSocketCleanupHelper::DoSocketCleanup] "
+		   "Win32s detected - forcing early WSACleanup()\n" );
+
+		WSACleanup();
+
+		// Make sure MFC does not try to call WSACleanup() as well.
+		m_pSockState->m_pfnSockTerm = NULL;
+		} // if
+
+}; // CSocketCleanupHelper::DoSocketCleanup
+
+///////////////////////////////////////////////////////////////////////////////
+BOOL Win32sAfxSocketInit(
+	CSocketCleanupHelper&	rHelper )
+{
+// NOTE: This method must be called in your APPLICATION's
+//       CWinApp::InitInstance instead of AfxSocketInit().
+	const BOOL bSuccess = AfxSocketInit();
+
+	// There is only a problem when running under Win32s.
+	if( bSuccess && afxData.bWin31 )
+		{
+		// Temporary CProcessLocal instance so we can use its m_nSlot
+		// value to determine the slot value for _afxSockState.
+		CProcessLocal< _AFX_SOCK_STATE > slotinfo;
+
+		// CProcessLocalObject instances are assumed to always be declared
+		// at file scope (We know this because CProcessLocalObject checks for
+		// m_nSlot to be zero as a flag, but there is no ctor to do this.
+		// However, file-scope variables are automagically zero-intialized!).
+		// Therefore, we must manually initialize slotinfo:
+		slotinfo.m_nSlot = 0;
+
+		// Force slot allocation.
+		slotinfo.GetData();
+
+		// As long as no FreeSlot() calls have been made for _afxProcessData
+		// (and this ONLY occurs in CProcessLocalObject::~CProcessLocalObject),
+		// AfxSocketInit() allocated its _AFX_SOCK_STATE instance in the 
+		// previous contiguous slot (see CThreadSlotData::AllocSlot()).
+		// Furthermore, this will ALWAYS be the case unless someone has put
+		// a CProcessLocal<> instance somewhere besides global scope
+		// (and even then, this would have had to have taken place prior to 
+		// the call to Win32sAfxsocketInit()).
+		// Again, because of the lack of a CProcessLocalObject ctor, we know 
+		// MFC 4.1 never does this.  
+		ASSERT( slotinfo.m_nSlot > 1 );
+		--slotinfo.m_nSlot;
+
+		// Now pluck out the _AFX_SOCK_STATE pointer.  Although additional
+		// CProcessLocal::GetData() calls may force _afxProcessData's thread
+		// slot table to be reallocated, the referenced objects (e.g.. the 
+		// _AFX_SOCK_STATE instance we're after) will not move in (virtual)
+		// memory.  Therefore, we can stash off a pointer for later.
+		rHelper.m_pSockState = slotinfo.GetDataNA();
+		ASSERT( rHelper.m_pSockState != NULL );
+
+		// IMPORTANT:  Restore slotinfo's m_nSlot so that the proper slot is
+		// freed when its dtor fires.
+		++slotinfo.m_nSlot;
+
+		TRACE( "[Win32sAfxSocketInit] Win32s detected; stashing off %lX\n",
+			rHelper.m_pSockState );
+		} // if
+
+	return bSuccess;
+
+} // BOOL Win32sAfxSocketInit
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Wednesday, January 08, 1997
+</B>
+At 21:43 1/5/97 -0500, Bradley V. Pohl wrote:
+
+To me, this looks like a bug in Win32s.  Your additional "facts" are a bit
+off:
+
+> (1) Win32s provides automatic thunking of WinSock functions for 32b 
+>     applications from WSOCK32.dll down to winsock.dll (16b).
+
+MFC isn't thunking 32-bit to 16-bit access.  It's thunking the dependency on
+the DLL.  With the AfxThunkSomething() functions and macros and structures
+in place, a program that uses MFC in a shared DLL will only need to initialize
+additional system components as they're used.  If this mechanism wasn't in
+place, even the most trivial MFC application would load and initialize
+sockets, the common controls, WININET, OLE, ODBC, and probably a few
+other things before it even started. You would have even tribial programs
+with a working set over five megabytes, or so.
+
+> (2) No order may be assumed with respect to the unloading of DLLs
+attached to
+> a process.
+
+This isn't correct.  It's true that the unload order of DLLs implicitly linked
+to a process can't be determined, but the uloading order of DLLs explicitly
+linked to a process is deterministic.  MFC has explicitly loaded the
+WSOCK32.DLL,
+and therefore controls its life cycle.
+
+>It appears that at the point of destruction of the _AFX_SOCK_STATE instance,
+>WSOCK32's automatic thunking has already been unhooked.  Hence, the
+first-chance
+>exception down in the bowels of the CRT.
+
+That's a little confusing to me.  What CRT function is involved in this
+process?  Or are you saying "in the bowels of the CRT" because it's the CRT
+that's responsible for calling static destructors, like those on the
+_AFX_SOCK_STATE object?
+
+You can see that, when _AFX_SOCK_STATE destructs, it ends up
+calling FreeLibrary() against the dynamically loaded m_hInstSock. 
+That handle was obtained back in the implementation of AfxLoadSock().
+If Win32s has let go of that library before that last call to FreeLibrary(),
+which you say it has, the bug is really in Win32s-- it has no right to
+ditch the libray when it has a non-zero refcount, even though the process
+which owns that reference count is about to terminate. It should only
+shut down the library when the owning process has completely terminated.
+
+>I believe that this must be classified as a bug in MFC. 
+
+I'm not quite as sure as you seem to be.  Since Fact #2 above is
+incompletely stated, and Fact #1 doesn't seem to apply to this 
+situation, I think your assertion might be on weak ground.
+
+>problem is encountered because of Win32s thunking, the fact remains that
+>MFC chose too late a point in program shutdown to perform the cleanup.
+
+I'm not sure I see where you've explained how the problem is caused by
+Win32s thunking.  What do you really mean, exactly?
+
+>After picking through the MFC source with a fine-tooth comb, I was able
+>to conjure up the Mother Of All Hacks to bypass the problem and ensure
+>proper cleanup.
+
+If it was me, I'd experiment with artificially inflating the reference
+count to WSOCK32.DLL.  As you mentioned, MFC 4.1 (like Win32s itself)
+is frozen and there won't be a forthcoming fix.
+
+
+
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+Why does the "new" Corvette look like a 1993 RX-7?
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Bradley V. Pohl -- <A HREF="mailto:brad.pohl@pobox.com">brad.pohl@pobox.com</A>
+Thursday, January 09, 1997
+</B>
+>To me, this looks like a bug in Win32s
+
+I certainly would not be suprised.
+
+> Your additional "facts" are a bit off:
+>> (1) Win32s provides automatic thunking of WinSock functions for 32b 
+>>     applications from WSOCK32.dll down to winsock.dll (16b).
+
+>MFC isn't thunking 32-bit to 16-bit access.  
+
+Nor did I imply that it was.  Note that I said "Win32s,"  not "MFC."
+
+>It's thunking the dependency on the DLL. 
+> With the AfxThunkSomething() functions and macros and structures
+>in place, a program that uses MFC in a shared DLL will only need to initialize
+>additional system components as they're used. 
+
+I was _not_ confusing the AfxThunkXXX stuff with 32b->16b thunking.  These
+are totally separate issues.
+
+> If this mechanism wasn't in
+>place, even the most trivial MFC application would load and initialize
+>sockets, the common controls, WININET, OLE, ODBC, and probably a few
+>other things before it even started. You would have even tribial programs
+>with a working set over five megabytes, or so.
+
+I was not in any way saying anything bad about this approach.  In fact, I wasn't
+even referring to it at all!  Actually, I  thought the on-demand method of getting function pointers 
+from the library was pretty slick--especially the way the thunk optimizes itself out under "pure"
+(i.e., non-Win32s) Win32.
+
+>> (2) No order may be assumed with respect to the unloading of DLLs attached to
+>> a process.
+
+>This isn't correct.  It's true that the unload order of DLLs implicitly linked
+>to a process can't be determined, but the uloading order of DLLs explicitly
+>linked to a process is deterministic.  MFC has explicitly loaded the
+>WSOCK32.DLL,
+>and therefore controls its life cycle.
+
+Sorry, a bit too broad of a statement there.  I was referring to implicitly linked DLLs.
+
+>>It appears that at the point of destruction of the _AFX_SOCK_STATE instance,
+>>WSOCK32's automatic thunking has already been unhooked.  Hence, the
+first-chance
+>>exception down in the bowels of the CRT.
+
+>That's a little confusing to me.  What CRT function is involved in this
+>process?  
+
+No, that's not what I mean...
+
+>r are you saying "in the bowels of the CRT" because it's the CRT
+>that's responsible for calling static destructors, like those on the
+>_AFX_SOCK_STATE object?
+
+...bingo!
+
+>>You can see that, when _AFX_SOCK_STATE destructs, it ends up
+>calling FreeLibrary() against the dynamically loaded m_hInstSock. 
+>That handle was obtained back in the implementation of AfxLoadSock().
+>If Win32s has let go of that library before that last call to FreeLibrary(),
+>which you say it has, the bug is really in Win32s-- it has no right to
+>ditch the libray when it has a non-zero refcount, even though the process
+>which owns that reference count is about to terminate. It should only
+>shut down the library when the owning process has completely terminated.
+
+Yes, this is the part where I was getting confused.  I was trying to make
+sense of what I was seeing and the only consistent behavior I could observe
+was that this first chance exception problem was occuring very late in the
+application shutdown phase.  Specifically, on a call during static destructor
+cleanup.
+
+I was hoping that someone who knows the gory details of Win32s might be able
+to make sense of this - or perhaps it _is_ simply a Win32s bug.  One point
+I haven't been able to find a definite answer on is the exact point in process
+shutdown where the thunked DLLs are unloaded.  
+
+>>I believe that this must be classified as a bug in MFC. 
+
+>I'm not quite as sure as you seem to be.  Since Fact #2 above is
+>incompletely stated, and Fact #1 doesn't seem to apply to this 
+>situation, I think your assertion might be on weak ground.
+
+Okay, I probably associated the B-word with MFC a little too quickly there.  
+Other than an outright bug in Win32s, the only other idea that seems to scream 
+out at me is some sort of "too-late" condition.  
+
+>>problem is encountered because of Win32s thunking, the fact remains that
+>>MFC chose too late a point in program shutdown to perform the cleanup.
+
+>I'm not sure I see where you've explained how the problem is caused by
+>Win32s thunking.  What do you really mean, exactly?
+
+Here's the part that bothers me.  As you say, a DLL should not be unloaded
+while an outstanding reference count remains.  However, the system must
+be able to unload DLLs with non-zero reference counts, right?  Specifically,
+when  an application does a LoadLibrary and then never performs a FreeLibrary.
+
+I was wondering if WSOCK32.DLL might be being unhooked from the 
+16b WINSOCK.DLL between the time that WinMain returned and the CRT
+ran through its static dtor business.  It seems obvious that these dtors should be
+allowed to run first, but, again, I don't know how the thunking unloading takes
+place.  
+
+This is all guesswork, but it would seem to explain this first-chance exception business.
+Some code _somewhere_ is catching that exception and allowing the application to shut
+down in spite of it. Any idea at what level this is taking place?
+
+Finally, I seem to remember someone saying that there are restrictions, especially in 
+Win16, about what API functions can be called post-WinMain.  If this is true, and if FreeLibrary()
+is off-limits this late in the game in 16b Windows, then I think I have a case for
+an MFC bug. Certainly, if FreeLibrary() is prohibited after WinMain, Win32s would have the
+right to forcibly unload DLLs with outstanding reference counts before the static dtors.
+In such a scenario,  the choice of a static-object's dtor for cleanup would be a bad one.
+
+>>After picking through the MFC source with a fine-tooth comb, I was able
+>>to conjure up the Mother Of All Hacks to bypass the problem and ensure
+>>proper cleanup.
+
+>If it was me, I'd experiment with artificially inflating the reference
+>count to WSOCK32.DLL.  As you mentioned, MFC 4.1 (like Win32s itself)
+>is frozen and there won't be a forthcoming fix.
+
+If an outstanding LoadLibrary() reference count is not doing the job, I doubt that an extra
+one will matter...maybe an off-by-one type bug, perhaps?  
+
+I am pretty darn sure that the code I posted is a trustworthy solution to this problem, albeit
+not pretty.  Any comments on that?
+
+--
+Brad Pohl                          Custom software development & solutions
+brad.pohl@pobox.com               Internet and intranet consulting services
+The Brads' Consulting          Windows NT/Windows 95 software development
+<A HREF="http://www.thebrads.com">http://www.thebrads.com</A>    Web site planning, development and maintenance
+
+
+
+------ =_NextPart_000_01BBFE74.760F3470
+Content-Type: application/ms-tnef
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Saturday, January 11, 1997
+</B>
+At 21:31 1/9/97 -0500, Bradley V. Pohl wrote:
+
+>In fact, I wasn't even referring to it at all! 
+
+I guess I'm a littl lost, then: what thunking is happening
+here?  You're running as a 32-bit process under Win32s, and
+you're hitting WSOCK32.DLL.  There's no thunking between
+your application and the 32-bit DLL, is there?  Or does a
+Win32s installation see LoadLibrary() requests for WSOCK32.DLL
+and substitute a thunked stub for it?
+
+>Actually, I  thought the on-demand method of getting function pointers 
+>from the library was pretty slick--especially the way the thunk optimizes
+>itself out under "pure" (i.e., non-Win32s) Win32.
+
+It doesn't optimize itself out. What MFC is doing isn't a 32-bit
+to 16-bit thunk, and is still there in an AFXDLL-build under Windows NT
+or Windows 95. The code that MFC calls a thunk simply isolates the
+MFC code from the DLL so that MFC doesn't always pull in the DLL
+at load time.  The DLL isn't pulled into your process until you (or MFC)
+actually uses it.
+
+>I was hoping that someone who knows the gory details of Win32s might be able
+>to make sense of this - or perhaps it _is_ simply a Win32s bug.
+
+>One point I haven't been able to find a definite answer on is the
+>exact point in process shutdown where the thunked DLLs are unloaded.  
+
+I pointed it out to you: the DLLs are (normally) unloaded when MFC 
+calls FreeLibrary() on them in the destructor of module-state structures,
+like AFX_SOCKET_DATA.
+
+>Okay, I probably associated the B-word with MFC a little too quickly there.  
+
+Most people do, I'm afraid.
+
+>I was wondering if WSOCK32.DLL might be being unhooked from the 
+>16b WINSOCK.DLL between the time that WinMain returned and the CRT
+
+When you use WSOCK32.DLL in a Win32s installation, is it really the same
+WSOCK32.DLL that a true Win32 application sees, or is it a forwarder
+that calls the 16-bit WINSOCK.DLL?
+
+If so, the problem lies in reference-counting implementation in the
+WSOCK32.DLL.  That's odd, because there's no way for the DLL to know
+the app is done using it but hasn't called FreeLibrary() on it yet
+and spontaneously unload from the process.
+
+If not, the problem lies in Win32s someplace.  There's _still_ no
+way for either the real DLL being accessed directly or the
+wrapper DLL being access directly or the real DLL under it to
+know that the application is about to terminate and start unloading
+before the application really has terminated.
+
+>ran through its static dtor business. 
+
+That is to say, I don't think there's an event which the libraries
+in the process would see to tell them that they can unload.  The
+three events that cause DLLs to unload are calls to FreeLibrary() for
+the DLL, a call to ExitProcess(), or the eventual return of the
+application from its entry point.  None of those is happened and
+MFC is right to continue accessing entry points it knows in the DLL.
+
+So, something in Win32s is buggy.  It's possible that Win32s sees
+the application process a WM_QUIT message and jumps the gun, and it's
+possible that Win32s just gets confused when trying to manage the
+reference count for the DLL.
+
+>Finally, I seem to remember someone saying that there are restrictions,
+>especially in Win16, about what API functions can be called post-WinMain. 
+>If this is true, and if FreeLibrary() is off-limits this late in the
+>game in 16b Windows, then I think I have a case for an MFC bug.
+
+No, you still don't.  Your application is running under Win32s, not 
+under Win16. Information about what calls are allowed when in a
+16-bit app are irrelevant.
+
+>Certainly, if FreeLibrary() is prohibited after WinMain, Win32s
+>would have the right to forcibly unload DLLs with outstanding
+>reference counts before the static dtors.
+
+In the mean time, what is "WinMain"?  In a GUI-based MFC application,
+the entry point to the application is supplied by the C Runtimes.
+The runtimes call WinMain() in MFC, and it runs.  When it returns,
+it returns back to the real entry-point provided by the CRTL, which
+is where the static destructors happen.
+
+Windows, at runtime, doesn't know when an application enters or
+leaves the function named WinMain(), if there _is_ such a function
+name.  It certainly knows when the application is done with the
+entry point it declared, but _no_ work can be done after that point
+because the application isn't executing any more.  At all.
+
+>------ =_NextPart_000_01BBFE74.760F3470
+>Content-Type: application/ms-tnef
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

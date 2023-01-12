@@ -1,0 +1,292 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CRecordset problem
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Heikki Toivonen -- <A HREF="mailto:hjtoi@cc.jyu.fi">hjtoi@cc.jyu.fi</A>
+Thursday, October 17, 1996
+</B>
+Environment: NT 3.51, VC++ 4.1
+
+The ODBC Driver and Access versions:
+             ODBC Driver: Microsoft Access Driver, 
+                          Microsoft ODBC Desktop Driver Pack 3.0,
+                          version 3.40.2204,
+             Microsoft Access for Windows 95, version 7.0
+
+I have made a dynamic recordset (with dynamic I mean that I can add
+the column names/types at run time). It seems to be working fine
+with single table.
+
+The problem arises when I try to do joins. I get a CDBException with:
+
+  m_nRetCode: -1
+  m_strError: "Too few parameters. Expected 1."
+  m_strStateNativeOrigin: "State:07001,Native:-3010,Origin:[Microsoft]
+                           [ODBC Microsoft Access 7.0 Driver]"
+
+when I try to open the recordset with (for example):
+
+  // set was created with a pointer to open CDatabase object
+  set.Open(AFX_DB_USE_DEFAULT_TYPE,
+    "SELECT DISTINCTROW "
+      "Documents.[System Document], "
+	  "Documents.[Function Document], "
+	  "Documents.[Operation Document], "
+	  "Documents.[Corr Maint Document], "
+	  "Documents.[Faultfinding Document] "
+    "FROM Documents INNER JOIN Systems ON "
+	  "Documents.[Documents ID] = Systems.[Documents ID] "
+    "WHERE (Systems.[System Name]=\"Fuel system\");");
+
+To my knowledge that is not a parametrized query.
+
+m_nParams is 0, sort and filter are empty, there are 5 fields
+(Documents.[System Document] etc.) with their types in the set, 
+which should be OK according to the article 
+"SQL: Customizing Your Recordset's SQL Statement (ODBC)"
+in Books Online.
+
+My set.Open() calls directly CRecordset::Open, and the line there
+that throws the exception is near the end:
+
+		// now attempt to execute the SQL Query
+		AFX_SQL_ASYNC(this, ::SQLExecute(m_hstmt));
+		if (!Check(nRetCode))
+			ThrowDBException(nRetCode);	// <-- throw here!
+		m_lOpen = AFX_RECORDSET_STATUS_OPEN;
+
+		// Give derived classes a call before binding
+		PreBindFields();
+
+		MoveFirst();
+
+Here are a couple of lines from the SQL.LOG:
+
+SQLPrepare(hstmt00148470, "SELECT DISTINCTROW Documents.`System Document`, 
+  Documents.`Function Document`, Documents.`Operation Document`, 
+  Documents.`Corr Maint Document`, Documents.`Faultfinding Document` 
+  FROM Documents INNER JOIN Systems ON 
+  Documents.`Documents ID` = Systems.`Documents ID` 
+  WHERE (Systems.`System Name`="Fuel system");", -3);
+SQLExecute(hstmt00148470);
+
+After that there are two SQLError lines, and SQLFreeStmt and 
+disconnect stuff. (BTW, what is that -3 as the last arg to SQLPrepare?)
+
+
+If I execute the SQL SELECT statement directly in Access, it works
+fine. I also tried with CDaoRecordset, and that worked as well.
+But ODBC is a must (first customer will have Oracle), so DAO is 
+out of the question. (The program should run in a single thread so
+I can't update to VC++ 4.2 (?) (Windows 3.x with Win32s?))
+
+I have checked the Visual C++ Books Online and MSDN Library - April 1996 CD
+with search for "Too few parameters", but did not see anything that would 
+help me here (maybe I just did not understand?).
+
+I have been stuck with this for some days now, so any help would be
+appreciated.
+
+As an afterthought, anyone made a dynamic recordset that works, or
+knows of a good 3rd party database/recordset combination? :) 
+Something like CDaoDatabase + CDaoRecordset without the DAO, heh...
+Any advice about books dealing with MFC/ODBC programming would be 
+nice too as I now have nothing.
+
+-- 
+  Heikki Toivonen
+  Email: hjtoi@cc.jyu.fi        Tel. +358 14 245 008
+  WWW: <A HREF="http://www.jyu.fi/~hjtoi">http://www.jyu.fi/~hjtoi</A>
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Tony Headford -- <A HREF="mailto:tony@ktgroup.co.uk">tony@ktgroup.co.uk</A>
+Friday, October 18, 1996
+</B>
+[Mini-digest: 2 responses]
+
+I'm afraid I can't really help with you're MFC problems but I can give you
+a few pointers.
+We encountered problems with using CRecordsets and so I wrote an ODBC/SQL
+handling class.
+The ODBC API is actually pretty simple and in reality you only need to know
+a small part of it to do 99% of all your requirements.
+I would suggest reading the ODBC 2.0 Programmers Reference & SDK Guide from
+Microsoft Press.
+It didn't take long to develop a really powerful and adaptable class to
+wrap the ODBC API in.
+Also are you using SQL compliant with ODBC ?. One thing we've found that
+different databases have different naming conventions 
+and keywords that can knacker your choice of table and columns names and
+SQL statements. ie embedded spaces in your column names. Things supported
+in one database are almost certainly NOT going to be supported in another
+thereby ruling out your database independence.
+
+The -3 in SQLPrepare is defined as SQL_NTS and means your SQL statement is
+null terminated. (NTS - null terminated string). 
+
+======================
+Tony Headford
+Software Developer
+
+tony@rms.co.uk
+======================
+
+----------
+> From: Heikki Toivonen <hjtoi@cc.jyu.fi>
+> To: mfc-l@netcom.com
+> Subject: CRecordset problem
+> Date: 17 October 1996 08:51
+> 
+> Environment: NT 3.51, VC++ 4.1
+> 
+> The ODBC Driver and Access versions:
+>              ODBC Driver: Microsoft Access Driver, 
+>                           Microsoft ODBC Desktop Driver Pack 3.0,
+>                           version 3.40.2204,
+>              Microsoft Access for Windows 95, version 7.0
+> 
+> I have made a dynamic recordset (with dynamic I mean that I can add
+> the column names/types at run time). It seems to be working fine
+> with single table.
+> 
+> The problem arises when I try to do joins. I get a CDBException with:
+> 
+>   m_nRetCode: -1
+>   m_strError: "Too few parameters. Expected 1."
+>   m_strStateNativeOrigin: "State:07001,Native:-3010,Origin:[Microsoft]
+>                            [ODBC Microsoft Access 7.0 Driver]"
+> 
+> when I try to open the recordset with (for example):
+> 
+>   // set was created with a pointer to open CDatabase object
+>   set.Open(AFX_DB_USE_DEFAULT_TYPE,
+>     "SELECT DISTINCTROW "
+>       "Documents.[System Document], "
+> 	  "Documents.[Function Document], "
+> 	  "Documents.[Operation Document], "
+> 	  "Documents.[Corr Maint Document], "
+> 	  "Documents.[Faultfinding Document] "
+>     "FROM Documents INNER JOIN Systems ON "
+> 	  "Documents.[Documents ID] = Systems.[Documents ID] "
+>     "WHERE (Systems.[System Name]=\"Fuel system\");");
+> 
+> To my knowledge that is not a parametrized query.
+> 
+> m_nParams is 0, sort and filter are empty, there are 5 fields
+> (Documents.[System Document] etc.) with their types in the set, 
+> which should be OK according to the article 
+> "SQL: Customizing Your Recordset's SQL Statement (ODBC)"
+> in Books Online.
+> 
+> My set.Open() calls directly CRecordset::Open, and the line there
+> that throws the exception is near the end:
+> 
+> 		// now attempt to execute the SQL Query
+> 		AFX_SQL_ASYNC(this, ::SQLExecute(m_hstmt));
+> 		if (!Check(nRetCode))
+> 			ThrowDBException(nRetCode);	// <-- throw here!
+> 		m_lOpen = AFX_RECORDSET_STATUS_OPEN;
+> 
+> 		// Give derived classes a call before binding
+> 		PreBindFields();
+> 
+> 		MoveFirst();
+> 
+> Here are a couple of lines from the SQL.LOG:
+> 
+> SQLPrepare(hstmt00148470, "SELECT DISTINCTROW Documents.`System
+Document`, 
+>   Documents.`Function Document`, Documents.`Operation Document`, 
+>   Documents.`Corr Maint Document`, Documents.`Faultfinding Document` 
+>   FROM Documents INNER JOIN Systems ON 
+>   Documents.`Documents ID` = Systems.`Documents ID` 
+>   WHERE (Systems.`System Name`="Fuel system");", -3);
+> SQLExecute(hstmt00148470);
+> 
+> After that there are two SQLError lines, and SQLFreeStmt and 
+> disconnect stuff. (BTW, what is that -3 as the last arg to SQLPrepare?)
+> 
+> 
+> If I execute the SQL SELECT statement directly in Access, it works
+> fine. I also tried with CDaoRecordset, and that worked as well.
+> But ODBC is a must (first customer will have Oracle), so DAO is 
+> out of the question. (The program should run in a single thread so
+> I can't update to VC++ 4.2 (?) (Windows 3.x with Win32s?))
+> 
+> I have checked the Visual C++ Books Online and MSDN Library - April 1996
+CD
+> with search for "Too few parameters", but did not see anything that would
+
+> help me here (maybe I just did not understand?).
+> 
+> I have been stuck with this for some days now, so any help would be
+> appreciated.
+> 
+> As an afterthought, anyone made a dynamic recordset that works, or
+> knows of a good 3rd party database/recordset combination? :) 
+> Something like CDaoDatabase + CDaoRecordset without the DAO, heh...
+> Any advice about books dealing with MFC/ODBC programming would be 
+> nice too as I now have nothing.
+> 
+> -- 
+>   Heikki Toivonen
+>   Email: hjtoi@cc.jyu.fi        Tel. +358 14 245 008
+>   WWW: <A HREF="http://www.jyu.fi/~hjtoi">http://www.jyu.fi/~hjtoi</A>
+-----From: Tim Meyer <tmeyer@southeast.net>
+
+Have you tried executing the query through MSQUERY. I find the
+"Too Few Parameters" message in non-parameterized queries usually gets
+displayed when there is a syntax error in the ODBC SQL. ie Too few
+parans or
+brackets.  Nothing in your syntax jumps out at me, but ir you use
+msquery
+you can "play" with the SQL a little easier.
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

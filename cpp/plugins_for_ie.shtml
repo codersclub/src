@@ -1,0 +1,432 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h2>Написание Plugin'ов для Internet Explorer</h2>
+    <p>Автор: Борис Гулай aka BoresExpress ( <a
+    href="http://boressoft.fromru.com">boressoft.fromru.com</a> )<br>
+    Источник: <a title="Открыть в новом окне" target="_blank"
+    href="http://www.programme.ru">журнал &quot;Программист&quot; №1 за
+    2002</a></p>
+    <hr color="#003399">
+    <p align="justify">&nbsp;<br>
+    &nbsp;&nbsp; Всем памятны обвинения в адрес Microsoft в том,
+    что включение браузера Internet Explorer в состав
+    операционной системы Windows недопустимо. Ответом
+    корпорации было то, что браузер является
+    неотъемлемой частью системы. Теперь мы можем
+    сказать даже больше – Internet Explorer как единое
+    приложение не существует. Это набор компонентов,
+    которые собираются в единое целое только при
+    запуске приложения. Сейчас мы попробуем включить
+    в этот стройный ряд компонентов свой, чтобы он
+    тоже стал неотъемлемой частью, ну если не
+    операционной системы, то конкретной копии
+    браузера точно.<br>
+    </p>
+    <h3 align="justify">Что мы будем делать?&nbsp;&nbsp;&nbsp;</h3>
+    <p align="justify">&nbsp;&nbsp; Что представляет собой плагин
+    для Internet Explorer? Это обычный внутрипроцессный (In
+    Process) COM-сервер (т.е. DLL-файл), который содержит
+    объект, реализующий как минимум 2 интерфейса:
+    IOleCommandTarget и IObjectWithSite. Кроме того, наш DLL-файл
+    должен экспортировать не менее 2 функций:
+    DllGetClassObject и DllCanUnloadNow. Думаю, их назначение всем
+    известно.&nbsp;</p>
+    <p align="justify">&nbsp;&nbsp; Наш плагин будет очень простым.
+    Он будет сохранять в результирующий файл все
+    ссылки со страницы, которые указывают на файлы с
+    заданными в .ini-файле расширениями. Такой плагин
+    может быть полезен, например, при создании
+    списков скачиваемых файлов для download-менеджеров.
+    Искать и сохранять ссылки он будет при нажатии на
+    кнопку, которую мы добавим на панель
+    инструментов браузера, или при выборе
+    соответствующего пункта в меню Сервис. Кнопку и
+    пункт меню мы будем делать доступными (enabled)
+    только в том случае, если в браузере открыт файл с
+    расширением .htm или .html (это мы сделаем просто для
+    демонстрации такой возможности).<br>
+    </p>
+    <h3 align="justify">Как это работает?</h3>
+    <p align="justify">&nbsp;&nbsp; Теперь, когда мы определились,
+    что будем писать, самое время узнать, как это
+    будет работать. А работать это будет следующим
+    образом: прежде всего, браузер загружает нашу
+    библиотеку, это происходит вместе с загрузкой
+    самого IE. Затем, после первого нажатия на кнопку,
+    он вызывает экспортируемую функцию DllGetClassObject и
+    запрашивает у неё указатель на интерфейс IClassFactory.
+    Из полученного интерфейса он вызывает метод
+    CreateInstance и запрашивает у него интерфейс IUnknown. Это
+    должен быть IUnknown компонента, который реализует и
+    IOleCommandTarget и IObjectWithSite.</p>
+    <p align="justify">&nbsp;&nbsp; Два вышеназванных интерфейса
+    должны быть реализованы именно в одном
+    компоненте. Internet Explorer будет запрашивать один
+    через QueryInterface другого. Поэтому реализовать их
+    отдельно нет никакой возможности.</p>
+    <p align="justify">&nbsp;&nbsp; Такое поведение контейнера
+    выглядит логичным, если принять во внимание то,
+    зачем компоненту интерфейс IObjectWithSite. Через его
+    метод SetSite браузер передаёт указатель на
+    интерфейс, через который можно добраться до
+    IWebBrowser – основного интерфейса WebBrowser Control. Это
+    может потребоваться компоненту при обработке
+    нажатия на кнопку или выбора пункта меню, если он
+    захочет узнать, в каком контексте произошло это
+    событие. Поэтому совершенно логично, что IObjectWithSite
+    должен реализовывать тот же компонент, который
+    обрабатывает нажатие на кнопку.</p>
+    <p align="justify">&nbsp;&nbsp; После того, как произошло
+    первое нажатие на кнопку, Internet Explorer вызывает
+    метод SetSite интерфейса IObjectWithSite и передаёт в него
+    IUnknown объекта, реализующего интерфейс IShellBrowser.
+    Хочу обратить ваше внимание, что вызов
+    вышеназванного метода происходит только один
+    раз.</p>
+    <p align="justify">&nbsp;&nbsp; Затем, в ответ на нажатие
+    кнопки, вызывается метод IOleCommandTarget::Exec, в котором
+    и происходит обработка события.</p>
+    <p align="justify">&nbsp;&nbsp; После вызова IObjectWithSite::SetSite IE
+    периодически вызывает метод IOleCommandTarget::QueryStatus,
+    где плагин может при необходимости изменить
+    статус своей кнопки и пункта меню (enabled/disabled).</p>
+    <p align="justify">&nbsp;&nbsp; При завершении своей работы
+    браузер вызывает IObjectWithSite::SetSite со значением NULL в
+    качестве единственного аргумента, что говорит
+    плагину о необходимости освободить (release)
+    сохранённый после первого вызова SetSite интерфейс
+    браузера (если он его сохранял, конечно). Затем IE
+    освобождает все интерфейсы плагина и при
+    положительном ответе функции DllCanUnloadNow выгружает
+    плагин.<br>
+    &nbsp;&nbsp; Так выглядят, в общих чертах, то, что нам
+    придётся запрограммировать.</p>
+    <h3 align="justify">Как это написать?</h3>
+    <p align="justify">&nbsp;&nbsp; После знакомства с механизмом
+    интеграции плагинов в Internet Explorer мы можем
+    приступать к написанию кода. Я предполагаю, что
+    читатель знаком с основами COM, поэтому не буду
+    описывать создание COM-сервера и добавление в него
+    компонентов. Сразу перейдем к самому
+    интересному: реализации методов интерфейсов,
+    которые необходимы плагину для полноценной
+    работы.<br>
+    Следует сразу сказать, что метод IObjectWithSite::GetSite в
+    реализации не нуждается (хотя в примере он и
+    реализован), т.к. браузер его никогда не вызывает
+    (он ведь всегда знает, какая страница в нём
+    открыта).</p>
+    <p align="justify">&nbsp;&nbsp; Начнём мы с самого простого, а
+    именно с метода IObjectWithSite::SetSite. Для начала добавим
+    в объявление объекта переменную типа IWebBrowser2Ptr (я
+    предпочитаю использовать то, что в MSDN называется
+    «compiler COM support classes»; это значительно ускоряет
+    работу). Через эту переменную мы всегда будем
+    иметь доступ ко всем предоставляемым браузером
+    интерфейсам. Код этого метода выгладит следующим
+    образом: </p>
+    <p class="code" align="justify">STDMETHODIMP IMyIEExtention::SetSite(IUnknown *pUnkSite)<br>
+    {<br>
+    if (!pUnkSite)<br>
+    {<br>
+    if (m_pWebBrowser2.GetInterfacePtr())<br>
+    m_pWebBrowser2.Release();<br>
+    return S_OK;<br>
+    }<br>
+    <br>
+    IServiceProviderPtr pServProv(pUnkSite);<br>
+    return pServProv-&gt;QueryService(SID_SWebBrowserApp, IID_IWebBrowser2,
+    (void**)&amp;m_pWebBrowser2);<br>
+    } </p>
+    <p align="justify">&nbsp;&nbsp; В начале я проверяю, не хочет ли
+    IE сказать мне этим вызовом, что происходит
+    завершение его работы, и я должен освободить его
+    интерфейсы. Дальше – интересней. Я запрашиваю
+    интерфейс IWebBrowser2, но не как обычно, через вызов
+    QueryInterface, а посредством вызова метода QueryService
+    предварительно полученного интерфейса IServiceProvider.
+    Зачем нужны такие странные манипуляции для
+    решения, казалось бы, стандартной задачи?</p>
+    <p align="justify">&nbsp;&nbsp; Интерфейс IServiceProvider
+    предназначен для использования в следующих
+    ситуациях. Предположим, существует некое
+    приложение-контейнер, которое использует
+    несколько COM-серверов. У каждого из них,
+    естественно, есть доступ к интерфейсам
+    контейнера (посредством IObjectWithSite::SetSite, например).
+    Но вот какому-то из COM-серверов потребовалось
+    получить доступ к интерфейсам другого COM-сервера,
+    также содержащегося в контейнере.</p>
+    <p align="justify">&nbsp;&nbsp; Как же ему решить эту задачу?
+    Ведь стандартными средствами он до другого
+    сервера никак не доберётся, поскольку контейнер,
+    в соответствии с идеологией COM, не предоставляет
+    доступ к интерфейсам содержащихся в нём объектов
+    непосредственно через вызовы QueryInterface своих
+    интерфейсов.</p>
+    <p align="justify">&nbsp;&nbsp; Для решения таких задач как раз
+    и предназначен интерфейс IServiceProvider. Его
+    единственный метод – QueryService – отличается от
+    QueryInterface одним параметром – идентификатором
+    сервиса. Фактически это идентификатор одного из
+    COM-компонентов, используемых
+    приложением-контейнером. И когда COM-сервер хочет
+    получить интерфейс другого сервера,
+    используемого тем же клиентом, он просто
+    вызывает вышеназванный метод с соответствующим
+    идентификатором сервиса.</p>
+    <p align="justify">&nbsp;&nbsp; Клиент же, в свою очередь,
+    просто определяет, какой из содержащихся в нём
+    компонентов соответствует переданному
+    идентификатору и вызывает его QueryInterface.<br>
+    Возвращаясь к нашей задаче, легко заметить, что
+    здесь аналогичная ситуация. Internet Explorer
+    представляет собой зоопарк компонентов, где наш
+    COM-сервер (т.е. плагин) – один из питомцев. Поэтому
+    нам и приходится использовать вышеописанную
+    технику для получения доступа к интерфейсам
+    другого компонента (которым, в нашем примере,
+    является WebBrowser Control).<br>
+    Следующим в очереди на реализацию у нас стоит
+    метод QueryStatus интерфейса IOleCommandTarget. Его текст
+    выглядит следующим образом: </p>
+    <p class="code" align="justify">STDMETHODIMP IMyIEExtention::QueryStatus(const GUID
+    *pCmdGroup, ULONG cCmds, OLECMD prgCmds[], OLECMDTEXT *pCmdText)<br>
+    {<br>
+    if (!prgCmds)<br>
+    return E_POINTER;<br>
+    ASSERT(cCmds == 1);<br>
+    if (!cCmds)<br>
+    return E_UNEXPECTED;<br>
+    <br>
+    BSTR url;<br>
+    HRESULT hRes=S_OK;<br>
+    hRes=m_pWebBrowser2-&gt;get_LocationURL(&amp;url);<br>
+    CHECK_COM_RESULT(hRes)<br>
+    bstr_t pszUrl(url, false);<br>
+    <br>
+    LPCTSTR pExt=(LPCTSTR)pszUrl+pszUrl.length()-5;<br>
+    if (!_tcsicmp(pExt, _T(&quot;.html&quot;)) || !_tcsicmp(pExt+1, _T(&quot;.htm&quot;)))<br>
+    prgCmds[0].cmdf=OLECMDF_ENABLED;<br>
+    else<br>
+    prgCmds[0].cmdf=OLECMDF_SUPPORTED;<br>
+    <br>
+    return S_OK;<br>
+    }</p>
+    <p align="justify">&nbsp;&nbsp; В начале необходимо
+    удостовериться в корректности переданных
+    данных. Затем мы просто запрашиваем текущий URL и,
+    если его последние символы .htm или .html, делаем
+    кнопку и пункт меню доступными, и недоступными в
+    противном случае. Следует заметить, что в этот
+    метод всегда должен передаваться только один
+    элемент в массиве prgCmds, т.к. мы отвечаем только за
+    одну кнопку и пункт меню.</p>
+    <p align="justify">&nbsp;&nbsp; Теперь мы вплотную подошли к
+    реализации основной функции нашего плагина. В
+    ней мы будем искать содержащиеся на странице
+    ссылки и сохранять их в файле. Код этой функции я
+    не буду приводить здесь, т.к. он прост и не имеет
+    прямого отношения к написанию плагинов. С ним
+    можно ознакомиться в исходном тексте
+    демонстрационного приложения, который можно
+    скачать с сайта журнала www.programme.ru.</p>
+    <h3 align="justify">Как это подключить?</h3>
+    <p align="justify">&nbsp;&nbsp; Теперь остался последний штрих
+    – регистрация нашего компонента в реестре. В
+    первую очередь необходимо корректно
+    зарегистрировать плагин как COM-сервер. Я не буду
+    описывать эту процедуру здесь, поскольку это
+    лежит за рамками моей статьи, да и информации на
+    эту тему немало. Остановимся подробнее на
+    регистрации нашей DLL в качестве плагина для Internet
+    Explorer. Для этого необходимо создать следующий
+    ключ в реестре: </p>
+    <p class="code" align="justify">&lt;key root&gt;\Software\Microsoft\Internet
+    Explorer\Extensions \&lt;ваш GUID&gt; </p>
+    <p align="justify">&nbsp;&nbsp; В качестве &lt;key root&gt; может
+    выступать либо HKEY_CURRENT_USER (в этом случае плагин
+    будет доступен только текущему пользователю),
+    либо HKEY_LOCAL_MACHINE (плагин будет доступен всем
+    пользователям). Теперь в нём необходимо создать
+    следующие параметры:</p>
+    <table
+    style="BORDER-COLLAPSE: collapse; mso-table-layout-alt: fixed; mso-padding-alt: 0cm 5.4pt 0cm 5.4pt"
+    cellSpacing="0" cellPadding="0" border="0">
+<TBODY>
+      <tr>
+        <td
+        style="PADDING-RIGHT: 5.4pt; PADDING-LEFT: 5.4pt; PADDING-BOTTOM: 0cm; WIDTH: 93.75pt; PADDING-TOP: 0cm"
+        vAlign="top" width="125"><p class="MsoNormal"><span lang="RU">ButtonText<O:P> </O:P></span></td>
+        <td
+        style="PADDING-RIGHT: 5.4pt; PADDING-LEFT: 5.4pt; PADDING-BOTTOM: 0cm; WIDTH: 398.95pt; PADDING-TOP: 0cm"
+        vAlign="top" width="532"><p class="MsoNormal"><span lang="RU">Текст
+        всплывающей подсказки для кнопки. Значение может
+        быть как текстом, так и строкой формата </span><span
+        lang="RU"
+        style="FONT-SIZE: 10pt; FONT-FAMILY: 'Courier New'; mso-bidi-font-size: 12.0pt; mso-bidi-font-family: 'Times New Roman'">@</span><span
+        style="FONT-SIZE: 10pt; FONT-FAMILY: 'Courier New'; mso-bidi-font-size: 12.0pt; mso-bidi-font-family: 'Times New Roman'; mso-ansi-language: EN-US">dll</span><span
+        lang="RU"
+        style="FONT-SIZE: 10pt; FONT-FAMILY: 'Courier New'; mso-bidi-font-size: 12.0pt; mso-bidi-font-family: 'Times New Roman'">_</span><span
+        style="FONT-SIZE: 10pt; FONT-FAMILY: 'Courier New'; mso-bidi-font-size: 12.0pt; mso-bidi-font-family: 'Times New Roman'; mso-ansi-language: EN-US">path</span><span
+        lang="RU"
+        style="FONT-SIZE: 10pt; FONT-FAMILY: 'Courier New'; mso-bidi-font-size: 12.0pt; mso-bidi-font-family: 'Times New Roman'">,-</span><span
+        style="FONT-SIZE: 10pt; FONT-FAMILY: 'Courier New'; mso-bidi-font-size: 12.0pt; mso-bidi-font-family: 'Times New Roman'; mso-ansi-language: EN-US">ID</span><span
+        lang="RU">, где </span><span style="mso-ansi-language: EN-US">dll</span><span lang="RU">_</span><span
+        style="mso-ansi-language: EN-US">path</span><span lang="RU"> путь к </span><span
+        style="mso-ansi-language: EN-US">DLL</span><span lang="RU"> плагина, </span><span
+        style="mso-ansi-language: EN-US">ID</span><span lang="RU"> – идентификатор
+        строки в </span><span style="mso-ansi-language: EN-US">string</span> <span
+        style="mso-ansi-language: EN-US">table</span><span lang="RU">.<O:P> </O:P></span></td>
+      </tr>
+      <tr>
+        <td
+        style="PADDING-RIGHT: 5.4pt; PADDING-LEFT: 5.4pt; PADDING-BOTTOM: 0cm; WIDTH: 93.75pt; PADDING-TOP: 0cm"
+        vAlign="top" width="125"><p class="MsoNormal"><span lang="RU">CLSID<O:P> </O:P></span></td>
+        <td
+        style="PADDING-RIGHT: 5.4pt; PADDING-LEFT: 5.4pt; PADDING-BOTTOM: 0cm; WIDTH: 398.95pt; PADDING-TOP: 0cm"
+        vAlign="top" width="532"><p class="MsoNormal"><span lang="RU">Всегда
+        {1FBA04EE-3024-11d2-8F1F-0000F87ABD16}<O:P> </O:P></span></td>
+      </tr>
+      <tr>
+        <td
+        style="PADDING-RIGHT: 5.4pt; PADDING-LEFT: 5.4pt; PADDING-BOTTOM: 0cm; WIDTH: 93.75pt; PADDING-TOP: 0cm"
+        vAlign="top" width="125"><p class="MsoNormal"><span style="mso-ansi-language: EN-US">Default</span>
+        <span style="mso-ansi-language: EN-US">Visible</span><span lang="RU"><O:P> </O:P></span></td>
+        <td
+        style="PADDING-RIGHT: 5.4pt; PADDING-LEFT: 5.4pt; PADDING-BOTTOM: 0cm; WIDTH: 398.95pt; PADDING-TOP: 0cm"
+        vAlign="top" width="532"><p class="MsoNormal"><span lang="RU">Будет ли кнопка
+        сразу после регистрации плагина находиться на
+        панели (‘</span><span style="mso-ansi-language: EN-US">yes</span><span lang="RU">’),
+        или пользователь должен будет добавить её на
+        панель самостоятельно (‘</span><span
+        style="mso-ansi-language: EN-US">no</span><span lang="RU">’ или если
+        параметр отсутствует).<O:P> </O:P></span></td>
+      </tr>
+      <tr>
+        <td
+        style="PADDING-RIGHT: 5.4pt; PADDING-LEFT: 5.4pt; PADDING-BOTTOM: 0cm; WIDTH: 93.75pt; PADDING-TOP: 0cm"
+        vAlign="top" width="125"><p class="MsoNormal"><span style="mso-ansi-language: EN-US">ClsidExtension</span><span
+        lang="RU"><O:P> </O:P></span></td>
+        <td
+        style="PADDING-RIGHT: 5.4pt; PADDING-LEFT: 5.4pt; PADDING-BOTTOM: 0cm; WIDTH: 398.95pt; PADDING-TOP: 0cm"
+        vAlign="top" width="532"><p class="MsoNormal"><span style="mso-ansi-language: EN-US">GUID</span><span
+        lang="RU"> плагина, как </span><span style="mso-ansi-language: EN-US">COM</span><span
+        lang="RU">-сервера (из раздела </span><span
+        style="mso-ansi-language: EN-US">HKCR</span><span lang="RU">\</span><span
+        style="mso-ansi-language: EN-US">CLSID</span><span lang="RU">).<O:P> </O:P></span></td>
+      </tr>
+      <tr>
+        <td
+        style="PADDING-RIGHT: 5.4pt; PADDING-LEFT: 5.4pt; PADDING-BOTTOM: 0cm; WIDTH: 93.75pt; PADDING-TOP: 0cm"
+        vAlign="top" width="125"><p class="MsoNormal"><span style="mso-ansi-language: EN-US">HotIcon</span><span
+        lang="RU"><O:P> </O:P></span></td>
+        <td
+        style="PADDING-RIGHT: 5.4pt; PADDING-LEFT: 5.4pt; PADDING-BOTTOM: 0cm; WIDTH: 398.95pt; PADDING-TOP: 0cm"
+        vAlign="top" width="532"><p class="MsoNormal"><span lang="RU">Путь к иконке,
+        соответствующей активному состоянию кнопки
+        (когда на неё наведена мышь). Если путь указывает
+        на файл .</span><span style="mso-ansi-language: EN-US">dll</span><span lang="RU">
+        или .</span><span style="mso-ansi-language: EN-US">exe</span><span lang="RU">, то
+        после него через запятую указывается
+        идентификатор ресурса.<O:P> </O:P> </span></td>
+      </tr>
+      <tr>
+        <td
+        style="PADDING-RIGHT: 5.4pt; PADDING-LEFT: 5.4pt; PADDING-BOTTOM: 0cm; WIDTH: 93.75pt; PADDING-TOP: 0cm"
+        vAlign="top" width="125"><p class="MsoNormal"><span style="mso-ansi-language: EN-US">Icon</span><span
+        lang="RU"><O:P> </O:P></span></td>
+        <td
+        style="PADDING-RIGHT: 5.4pt; PADDING-LEFT: 5.4pt; PADDING-BOTTOM: 0cm; WIDTH: 398.95pt; PADDING-TOP: 0cm"
+        vAlign="top" width="532"><p class="MsoNormal"><span lang="RU">Путь к иконке,
+        соответствующей обычному состоянию кнопки.<O:P> </O:P></span></td>
+      </tr>
+      <tr>
+        <td
+        style="PADDING-RIGHT: 5.4pt; PADDING-LEFT: 5.4pt; PADDING-BOTTOM: 0cm; WIDTH: 93.75pt; PADDING-TOP: 0cm"
+        vAlign="top" width="125"><p class="MsoNormal"><span style="mso-ansi-language: EN-US">MenuText</span><span
+        lang="RU"><O:P> </O:P></span></td>
+        <td
+        style="PADDING-RIGHT: 5.4pt; PADDING-LEFT: 5.4pt; PADDING-BOTTOM: 0cm; WIDTH: 398.95pt; PADDING-TOP: 0cm"
+        vAlign="top" width="532"><p class="MsoNormal"><span lang="RU">Текст пункта в
+        меню «Сервис».<O:P> </O:P></span></td>
+      </tr>
+      <tr>
+        <td
+        style="PADDING-RIGHT: 5.4pt; PADDING-LEFT: 5.4pt; PADDING-BOTTOM: 0cm; WIDTH: 93.75pt; PADDING-TOP: 0cm"
+        vAlign="top" width="125"><p class="MsoNormal"><span lang="RU">MenuStatusBar<O:P> </O:P></span></td>
+        <td
+        style="PADDING-RIGHT: 5.4pt; PADDING-LEFT: 5.4pt; PADDING-BOTTOM: 0cm; WIDTH: 398.95pt; PADDING-TOP: 0cm"
+        vAlign="top" width="532"><p class="MsoNormal"><span lang="RU">Текст
+        подсказки, появляющейся в строке состояния,
+        когда пункт меню активен (формат аналогичен
+        параметру </span><span style="mso-ansi-language: EN-US">ButtonText</span><span
+        lang="RU">).<O:P> </O:P></span></td>
+      </tr>
+</TBODY>
+    </table>
+    <p align="justify">&nbsp;&nbsp; Файл, на который указывает
+    параметр HotIcon, должен содержать следующие
+    цветные значки:</p>
+    <ul>
+      <li><p align="justify">16х16 16 цветов<br>
+        </p>
+      </li>
+      <li><p align="justify">20х20 16 цветов (не обязательно)<br>
+        </p>
+      </li>
+      <li><p align="justify">20х20 256 цветов </p>
+      </li>
+    </ul>
+    <p align="justify">&nbsp;&nbsp; Второй файл (соответствующий
+    параметру Icon) должен содержать значки в оттенках
+    серого. Параметры этих значков следующие:</p>
+    <ul>
+      <li><p align="justify">16х16 16 оттенков серого<br>
+        </p>
+      </li>
+      <li><p align="justify">20х20 16 оттенков серого (не обязательно)<br>
+        </p>
+      </li>
+      <li><p align="justify">20х20 256 оттенков серого </p>
+      </li>
+    </ul>
+    <p align="justify">&nbsp;&nbsp; Вообще-то и эти значки могут
+    быть цветными, но в таком случае они не будут
+    соответствовать общему стилю оформления панелей
+    инструментов Internet Explorer. Подробнее о стиле, в
+    котором должны быть решены эти кнопки можно
+    прочитать здесь
+    (http://msdn.microsoft.com/library/default.asp?url=/workshop/browser/ext/tutorials/button.asp).</p>
+    <p align="justify">&nbsp;&nbsp; Выполнение операций по
+    добавлению информации в реестр логично
+    возложить на функцию DllRegisterServer, экспортируемую
+    нашей DLL. Именно так сделано в примере к этой
+    статье. Также в демонстрационном приложении
+    реализована функция DllUnregisterServer, удаляющая всю
+    информацию о плагине из реестра.</p>
+    <h3 align="justify">Что в итоге?</h3>
+    <p align="justify">&nbsp;&nbsp; Теперь, если вы следовали
+    приведённым выше действиям, на панели
+    инструментов Internet Explorer должна появиться кнопка,
+    а в меню «Сервис» строка, запускающая наш плагин.<br>
+    Надеюсь, что написание плагинов для самого
+    популярного в мире браузера не показалось вам
+    трудным. Если так, то у вас наверняка появилось
+    желание поэкспериментировать с компонентами,
+    расширяющими функциональность браузера. В этом
+    случае я могу считать, что цель, к которой я
+    стремился при написании этой статьи, достигнута.</p>
+    <p align="justify"><a href="ie-plugin.zip"><b>СКАЧАТЬ ИСХОДНИК К
+    СТАТЬЕ</b></a> - 12Kb</p>
+    <pre>
+</pre>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

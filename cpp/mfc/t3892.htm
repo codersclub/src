@@ -1,0 +1,315 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+DAO deadlock
+</B></FONT>
+<BR>
+<PRE>
+<B>
+shane -- <A HREF="mailto:shane@datatree.com">shane@datatree.com</A>
+Friday, February 09, 1996
+</B>
+
+
+I need a little help here!
+
+I have been using DAO with MS Access 2.0 and VC++ 4.0.  I have been trying
+to update records of the same database with three different applications.
+Actually, they are all the exact same application and they are going through
+the exact same sequence of events.  The problem is that when they are trying
+to update the same record, that record and/or page gets locked.  I have set
+up a try-catch sequence to catch the CDaoException with success.  When I see
+that I have caught an error, such as:  "couldn't update, currently locked by
+user "Admin" on computer ..." I try the update again, which is the solution
+as explained by any of the "help" that I have found.  The problem lies in
+the fact that they all seem to be getting the exception with no one of them
+actually having update access to the database.  This throws me into an
+infinite loop or deadlock.  I have also set up a counter to show me how many
+times it has tried to update the database.  At some point in execution they
+all continually grow. 
+bNotAccepted = TRUE
+while (bNotAccepted)
+{
+  try{
+    m_pHistorySet.Update();  
+    bNotAccepted = FALSE;		
+  }
+  catch (CDaoException* e) {
+    bNotAccepted = TRUE;
+    pEdit2->SetWindowText(e->m_pErrorInfo->m_strDescription);
+    e->Delete();
+  }
+}   /* end while */
+
+
+Questions:  Does anyone know a solution to this problem?  Is it something
+that I could be doing wrong or is it a "feature" of the DAO
+design?
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+shane -- <A HREF="mailto:shane@datatree.com">shane@datatree.com</A>
+Monday, February 12, 1996
+</B>
+
+
+Thanks HTH!
+
+I should have mentioned also that I am opening the recordset as a dynaset(I
+have also tried a tabletype).  When the Update function for a recordset is
+called when no BeginTrans or CommitTrans functions are used, the Update
+function will commit all changes to the database automatically.  Therefore,
+each app is trying to commit its changes to the database but they can't as
+no one of them are able to get update/write access to that record.  Another
+note:  I have found my own workaround but am wondering why this needs to be
+done and if there is a more efficient way of doing things.  
+
+My workaround was to:  while using try/catch I would use a counter to see
+how many times I had caught an error. After each error I would loop around
+and try the Update again.  After 25 attempts with an error I would throw it
+out, close the recordset, reopen it again, and then try the update over with
+success.
+
+I don't know why I need to do this!  It seems that I should have no problem
+with just retrying the Update without closing the recordset.  Why is it that
+no one of the apps could get the access to the database to update it?
+
+Appreciate the help!
+
+>
+>
+>If I understand correctly what you've said, you have a situation where
+>a database row is being updated simultaneously by multiple users.  In
+>this case you're absolutely correct - you're going to get a lock
+>conflict.  I believe that the only way to resolve the lock conflict is
+>for each app to commit its changes to the database.  HTH
+>
+>*************************** Attachment ***********************************
+>Date: 11 Feburary 1996, 20:13:33 EST
+>From: shane                                          shane    at INTERNET
+>      shane@datatree.com
+>To:                                                mfc-l    at INTERNET
+>      mfc-l@netcom.com
+>cc:                                                frohnzie at INTERNET
+>      frohnzie@aol.com
+>
+>Reply-To:                                                mfc-l    at INTERNET
+>      mfc-l@netcom.com
+>Subject: DAO deadlock
+>X-Sender: shane <shane@datatree.com>
+>Mime-Version: 1.0
+>Content-Type: text/plain; charset="us-ascii"
+>Precedence: list
+>
+>
+>I need a little help here!
+>
+>I have been using DAO with MS Access 2.0 and VC++ 4.0.  I have been trying
+>to update records of the same database with three different applications.
+>Actually, they are all the exact same application and they are going through
+>the exact same sequence of events.  The problem is that when they are trying
+>to update the same record, that record and/or page gets locked.  I have set
+>up a try-catch sequence to catch the CDaoException with success.  When I see
+>that I have caught an error, such as:  "couldn't update, currently locked by
+>user "Admin" on computer ..." I try the update again, which is the solution
+>as explained by any of the "help" that I have found.  The problem lies in
+>the fact that they all seem to be getting the exception with no one of them
+>actually having update access to the database.  This throws me into an
+>infinite loop or deadlock.  I have also set up a counter to show me how many
+>times it has tried to update the database.  At some point in execution they
+>all continually grow.
+>bNotAccepted = TRUE
+>while (bNotAccepted)
+>{
+>  try{
+>    m_pHistorySet.Update();
+>    bNotAccepted = FALSE;		
+>  }
+>  catch (CDaoException* e) {
+>    bNotAccepted = TRUE;
+>    pEdit2->SetWindowText(e->m_pErrorInfo->m_strDescription);
+>    e->Delete();
+>  }
+>}   /* end while */
+>
+>
+>Questions:  Does anyone know a solution to this problem?  Is it something
+>that I could be doing wrong or is it a "feature" of the DAO
+>design?
+>
+>
+>
+>
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:jarvisb@timken.com">jarvisb@timken.com</A>
+Wednesday, February 14, 1996
+</B>
+I suspect that the reason none of your apps could successfully UPDATE
+a record is because you tried to redo the UPDATE too quickly.  Think
+about it - if you detect a failure and immediately retry you're not
+giving the system much time to get anything done.  The time required
+for the disk access is measured in multiples of a thousandth of a
+second (milliseconds).  The time required to execute the code is
+measured in millionths of a second (microseconds), so you can probably
+do MANY retries before the lock conflict might be resolved.  A
+reasonable thing to do is to set up a timer to expire after several
+seconds, wait for that timer to expire, then retry your update.  This
+might work.  My preferred solution when encountering a lock conflict
+or deadlock is to roll back the transaction, wait for a few seconds,
+and start over again.  Hope this helps.
+
+Bob Jarvis
+
+*************************** Attachment ***********************************
+Date: 14 Feburary 1996, 01:16:48 EST
+From: shane                                          shane    at INTERNET
+      shane@datatree.com
+To:                                                mfc-l    at INTERNET
+      mfc-l@netcom.com
+
+Reply-To:                                                mfc-l    at INTERNET
+      mfc-l@netcom.com
+Subject: Re: DAO deadlock
+X-Sender: shane <shane@datatree.com>
+Mime-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
+Precedence: list
+
+
+Thanks HTH!
+
+I should have mentioned also that I am opening the recordset as a dynaset(I
+have also tried a tabletype).  When the Update function for a recordset is
+called when no BeginTrans or CommitTrans functions are used, the Update
+function will commit all changes to the database automatically.  Therefore,
+each app is trying to commit its changes to the database but they can't as
+no one of them are able to get update/write access to that record.  Another
+note:  I have found my own workaround but am wondering why this needs to be
+done and if there is a more efficient way of doing things.
+
+My workaround was to:  while using try/catch I would use a counter to see
+how many times I had caught an error. After each error I would loop around
+and try the Update again.  After 25 attempts with an error I would throw it
+out, close the recordset, reopen it again, and then try the update over with
+success.
+
+I don't know why I need to do this!  It seems that I should have no problem
+with just retrying the Update without closing the recordset.  Why is it that
+no one of the apps could get the access to the database to update it?
+
+Appreciate the help!
+
+>
+>
+>If I understand correctly what you've said, you have a situation where
+>a database row is being updated simultaneously by multiple users.  In
+>this case you're absolutely correct - you're going to get a lock
+>conflict.  I believe that the only way to resolve the lock conflict is
+>for each app to commit its changes to the database.  HTH
+>
+>*************************** Attachment ***********************************
+>Date: 11 Feburary 1996, 20:13:33 EST
+>From: shane                                          shane    at INTERNET
+>      shane@datatree.com
+>To:                                                mfc-l    at INTERNET
+>      mfc-l@netcom.com
+>cc:                                                frohnzie at INTERNET
+>      frohnzie@aol.com
+>
+>Reply-To:                                                mfc-l    at INTERNET
+>      mfc-l@netcom.com
+>Subject: DAO deadlock
+>X-Sender: shane <shane@datatree.com>
+>Mime-Version: 1.0
+>Content-Type: text/plain; charset="us-ascii"
+>Precedence: list
+>
+>
+>I need a little help here!
+>
+>I have been using DAO with MS Access 2.0 and VC++ 4.0.  I have been trying
+>to update records of the same database with three different applications.
+>Actually, they are all the exact same application and they are going through
+>the exact same sequence of events.  The problem is that when they are trying
+>to update the same record, that record and/or page gets locked.  I have set
+>up a try-catch sequence to catch the CDaoException with success.  When I see
+>that I have caught an error, such as:  "couldn't update, currently locked by
+>user "Admin" on computer ..." I try the update again, which is the solution
+>as explained by any of the "help" that I have found.  The problem lies in
+>the fact that they all seem to be getting the exception with no one of them
+>actually having update access to the database.  This throws me into an
+>infinite loop or deadlock.  I have also set up a counter to show me how many
+>times it has tried to update the database.  At some point in execution they
+>all continually grow.
+>bNotAccepted = TRUE
+>while (bNotAccepted)
+>{
+>  try{
+>    m_pHistorySet.Update();
+>    bNotAccepted = FALSE;		
+>  }
+>  catch (CDaoException* e) {
+>    bNotAccepted = TRUE;
+>    pEdit2->SetWindowText(e->m_pErrorInfo->m_strDescription);
+>    e->Delete();
+>  }
+>}   /* end while */
+>
+>
+>Questions:  Does anyone know a solution to this problem?  Is it something
+>that I could be doing wrong or is it a "feature" of the DAO
+>design?
+>
+>
+>
+>
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

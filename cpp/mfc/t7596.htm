@@ -1,0 +1,178 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Tab stops in a combo box
+</B></FONT>
+<BR>
+<PRE>
+<B>
+<A HREF="mailto:Magnus_Johannesson/FSVAB/FRONTEC.FRONTEC@notes.frontec.se">Magnus_Johannesson/FSVAB/FRONTEC.FRONTEC@notes.frontec.se</A>
+Thursday, November 07, 1996
+</B>
+
+Environment: VC++ 4.0, Win 95 (development), Win32s (target).
+
+I want to set tab stops in a combo box, just as in a list box. Is this p=
+ossible?
+
+Magnus Johannesson
+Frontec Konsulter G=F6teborg AB
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Kit Kauffmann -- <A HREF="mailto:kitk@mudshark.sunquest.com">kitk@mudshark.sunquest.com</A>
+Friday, November 08, 1996
+</B>
+>Environment: VC++ 4.0, Win 95 (development), Win32s (target).
+>
+>I want to set tab stops in a combo box, just as in a list box. Is this 
+possible?
+
+i believe the only way is via owner-draw, as the LB controlled by the combo 
+doesn't have the LBS_USETABSTOPS style bit - here is a portion of an MFC 
+tabbed combo box (use CBS_HASSTRINGS and CBS_OWNERDRAWFIXED) which should 
+help get you going:
+
+const int MaxTabs = 255;
+
+class SQTabbedComboBox : public CComboBox
+{
+public:
+        void Subclass( int   ID,
+		       CWnd* pDlg,
+		       int   firstTab,
+		       ... );
+protected:
+
+        virtual void DrawItem(LPDRAWITEMSTRUCT lpDIS);
+
+        int m_NumTabs;
+        int m_TabArray[MaxTabs];
+};
+
+//
+// usage might be: Subclass( ID_COMBO, this, 50, 100, -1 );
+//
+void SQTabbedComboBox::Subclass( int   ID,
+				 CWnd* pDlg,
+                                 int   firstTab,
+				 ... )
+{
+	SubclassDlgItem( ID, pDlg );
+
+        m_NumTabs = 0;                  // extract tab information
+        int Tab = firstTab;
+        va_list marker;
+        va_start( marker, firstTab );   // get first tab
+        int NumArgs = 0;
+        while( (NumArgs < MaxTabs) && (Tab != -1) )
+        {                               // add tab to list
+                m_TabArray[m_NumTabs++] = Tab;
+                                        // get next tab
+                Tab = va_arg( marker, int );
+                NumArgs++;
+        }
+}
+
+void SQTabbedComboBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
+{
+	CString Text;
+	int CurSel = (int) lpDIS->itemID;
+	if( CurSel != -1 )
+	{
+		GetLBText( CurSel, Text );
+	}
+	DrawComboBoxItem( lpDIS, m_NumTabs, m_TabArray, Text );
+}
+
+//
+// the fun part :)
+//
+void DrawComboBoxItem( LPDRAWITEMSTRUCT lpDIS,
+		       int              NumTabs,
+		       LPINT            pTabArray,
+		       const char*      pText )
+{
+	if( lpDIS->itemAction & ODA_DRAWENTIRE )
+        {
+		CDC* pDC = CDC::FromHandle( lpDIS->hDC );
+//
+// combo boxes have child windows which are desktop children, not dialog
+// children, so we have to clip manually
+//
+		CRgn Region;
+		Region.CreateRectRgn( lpDIS->rcItem.left,
+				      lpDIS->rcItem.top,
+				      lpDIS->rcItem.right,
+				      lpDIS->rcItem.bottom );
+		pDC->SelectClipRgn( &Region );
+		TabbedTextOut( lpDIS->rcItem.left,
+			       lpDIS->rcItem.top,
+			       pText,
+                               strlen( pText ),
+			       NumTabs,
+			       pTabArray, 0 );
+		Region.DeleteObject();
+
+		if( (lpDIS->itemState & ODS_SELECTED) )
+			InvertRect( lpDIS->hDC, &lpDIS->rcItem );
+
+		if( (lpDIS->itemState & ODS_FOCUS) &&
+                    (lpDIS->rcItem.left != 0) )
+			InvertRect( lpDIS->hDC, &lpDIS->rcItem );
+
+		return;
+	}
+	if( (lpDIS->itemAction & ODA_SELECT) )
+		InvertRect( lpDIS->hDC, &lpDIS->rcItem );
+}
+
+HTH!
+kit
+I saw Elvis. He sat between me and Bigfoot on the UFO.
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

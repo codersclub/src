@@ -1,0 +1,218 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CListCtrl bug in WIn95
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Steve Rothweiler -- <A HREF="mailto:sr@ccrl.nj.nec.com">sr@ccrl.nj.nec.com</A>
+Monday, May 06, 1996
+</B>
+ENV: VC++ 4.1 Win95
+
+I spent several hours on the phone with Microsoft engineers, and
+I thought that this group might benefit from this.  The bottom
+line is that I got them to admit that there is a (previously
+undiscovered) bug in the CListCtrl code in Windows95.  I would
+like to know if this same bug also occurs in WindowsNT, if anyone
+has the time.  The bug will be fixed "in the next version of
+Windows95", said Microsoft.  I asked the obvious question, "When
+will that be?".  They didn't know.  This was back in March.
+
+I know this is a little detailed, but it really isn't all that bad.
+If you are using CListView or a CListCtrl in your app, you may want
+to try this, because you may run into it in the future.  You can
+reproduce the bug as follows:
+
+1) Open the database/catalog2 MFC sample, compile it, and run it.
+
+2) File:Open any Access database (.mdb) file.  I like to use
+   database/daoctl/sampdata.mdb in the mfc samples directory.
+   If you have trouble opening it, make sure it's not read-only.
+
+3) Memorize the ListView data.  Note what data is in what columns.
+   For sampdata.mdb, the Type column has the word TABLE for each item,
+   and the Qualifier column has the pathname to sampdata for each item.
+
+4) Now make the following modifications to cat2view.cpp.  The gist of
+   this is we are going to delay the addition of column 4 until after
+   columns 0-3 are added and all their items are added.
+
+   A) Comment out line 119 in cat2view.cpp (line numbers may differ):
+
+      // control.InsertColumn(4,_T("Remarks"),LVCFMT_LEFT,100,4);
+
+   B) Also comment out lines 135-136 inside the while loop in the
+      CCatalog2Doc::levelTable case:
+
+      //   control.SetItem(item,4,LVIF_TEXT,
+      //     pDoc->m_pTableset->m_strRemarks,0,0,0,0);
+
+   C) Add the following lines immediately after the while loop, but before
+      the break statement that ends the CCatalog2Doc::levelTable case:
+
+      // Now add column 4.
+      control.InsertColumn(4,_T("Remarks"),LVCFMT_LEFT,100,4);
+      item = 0;
+      pDoc->m_pTableset->MoveFirst();
+      while (!pDoc->m_pTableset->IsEOF())
+      {
+        control.SetItem(item,4,LVIF_TEXT,
+          pDoc->m_pTableset->m_strRemarks,0,0,0,0);
+        item++;
+        pDoc->m_pTableset->MoveNext();
+      }
+
+5) It is easy to see that this should have no effect on the behavior
+   of the program, but it does!  Recompile, run, and open the same
+   database file you opened before.  For sampdata.mdb, the Type column
+   now has nothing in it, the Qualifier column now has the word TABLE
+   for each item, and the Owner column which had nothing in it before,
+   now has the pathnames to sampdata in it!!!
+
+
+The Microsoft engineers explained that the bug is in the implementation
+of InsertColumn().  Even though I added the _LAST_ column to the ListCtrl,
+data in previous columns were affected.  Since InsertColumn() is
+implemented by the operating system, it is a bug in Windows95.
+
+The workaround for me is, when my user wishes to add a new column, I must
+delete all the items and column data, then I can reload the entire
+ListCtrl.  I told them that this is unacceptable for me because I have
+many columns (>10) and possibly hundreds of items and it takes over 20
+seconds sometimes to reload the ListCtrl (and I have a pretty fast
+machine!).  They tried for many days to find another workaround, but to
+no avail.
+
+They also promised me that they would credit back one of my 2 incidents
+that I get for being a Level 2 member of MSDN.  The next time I called,
+I had no incidents left!  I _SCREAMED_ at them.  They deserved worse.
+
+Sorry about this, I had to get it off my chest.
+--
+Steve Rothweiler  
+sr@ccrl.nj.nec.com              Is it just me, or does Microsoft
+609-951-2969                    _intentionally_ complicate things?
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Jeff Lindholm -- <A HREF="mailto:JeffL@inter-intelli.com">JeffL@inter-intelli.com</A>
+Thursday, May 09, 1996
+</B>
+[Mini-digest: 3 responses]
+
+ENV: VC++ 4.1, Win95, and NT 4.0
+
+There is a work around, not a very elegant one. If you use an owner 
+draw list and the lParam is the actual data associated with the row you 
+can draw the data into the columns as you wish. This is what I do. The 
+only problem I ran into with this is if you want to switch views you 
+must either changed the window styles or handle their drawing as well. 
+The benefit is you can highlight the ENTIRE row not just the first 
+column.
+
+Jeff
+
+-----From: mikeblas@interserv.com
+
+On Mon, 6 May 96, sr@ccrl.nj.nec.com (Steve Rothweiler) wrote:
+>ENV: VC++ 4.1 Win95
+
+Thanks.
+
+>I spent several hours on the phone with Microsoft engineers, and
+>I thought that this group might benefit from this.  The bottom
+>line is that I got them to admit that there is a (previously
+>undiscovered) bug in the CListCtrl code in Windows95. 
+
+>Since InsertColumn() is
+>implemented by the operating system, it is a bug in Windows95.
+
+That is to say, the bug is _not_ in CListCtrl, it is in the Windows common 
+list control.  I think this is far above hair-splitting because people have a 
+really hard time understanding what part of what program is what library and 
+where the system starts and ends.
+
+>They also promised me that they would credit back one of my 2 incidents
+>that I get for being a Level 2 member of MSDN.  The next time I called,
+>I had no incidents left!  I _SCREAMED_ at them.  They deserved worse.
+
+They work as hard as they can in a very stressful environment where they 
+debug other people's code, try to find problems in software they didn't 
+write, and then have inappreciative people _SCREAM_ at them all day.  It was 
+probably an honest mistake, but you've made it into some personal vendetta.  
+What "worse" can they expect?  Are you going to fire off hate mail and stuff?
+
+By the way, since you work at NEC, maybe you can answer this: why does my 
+17-inch NEC monitor have a viewable area so much smaller than NEC?  Maybe 
+I'll call your number and _SCREAM_ at you for a while.  You certainly deserve 
+worse--and you're getting worse, because I'm telling all my friends to buy 
+Sonys.
+
+.B ekiM
+--
+TCHAR szDisc[] = _T("These words are my own; I do not speak for Microsoft.");
+
+-----From: Gene Sewell <genes@fast.net>
+
+For what it's worth, you might suggest an alternative way to implement your
+list control, namely treat it as a virtual list control.
+
+I am displaying potentially very large databases (w/ cols) using list
+controls, and have implemented a virtual list control.  Rather than load all
+the data into the list control, I only load in the number of lines that are
+visible.  I then play games with the thumb, positioning it, and responding
+to it as if there were many many items in the display.  I'm only supporting
+report mode, BTW.
+
+If you were to do this approach, there would be no 20 sec reload - it would
+be done instantly....  
+
+Just a suggestion, since it sounds like the current system is unusable.
+
+Gene
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,619 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Floating point inconsistency
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Jamie Koo -- <A HREF="mailto:kooj@earthlink.net">kooj@earthlink.net</A>
+Tuesday, February 25, 1997
+</B>
+Environment: NT 3.51, VC++ 4.2-flat
+
+Hello,
+
+I'm having a problem converting a floating point number to a correct
+integer value. Basically, I access an OCX control on a form to get
+a floating point number and try to convert it to an integer. I've
+chosen the 'floating point consistency' option under the project
+setting, and it doesn't seem to work when the floating point number
+is obtained through a function(GetPropety() in this case) as follows:
+
+   void Myfunction::ConvertScreenData()
+   {
+     // IDC_MHINRELCTRL1 represents the OCX control
+     CWnd* pWnd = GetDlgItem(IDC_MHINRELCTRL1);   
+     ASSERT(pWnd);
+     float result;
+     char szBuf[18];    
+     pWnd->GetProperty(0x24, VT_R4, (void*)&result);
+     _itoa( (int)((result * 100.0f)), szBuf, 10 );
+     TRACE("%s\n", szBuf);   
+   }
+
+Stepping through the DEBUGGER shows that, when I entered 123.45 on
+the screen, 123.450 was assigned to the 'result' variable(so far
+so good). However, when _itoa() call was completed, 123.44 was
+assigned to szBuf. The Disassembly code indicates that __ftol()
+call was made in addition to __imp_itoa() when GetProperty() was
+used. Any idea how I can fix this problem? Your help will be
+greately appreciated.
+ 
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Wednesday, February 26, 1997
+</B>
+[Mini-digest: 9 responses]
+
+At 08:13 2/25/97 -0800, you wrote:
+>Environment: NT 3.51, VC++ 4.2-flat
+
+MFC 4.2-flat works only against unsupported beta versions of
+operating system components. Since you're probably not using
+those beta operating system components, you really need to upgrade
+to MFC 4.2b by installing the patch.  That'll leave you with a
+version of MFC that's compatible with the real, shipping versions
+of those components.
+
+>I've chosen the 'floating point consistency' option under the project
+>setting, and it doesn't seem to work when the floating point number
+>is obtained through a function(GetPropety() in this case) as follows:
+
+The "Floating point consistency" option for the compiler actually
+changes the way the compiler decides to generate code for certain
+floating point situations.  The compiler might take shortcuts based
+on assumptions that it makes about the rounding rules the NDP uses.
+You might want to slow down your code and not make those assumptions
+to improve the exactness of the rounding that your floating point
+operation does.
+
+Generally speaking, this kind of optimization only has an effect on
+code that lots of repetitive or involved operations on floating
+point numbers--like performing a fourier transform, or manipulating
+floating-point matrixes.
+
+The problem you're having is unrelated to this option. (And, by the
+way, it's unrelated to MFC.)
+
+It turns out that you can't exactly represent 123.45 in a "float"
+data type--there isn't enough precision.  You can see so yourself
+by writing this short program:
+
+#include <stdio.h>
+
+void main()
+{
+	printf("%.32g\n", (double) 123.45f);
+	printf("%.32g\n", 123.45);
+}
+
+123.45f is not a precise number.  You need to either start using
+doubles or put code to handle the rounding errors that you don't
+want to see.
+
+Some floating point constants aren't representable in a binary form
+in as many bits as that binary form provides.  For 123.45, you need
+more bits than a "float" offers.  It turns out that "double" offers
+quite enough to represent the number, but might have problems with
+other numbers.
+
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+These words are my own. I do not speak on behalf of Microsoft.
+           This performance was not lip-synched.
+
+-----From: Mike Blaszczak <mikeblas@nwlink.com>
+
+At 08:13 2/25/97 -0800, you wrote:
+
+>I've
+>chosen the 'floating point consistency' option under the project
+>setting, and it doesn't seem to work when the floating point number
+>is obtained through a function(GetPropety() in this case) as follows:
+
+Oh, and you can look up the compiler's /Op option in the online help
+to get a pretty good description of what the option _really_ does.
+
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+These words are my own. I do not speak on behalf of Microsoft.
+           This performance was not lip-synched.
+
+-----From: kenn@owl.co.uk (Ken Nicolson)
+
+On Tue, 25 Feb 1997 08:13:57 -0800 (PST), you wrote:
+
+[snip!]
+
+>     float result;
+>     char szBuf[18];   =20
+>     pWnd->GetProperty(0x24, VT_R4, (void*)&result);
+>     _itoa( (int)((result * 100.0f)), szBuf, 10 );
+>     TRACE("%s\n", szBuf);  =20
+>   }
+>
+>Stepping through the DEBUGGER shows that, when I entered 123.45 on
+>the screen, 123.450 was assigned to the 'result' variable(so far
+>so good). However, when _itoa() call was completed, 123.44 was
+>assigned to szBuf.
+
+[snip!]
+
+This is not an OLE problem, but one of float inaccuracies. This
+snippet exhibits the same behavior.
+
+#include <stdio.h>
+
+int main( void )
+{
+   float f =3D 123.45F;
+   int i =3D (int) (f * 100.0F);
+
+   printf( "%d\n", i );
+
+   return 0;
+}
+
+=46rom the C FAQ at <A HREF="http://www.eskimo.com/~scs/C-faq.top.html">http://www.eskimo.com/~scs/C-faq.top.html</A>
+
+>14.1:	When I set a float variable to, say, 3.1, why is printf()
+>	printing it as 3.0999999?
+>
+>A:	Most computers use base 2 for floating-point numbers as well as
+>	for integers.  In base 2, 1/1010 (that is, 1/10 decimal) is an
+>	infinitely-repeating fraction: its binary representation is
+>	0.0001100110011... .  Depending on how carefully your compiler's
+>	binary/decimal conversion routines (such as those used by
+>	printf) have been written, you may see discrepancies when
+>	numbers (especially low-precision floats) not exactly
+>	representable in base 2 are assigned or read in and then printed
+>	(i.e. converted from base 10 to base 2 and back again).  See
+>	also question 14.6.
+
+Try using:
+
+   int i =3D (int) (f * 100.5F);
+
+to get better rounding. Also, drop _itoa() and use sprintf() instead.
+See the FAQ 13.1.
+
+Just out of interest, I wonder how many people here have read the
+news:comp.lang.c and news:comp.lang.c++ FAQs? These are wonderful
+documents, and full of really useful info like this.
+
+Ken
+--=20
+Ken Nicolson, Panasonic OWL: kenn@owl.co.uk <A HREF="http://www.owl.co.uk">http://www.owl.co.uk</A>
+       At Home: ken@ride.demon.co.uk <A HREF="http://www.ride.demon.co.uk">http://www.ride.demon.co.uk</A>
+#include <disclaim>
+-----From: =?iso-8859-1?Q?Klaus_G=FCtter?= <KG@it-gmbh.de>
+
+Jamie,
+
+The number 123.45 cannot be represented exactly as a binary floating
+point number. So internally, it may be stored as something like
+123.4499999998. The (int) cast always truncates the fractional part. You
+will get better result if you use rounding instead of truncating:
+replace (int)((result * 100.0f)) by (int)((result * 100.0f) + .5f).
+
+If you want exact decimal representations, an alternative would be to
+transfer the number as VT_CURRENCY, as a properly scaled integer (if
+there is a fixed numer of decimal places), or as a string.
+
+- Klaus Guetter
+
+>----------
+>Von: 	Jamie Koo[SMTP:kooj@earthlink.net]
+>Gesendet: 	Dienstag, 25. Februar 1997 17:13
+>An: 	mfc-l@netcom.com
+>Betreff: 	Floating point inconsistency
+>
+>Environment: NT 3.51, VC++ 4.2-flat
+>
+>Hello,
+>
+>I'm having a problem converting a floating point number to a correct
+>integer value. Basically, I access an OCX control on a form to get
+>a floating point number and try to convert it to an integer. I've
+>chosen the 'floating point consistency' option under the project
+>setting, and it doesn't seem to work when the floating point number
+>is obtained through a function(GetPropety() in this case) as follows:
+>
+>   void Myfunction::ConvertScreenData()
+>   {
+>     // IDC_MHINRELCTRL1 represents the OCX control
+>     CWnd* pWnd = GetDlgItem(IDC_MHINRELCTRL1);   
+>     ASSERT(pWnd);
+>     float result;
+>     char szBuf[18];    
+>     pWnd->GetProperty(0x24, VT_R4, (void*)&result);
+>     _itoa( (int)((result * 100.0f)), szBuf, 10 );
+>     TRACE("%s\n", szBuf);   
+>   }
+>
+>Stepping through the DEBUGGER shows that, when I entered 123.45 on
+>the screen, 123.450 was assigned to the 'result' variable(so far
+>so good). However, when _itoa() call was completed, 123.44 was
+>assigned to szBuf. The Disassembly code indicates that __ftol()
+>call was made in addition to __imp_itoa() when GetProperty() was
+>used. Any idea how I can fix this problem? Your help will be
+>greately appreciated.
+> 
+>
+>
+-----From: jeremy@omsys.com (Jeremy H. Griffith)
+
+On Tue, 25 Feb 1997 08:13:57 -0800 (PST), Jamie Koo <kooj@earthlink.net> wrote:
+
+>Environment: NT 3.51, VC++ 4.2-flat
+>
+>I'm having a problem converting a floating point number to a correct
+>integer value. Basically, I access an OCX control on a form to get
+>a floating point number and try to convert it to an integer. I've
+>chosen the 'floating point consistency' option under the project
+>setting, and it doesn't seem to work when the floating point number
+>is obtained through a function(GetPropety() in this case) as follows:
+>
+>   void Myfunction::ConvertScreenData()
+>   {
+>     // IDC_MHINRELCTRL1 represents the OCX control
+>     CWnd* pWnd = GetDlgItem(IDC_MHINRELCTRL1);   
+>     ASSERT(pWnd);
+>     float result;
+>     char szBuf[18];    
+>     pWnd->GetProperty(0x24, VT_R4, (void*)&result);
+>     _itoa( (int)((result * 100.0f)), szBuf, 10 );
+>     TRACE("%s\n", szBuf);   
+>   }
+>
+>Stepping through the DEBUGGER shows that, when I entered 123.45 on
+>the screen, 123.450 was assigned to the 'result' variable(so far
+>so good).
+
+>The Disassembly code indicates that __ftol()
+>call was made in addition to __imp_itoa() when GetProperty() was
+>used.
+
+However, that was before the desired value was assigned to "result",
+so it appears it worked correctly.
+
+> However, when _itoa() call was completed, 123.44 was
+>assigned to szBuf.
+
+It looks to me like the problem arose with the cast:
+  (int)((result * 100.0f))
+The float product could fall to either side of the product of
+the decimal multiplication and still be "correct".  But the
+cast operates by truncation, not by rounding.  What I usually
+do is:
+  (int)((result * 100.0) + 0.5)
+(assuming result is always positive) so that truncation gives
+the expected "rounded" value.  Also look at "floor" and "ceil".
+
+The "floating point consistency" option /Op doesn't affect
+such casts; it only relates to the storage of intermediate
+results during floating-point calculations, by reducing
+the stored values from 80-bit to 64-bit in all circumstances
+(rather than only *some* of the time).
+
+--Jeremy
+-----From: Stuart Downing <sdowning@fame.com>
+
+>----------
+From:  Jamie Koo[SMTP:kooj@earthlink.net]
+>Sent:  Tuesday, February 25, 1997 11:14 AM
+>To:  mfc-l@netcom.com
+>Subject:  Floating point inconsistency
+>
+>Environment: NT 3.51, VC++ 4.2-flat
+
+"You should upgrade to MFC 4.2B by installing the patch as soon as possible.
+Without the patch, MFC (and, therefore, your programs) are only compatible
+with beta versions of various operating system components, and without
+the patch you'll  necessarily run into trouble sooner or later." --.B ekiM
+
+
+>
+>Hello,
+>
+>I'm having a problem converting a floating point number to a correct
+>integer value. Basically, I access an OCX control on a form to get
+>a floating point number and try to convert it to an integer. I've
+>chosen the 'floating point consistency' option under the project
+>setting, and it doesn't seem to work when the floating point number
+>is obtained through a function(GetPropety() in this case) as follows:
+
+You don't have a "consistency" problem, you have a rounding problem.
+
+>
+>   void Myfunction::ConvertScreenData()
+>   {
+>     // IDC_MHINRELCTRL1 represents the OCX control
+>     CWnd* pWnd = GetDlgItem(IDC_MHINRELCTRL1);   
+>     ASSERT(pWnd);
+>     float result;
+>     char szBuf[18];    
+>     pWnd->GetProperty(0x24, VT_R4, (void*)&result);
+>     _itoa( (int)((result * 100.0f)), szBuf, 10 );
+>     TRACE("%s\n", szBuf);   
+>   }
+>
+>Stepping through the DEBUGGER shows that, when I entered 123.45 on
+>the screen, 123.450 was assigned to the 'result' variable(so far
+>so good). However, when _itoa() call was completed, 123.44 was
+>assigned to szBuf. The Disassembly code indicates that __ftol()
+>call was made in addition to __imp_itoa() when GetProperty() was
+>used. 
+
+ftol is called because of the cast to int.
+
+For most real values, floating point numbers don't represent 
+the fractional component of the number exactly, only as an
+approximation.  123.45 is probably being represented by
+something like 123.449999999998.
+When the debugger displays this value, it only shows a few places
+after the decimal.  It rounds the last decimal place, so you
+see "123.450".  When you multiply by 100, the result is
+12344.9999999998.  When casting a floating point value to an
+int, the fractional component is truncated, not rounded (look
+up "Assignment Conversions" in the C language reference).
+You want to round this intermediate value.  Like this...
+
+     _itoa( (int)(result * 100.0f + 0.5), szBuf, 10 );
+
+-----
+Stuart Downing
+sdowning@fame.com
+FAME Information Services, Inc.
+
+
+-----From: Curt Sutherland <csutherland@tiweco.com>
+
+Environment: VC++ 4.2b, NT 4.0
+>   void Myfunction::ConvertScreenData()
+>   {
+>     // IDC_MHINRELCTRL1 represents the OCX control
+>     CWnd* pWnd = GetDlgItem(IDC_MHINRELCTRL1);   
+>     ASSERT(pWnd);
+>     float result;
+>     char szBuf[18];    
+>     pWnd->GetProperty(0x24, VT_R4, (void*)&result);
+>     _itoa( (int)((result * 100.0f)), szBuf, 10 );
+>     TRACE("%s\n", szBuf);   
+>   }
+>
+>Stepping through the DEBUGGER shows that, when I entered 123.45 on
+>the screen, 123.450 was assigned to the 'result' variable(so far
+>so good). However, when _itoa() call was completed, 123.44 was
+>assigned to szBuf. The Disassembly code indicates that __ftol()
+>call was made in addition to __imp_itoa() when GetProperty() was
+>used. Any idea how I can fix this problem? Your help will be
+>greately appreciated.
+The problem is in the cast to int.  This is a C++ issue and not an MFC
+issue.  Here, C and C++ have always had a problem casting round integers
+represented as floating point numbers into integers.  This is because of
+the floating point representation and the method used for conversion.  The
+work around is to always cast using some sort of rounding.
+So use
+
+(int)((result*100.0) + 0.01)
+
+If you want numbers in the range of 123.4499 to 123.4500 to be 12345.
+Replace the 0.01 with any number you deem appropriate for your application.
+ Note: I usually use 0.5 (for standard rounding).
+
+Curt Sutherland
+
+
+-----From: Hans Wedemeyer <hansw@sprintmail.com>
+
+Well, in the example your show 123.45 the integer value for it can only
+be 123. 
+Now, you can decide what to do with the 0.45 . Of course normal rounding
+would put 0.45 to 0 and 0.55 to 1 
+There are other tricks you can play using integers, assembly language
+people have many of them.
+But then if you are using the normal libraries there's only one integer
+result for 123.45 and that's 123
+How about multiplying everything by a 100 first that would give you
+12345 and what ever you used that value for, do the opposite on the
+result and you may end up with a more accurate ( closer to what you
+want) figure.
+regards
+Hans W
+
+
+Jamie Koo wrote:
+> 
+ Environment: NT 3.51, VC++ 4.2-flat
+> 
+> Hello,
+> 
+> I'm having a problem converting a floating point number to a correct
+> integer value. Basically, I access an OCX control on a form to get
+> a floating point number and try to convert it to an integer. I've
+> chosen the 'floating point consistency' option under the project
+> setting, and it doesn't seem to work when the floating point number
+> is obtained through a function(GetPropety() in this case) as follows:
+> 
+>    void Myfunction::ConvertScreenData()
+>    {
+>      // IDC_MHINRELCTRL1 represents the OCX control
+>      CWnd* pWnd = GetDlgItem(IDC_MHINRELCTRL1);
+>      ASSERT(pWnd);
+>      float result;
+>      char szBuf[18];
+>      pWnd->GetProperty(0x24, VT_R4, (void*)&result);
+>      _itoa( (int)((result * 100.0f)), szBuf, 10 );
+>      TRACE("%s\n", szBuf);
+>    }
+> 
+> Stepping through the DEBUGGER shows that, when I entered 123.45 on
+> the screen, 123.450 was assigned to the 'result' variable(so far
+> so good). However, when _itoa() call was completed, 123.44 was
+> assigned to szBuf. The Disassembly code indicates that __ftol()
+> call was made in addition to __imp_itoa() when GetProperty() was
+> used. Any idea how I can fix this problem? Your help will be
+> greately appreciated.
+>
+-----From: David Little <dlittle@equinoxcorp.com>
+
+I might try using sprintf, or wsprintf, as the case may be...it seems to work better than itoa...
+
+
+----------
+From: 	Jamie Koo[SMTP:kooj@earthlink.net]
+Sent: 	Tuesday, February 25, 1997 2:13 AM
+To: 	mfc-l@netcom.com
+Subject: 	Floating point inconsistency
+
+Environment: NT 3.51, VC++ 4.2-flat
+
+Hello,
+
+I'm having a problem converting a floating point number to a correct
+integer value. Basically, I access an OCX control on a form to get
+a floating point number and try to convert it to an integer. I've
+chosen the 'floating point consistency' option under the project
+setting, and it doesn't seem to work when the floating point number
+is obtained through a function(GetPropety() in this case) as follows:
+
+   void Myfunction::ConvertScreenData()
+   {
+     // IDC_MHINRELCTRL1 represents the OCX control
+     CWnd* pWnd = GetDlgItem(IDC_MHINRELCTRL1);   
+     ASSERT(pWnd);
+     float result;
+     char szBuf[18];    
+     pWnd->GetProperty(0x24, VT_R4, (void*)&result);
+     _itoa( (int)((result * 100.0f)), szBuf, 10 );
+     TRACE("%s\n", szBuf);   
+   }
+
+Stepping through the DEBUGGER shows that, when I entered 123.45 on
+the screen, 123.450 was assigned to the 'result' variable(so far
+so good). However, when _itoa() call was completed, 123.44 was
+assigned to szBuf. The Disassembly code indicates that __ftol()
+call was made in addition to __imp_itoa() when GetProperty() was
+used. Any idea how I can fix this problem? Your help will be
+greately appreciated.
+ 
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+David Mayes -- <A HREF="mailto:mayesd@eosc.osshe.edu">mayesd@eosc.osshe.edu</A>
+Thursday, February 27, 1997
+</B>
+Environment: Win95, VC++ 4.2b, VC++ 1.52
+
+I have seen a similar problem when using sprintf to display floating =
+point values.  For instance, if the user enters 17.8 in an edit box and =
+then I display the number in a list box using:
+
+sprintf(cbuf,"%f",fval); =20
+pLB->AddString(cbuf)  // this produces an output of "17.799999" in the =
+list box
+
+
+This occurs also with the value of 18.3 ("18.299999") gets produced and =
+17.2 produces 17.00001, 16.3 =3D "16.29999", 19.2 =3D "19.200001..... =20
+
+It does not happen with other numbers like 17.1!
+
+Does anyone know of a way around this?  Is there another function that I =
+should be using??  I have customers that complain when they enter the =
+value of 17.8 and get 17.7999999!
+
+
+David Mayes
+
+
+
+
+----------
+From: 	Jamie Koo[SMTP:kooj@earthlink.net]
+Sent: 	Tuesday, February 25, 1997 12:13 AM
+To: 	mfc-l@netcom.com
+Subject: 	Floating point inconsistency
+
+Environment: NT 3.51, VC++ 4.2-flat
+
+Hello,
+
+I'm having a problem converting a floating point number to a correct
+integer value. Basically, I access an OCX control on a form to get
+a floating point number and try to convert it to an integer. I've
+chosen the 'floating point consistency' option under the project
+setting, and it doesn't seem to work when the floating point number
+is obtained through a function(GetPropety() in this case) as follows:
+
+   void Myfunction::ConvertScreenData()
+   {
+     // IDC_MHINRELCTRL1 represents the OCX control
+     CWnd* pWnd =3D GetDlgItem(IDC_MHINRELCTRL1);  =20
+     ASSERT(pWnd);
+     float result;
+     char szBuf[18];   =20
+     pWnd->GetProperty(0x24, VT_R4, (void*)&result);
+     _itoa( (int)((result * 100.0f)), szBuf, 10 );
+     TRACE("%s\n", szBuf);  =20
+   }
+
+Stepping through the DEBUGGER shows that, when I entered 123.45 on
+the screen, 123.450 was assigned to the 'result' variable(so far
+so good). However, when _itoa() call was completed, 123.44 was
+assigned to szBuf. The Disassembly code indicates that __ftol()
+call was made in addition to __imp_itoa() when GetProperty() was
+used. Any idea how I can fix this problem? Your help will be
+greately appreciated.
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+    <A HREF="http://www.digiday.com/mfcpro/joinmfcl.htm">Become an MFC-L member</A>
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

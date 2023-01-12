@@ -1,0 +1,186 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Setting up 'standard output device' for a MFC Thread
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Casey E Mullen -- <A HREF="mailto:mullenc@battelle.org">mullenc@battelle.org</A>
+Friday, May 31, 1996
+</B>
+     Environment:  VC 4.1, Powerstation Fortran 4 and Win95
+     
+     I am writing an application which calls Fortran for some heavy-duty 
+     CFD calculations, and I would like to route Fortran's write(*,*) 
+     output (which writes to the standard output device) to a CEditView.  I 
+     have investigated using a Console window, but a CEditView would fit 
+     better in the application. 
+     
+     The Fortran code and it's associated window will have its own thread.  
+     I have not figured out how to get either the Console or CEditView to 
+     work.  The write(*,*) statements don't cause an error, but I have no 
+     idea where they are sending their output.  I think that I need to 
+     hookup a "standard output device" for the thread when it is created, 
+     but I don't know how.
+     
+     Any ideas?  If the calculation code were in C, where would output from 
+     printf be sent?
+     
+     Danke sehr,
+     Casey Mullen
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Deepak Saxena -- <A HREF="mailto:Deepak_Saxena@ccm.ch.intel.com">Deepak_Saxena@ccm.ch.intel.com</A>
+Monday, June 03, 1996
+</B>
+[Mini-digest: 4 responses]
+
+Take a look at ::CreatePipe(), ::SetStdHandle(), and ::GetStdHandle()
+
+Basically what you want to do is redirect stdout for your app into a pipe.  All 
+output will be fed into the write end of the pipe.  Read the data from the other
+end of the pipe and then display it in your CEditView.  You need to make sure 
+you keep reading data out of the pipe as it is put into.  Otherwise your app. 
+will deadlock!
+
+Deepak
+
+-----From: "Robertson David" <davidr@devmail.sps.mot.com>
+
+
+     If your app is to only run on WinNT/Win95, you can create pipes and
+     pass handles to the pipes in your call to CreateProcess. Output from
+     the other application would then be redirected to the pipe, which you
+     can read and display in your CEditView. This will not work on Win32s!
+
+-----From: Vellore Gururaja Rao <guru@sas.soft.net>
+
+      If the calculation code were in C and u use printf functions,
+      there are two functions attached below which might help.
+      Instead of "COutWnd" make these functions global.
+      Instead of "outlist" (for a list box ) make them point to u'r
+      CEditView
+
+Hope this helps,
+Bye,
+GURU.
+##########
+int printf(const char * format, ... )
+{
+	char msgbuf[BUFSIZ*2];
+	char tmpbuf[BUFSIZ*2];
+	const char *fmt;
+	//FILE *fl ;
+    FILE *x ;
+
+	CListBox * lst = COutWnd :: outlist;
+	va_list args;
+	int returnVal, i, j ;
+
+	
+	va_start( args, format);
+	(void) vsprintf( msgbuf, format, args );
+	va_end( args );
+
+	returnVal = strlen (msgbuf) ;
+
+	COutWnd :: displayText(msgbuf, &currLnNo) ;
+
+	return returnVal ;
+}
+
+void 
+COutWnd :: displayText (char *msgbuf, int *crLnNo)
+{
+
+	char	tmpbuf[BUFSIZ];
+	int		i, j ;
+
+	CListBox * lst = COutWnd :: outlist;
+	for (j = 0, i = 0 ; msgbuf[i] ; i++)
+	{
+		if(msgbuf[i] != '\n')
+		{
+			tmpbuf[j++] = msgbuf[i] ;
+		}
+		else
+		{
+			tmpbuf[j] = '\0' ;
+			lst->SendMessage( LB_ADDSTRING, 0,(long)tmpbuf) ;
+			lst->SendMessage( LB_SETTOPINDEX,*crLnNo, 0L) ;
+			(*crLnNo)++ ;
+			j = 0 ;
+		}
+	}
+
+	if(i)
+	{
+		if(j > 1)
+		{
+			tmpbuf[j] = '\0' ;
+			lst->SendMessage(LB_INSERTSTRING, *crLnNo,(long)tmpbuf) ;
+			lst->SendMessage(LB_SETTOPINDEX, *crLnNo, 0L) ;
+			(*crLnNo)++ ;
+		}
+	}
+}
+-----From: "Greg Tighe" <gdt@eng.aisinc.com>
+
+Casey,
+	I have had a similar experience - I needed to take some legacy C 
+console apps and get them to run in a CEditView window.  What I did 
+was in the main header file for all the C code I redefined printf, i.e.:
+
+#define printf	my_CEditView_printf
+
+Then I created a function:
+
+extern "C" int my_CEditView_printf (const char *pszFormatString, ...)
+{
+// Do necessary formatting here...
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

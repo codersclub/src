@@ -1,0 +1,329 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+ODBC access violation...
+</B></FONT>
+<BR>
+<PRE>
+<B>
+David Little -- <A HREF="mailto:dlittle@equinoxcorp.com">dlittle@equinoxcorp.com</A>
+Thursday, February 13, 1997
+</B>
+Environment: Win95, VC++ 4.1, PS4.0
+
+I am having a problem with an Access/95 table and ODBC.  It seems if I =
+delete all the rows in the table, then try to add a new record, I get an =
+access violation in this code from dbrfx.cpp, line 1534:
+
+	case CFieldExchange::LoadField:
+		{
+			// Get the field data
+			CFieldInfo* pInfo = &pFX->m_prs->m_rgFieldInfos[nField - 1];
+
+			// Restore the status
+			pFX->m_prs->SetFieldStatus(nField - 1, pInfo->m_bStatus);
+
+			// If not NULL, restore the value, length and proxy
+			if (!pFX->m_prs->IsFieldStatusNull(nField - 1))
+			{
+				AfxCopyValueByRef(pInfo->m_pvDataCache, &value,
+					plLength, pInfo->m_nDataType);
+
+				// Restore proxy for correct WHERE CURRENT OF operations
+				TIMESTAMP_STRUCT* pts 				(TIMESTAMP_STRUCT*)pFX->m_prs-m_vFieldProxy[nField-];
+
+>> dies here ------		pts->year =3D (SWORD)value.GetYear();
+				pts->month =3D (UWORD)value.GetMonth();
+				pts->day =3D (UWORD)value.GetDay();
+				pts->hour =3D (UWORD)value.GetHour();
+				pts->minute =3D (UWORD)value.GetMinute();
+				pts->second =3D (UWORD)value.GetSecond();
+				pts->fraction =3D 0;
+			}
+			else
+				*plLength =3D SQL_NULL_DATA;
+
+It seems that the value contains a -842150451.  This is my code... They =
+error occurs when I try to call Update():
+
+void CStartOfDay::ClearRemitHeader()
+{
+	CTerminal* termTable;
+	CDatabase* m_DB =3D ((CCashWareApp*)AfxGetApp())->GetAppDB();
+	termTable =3D new CTerminal(m_DB);
+
+	CString s;
+	s.Format("DELETE DISTINCTROW [Remittance Header]"
+		"FROM [Remittance Header] "
+		"WHERE (([Remittance Header].Terminal_Number=3D'%s'))",
+		termTable->GetCurrentTerminalID());
+
+	delete termTable;
+
+	TRY
+	{
+		m_DB->ExecuteSQL(s);
+	}
+	CATCH_ALL(e)
+	{
+		CString es;
+		LPTSTR pe =3D es.GetBuffer(255);
+		e->GetErrorMessage(pe, 255, NULL);
+		es.ReleaseBuffer();
+		AfxMessageBox(es);
+	}
+	END_CATCH_ALL;
+	CRemitMaster* rm =3D new CRemitMaster(m_DB);
+	TRY
+	{
+		rm->Open(CRecordset::dynaset);
+		if(rm->IsEOF() && rm->IsBOF())
+		{
+			rm->AddNew();
+			rm->m_Terminal_Number =3D "99";
+			rm->m_Receipt_Number =3D "1000";
+			rm->m_Transaction_Number =3D "1000";
+			rm->m_Amount =3D "0";
+			rm->Update();
+			rm->Close();
+		}
+	}
+	CATCH_ALL(e)
+	{
+		CString es;
+		LPTSTR pe =3D es.GetBuffer(255);
+		e->GetErrorMessage(pe, 255, NULL);
+		es.ReleaseBuffer();
+		AfxMessageBox(es);
+	}
+	END_CATCH_ALL;
+	delete rm;
+}
+
+If the delete happens to leave a record in the table, everything works 
+fine...
+
+Please Help!
+
+Thanks!
+
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dan Frankowski -- <A HREF="mailto:dsfrankowski@mmm.com">dsfrankowski@mmm.com</A>
+Monday, February 17, 1997
+</B>
+Environment: NT 3.51, VC++ 4.2-flat
+
+I'm having the same problem: when I try to AddNew() a CRecordSet with
+a CTime in it to an empty table using ODBC, it crashes on the Update()
+in CTime::GetYear() because the code in RFX_Date() tries to GetYear()
+from an invalid CTime in the same code referenced in the previous
+email.  If the table is not empty, it's fine.  This crash does not
+show up in a table with only a single CTime in it, so it's not trivial
+to reproduce.
+
+I've seen this crash using Microsoft SQL Server 6.5 or Sybase 10.
+
+If anyone finds out what's going on, I'd appreciate a pointer.
+
+Also, I ran with purify, and CRecordSet::GetRowStatus [afxdb.inl:71 in
+VC++ 4.2] shows an uninitialized memory read for the Microsoft
+m_rgRowStatus[wRow-1] variable.  I don't know if that's related.  This
+might be a bug.
+
+I have not yet tried 4.2b.  I know I should, but there are only so
+many hours in the day.  If it's a bug, maybe Microsoft fixed it in 4.2b.
+
+Dan Frankowski
+-- 
+3M Corporate Research Lab - Sage Group       dsfrankowski@mmm.com  
+3M Center  Bldg. 260-6A08                    ph. 612-737-8813
+Maplewood, MN 55144                          fax 612-733-2165
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+David Little -- <A HREF="mailto:dlittle@equinoxcorp.com">dlittle@equinoxcorp.com</A>
+Monday, February 17, 1997
+</B>
+[Mini-digest: 2 responses]
+
+I figured out the answer, so anyone with this problem can repeat it:
+
+MFC never initializes CTime variables, so you must do it manually.  See =
+the CRecordset constructor that MFC builds. All you have to do is add a =
+m_CtimeVariable =3D CTime(NULL) ; for each CTime field.  I finally =
+noticed that the value that was causing the access violation was the =
+same value as if I had created a CTime variable with no parameters, id: =
+CTime t;...
+
+If anybody knows the reason, I would like to know...
+
+Thanks!
+David
+
+
+----------
+From: 	Dan Frankowski[SMTP:dsfrankowski@mmm.com]
+Sent: 	Monday, February 17, 1997 2:25 PM
+To: 	mfc-l@netcom.com
+Cc: 	dlittle@equinoxcorp.com
+Subject: 	Re: ODBC access violation...
+
+Environment: NT 3.51, VC++ 4.2-flat
+
+I'm having the same problem: when I try to AddNew() a CRecordSet with
+a CTime in it to an empty table using ODBC, it crashes on the Update()
+in CTime::GetYear() because the code in RFX_Date() tries to GetYear()
+from an invalid CTime in the same code referenced in the previous
+email.  If the table is not empty, it's fine.  This crash does not
+show up in a table with only a single CTime in it, so it's not trivial
+to reproduce.
+
+I've seen this crash using Microsoft SQL Server 6.5 or Sybase 10.
+
+If anyone finds out what's going on, I'd appreciate a pointer.
+
+Also, I ran with purify, and CRecordSet::GetRowStatus [afxdb.inl:71 in
+VC++ 4.2] shows an uninitialized memory read for the Microsoft
+m_rgRowStatus[wRow-1] variable.  I don't know if that's related.  This
+might be a bug.
+
+I have not yet tried 4.2b.  I know I should, but there are only so
+many hours in the day.  If it's a bug, maybe Microsoft fixed it in 4.2b.
+
+Dan Frankowski
+--=20
+3M Corporate Research Lab - Sage Group       dsfrankowski@mmm.com =20
+3M Center  Bldg. 260-6A08                    ph. 612-737-8813
+Maplewood, MN 55144                          fax 612-733-2165
+
+
+
+-----From: David Little <dlittle@equinoxcorp.com>
+
+Since posting this problem, I have found the solution.  It seems that =
+MFC/ClassWizard doesn't initialize a CTime field in the =
+CRecordset-derived constructor.  The solution is to add an initializer =
+for each CTime field and everything will be fine.  It isn't necessary to =
+change anything else.  I did it like this:
+
+m_SomeCTimeDatabaseField =3D CTime(NULL);
+
+Be sure and add it outside of the ClassWizard comments, or it will =
+disappear the next time you run CW....
+
+David
+----------
+From: 	Dan Frankowski[SMTP:dsfrankowski@mmm.com]
+Sent: 	Monday, February 17, 1997 2:25 PM
+To: 	mfc-l@netcom.com
+Cc: 	dlittle@equinoxcorp.com
+Subject: 	Re: ODBC access violation...
+
+Environment: NT 3.51, VC++ 4.2-flat
+
+I'm having the same problem: when I try to AddNew() a CRecordSet with
+a CTime in it to an empty table using ODBC, it crashes on the Update()
+in CTime::GetYear() because the code in RFX_Date() tries to GetYear()
+from an invalid CTime in the same code referenced in the previous
+email.  If the table is not empty, it's fine.  This crash does not
+show up in a table with only a single CTime in it, so it's not trivial
+to reproduce.
+
+I've seen this crash using Microsoft SQL Server 6.5 or Sybase 10.
+
+If anyone finds out what's going on, I'd appreciate a pointer.
+
+Also, I ran with purify, and CRecordSet::GetRowStatus [afxdb.inl:71 in
+VC++ 4.2] shows an uninitialized memory read for the Microsoft
+m_rgRowStatus[wRow-1] variable.  I don't know if that's related.  This
+might be a bug.
+
+I have not yet tried 4.2b.  I know I should, but there are only so
+many hours in the day.  If it's a bug, maybe Microsoft fixed it in 4.2b.
+
+Dan Frankowski
+--=20
+3M Corporate Research Lab - Sage Group       dsfrankowski@mmm.com =20
+3M Center  Bldg. 260-6A08                    ph. 612-737-8813
+Maplewood, MN 55144                          fax 612-733-2165
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Thursday, February 20, 1997
+</B>
+At 17:27 2/17/97 -0600, dlittle@equinoxcorp.com wrote:
+
+>If anybody knows the reason, I would like to know...
+
+Performance.  We wanted to avoid initializing something that's usually
+assigned to something else, anyway.  This is particularly important when
+you're dealing with arrays of CTime objects.
+
+You'll find that _no_ MFC simple data types are initialized,
+including CRect and CTime and CPoint.  The documentation even syays so:
+
+   CTime( );=A0=A0=A0Constructs an unitialized CTime object.=20
+
+
+
+
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+These words are my own. I do not speak on behalf of Microsoft.
+           This performance was not lip-synched.
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+    <A HREF="http://www.digiday.com/mfcpro/joinmfcl.htm">Become an MFC-L member</A>
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

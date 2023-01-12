@@ -1,0 +1,262 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+finding the last active view from a modeless dlg
+</B></FONT>
+<BR>
+<PRE>
+<B>
+<A HREF="mailto:Lawrence_Chan_at_HONGKONG@pcmailgw.ml.com">Lawrence_Chan_at_HONGKONG@pcmailgw.ml.com</A>
+Thursday, May 30, 1996
+</B>
+     VC4.0 NT3.51
+     
+     I am creating a modeless dialog that interacts with views in a MDI 
+     application. The dialog contains 3 slide controls which the user can 
+     slide up and down. When the left button is up, a user-defined message 
+     is sent to the active view to tell the view to reflect the changes. 
+     
+     That's pretty straight forward in a SDI. But in a MDI how do you know 
+     which view is active? (the current active window is the dialog 
+     itself). I know you can iterate thru a bunch of 
+     GetFirstDocTemplatePosition() or pDoc->GetFirstViewPostion() to get 
+     all the views. A solution that I can think of is to have the modeless 
+     dialog keeping a list of views currently in the application. Each time 
+     a view is activated, the view tells the dialog to remember it is the 
+     current active view. 
+     
+     
+     An example of such a dialog is the Find dialog in Winword 6.0. When 
+     the find button is pressed, it always goes and finds the string in the 
+     document that was last active. When there are no active documents in 
+     the window, the Find dialog disables the find button itself.
+     
+     
+     Is there a more elegant way to solve this problem?
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Frederic Steppe -- <A HREF="mailto:FredericS@msn.com">FredericS@msn.com</A>
+Sunday, June 02, 1996
+</B>
+[Mini-digest: 8 responses]
+
+>     VC4.0 NT3.51
+>     
+>     I am creating a modeless dialog that interacts with views in a MDI 
+>     application. The dialog contains 3 slide controls which the user can 
+>     slide up and down. When the left button is up, a user-defined message 
+>     is sent to the active view to tell the view to reflect the changes. 
+>     
+>     That's pretty straight forward in a SDI. But in a MDI how do you know 
+>     which view is active? (the current active window is the dialog 
+>     itself). I know you can iterate thru a bunch of 
+>     GetFirstDocTemplatePosition() or pDoc->GetFirstViewPostion() to get 
+>     all the views. A solution that I can think of is to have the modeless 
+>     dialog keeping a list of views currently in the application. Each time 
+>     a view is activated, the view tells the dialog to remember it is the 
+>     current active view. 
+  
+You may try something like this :
+
+	CMDIChildWnd * pActiveChild;
+	CView * pActiveView;
+
+	pActiveChild = AfxGetMainWnd()->MDIGetActive();
+	if(pActiveChild != NULL) pActiveView = pActiveChild->GetActiveView();
+
+Frederic Steppe (frederics@msn.com)
+-----From: chucks@skypoint.com (Erik Funkenbusch)
+
+Umm.. UpdateAllViews?
+
+The approach I usually take is call UpdateAllViews, then in the OnUpdate
+code of your child windows you have them detect if they are currently the
+active MDI window via GetActiveView()
+
+-----From: Mario Contestabile
+
+If the CMDIChildWnd is the parent of the dialog, perhaps something like
+CView* m_currentview = GetParent()->GetActiveDocument()->GetActiveView();
+might work. 
+
+mcontest@universal.com
+
+-----From: "Greg Tighe" <gdt@eng.aisinc.com>
+
+AfxGetMainWnd()->GetDescendantWindow(AFX_IDW_PANE_FIRST, TRUE);
+
+This will return a pointer to the currently active view (the one on 
+top.)  I believe it will return NULL if no documents (views) are 
+currently open.
+
+	-Greg Tighe
+	Applied Intelligent Systems, Inc.
+	Ann Arbor, MI
+	gdt@aisinc.com
+-----From: Lawrence_Chan@pcmailgw.ml.com
+
+     Greg, 
+     
+     Thanks for your suggestion.
+     I tried your code and it works all right except that if I close all 
+     the views, GetDescendantWindow will still return a pointer to the main 
+     frame. But the problem is easily solved by doing:
+     
+     CView * CFloatdlg::GetLastActivateView()
+     {
+        CWnd *pWnd= AfxGetMainWnd()->
+                GetDescendantWindow(AFX_IDW_PANE_FIRST, TRUE);
+     
+        if (pWnd->IsKindOf(RUNTIME_CLASS(CView)))
+                 return (CView *)pWnd;
+        
+        return NULL;
+     }
+     
+
+-----From: Lawrence_Chan@pcmailgw.ml.com
+
+You solved my first problems. Thanks very much. 
+
+The second problem has not been solved, at least for now. The CFloatDlg is 
+created by calling CFloatDlg::Create(). Memory is deallocated at 
+CFloatDlg::PostNcDestroy().
+
+My design goal is that I don't want the application to know who created 
+CFloatDlg. As long as it is created, the FloatDlg does whatever interactions it 
+wants to the views(if it found one. <- solved...with your help). In my view I 
+have something like this:
+
+
+void CMyView::OnViewFloatdlg() 
+{
+        CFloatdlg *pDlg= (CFloatdlg *)IsDlgFloating();  <<== need help on this
+
+        if (!pDlg)
+        {
+                pDlg= new CFloatdlg;
+                pDlg->Create(IDD_DIALOG1, this);
+
+                pDlg->CenterWindow();
+                pDlg->ShowWindow(SW_SHOWNORMAL);
+                
+        }
+        else
+                pDlg->SetActiveWindow();
+                
+}
+
+This way I don't need a member pointer to store the dialog. The question should 
+therefore be: How do I code the IsDlgFloating()? 
+In my opinion, the best way is to make use of the unique dialog identifier. By 
+passing the nID to IsDlgFloating(), the function returns a pointer to the dialog
+or null if it couldn't find one floating. Could that be done?
+
+
+
+----------------------------------------------------------------------------
+First of all, did my suggestion (above) solve your (first) problem?
+     
+Secondly, how are you creating you modeless dialog?  Are you calling 
+CDialog::Create()?  In that case you must have allocated the CDialog 
+first, either dynamically or on the stack.  So you should have either 
+a pointer to your CDialog or a CDialog member variable hanging around 
+somewhere.  In this case just do something like the following:
+     
+if (NULL != m_pMyModelessDlg)  // Only necessary if dialog is dynamically 
+allocated.
+    {
+    if (::IsWindow (m_pMyModelessDlg->GetSafeHwnd ()))
+        {
+        return m_pMyModelessDlg;
+        }
+    }
+     
+return NULL;
+     
+Hope this helps.
+     
+ -Greg Tighe
+ Applied Intelligent Systems, Inc.
+ Ann Arbor, MI
+ gdt@aisinc.com
+
+-----From: Lawrence_Chan_at_HONGKONG@pcmailgw.ml.com
+
+     Greg, 
+     I tried it but it wouldn't work. Even if I force CFloatDlg to set its 
+     parent to AfxGetMainWnd(), I still get NULL from 
+     GetDescendantWindow(). I looked into WINCORE.CPP and found that 
+     GetDescendantWindow() is basically a recursive function that iterates 
+     through the child windows list and tries its luck on GetDlgItem. 
+     
+     So your suggestion should work!!! Truth is it did not. Do we have any other
+alternatives in solving this?
+
+_
+Try removing the second parameter from your call to Create().  The 
+second parameter will then default to NULL which means the main 
+application window will be the parent of your floating dialog.  As 
+you have it above means that one of the view windows will be the 
+parent of your floating dialog which is perhaps why you cannot find 
+it.
+     
+After you have done this try the following for IsDlgFloating():
+     
+AfxGetMainWnd()->GetDescendantWindow(IDD_DIALOG1, TRUE);
+// I think you tried this before, but it always returned NULL, 
+// perhaps because the floating dialog was not a child of the main 
+// application window.
+     
+Let me know how this works.
+     
+ -Greg Tighe
+ Applied Intelligent Systems, Inc.
+ Ann Arbor, MI
+ gdt@aisinc.com
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

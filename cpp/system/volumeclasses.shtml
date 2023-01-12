@@ -1,0 +1,124 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Набор классов для работы с регулятором
+    громкости.</h3>
+    <p>Компилятор: Visual C++ 6</p>
+    <p>Автор: Alex Chmut</p>
+    <a href="volumeclasses.zip"><p>Скачать исходник - 15 Кб</a></p>
+    <p>Данный набор классов позволяет упростить
+    разработку приложений, которые работают со
+    звуком. Классы позволяют изменять и отслеживать
+    такие значения как Output Master Volume, WaveOut Volume и Input (WaveIn)
+    Volume.</p>
+    <p>Ниже представлены основные методы для всех
+    классов (объявленные в IVolume.h):</p>
+    <pre><span>bool</span>    IsAvailable() - Доступно ли управление звуком
+<span>void</span>    Enable() - Разрешаем данную громкость
+<span>void</span>    Disable() - Блокируем данную громкость
+DWORD   GetVolumeMetric() - Получаем степень детализации громкости
+DWORD   GetMinimalVolume() - Узнаём минимальное значение
+DWORD   GetMaximalVolume() - Узнаём максимальное значение
+DWORD   GetCurrentVolume() - Узнаём текущее значение
+<span>void</span>    SetCurrentVolume( DWORD dwValue ) - Устанавливаем громкость
+</pre>
+    <p>А следующая функция позволяет послать
+    уведомление для изменения громкости:</p>
+    <pre><span>void</span>    RegisterNotificationSink( PONMICVOULUMECHANGE, DWORD )
+</pre>
+    <p>В исходнике присутствуют три класса: CVolumeOutMaster
+    (VolumeOutMaster.h/cpp), CVolumeOutWave (VolumeOutWave.h/cpp) и CVolumeInXXX
+    (VolumeInXXX.h/cpp). Использовать их можно следующим
+    образом:</p>
+    <p>В StdAfx.h добавьте &quot;mmSystem.h&quot; и убадитесь,
+    что присутствует ссылка на &quot;winmm.lib&quot; (#pragma
+    comment(lib, &quot;winmm.lib&quot;)). Затем, если Вы, например,
+    захотите использовать регулятор громкости Output
+    Mater, то добавьте &quot;VolumeOutMaster.h&quot;, скажем, в StdAfx.h.</p>
+    <p>Файлы IVolume.h, VolumeInXXX.h, VolumeInXXX.cpp необходимо
+    добавить как файлы проекта.</p>
+    <pre>...
+<span>void</span> CALLBACK MasterVolumeChanged( DWORD dwCurrentVolume, DWORD dwUserValue );
+...
+<span>// Инициализация регулятора громкости</span>
+IVolume* pMasterVolume = (IVolume*)<span>new</span> CVolumeOutMaster();
+<span>if</span> ( !pMasterVolume || !pMasterVolume-&gt;IsAvailable() )
+{
+        <span>// обработка ошибки</span>
+}
+pMasterVolume-&gt;Enable();
+pMasterVolume-&gt;RegisterNotificationSink( MasterVolumeChanged, dwAnyUserValue );
+...
+pMasterVolume-&gt;SetCurrentVolume( dwVolumeToSet );
+...
+DWORD dwCurrentVolume = pMasterVolume-&gt;SetCurrentVolume();
+...
+<span>void</span> CALLBACK MasterVolumeChanged( DWORD dwCurrentVolume, DWORD dwUserValue )
+{
+        <span>// обрабатываем изменения громкости</span>
+}
+...
+</pre>
+    <p>Класс CVolumeInXXX требует более детального
+    объяснения. Чтобы манипулировать с громкостью
+    входа (Input), необходимо передать номер входа в
+    конструктор. Для этого в классе CVolumeInXXX
+    присутствует статическая функция для
+    определения входных линий:</p>
+    <pre><span>bool</span>    EnumerateInputLines( PINPUTLINEPROC, DWORD dwUserValue );
+</pre>
+    <p>Допустим Вам необходимо работать с громкостью
+    микрофона:</p>
+    <pre>...
+<span>bool</span> CALLBACK EnumInputLineProc( UINT uLineIndex, MIXERLINE* pLineInfo, DWORD dwUserValue );
+...
+<span>// Инициализация</span>
+UINT uMicrophoneLineIndex = (UINT)-<span>1</span>;
+<span>if</span> ( !CVolumeInXXX::EnumerateInputLines( EnumInputLineProc, (DWORD)&amp;uMicrophoneLineIndex ) )
+{
+        <span
+class="cpp-comment">// обработка ошибки</span>
+}
+<span class="cpp-keyword">if</span> ( uMicrophoneLineIndex == (UINT)-<span
+class="cpp-literal">1</span> )
+{
+        <span class="cpp-comment">// Ошибка: доступ к громкости микрофона не возможен.</span>
+}
+IVolume* pMicrophoneVolume = (IVolume*)<span
+class="cpp-keyword">new</span> CVolumeInXXX( uMicrophoneLineIndex );
+<span class="cpp-keyword">if</span> ( !pMicrophoneVolume || !pMicrophoneVolume-&gt;IsAvailable() )
+{
+        <span
+class="cpp-comment">// обработка ошибки</span>
+}
+<span class="cpp-comment">// Далее приступаем к использованию pMicrophoneVolume для регуляции громкости</span>
+...
+<span
+class="cpp-keyword">bool</span> CALLBACK EnumInputLineProc( UINT uLineIndex, MIXERLINE* pLineInfo, DWORD dwUserValue )
+{
+        <span
+class="cpp-keyword">if</span> ( pLineInfo-&gt;dwComponentType == MIXERLINE_COMPONENTTYPE_SRC_MICROPHONE )
+        {
+               *((UINT*)dwUserValue) = uLineIndex;
+               <span
+class="cpp-keyword">return</span> <span class="cpp-keyword">false</span>;
+        }
+        <span
+class="cpp-keyword">return</span> <span class="cpp-keyword">true</span>;
+}
+...
+</pre>
+    <p>Для большей производительности лучше
+    ограничиться одним экземпляром класса для
+    каждого регулятора громкости. Поэтому не стоит
+    создавать много объектов CVolumeInXXX, лучше сделать
+    доступным один экземпляр во всём коде.</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

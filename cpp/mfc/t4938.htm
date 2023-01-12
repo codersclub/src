@@ -1,0 +1,213 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Threaded views
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Ron Forrester -- <A HREF="mailto:rjf@infograph.com">rjf@infograph.com</A>
+Thursday, April 25, 1996
+</B>
+
+VC++ 4.1, NT 4.0b1
+
+
+Has anyone done anywork, or have a strategy for threading an MFC Doc/View 
+application such that each view has its message pump in a separate thread?
+
+Any ideas?
+rjf
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@interserv.com">mikeblas@interserv.com</A>
+Saturday, April 27, 1996
+</B>
+On Thu, 25 Apr 1996, Ron Forrester <rjf@infograph.com> wrote:
+
+>VC++ 4.1, NT 4.0b1
+
+Thanks.
+
+
+>Has anyone done anywork, or have a strategy for threading an MFC Doc/View 
+>application such that each view has its message pump in a separate thread?
+
+If you want to have multiple top-level windows (eg, multiple CFrameWnd 
+windows) that own views, it's a reasonable idea to make each of those 
+CFrameWnd windows be created by a different thread.  It's easy: just create 
+the thread and have the thread create the view.  The view will be owned by 
+the thread and will only be serivced by the thread.
+
+If you want to have an MDI application which has different views in the same 
+CMDIFrameWnd and each of those views is owned by a different thread, I think 
+you might want to think of a different architecture.  Since the child windows 
+will often communicate with their parent using messages, you'll really waste 
+any benefit you would have gained from multiple UI threads.
+
+.B ekiM
+--
+TCHAR szDisc[] = _T("These words are my own; I do not speak for Microsoft.");
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Ranjiv Sharma -- <A HREF="mailto:RanjivS@datastorm.com">RanjivS@datastorm.com</A>
+Monday, April 29, 1996
+</B>
+
+VC++ 4.1, NT 4.0b1
+
+There is an inherent problem with having one document object which has   
+views which are in different threads. If a CDocument object has more that   
+one view, then all the views must belong to the same thread. (Which is   
+unfortunate). Here is the reason why -
+ - MFC maintains  window maps (HWND's to CWnd's). These maps
+   are maintained in Thread Local Storage, i.e. every thread has it's own   
+map.
+
+ - When a view is created (It's create function called), then that view   
+gets put in
+   the window map of that thread.
+
+ - If you create multiple views in different threads - then they have all   
+gone into
+  different window maps.
+
+ - When you call UpdateAllViews() - or any Document method that
+  needs to cycle through the views, these functions typically do an
+  ASSERT_VALID(pView). The first thing the AssertValid of the view
+  does is to check if it is in the window map of the current executing
+  thread. If not - you get an Assertion.
+
+This is true even when you deal with just CWnd's - if you are keeping   
+track
+of windows in different threads, then it is best to do so by keeping the   
+HWND
+rather than the CWnd's - because CWnd's are only good in the thread they   
+were
+created in.
+
+ I think this is a problem with MFC, because CWnd's should behave just   
+like HWNDS in
+Win 32 - and be independent of the thread they were created in.
+
+ -Ranjiv
+(ranjivs@datastorm.com)
+
+
+On Thu, 25 Apr 1996, Ron Forrester <rjf@infograph.com> wrote:
+
+>VC++ 4.1, NT 4.0b1
+
+>Thanks.
+
+
+>Has anyone done anywork, or have a strategy for threading an MFC   
+Doc/View
+>application such that each view has its message pump in a separate   
+thread?
+
+If you want to have multiple top-level windows (eg, multiple CFrameWnd
+windows) that own views, it's a reasonable idea to make each of those
+CFrameWnd windows be created by a different thread.  It's easy: just   
+create
+the thread and have the thread create the view.  The view will be owned   
+by
+the thread and will only be serivced by the thread.
+
+If you want to have an MDI application which has different views in the   
+same
+CMDIFrameWnd and each of those views is owned by a different thread, I   
+think
+you might want to think of a different architecture.  Since the child   
+windows
+will often communicate with their parent using messages, you'll really   
+waste
+any benefit you would have gained from multiple UI threads.
+
+.B ekiM
+ --
+TCHAR szDisc[] = _T("These words are my own; I do not speak for   
+Microsoft.");
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@interserv.com">mikeblas@interserv.com</A>
+Tuesday, April 30, 1996
+</B>
+On Mon, 29 Apr 96, Ranjiv Sharma <RanjivS@datastorm.com> wrote:
+
+>There is an inherent problem with having one document object which has   
+>views which are in different threads. If a CDocument object has more that   
+>one view, then all the views must belong to the same thread. (Which is   
+>unfortunate). 
+
+It's easy to get around this limitation... just implement your own version of 
+UpdateAllViews() and invoke some other mechanism to update the views.  Or, 
+perhaps better yet, carefully code your OnUpdate() routine so that it doesn't 
+force MFC to use the map.
+
+> - When a view is created (It's create function called), then that view   
+>gets put in
+>   the window map of that thread.
+
+It is possible, though not quite as easy, to get around the issue by 
+attacking this part of the problem.  While this is harder, I think it would 
+result in a more elegant solution.
+
+.B ekiM
+--
+TCHAR szDisc[] = _T("These words are my own; I do not speak for Microsoft.");
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

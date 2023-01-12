@@ -1,0 +1,405 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Bitmap & printe problem
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Joern Dahl-Stamnes -- <A HREF="mailto:Jorn.Dahl-Stamnes@fysel.ntnu.no">Jorn.Dahl-Stamnes@fysel.ntnu.no</A>
+Monday, January 20, 1997
+</B>
+Environment: VC++ 1.52, WinNT 3.51
+
+I'm designing a calendar view where I use four different bitmaps to
+indicate different events. I use black color in the bitmap as the
+transparent color. The other colors are inverted (I think).
+
+The first problem is to draw the bitmap correctly in the view using
+different brushes. As long as brush is grey (= RGB(192,192,192)), the
+background color in the bitmaps it looks OK, but if I change the brush
+(e.g. = RGB(255,255,255)), the result does not look good.
+
+Question: How do I draw a bitmap transparently regardless of the brush
+in the view?
+
+Part of the code that draw the daynumber and the bitmaps for a given
+date:
+
+{
+  // Marks is a enumerator
+  static Marks Markers[] = {Marker1, Marker2, Marker3, Marker4};
+  static UINT  Bitmaps[] = {IDB_MARKER_1, IDB_MARKER_2, IDB_MARKER_3,
+                            IDB_MARKER_4};
+
+  dcMem.CreateCompatibleDC (pDC);
+
+  if (!pDC->IsPrinting()) oldBrush = pDC->SelectObject (pGrayBrush);
+  pDC->Rectangle (m_Size);
+
+  pDC->SetTextColor (RGB(0,0,0));
+  oldFont = pDC->SelectObject (pFont1);
+
+  sprintf (buffer,"%d",m_iDay);
+  TextSize = pDC->GetTextExtent (buffer,strlen(buffer));
+  xpos = m_Size.TopLeft().x + 4;
+  ypos = m_Size.TopLeft().y + 2;
+  RectSize = m_Size.Size ();
+  if (TextSize.cx+4 >= RectSize.cx || TextSize.cy+2 >= RectSize.cy)
+  {
+    bToSmall = TRUE;
+  } else {
+    pDC->TextOut (xpos,ypos,buffer,strlen(buffer));
+  }
+
+  if (!pDC->IsPrinting()) pDC->SelectObject (oldBrush);
+  pDC->SelectObject (oldFont);
+  if (bToSmall) return;
+
+  // Display one or more bitmap markers?
+  xpos = m_Size.BottomRight().x - 2;
+  minx = m_Size.TopLeft().x + 4 + TextSize.cx;
+  for (i = 0; i < iMarkCount; i++)
+  {
+    if (m_lMarks & ((LONG)1 << Markers[i]))
+    {
+      xpos -= iXSize;
+      if (xpos < minx) break;
+      status = BitMarker.LoadBitmap (Bitmaps[i]);
+      if (status == 0) TRACE ("LoadBitmap failed\n");
+      dcMem.SelectObject (&BitMarker);
+      pDC->BitBlt (xpos,ypos+2,iXSize,iYSize,&dcMem,0,0,0x00600365);
+      BitMarker.DeleteObject ();
+    }
+  }
+
+  // more code to display text information...
+}
+
+
+Second problem:
+
+My current solution look good on the screen as long as I don't change
+the brush. When I use the print preview command to look at the view I
+can see the bitmaps in black and white. But when I print the view to my
+HP Deskjet 600 (with color), the bitmaps are not printed out. When
+printing the view, I change the brush to white.
+
+It has also been tested on another machine with a different printer, but
+with the same result.
+
+Question: Why? What am I doing wrong?
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Bing Hou -- <A HREF="mailto:hou@tfn.com">hou@tfn.com</A>
+Wednesday, January 22, 1997
+</B>
+[Mini-digest: 2 responses]
+
+     
+Joern,
+
+Here is the trick I played to draw a transparent bitmap depending on the 
+background color of the view window.
+
+void DrawTransparentBitmap(CDC* pDC)
+{
+  CDC dcMem;
+  dcMem.CreateCompatibleDC(pdc);
+
+  CBitmap bitmap;
+  bitmap.LoadBitmap(nBitmapID);
+  CBitmap* pOldbitmap = dcMem.SelectObject(&bitmap);
+
+  CBrush brush(WhateverColor);
+  CBrush* pOldbrush = dcMem.SelectObject(&brush);
+  ::ExtFloodFill(dcMem.GetSafeHdc(), 1, 1, RGB(255, 255, 255),                  
+                      FLOODFILLSURFACE);
+
+  CRect rect;
+  GetClientRect(&rect);
+  pdc->StretchBlt(0, 0, rect.Width(), rect.Height(), &dcMem, 0, 0,              
+                 m_bitmapWidth, m_bitmapHeight, SRCCOPY);
+
+  // clean up omitted
+  ...
+}
+
+The code looks just like yours with one exception of the call to the 
+ExtFloodFill function.
+
+The ExtFloodFill function is documented in SDK documentation. When the 
+fill type is FLOODFILLSURFACE, it fills the dc's surface with the 
+currently selected brush, note the fill starts at the x, y location, and 
+replace the color you specified. 
+
+Therefore, you need to pay a little attention to the way you create your 
+bitmaps. In my case, I created my bitmap with WHITE background color, 
+and made damn sure that the pixel at (1, 1) is nothing but a white dot.
+
+
+Bing Hou
+hou@tfn.com
+======================
+  Jambalaya Baby!!!
+======================
+______________________________ Reply Separator 
+_________________________________
+Subject: Bitmap & printe problem
+Author:  Joern Dahl-Stamnes <Jorn.Dahl-Stamnes@fysel.ntnu.no> at 
+Internet
+Date:    1/20/97 12:21 PM
+
+
+Environment: VC++ 1.52, WinNT 3.51
+
+I'm designing a calendar view where I use four different bitmaps to 
+indicate different events. I use black color in the bitmap as the 
+transparent color. The other colors are inverted (I think).
+
+The first problem is to draw the bitmap correctly in the view using 
+different brushes. As long as brush is grey (= RGB(192,192,192)), the 
+background color in the bitmaps it looks OK, but if I change the brush 
+(e.g. = RGB(255,255,255)), the result does not look good.
+     
+Question: How do I draw a bitmap transparently regardless of the brush 
+in the view?
+     
+Part of the code that draw the daynumber and the bitmaps for a given 
+date:
+     
+{
+  // Marks is a enumerator
+  static Marks Markers[] = {Marker1, Marker2, Marker3, Marker4}; 
+  static UINT  Bitmaps[] = {IDB_MARKER_1, IDB_MARKER_2, IDB_MARKER_3,
+                            IDB_MARKER_4};
+     
+  dcMem.CreateCompatibleDC (pDC);
+     
+  if (!pDC->IsPrinting()) oldBrush = pDC->SelectObject (pGrayBrush); 
+  pDC->Rectangle (m_Size);
+     
+  pDC->SetTextColor (RGB(0,0,0));
+  oldFont = pDC->SelectObject (pFont1);
+     
+  sprintf (buffer,"%d",m_iDay);
+  TextSize = pDC->GetTextExtent (buffer,strlen(buffer)); 
+  xpos = m_Size.TopLeft().x + 4;
+  ypos = m_Size.TopLeft().y + 2;
+  RectSize = m_Size.Size ();
+  if (TextSize.cx+4 >= RectSize.cx || TextSize.cy+2 >= RectSize.cy) 
+  {
+    bToSmall = TRUE;
+  } else {
+    pDC->TextOut (xpos,ypos,buffer,strlen(buffer));
+  }
+     
+  if (!pDC->IsPrinting()) pDC->SelectObject (oldBrush); 
+  pDC->SelectObject (oldFont);
+  if (bToSmall) return;
+     
+  // Display one or more bitmap markers? 
+  xpos = m_Size.BottomRight().x - 2;
+  minx = m_Size.TopLeft().x + 4 + TextSize.cx; 
+  for (i = 0; i < iMarkCount; i++)
+  {
+    if (m_lMarks & ((LONG)1 << Markers[i])) 
+    {
+      xpos -= iXSize;
+      if (xpos < minx) break;
+      status = BitMarker.LoadBitmap (Bitmaps[i]);
+      if (status == 0) TRACE ("LoadBitmap failed\n"); 
+      dcMem.SelectObject (&BitMarker);
+      pDC->BitBlt (xpos,ypos+2,iXSize,iYSize,&dcMem,0,0,0x00600365); 
+      BitMarker.DeleteObject ();
+    }
+  }
+     
+  // more code to display text information...
+}
+     
+     
+Second problem:
+     
+My current solution look good on the screen as long as I don't change 
+the brush. When I use the print preview command to look at the view I 
+can see the bitmaps in black and white. But when I print the view to my 
+HP Deskjet 600 (with color), the bitmaps are not printed out. When 
+printing the view, I change the brush to white.
+     
+It has also been tested on another machine with a different printer, but 
+with the same result.
+     
+Question: Why? What am I doing wrong?
+     
+-----From: "David Carballo" <fibeto@redestb.es>
+
+Joem,
+
+For the second problem you can try:
+
+a) implement OnPrepareDC with the following code:
+
+void CYourView::OnPrepareDC(CDC* pDC, CPrintInfo* pInfo) 
+{
+	CYourBaseView::OnPrepareDC(pDC, pInfo);
+
+	if ( !pDC->IsPrinting() )
+		return;
+	pDC->SetMapMode(MM_ISOTROPIC);
+	pDC->SetWindowOrg(BITMAP_WIDTH / 2,BITMAP_HEIGHT / 2);
+	pDC->SetViewportOrg(pDC->GetDeviceCaps(HORZRES) / 2,
+	      			pDC->GetDeviceCaps(VERTRES) / 2);
+	pDC->SetWindowExt(BITMAP_WIDTH,BITMAP_HEIGHT);	
+	pDC->SetViewportExt(pDC->GetDeviceCaps(HORZRES),pDC->GetDeviceCaps(VERTRES)
+);
+}
+
+b) Implement OnPreparePrinting
+
+BOOL CYourView::OnPreparePrinting(CPrintInfo* pInfo)
+{
+	// default preparation
+	pInfo->SetMinPage(1);
+	pInfo->SetMaxPage(1);
+	return DoPreparePrinting(pInfo);
+}
+
+c) implement the OnPrint function by calling OnDraw
+
+Hope This help.
+
+David Carballo
+fibeto@redestb.es
+
+----------
+> De: Joern Dahl-Stamnes <Jorn.Dahl-Stamnes@fysel.ntnu.no>
+> A: mfc-l@netcom.com
+> Asunto: Bitmap & printe problem
+> Fecha: lunes 20 de enero de 1997 12:21
+> 
+> Environment: VC++ 1.52, WinNT 3.51
+> 
+> I'm designing a calendar view where I use four different bitmaps to
+> indicate different events. I use black color in the bitmap as the
+> transparent color. The other colors are inverted (I think).
+> 
+> The first problem is to draw the bitmap correctly in the view using
+> different brushes. As long as brush is grey (= RGB(192,192,192)), the
+> background color in the bitmaps it looks OK, but if I change the brush
+> (e.g. = RGB(255,255,255)), the result does not look good.
+> 
+> Question: How do I draw a bitmap transparently regardless of the brush
+> in the view?
+> 
+> Part of the code that draw the daynumber and the bitmaps for a given
+> date:
+> 
+> {
+>   // Marks is a enumerator
+>   static Marks Markers[] = {Marker1, Marker2, Marker3, Marker4};
+>   static UINT  Bitmaps[] = {IDB_MARKER_1, IDB_MARKER_2, IDB_MARKER_3,
+>                             IDB_MARKER_4};
+> 
+>   dcMem.CreateCompatibleDC (pDC);
+> 
+>   if (!pDC->IsPrinting()) oldBrush = pDC->SelectObject (pGrayBrush);
+>   pDC->Rectangle (m_Size);
+> 
+>   pDC->SetTextColor (RGB(0,0,0));
+>   oldFont = pDC->SelectObject (pFont1);
+> 
+>   sprintf (buffer,"%d",m_iDay);
+>   TextSize = pDC->GetTextExtent (buffer,strlen(buffer));
+>   xpos = m_Size.TopLeft().x + 4;
+>   ypos = m_Size.TopLeft().y + 2;
+>   RectSize = m_Size.Size ();
+>   if (TextSize.cx+4 >= RectSize.cx || TextSize.cy+2 >= RectSize.cy)
+>   {
+>     bToSmall = TRUE;
+>   } else {
+>     pDC->TextOut (xpos,ypos,buffer,strlen(buffer));
+>   }
+> 
+>   if (!pDC->IsPrinting()) pDC->SelectObject (oldBrush);
+>   pDC->SelectObject (oldFont);
+>   if (bToSmall) return;
+> 
+>   // Display one or more bitmap markers?
+>   xpos = m_Size.BottomRight().x - 2;
+>   minx = m_Size.TopLeft().x + 4 + TextSize.cx;
+>   for (i = 0; i < iMarkCount; i++)
+>   {
+>     if (m_lMarks & ((LONG)1 << Markers[i]))
+>     {
+>       xpos -= iXSize;
+>       if (xpos < minx) break;
+>       status = BitMarker.LoadBitmap (Bitmaps[i]);
+>       if (status == 0) TRACE ("LoadBitmap failed\n");
+>       dcMem.SelectObject (&BitMarker);
+>       pDC->BitBlt (xpos,ypos+2,iXSize,iYSize,&dcMem,0,0,0x00600365);
+>       BitMarker.DeleteObject ();
+>     }
+>   }
+> 
+>   // more code to display text information...
+> }
+> 
+> 
+> Second problem:
+> 
+> My current solution look good on the screen as long as I don't change
+> the brush. When I use the print preview command to look at the view I
+> can see the bitmaps in black and white. But when I print the view to my
+> HP Deskjet 600 (with color), the bitmaps are not printed out. When
+> printing the view, I change the brush to white.
+> 
+> It has also been tested on another machine with a different printer, but
+> with the same result.
+> 
+> Question: Why? What am I doing wrong?
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

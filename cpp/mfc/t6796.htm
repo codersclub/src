@@ -1,0 +1,353 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CDialog and CRecordSet......
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Mihir Dalal -- <A HREF="mailto:m_dalal@ECE.concordia.CA">m_dalal@ECE.concordia.CA</A>
+Sunday, September 15, 1996
+</B>
+
+> 	Environment: MSVC 1.5, Windows 95
+> 
+> >In mfc, the class CRecordSet provides support for database connectivity. 
+> >The corrosponding view class is generally derived from CRecordView. 
+> >
+> >I am trying to communicate with CRecordSet via a Modal DialogBox derived 
+> >from CDialog, instead of a form view derived from CRecordView. I have put 
+> >all my database handling code in the Dialog Class.
+> >
+> >The general procedure is that of connecting through a pointer(m_pSet), for 
+> >the view class (in my case, the dialog class) and through this 
+> >(and DDX/DDV mechanisim) communication is established with the CRecordSet,
+> >by binding dialog box controls to appropriate fields of the database.
+> >
+> >After establishing communication, the program compiles with 0 errors and 
+> >0 warnings, but at run time, invoking the dialog box invariably causes an 
+> >error message to popup 
+> >        
+> >       ---------------------------------------------------------
+> >     |                                                          |
+> >     |                  "Assertion failed !!"                   |
+> >     |                                                          |
+> >     |    My Windows App. : File dbview.cpp Line 307, Error     |
+> >     |                                                          |
+> >       ---------------------------------------------------------
+> >
+> >The program further terminates abnormally.
+> >Has anyone experienced this before, and if yes what is the reason for 
+> >this to happen ?????
+> >
+> >Mihir. 
+> >University Researcher
+> >(m_dalal@ece.concordia.ca)
+> 
+
+
+On Thu, 12 Sep 1996, David Elliott wrote:
+
+> What is the code at the line where the assertion happens?  Without
+> this, it's impossible to say.
+> 
+> David Elliott -- dce@netcom.com - Moderator MFC-L
+
+
+David,
+
+With some debugging techniques, I have come to the following conclusions: 
+The problem is with the DDX_FieldText() line of the following block of 
+CMyDlg class code: 
+
+void CMyDlg::DoDataExchange(CDataExchange* pDX)
+{
+	CDialog::DoDataExchange(pDX);
+	//{{AFX_DATA_MAP(CMyDlg)
+	DDX_FieldText(pDX, IDC_CLIENT_ID, m_pSet->m_ClientID, m_pSet);
+	//}}AFX_DATA_MAP
+}
+
+Further investigation reveals that it is the m_pSet pointer which is not 
+getting initialized correctly and that causes the Assertion Failed !! 
+exception to be raised. (The CRecordSet is not asserted as valid) 
+
+The m_pSet pointer gets initialized in the OnInitDialog block of code
+which I have directly imported from the CRecordView:
+
+As it appears in the RecordView case:
+void CMyRecordView::OnInitialUpdate()
+{
+	m_pSet = &GetDocument()->m_ClientSet;
+	CRecordView::OnInitialUpdate();
+
+}
+
+
+As I have imported in my Dialog Box case:
+BOOL CMyDlg::OnInitDialog()
+{
+   m_pSet = &GetDocument()->m_ClientSet;    <-This line needs correction
+   CDialog::OnInitDialog();                   so that m_pSet is initialized
+   return TRUE;                               correctly.
+}
+
+
+Closer investigation reveals that the real problem is the GetDocument() 
+member function. This function is supported by the RecordView but is not 
+supported by CDialog, since RecordViews have associated document classes 
+implicitly whereas Dialog Boxes donot have a document class associated 
+with them implicitly,
+
+The code passes the pointer of the RecordSet(m_ClientSet) to m_pSet 
+indirectly through the associated document class. This causes the m_pSet to 
+be initialized correctly in the RecordView case but not in the DialogBox 
+case since GetDocument() is not supported in the latter.    
+
+What I finally conclude is that while importing database handling  code from 
+RecordView to Dialog Box, THE POINTER INITIALIZATION CODE HAS TO BE SUITABLY 
+MODIFIED, so that it may correctly work with the Dialog class. 
+
+Can anyone guide me as to how do I go around with it ??
+
+Mihir. 
+University Researcher
+(m_dalal@ece.concordia.ca)
+
+P.S. Note that this techinique of passing pointers indirectly from 
+     CRecordSet to the CDialog/CRecordView through the associated document 
+     class (instead of passing it directly from the CRecordSet to the 
+     CDialog/CRecordView) is not absolutely necessary. It is recommened by 
+     Microsoft and is implemented in the "Enroll" sample code only because, 
+     Microsoft advices to make use of the document/view architecture as 
+     far as possible.   
+
+     It would also help if someone could show me a way of passing the 
+     pointer directly to my CDialog from CRecordSet, instead of going by the 
+     beaten Microsoft way. 
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Andrew Lazarus -- <A HREF="mailto:DrLaz@advisorsw.com">DrLaz@advisorsw.com</A>
+Monday, September 16, 1996
+</B>
+[Mini-digest: 3 responses]
+
+> > 	Environment: MSVC 1.5, Windows 95
+
+>      It would also help if someone could show me a way of passing the 
+>      pointer directly to my CDialog from CRecordSet, instead of going by the 
+>      beaten Microsoft way. 
+
+Just make it a member of the Dialog and pass it in the dialog 
+constructor.
+
+class CMyDlog : public CDialog
+{
+  CRecordset* m_pSet;
+//
+}
+
+Then set this when convenient.
+andrew lazarus
+senior software engineer
+DrLaz@advisorsw.com
+-----From: wei@cmgroup.com
+
+
+> P.S. Note that this techinique of passing pointers indirectly from 
+>      CRecordSet to the CDialog/CRecordView through the associated document 
+>      class (instead of passing it directly from the CRecordSet to the 
+>      CDialog/CRecordView) is not absolutely necessary. It is recommened by 
+>      Microsoft and is implemented in the "Enroll" sample code only because, 
+>      Microsoft advices to make use of the document/view architecture as 
+>      far as possible.   
+
+>      It would also help if someone could show me a way of passing the 
+>      pointer directly to my CDialog from CRecordSet, instead of going by the 
+>      beaten Microsoft way. 
+Unless you m_pSet created else where, there's no reason you pass a pointer
+to your dialog box. What you can do, just call 'new' inside you OnInitDialog
+then call m_pSet->Open(); Of cause you'd delete m_pSet in your
+Dialog's destructor.
+
+Hope this help.
+
+Wei Sheng
+
+
+-----From: Jean-Francois Bertrand <monsieur@step.polymtl.ca>
+
+Mihir Dalal wrote:
+> 
+> >       Environment: MSVC 1.5, Windows 95
+> >
+> > >In mfc, the class CRecordSet provides support for database connectivity.
+> > >The corrosponding view class is generally derived from CRecordView.
+> > >
+> > >I am trying to communicate with CRecordSet via a Modal DialogBox derived
+> > >from CDialog, instead of a form view derived from CRecordView. I have put
+> > >all my database handling code in the Dialog Class.
+> > >
+> > >The general procedure is that of connecting through a pointer(m_pSet), for
+> > >the view class (in my case, the dialog class) and through this
+> > >(and DDX/DDV mechanisim) communication is established with the CRecordSet,
+> > >by binding dialog box controls to appropriate fields of the database.
+> > >
+> > >After establishing communication, the program compiles with 0 errors and
+> > >0 warnings, but at run time, invoking the dialog box invariably causes an
+> > >error message to popup
+> > >
+> > >       ---------------------------------------------------------
+> > >     |                                                          |
+> > >     |                  "Assertion failed !!"                   |
+> > >     |                                                          |
+> > >     |    My Windows App. : File dbview.cpp Line 307, Error     |
+> > >     |                                                          |
+> > >       ---------------------------------------------------------
+> > >
+> > >The program further terminates abnormally.
+> > >Has anyone experienced this before, and if yes what is the reason for
+> > >this to happen ?????
+> > >
+> > >Mihir.
+> > >University Researcher
+> > >(m_dalal@ece.concordia.ca)
+> >
+> 
+> On Thu, 12 Sep 1996, David Elliott wrote:
+> 
+> > What is the code at the line where the assertion happens?  Without
+> > this, it's impossible to say.
+> >
+> > David Elliott -- dce@netcom.com - Moderator MFC-L
+> 
+> David,
+> 
+> With some debugging techniques, I have come to the following conclusions:
+> The problem is with the DDX_FieldText() line of the following block of
+> CMyDlg class code:
+> 
+> void CMyDlg::DoDataExchange(CDataExchange* pDX)
+> {
+>         CDialog::DoDataExchange(pDX);
+>         //{{AFX_DATA_MAP(CMyDlg)
+>         DDX_FieldText(pDX, IDC_CLIENT_ID, m_pSet->m_ClientID, m_pSet);
+>         //}}AFX_DATA_MAP
+> }
+> 
+> Further investigation reveals that it is the m_pSet pointer which is not
+> getting initialized correctly and that causes the Assertion Failed !!
+> exception to be raised. (The CRecordSet is not asserted as valid)
+> 
+> The m_pSet pointer gets initialized in the OnInitDialog block of code
+> which I have directly imported from the CRecordView:
+> 
+> As it appears in the RecordView case:
+> void CMyRecordView::OnInitialUpdate()
+> {
+>         m_pSet = &GetDocument()->m_ClientSet;
+>         CRecordView::OnInitialUpdate();
+> 
+> }
+> 
+> As I have imported in my Dialog Box case:
+> BOOL CMyDlg::OnInitDialog()
+> {
+>    m_pSet = &GetDocument()->m_ClientSet;    <-This line needs correction
+>    CDialog::OnInitDialog();                   so that m_pSet is initialized
+>    return TRUE;                               correctly.
+> }
+> 
+> Closer investigation reveals that the real problem is the GetDocument()
+> member function. This function is supported by the RecordView but is not
+> supported by CDialog, since RecordViews have associated document classes
+> implicitly whereas Dialog Boxes donot have a document class associated
+> with them implicitly,
+> 
+> The code passes the pointer of the RecordSet(m_ClientSet) to m_pSet
+> indirectly through the associated document class. This causes the m_pSet to
+> be initialized correctly in the RecordView case but not in the DialogBox
+> case since GetDocument() is not supported in the latter.
+> 
+> What I finally conclude is that while importing database handling  code from
+> RecordView to Dialog Box, THE POINTER INITIALIZATION CODE HAS TO BE SUITABLY
+> MODIFIED, so that it may correctly work with the Dialog class.
+> 
+> Can anyone guide me as to how do I go around with it ??
+> 
+> Mihir.
+> University Researcher
+> (m_dalal@ece.concordia.ca)
+> 
+> P.S. Note that this techinique of passing pointers indirectly from
+>      CRecordSet to the CDialog/CRecordView through the associated document
+>      class (instead of passing it directly from the CRecordSet to the
+>      CDialog/CRecordView) is not absolutely necessary. It is recommened by
+>      Microsoft and is implemented in the "Enroll" sample code only because,
+>      Microsoft advices to make use of the document/view architecture as
+>      far as possible.
+> 
+>      It would also help if someone could show me a way of passing the
+>      pointer directly to my CDialog from CRecordSet, instead of going by the
+>      beaten Microsoft way.Hi,
+Depending of where you call your CDialog.DoModal you can always set up 
+your m_pSet pointer before you call DoModal.  You probably have access 
+to the GetDocument from there??
+It would look something like this:
+
+void MyView::CallDialog
+{
+	CMyDialog Dlg;
+	Dlg.m_pSet = &GetDocument->m_myRecordSet;
+	Dlg.DoModal();
+	...
+}
+
+Usally, you should have access to the GetDocument function before you 
+call the DoModal.
+
+Jean-Francois Bertrand
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

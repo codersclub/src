@@ -1,0 +1,633 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CRecordset and CString - Assertion in DBFRX.CPP
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Venkat NJAOST -- <A HREF="mailto:VVaitheeswa@NJAOST.ML.com">VVaitheeswa@NJAOST.ML.com</A>
+Thursday, September 19, 1996
+</B>
+
+Environment: Windows NT 3.51, Visual C++ 4.2, Access 7.0 
+
+
+Following is the scenario:
+
+Test1.MDB has a table Table1 with the following fields
+
+	long 	m_Rank;
+	CString  m_Name;
+
+Using ClassWizard    a CTestRecSet class (using ODBC) was created..
+
+In the App the following  function is  called.. This is the ONLY place
+that
+the Recordset is being used ..
+
+int Failduring AdditionorUpdate()
+{
+	CTestRecSet  rs;
+	AfxMessageBox("The simplified Test Begins ...");
+	int  Param = 99;
+	try
+	{
+		rs.Open();
+	}
+	catch(...)
+	{
+		AfxMessageBox(" Open Failed ....");
+		return  -1;
+	}
+	for (int i=0; i< Param; i++)
+	{
+		TRACE("In a loop Add Names\n");
+		try
+		{
+			rs.AddNew();
+		}
+		catch(...)
+		{
+			AfxMessageBox(" Open Failed ....");
+			return  -1;
+		}
+		CString tmp;
+		tmp.Format(" [%d]",i);
+		CurrentName = CurrentName + "Name Numbered " +  tmp;
+		rs.m_Name =  CurrentName;
+		rs.m_Rank = i;
+		try
+		{
+			rs.Update();
+		}
+		catch(CDBException *e)
+		{
+			AfxMessageBox(" Update Failed ....");
+			TRACE(" This is the place I fail on Column 2");
+			return  -1;
+		}
+	}
+	try
+	{
+		rs.Close();
+	}
+	catch(CDBException *e)
+	{
+		e->ReportError();
+		return -1;
+	}
+	return 1;
+}
+
+
+
+
+While using the above 'simplfied' code I get an assertion in RFX_Text()
+-> Default();
+
+as follows
+
+	case CFieldExchange::LoadField:
+		{
+			// Get the field data
+			CFieldInfo* pInfo = &pFX->m_prs->m_rgFieldInfos[nField - 1];
+			CString* pStrCachedValue = (CString*)pInfo->m_pvDataCache;
+
+			// Restore the status
+			pFX->m_prs->SetFieldStatus(nField - 1, pInfo->m_bStatus);
+
+			// If not NULL, restore the value and length
+			if (!pFX->m_prs->IsFieldStatusNull(nField - 1))
+			{
+				value = *pStrCachedValue;
+				*plLength = value.GetLength();
+
+#ifdef _UNICODE
+				// Must restore proxy for correct WHERE CURRENT OF operation
+				USES_CONVERSION;
+				LPSTR lpszData = (LPSTR)pFX->m_prs->m_pvFieldProxy[nField-1];
+				lstrcpyA(lpszData, T2A((LPCTSTR)value));
+#endif // _UNICODE
+			}
+			else
+			{
+				*plLength = SQL_NULL_DATA;
+			}
+
+#ifdef _DEBUG
+			// Buffer address must not change - ODBC's SQLBindCol depends upon
+this
+			void* pvBind;
+
+	#ifdef _UNICODE
+			pvBind = pFX->m_prs->m_pvFieldProxy[nField-1];
+	#else // !_UNICODE
+			pvBind = value.GetBuffer(0);
+			value.ReleaseBuffer();
+	#endif
+
+			if (pvBind != pInfo->m_pvBindAddress)
+			{
+>>>>				TRACE1("Error: CString buffer (column %u) address has changed!\n",
+>>>>					nField);
+>>>>				ASSERT(FALSE);
+			}
+#endif // _DEBUG
+		}
+		return;
+
+
+The  lines marked >>>> are the ones  failed .... 
+Also please Note that this failure occurs on the first attempt to
+Update(), not in the 99th attempt. 
+To fix the problem, as soon as class Wizard generated the code, I had to
+change the 
+CString buffers. an arbitrary size(like 512) was alloated  and the code
+worked fine.
+
+has anyone encountered this problem. If so, what should I do  other than
+fixing the size of CStrings.
+It is a big table changing all CString fields is tedious. Any pointers,
+please ?
+
+
+Venkatramani
+  The train never waits ......
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+David Little -- <A HREF="mailto:dlittle@communique.net">dlittle@communique.net</A>
+Saturday, September 21, 1996
+</B>
+[Mini-digest: 2 responses]
+
+I got the exact same problem when I "upgraded" to 4.2... Get rid of 4.2 =
+and re-install 4.1, and the problem will disappear.  No kidding.  I =
+recompiled a project that has been in use for almost a year with 4.2 and =
+couldn't even open a table...
+
+I hear that there is a big patch almost ready (4.2a) that MIGHT take =
+care of this problem....
+
+----------
+From: 	Vaitheeswaran, Venkat (NJAOST)[SMTP:VVaitheeswa@NJAOST.ML.com]
+Sent: 	Thursday, September 19, 1996 12:34 PM
+To: 	'mfc-l@netcom.com'
+Subject: 	CRecordset and CString - Assertion in DBFRX.CPP
+
+
+Environment: Windows NT 3.51, Visual C++ 4.2, Access 7.0=20
+
+
+Following is the scenario:
+
+Test1.MDB has a table Table1 with the following fields
+
+	long 	m_Rank;
+	CString  m_Name;
+
+Using ClassWizard    a CTestRecSet class (using ODBC) was created..
+
+In the App the following  function is  called.. This is the ONLY place
+that
+the Recordset is being used ..
+
+int Failduring AdditionorUpdate()
+{
+	CTestRecSet  rs;
+	AfxMessageBox("The simplified Test Begins ...");
+	int  Param =3D 99;
+	try
+	{
+		rs.Open();
+	}
+	catch(...)
+	{
+		AfxMessageBox(" Open Failed ....");
+		return  -1;
+	}
+	for (int i=3D0; i< Param; i++)
+	{
+		TRACE("In a loop Add Names\n");
+		try
+		{
+			rs.AddNew();
+		}
+		catch(...)
+		{
+			AfxMessageBox(" Open Failed ....");
+			return  -1;
+		}
+		CString tmp;
+		tmp.Format(" [%d]",i);
+		CurrentName =3D CurrentName + "Name Numbered " +  tmp;
+		rs.m_Name =3D  CurrentName;
+		rs.m_Rank =3D i;
+		try
+		{
+			rs.Update();
+		}
+		catch(CDBException *e)
+		{
+			AfxMessageBox(" Update Failed ....");
+			TRACE(" This is the place I fail on Column 2");
+			return  -1;
+		}
+	}
+	try
+	{
+		rs.Close();
+	}
+	catch(CDBException *e)
+	{
+		e->ReportError();
+		return -1;
+	}
+	return 1;
+}
+
+
+
+
+While using the above 'simplfied' code I get an assertion in RFX_Text()
+-> Default();
+
+as follows
+
+	case CFieldExchange::LoadField:
+		{
+			// Get the field data
+			CFieldInfo* pInfo =3D &pFX->m_prs->m_rgFieldInfos[nField - 1];
+			CString* pStrCachedValue =3D (CString*)pInfo->m_pvDataCache;
+
+			// Restore the status
+			pFX->m_prs->SetFieldStatus(nField - 1, pInfo->m_bStatus);
+
+			// If not NULL, restore the value and length
+			if (!pFX->m_prs->IsFieldStatusNull(nField - 1))
+			{
+				value =3D *pStrCachedValue;
+				*plLength =3D value.GetLength();
+
+#ifdef _UNICODE
+				// Must restore proxy for correct WHERE CURRENT OF operation
+				USES_CONVERSION;
+				LPSTR lpszData =3D (LPSTR)pFX->m_prs->m_pvFieldProxy[nField-1];
+				lstrcpyA(lpszData, T2A((LPCTSTR)value));
+#endif // _UNICODE
+			}
+			else
+			{
+				*plLength =3D SQL_NULL_DATA;
+			}
+
+#ifdef _DEBUG
+			// Buffer address must not change - ODBC's SQLBindCol depends upon
+this
+			void* pvBind;
+
+	#ifdef _UNICODE
+			pvBind =3D pFX->m_prs->m_pvFieldProxy[nField-1];
+	#else // !_UNICODE
+			pvBind =3D value.GetBuffer(0);
+			value.ReleaseBuffer();
+	#endif
+
+			if (pvBind !=3D pInfo->m_pvBindAddress)
+			{
+>>>>				TRACE1("Error: CString buffer (column %u) address has =
+changed!\n",
+>>>>					nField);
+>>>>				ASSERT(FALSE);
+			}
+#endif // _DEBUG
+		}
+		return;
+
+
+The  lines marked >>>> are the ones  failed ....=20
+Also please Note that this failure occurs on the first attempt to
+Update(), not in the 99th attempt.=20
+To fix the problem, as soon as class Wizard generated the code, I had to
+change the=20
+CString buffers. an arbitrary size(like 512) was alloated  and the code
+worked fine.
+
+has anyone encountered this problem. If so, what should I do  other than
+fixing the size of CStrings.
+It is a big table changing all CString fields is tedious. Any pointers,
+please ?
+
+
+Venkatramani
+  The train never waits ......
+
+
+-----From: Mike Morel <mmorel@mushroomsoft.com>
+
+You didn't get into any details as to how long your database columns =
+are, but I'm sure this is the problem.  You cannot move more data into =
+your CString recordset variable than the length of the database column.  =
+This is because RFX_Text does a GetBuffer (or maybe GetBufferSetLength) =
+to reserve the exact amount of bytes needed by the column.  Then that =
+buffer is bound to the statement.  If you assign a longer string value =
+to the variable, CString will, of course, re-allocate the buffer.  This =
+changes the buffers address most likely.  But the old address is still =
+the one that's bound.  So RFX_Text does some checking each time it is =
+called to make sure your pointer hasn't changed.  The assertion told you =
+that it has.
+
+>From the lines:
+>>		CurrentName =3D CurrentName + "Name Numbered " +  tmp;
+>>		rs.m_Name =3D  CurrentName;
+It seems that each time through the loop a longer and longer value is =
+being stored.  Eventually, it is longer than the database column, and =
+therefore the buffer gets re-allocated.
+
+The solution is to always check that anything assign to your CString =
+recordset variable is shorter than the space allocate to prevent =
+re-allocation.
+
+Mike Morel
+Mushroom Software
+Home of MFC For Yourself
+<A HREF="http://www.mushroomsoft.com/mushroom">http://www.mushroomsoft.com/mushroom</A>
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+John Ferguson -- <A HREF="mailto:johnf@uvsg.com">johnf@uvsg.com</A>
+Monday, September 23, 1996
+</B>
+whoa... No need to get too excited yet. < throwing out 4.2? >
+
+I am using 4.2 EE and my odbc code that worked under 4.1 is working fine
+in 4.2; although i did have to make a change to my code.
+There are a lot of changes in the 4.2 that deal with database
+connectivity; which could mean several bugs...
+The first thing that I would check is on your Open or OpenEx statement
+for the CDatabase class. The "default value for loading the ODBC cursor
+library is reversed between 4.1 and 4.2; this was indirectly causing my
+problem.
+
+good luck.
+
+>[Mini-digest: 2 responses]
+>
+>I got the exact same problem when I "upgraded" to 4.2... Get rid of 4.2 =
+>and re-install 4.1, and the problem will disappear.  No kidding.  I =
+>recompiled a project that has been in use for almost a year with 4.2 and =
+>couldn't even open a table...
+>
+>I hear that there is a big patch almost ready (4.2a) that MIGHT take =
+>care of this problem....
+>
+>----------
+>From: 	Vaitheeswaran, Venkat (NJAOST)[SMTP:VVaitheeswa@NJAOST.ML.com]
+>Sent: 	Thursday, September 19, 1996 12:34 PM
+>To: 	'mfc-l@netcom.com'
+>Subject: 	CRecordset and CString - Assertion in DBFRX.CPP
+>
+>
+>Environment: Windows NT 3.51, Visual C++ 4.2, Access 7.0=20
+>
+>
+>Following is the scenario:
+>
+>Test1.MDB has a table Table1 with the following fields
+>
+>	long 	m_Rank;
+>	CString  m_Name;
+>
+>Using ClassWizard    a CTestRecSet class (using ODBC) was created..
+>
+>In the App the following  function is  called.. This is the ONLY place
+>that
+>the Recordset is being used ..
+>
+>int Failduring AdditionorUpdate()
+>{
+>	CTestRecSet  rs;
+>	AfxMessageBox("The simplified Test Begins ...");
+>	int  Param =3D 99;
+>	try
+>	{
+>		rs.Open();
+>	}
+>	catch(...)
+>	{
+>		AfxMessageBox(" Open Failed ....");
+>		return  -1;
+>	}
+>	for (int i=3D0; i< Param; i++)
+>	{
+>		TRACE("In a loop Add Names\n");
+>		try
+>		{
+>			rs.AddNew();
+>		}
+>		catch(...)
+>		{
+>			AfxMessageBox(" Open Failed ....");
+>			return  -1;
+>		}
+>		CString tmp;
+>		tmp.Format(" [%d]",i);
+>		CurrentName =3D CurrentName + "Name Numbered " +  tmp;
+>		rs.m_Name =3D  CurrentName;
+>		rs.m_Rank =3D i;
+>		try
+>		{
+>			rs.Update();
+>		}
+>		catch(CDBException *e)
+>		{
+>			AfxMessageBox(" Update Failed ....");
+>			TRACE(" This is the place I fail on Column 2");
+>			return  -1;
+>		}
+>	}
+>	try
+>	{
+>		rs.Close();
+>	}
+>	catch(CDBException *e)
+>	{
+>		e->ReportError();
+>		return -1;
+>	}
+>	return 1;
+>}
+>
+>
+>
+>
+>While using the above 'simplfied' code I get an assertion in RFX_Text()
+>-> Default();
+>
+>as follows
+>
+>	case CFieldExchange::LoadField:
+>		{
+>			// Get the field data
+>			CFieldInfo* pInfo =3D &pFX->m_prs->m_rgFieldInfos[nField - 1];
+>			CString* pStrCachedValue =3D (CString*)pInfo->m_pvDataCache;
+>
+>			// Restore the status
+>			pFX->m_prs->SetFieldStatus(nField - 1, pInfo->m_bStatus);
+>
+>			// If not NULL, restore the value and length
+>			if (!pFX->m_prs->IsFieldStatusNull(nField - 1))
+>			{
+>				value =3D *pStrCachedValue;
+>				*plLength =3D value.GetLength();
+>
+>#ifdef _UNICODE
+>				// Must restore proxy for correct WHERE CURRENT OF operation
+>				USES_CONVERSION;
+>				LPSTR lpszData =3D (LPSTR)pFX->m_prs->m_pvFieldProxy[nField-1];
+>				lstrcpyA(lpszData, T2A((LPCTSTR)value));
+>#endif // _UNICODE
+>			}
+>			else
+>			{
+>				*plLength =3D SQL_NULL_DATA;
+>			}
+>
+>#ifdef _DEBUG
+>			// Buffer address must not change - ODBC's SQLBindCol depends upon
+>this
+>			void* pvBind;
+>
+>	#ifdef _UNICODE
+>			pvBind =3D pFX->m_prs->m_pvFieldProxy[nField-1];
+>	#else // !_UNICODE
+>			pvBind =3D value.GetBuffer(0);
+>			value.ReleaseBuffer();
+>	#endif
+>
+>			if (pvBind !=3D pInfo->m_pvBindAddress)
+>			{
+>>>>>				TRACE1("Error: CString buffer (column %u) address has =
+>changed!\n",
+>>>>>					nField);
+>>>>>				ASSERT(FALSE);
+>			}
+>#endif // _DEBUG
+>		}
+>		return;
+>
+>
+>The  lines marked >>>> are the ones  failed ....=20
+>Also please Note that this failure occurs on the first attempt to
+>Update(), not in the 99th attempt.=20
+>To fix the problem, as soon as class Wizard generated the code, I had to
+>change the=20
+>CString buffers. an arbitrary size(like 512) was alloated  and the code
+>worked fine.
+>
+>has anyone encountered this problem. If so, what should I do  other than
+>fixing the size of CStrings.
+>It is a big table changing all CString fields is tedious. Any pointers,
+>please ?
+>
+>
+>Venkatramani
+>  The train never waits ......
+>
+>
+>-----From: Mike Morel <mmorel@mushroomsoft.com>
+>
+>You didn't get into any details as to how long your database columns =
+>are, but I'm sure this is the problem.  You cannot move more data into =
+>your CString recordset variable than the length of the database column.  =
+>This is because RFX_Text does a GetBuffer (or maybe GetBufferSetLength) =
+>to reserve the exact amount of bytes needed by the column.  Then that =
+>buffer is bound to the statement.  If you assign a longer string value =
+>to the variable, CString will, of course, re-allocate the buffer.  This =
+>changes the buffers address most likely.  But the old address is still =
+>the one that's bound.  So RFX_Text does some checking each time it is =
+>called to make sure your pointer hasn't changed.  The assertion told you =
+>that it has.
+>
+>>From the lines:
+>>>		CurrentName =3D CurrentName + "Name Numbered " +  tmp;
+>>>		rs.m_Name =3D  CurrentName;
+>It seems that each time through the loop a longer and longer value is =
+>being stored.  Eventually, it is longer than the database column, and =
+>therefore the buffer gets re-allocated.
+>
+>The solution is to always check that anything assign to your CString =
+>recordset variable is shorter than the space allocate to prevent =
+>re-allocation.
+>
+>Mike Morel
+>Mushroom Software
+>Home of MFC For Yourself
+><A HREF="http://www.mushroomsoft.com/mushroom">http://www.mushroomsoft.com/mushroom</A>
+>
+>
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Jeff Shannon -- <A HREF="mailto:jshannon@southeast.net">jshannon@southeast.net</A>
+Saturday, September 28, 1996
+</B>
+> has anyone encountered this problem. If so, what should I do  other than
+> fixing the size of CStrings.
+> It is a big table changing all CString fields is tedious. Any pointers,
+> please ?
+
+I run into the same problem using SQL Server.   You're going to have to
+either increase the size of your columns in the database or do some error
+checking so your data doesn't exceed the size of the columns. 
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

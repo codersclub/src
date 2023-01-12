@@ -1,0 +1,165 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+MFC memory leaks when unloading DLL
+</B></FONT>
+<BR>
+<PRE>
+<B>
+John W. Podlogar Jr. -- <A HREF="mailto:podlogar@telerama.lm.com">podlogar@telerama.lm.com</A>
+Wednesday, April 10, 1996
+</B>
+
+Greetings...
+
+Environment MSVC 4.1, NT 4.0 Beta 1, Intel, SDI application
+
+I'm writing a "regular" DLL (USRDLL) that uses MFC in a DLL (not statically
+linked). Everything is working great except for when I unload
+the DLL. MFC and the debugger are reporting some memory leaks
+in various MFC source files. They are reported when my overridden
+CWinApp::ExitInstance() is run by the framework.
+
+I've been searching through the online doc and the kb at Microsoft
+and found some articles relating to use of the CRT WEP procedure.
+This however doesn't seem to work as stated anymore (it's kind of
+and old article). It appears that the destructors aren't
+being called for internal MFC static and global data.
+
+Since I am kind of anal about memory leaks I'd really like to
+get the DLL to unload cleanly. Does anybody have any ideas?
+
+Thanks -John
+
+Below is the output from the debugger...
+
+Detected memory leaks!
+Dumping objects ->
+plex.cpp(31) : {49} normal block at 0x00C32450, 124 bytes long.
+ Data: <             "  > 00 00 00 00 00 00 00 00 00 00 00 00 F0 22 C3 00 
+doctempl.cpp(64) : {48} client block at 0x00C323F0, subtype 0, 32 bytes long.
+a CDocManager object at $00C323F0, 32 bytes long
+doctempl.cpp(62) : {47} client block at 0x00C32398, subtype 0, 28 bytes long.
+a CPtrList object at $00C32398, 28 bytes long
+Object dump complete.
+
+John W. Podlogar Jr.    The wise man doesn't pose the right answers, 
+podlogar@lm.com                         he asks the right questions. 
+http://www.lm.com/~podlogar
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@msn.com">mikeblas@msn.com</A>
+Sunday, April 14, 1996
+</B>
+[Mini-digest: 3 responses]
+
+> Environment MSVC 4.1, NT 4.0 Beta 1, Intel, SDI application
+
+Thanks.
+
+> It appears that the destructors aren't
+> being called for internal MFC static and global data.
+
+They are.  It looks like these bugs are yours, not MFC's.
+
+> plex.cpp(31) : {49} normal block at 0x00C32450, 124 bytes long.
+
+This object is normally used to manage items in an MFC collection.  You can 
+get leaks with this signature if you don't correctly clean up a linked list or 
+a map or an MFC array.
+
+> doctempl.cpp(64) : {48} client block at 0x00C323F0, subtype 0, 32 bytes 
+long.
+> doctempl.cpp(62) : {47} client block at 0x00C32398, subtype 0, 28 bytes 
+long.
+
+These two mean that you're leaving a CDocTemplate around.  Are you creating 
+your own, extra CDocTemplate?  You'll get these leaks if you create your own, 
+don't register it with MFC, and don't clean it up yourself.  Taken together, 
+it looks like there's a chance the whole doc template chain isn't being 
+destroyed since the list itself _and_ its content aren't being destroyed.  You 
+say that you've overridden ExitInstance()--did you call the base class 
+implementation?
+
+.B ekiM
+TCHAR szSpringtime[] = _T("Check twice and save a life: motorcycles are 
+everywhere.");
+
+-----From: "Matt Gradwohl" <Matt_Gradwohl@msn.com>
+
+I'm not sure about these specific leaks, but I know that some MFC "leaks" 
+aren't really leaks. There is, or soon will be, a knowledgebase article on 
+this.
+
+*** Foggy memory, talking out rear-end == ON ***
+Something to do with the leak checking code not taking into account the 
+destructor throwing the memory away
+*** Foggy memory, talking out rear-end == OFF ***
+
+So, basically, it's good that you are anal about memory leaks, but some of 
+these MAY be false (wait for the KB article. Then again, if it's only 28 + 28 
++ 32 +124 bytes each time your APP runs, and you don't allow multiple 
+instances of your app, the leak, although bad, shouldn't cause too much bad 
+mojo.
+
+-Matt
+http://hellbender/mattgr/ <--sucks
+http://hellbender/project/grunt/
+
+-----From: Randal Parsons <Randal.Parsons@btal.com.au>
+
+It seems that the memory leak detection can't tell when static/global 
+data is destructed because of the mechanism it uses (which is itself 
+based around global/static data I think). We have had the same problem 
+since we started using Objectspace STL because it contains static 
+allocators, so we traced the memory allocations that were 
+identified as leaks and just ignored the ones that were for global data.
+
+Regards,
+
+Randal Parsons.
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,318 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Using throw() during DoModal() calls
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Carl Downs -- <A HREF="mailto:cdowns@dev.tivoli.com">cdowns@dev.tivoli.com</A>
+Friday, November 22, 1996
+</B>
+Environment: VC++ 4.0, NT 3.51
+
+I'm trying to execute a throw from within a modal dialog box.  
+
+I call DoModal() as usual.  The OnHelp() event method
+throws, and control returns (from DoModal) to the
+catch (CString msg).
+
+Everything works as expected, except that once the catch
+completes executing, the main program cannot receive
+focus!  It must be killed from the system's task list.
+
+This code snippet exhibits the problem:
+
+/////////////////////////////////////////////////////////////////////////////
+// App command to run the dialog
+void CDriverApp::OnAppAbout()
+{
+	CAboutDlg *aboutDlg = new CAboutDlg;
+	try 
+	{
+		aboutDlg->DoModal();
+	}
+	catch (CString msg)
+	{
+                AfxMessageBox (msg);
+	}
+	catch (...)
+	{
+                AfxMessageBox ("Unknown Exception caught...");
+	}
+
+ 	delete aboutDlg;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+class CAboutDlg : public CDialog
+{
+public:
+	CAboutDlg();
+
+// Dialog Data
+	//{{AFX_DATA(CAboutDlg)
+	enum { IDD = IDD_ABOUTBOX };
+	//}}AFX_DATA
+
+	// ClassWizard generated virtual function overrides
+	//{{AFX_VIRTUAL(CAboutDlg)
+	protected:
+	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
+	//}}AFX_VIRTUAL
+
+// Implementation
+protected:
+	//{{AFX_MSG(CAboutDlg)
+	afx_msg void OnHelp();
+	//}}AFX_MSG
+	DECLARE_MESSAGE_MAP()
+};
+
+/////////////////////////////////////////////////////////////////////////////
+// CDriverApp commands
+
+void CAboutDlg::OnHelp() 
+{
+	throw CString ("Help not available.");
+}
+
+/////////////////////////////////////////////////////////////////////////////
+
+
+This problem occurs regardless of whether I place the CAboutDlg instance
+on the stack or heap.
+
+VC displays this warning as the delete method is called on 
+the dialog box object:
+
+Warning: calling DestroyWindow in CDialog::~CDialog --
+	OnDestroy or PostNcDestroy in derived class will not be called.
+
+If no exception is thrown, the delete method call works.
+
+Anyone know how I can make CDialog derived class methods throwable?
+
+Thanks
+Carl
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Rick Rankin -- <A HREF="mailto:RickR@fscrater.com">RickR@fscrater.com</A>
+Monday, November 25, 1996
+</B>
+[Mini-digest: 3 responses]
+
+There is a good article in MSJ that should answer your questions. The
+bottom line is that you can't throw exceptions across callback
+boundaries. MSJ November 1996 starting on page 104.
+
+>----------
+>From: 	cdowns@dev.tivoli.com[SMTP:cdowns@dev.tivoli.com]
+>Sent: 	Friday, November 22, 1996 7:30 AM
+>To: 	mfc-l@netcom.com
+>Subject: 	Using throw() during DoModal() calls
+>
+>Environment: VC++ 4.0, NT 3.51
+>
+>I'm trying to execute a throw from within a modal dialog box.  
+>
+>I call DoModal() as usual.  The OnHelp() event method
+>throws, and control returns (from DoModal) to the
+>catch (CString msg).
+>
+>Everything works as expected, except that once the catch
+>completes executing, the main program cannot receive
+>focus!  It must be killed from the system's task list.
+>
+>This code snippet exhibits the problem:
+>
+>/////////////////////////////////////////////////////////////////////////////
+>// App command to run the dialog
+>void CDriverApp::OnAppAbout()
+>{
+>	CAboutDlg *aboutDlg = new CAboutDlg;
+>	try 
+>	{
+>		aboutDlg->DoModal();
+>	}
+>	catch (CString msg)
+>	{
+>                AfxMessageBox (msg);
+>	}
+>	catch (...)
+>	{
+>                AfxMessageBox ("Unknown Exception caught...");
+>	}
+>
+> 	delete aboutDlg;
+>}
+>
+>/////////////////////////////////////////////////////////////////////////////
+>class CAboutDlg : public CDialog
+>{
+>public:
+>	CAboutDlg();
+>
+>// Dialog Data
+>	//{{AFX_DATA(CAboutDlg)
+>	enum { IDD = IDD_ABOUTBOX };
+>	//}}AFX_DATA
+>
+>	// ClassWizard generated virtual function overrides
+>	//{{AFX_VIRTUAL(CAboutDlg)
+>	protected:
+>	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
+>	//}}AFX_VIRTUAL
+>
+>// Implementation
+>protected:
+>	//{{AFX_MSG(CAboutDlg)
+>	afx_msg void OnHelp();
+>	//}}AFX_MSG
+>	DECLARE_MESSAGE_MAP()
+>};
+>
+>/////////////////////////////////////////////////////////////////////////////
+>// CDriverApp commands
+>
+>void CAboutDlg::OnHelp() 
+>{
+>	throw CString ("Help not available.");
+>}
+>
+>/////////////////////////////////////////////////////////////////////////////
+>
+>
+>This problem occurs regardless of whether I place the CAboutDlg instance
+>on the stack or heap.
+>
+>VC displays this warning as the delete method is called on 
+>the dialog box object:
+>
+>Warning: calling DestroyWindow in CDialog::~CDialog --
+>	OnDestroy or PostNcDestroy in derived class will not be called.
+>
+>If no exception is thrown, the delete method call works.
+>
+>Anyone know how I can make CDialog derived class methods throwable?
+>
+>Thanks
+>Carl
+>
+>
+-----From: "Eric Kenslow" <ekenslow@nwrain.com>
+
+Your problem is that MFC is explicitly disabling your app's main window.
+You need to re-enable it in your catch clauses.
+
+If you check the MFC source for DoModal(), you'll see what I mean. I'd
+provide some code, but it's pretty late and I've been coding for 10 hours
+already :)...
+
+/* Eric Kenslow - Developer, MetaInfo Inc.
+ * EricK@metainfo.com
+ */
+
+-----From: zhangdh.bbs@bbs.net.tsinghua.edu.cn
+
+>I call DoModal() as usual.  The OnHelp() event method
+>throws, and control returns (from DoModal) to the
+>catch (CString msg).
+>
+>
+>/////////////////////////////////////////////////////////////////////////////
+ // App command to run the dialog
+>void CDriverApp::OnAppAbout()
+>{
+>       CAboutDlg *aboutDlg = new CAboutDlg;
+>       try 
+>       {
+>               aboutDlg->DoModal();
+>       }
+>       catch (CString msg)
+>       {
+>                 AfxMessageBox (msg);
+        //ADD here
+                AfxMessageBox (msg);
+                  aboutDlg->DestroyWindow();
+                  delete aboutDlg;
+                  (GetMainWnd())->EnableWindow();
+                  return;
+        
+>       }
+>       catch (...)
+>       {
+>                 AfxMessageBox ("Unknown Exception caught...");
+        //ADD here         
+                        aboutDlg->DestroyWindow();
+                        delete aboutDlg;
+                        return;
+
+>       }
+>
+>       delete aboutDlg;
+>}
+>
+>
+>This problem occurs regardless of whether I place the CAboutDlg instance
+>on the stack or heap.
+>
+> VC displays this warning as the delete method is called on 
+>the dialog box object:
+>
+>Warning: calling DestroyWindow in CDialog::~CDialog --
+>       OnDestroy or PostNcDestroy in derived class will not be called.
+>
+>If no exception is thrown, the delete method call works.
+>
+>Anyone know how I can make CDialog derived class methods throwable?
+ BackGround:
+MFC is sending a WM_DISABLEMODAL to all of the frame's descendant windows
+when a modal dialog box pops up. But the exception cause the frame 
+don't know that the dialog have over!
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

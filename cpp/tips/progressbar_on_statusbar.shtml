@@ -1,0 +1,86 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как показать ProgressBar на StatusBar'е ?</h3>
+    <p>Предположим, что вы хотите показать CProgressCtrl на
+    весь StatusBar. Для этого необходимо проделать
+    следующее: - Выберите пункт меню View - Resource Symbols.
+    Нажмите кнопку New и добавьте новое имя, в нашем
+    примере это будет ID_PROGRBAR. - В файле MainFrm.cpp найдите
+    объявление массива indicators (он находиться сразу
+    после END_MESSAGE_MAP) и отредактируйте его к
+    следующиему виду</p>
+    <pre>static UINT indicators[] =
+             {
+                 ID_PROGRBAR
+              };</pre>
+    <p>- В файле _MainFrm.h создайте protected переменную m_bCreated
+    типа BOOL и public переменную m_progress типа CProgressCtl. - В
+    файле MainFrm.cpp отредактируйте конец функции int
+    CMainFrame::OnCreate(LPCREATESTRUCT lpCreateStruct) таким образом:</p>
+    <p>к участку кода: </p>
+    <pre>if (!m_wndStatusBar.Create(this ) ||
+                       !m_wndStatusBar.SetIndicators(indicators,
+                       sizeof(indicators)/sizeof (UINT)))
+                   {
+                       TRACE0(&quot;Failed to create status bar\n&quot; );
+                       return -1; // fail to create
+                   }</pre>
+    <p>добавьте следующую строку:</p>
+    <pre>            else {
+              m_wndStatusBar.SetPaneInfo(0,ID_PROGRBAR,SBPS_STRETCH,10);
+               }</pre>
+    <p>Кроме того, добавьте инициализацию нашей
+    переменной m_bCreated</p>
+    <pre>                     .........
+                     m_bCreated=FALSE;
+                     ..........</pre>
+    <p>- Теперь мы можем использовать ProgressBar в строке
+    статуса, естественно не забыв создать этот
+    объект. Предположим, у нас есть функция
+    CMainFrame::OnWork(). Она будет выглядеть примерно так:</p>
+    <pre>void CMainFrame::OnWork()
+         {
+           RECT rc;
+             m_wndStatusBar.GetItemRect(0,&amp;rc);
+            if (m_bCreated==FALSE)
+            {
+              // создаем  m_progress
+              m_progress.Create(WS_VISIBLE|WS_CHILD, rc,&amp;m_wndStatusBar, 1);
+// Устанавливаем размер от 0 до 100
+              m_progress.SetRange(0,100);
+              m_progress.SetStep(1);
+              m_bCreated=TRUE;
+             }
+             for (int I = 0; I &lt; 100; I++)
+             {
+               Sleep(20);
+               m_progress.StepIt();
+             }
+         }</pre>
+    <p>-Если откомпилировать проект на этой фазе, то
+    все будет работать, но при изменении размера окна
+    линейка ProgressBar'а размеры менять не будет, поэтому
+    необходимо перекрыть событие OnSize:</p>
+    <pre>void CMainFrame::OnSize(UINT nType, int cx, int cy)
+            {
+                CFrameWnd::OnSize(nType, cx, cy);
+                 if (m_bCreated)
+                  {
+                      RECT rc;
+                      m_wndStatusBar.GetItemRect(0,&amp;rc);
+                      m_progress.SetWindowPos(&amp;wndTop, rc.left, rc.top,
+                      rc.right - rc.left,rc.bottom - rc.top, 0);
+                    }
+              }</pre>
+    <p>- Вот теперь все /-))))) Откомпилируйте проект и
+    убедитесь, что все работает.</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

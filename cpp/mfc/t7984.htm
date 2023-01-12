@@ -1,0 +1,300 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CMenu: Disabling/Dimmint a Menu Item
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Peter Ingraham -- <A HREF="mailto:ingraham@vci.com">ingraham@vci.com</A>
+Tuesday, November 26, 1996
+</B>
+Environment: VC++ 4.2-flat, NT 4.0
+
+I am trying to disable and dim menu items using CMenu::EnableMenuItem,
+but I am not having any success.  The simple example below
+illustrates the problem:
+
+	CMenu* pMnuMain = GetMenu();
+	CMenu mnuMain;
+	mnuMain.Attach(pMnuMain->m_hMenu);
+	mnuMain.EnableMenuItem(ID_SHOW_FILES, MF_BYCOMMAND | MF_GRAYED);
+	mnuMain.Detach();
+
+The result is that the menu item is neither dimmed not disabled.
+To test the code, I replaced the "EnableMenuItem" line with:
+
+	mnuMain.CheckMenuItem(ID_SHOW_FILES, MF_BYCOMMAND | MF_CHECKED);
+
+from which I got the expected result (the item was checked).
+
+It has been suggested that I use the ON_UPDATE_COMMAND_UI interface,
+but the menu items I'm trying to control reside on nested pop-up
+menus that are dynamically created during program initialization
+from information in a database.  The item command IDs are dynamically
+assigned during that time, and I need to control the items
+"by command", so that I don't have to keep track of which item
+position on which nested pop-up menu (a bookkeeping nightmare).
+
+The code above is a simple illustration of the problem. If I can get
+that to work, I have no problem with the rest.  Why doesn't this
+code work?
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Randy Taylor -- <A HREF="mailto:randy_taylor@ebt.com">randy_taylor@ebt.com</A>
+Wednesday, November 27, 1996
+</B>
+Try handling the WM_INITMENUPOPUP in your frame class.
+There is a macro for it: ON_INITMENUPOPUP
+
+Then the function in your frame class can look something like this:
+
+void CMainFrame::OnInitMenuPopup(CMenu* pPopupMenu, UINT nIndex, BOOL
+bSysMenu) 
+{   
+   // Note: the nIndex is the zero based popup menu inclusive of the popups
+   //       that you see when the main menu pops become visible. In other
+   //       words, you count the cascading menus to get right index.
+
+   CMenu *open;
+   if (nIndex == ITEM_MENU_INDEX
+      && pPopupMenu->GetMenuItemID(ITEM_MENU_1ST_NON_POPUP_INDEX)
+                                   == ID_ITEM_IMPORT)
+   {
+
+      // Get the "Open" popup menu
+      open = pPopupMenu->GetSubMenu(ITEM_MENU_OPEN_INDEX);
+      ASSERT(open != NULL);
+
+    // ... more code sniped from here. But this is where your enablment
+code
+   // can go!
+}
+
+
+Also, just because your menu's are dynamically created does NOT
+mean that you can not use ON_UPDATE_COMMAND_UI handlers
+for them: you probably know the range of ID's that you be dynamically
+adding,
+and you just create a single handler for the whole range in
+your message map, like this:
+
+ON_COMMAND_UPDATE_UI_RANGE(YOUR_FIRST_DYNAMENUID,
+                                                        
+YOUR_LAST_DYNAMENUID,
+                        yourFunctionWhichHandlesTheWholeRange)
+
+Then in yourFunction you can use CWnd::GetLastMessage to get the message
+and pull the exact ID out of the WPARAM value of the message.
+
+Have Fun,
+Randy Taylor
+randy_taylor@ebt.com
+
+
+
+----------
+> From: Peter Ingraham <ingraham@vci.com>
+> To: mfc-l@netcom.com
+> Subject: CMenu: Disabling/Dimmint a Menu Item
+> Date: Tuesday, November 26, 1996 4:45 PM
+> 
+> Environment: VC++ 4.2-flat, NT 4.0
+> 
+> I am trying to disable and dim menu items using CMenu::EnableMenuItem,
+> but I am not having any success.  The simple example below
+> illustrates the problem:
+> 
+> 	CMenu* pMnuMain = GetMenu();
+> 	CMenu mnuMain;
+> 	mnuMain.Attach(pMnuMain->m_hMenu);
+> 	mnuMain.EnableMenuItem(ID_SHOW_FILES, MF_BYCOMMAND | MF_GRAYED);
+> 	mnuMain.Detach();
+> 
+> The result is that the menu item is neither dimmed not disabled.
+> To test the code, I replaced the "EnableMenuItem" line with:
+> 
+> 	mnuMain.CheckMenuItem(ID_SHOW_FILES, MF_BYCOMMAND | MF_CHECKED);
+> 
+> from which I got the expected result (the item was checked).
+> 
+> It has been suggested that I use the ON_UPDATE_COMMAND_UI interface,
+> but the menu items I'm trying to control reside on nested pop-up
+> menus that are dynamically created during program initialization
+> from information in a database.  The item command IDs are dynamically
+> assigned during that time, and I need to control the items
+> "by command", so that I don't have to keep track of which item
+> position on which nested pop-up menu (a bookkeeping nightmare).
+> 
+> The code above is a simple illustration of the problem. If I can get
+> that to work, I have no problem with the rest.  Why doesn't this
+> code work?
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Jim Lawson Williams -- <A HREF="mailto:jimlw@mail.ccur.com.au">jimlw@mail.ccur.com.au</A>
+Friday, November 29, 1996
+</B>
+I think you need something like
+
+m_pApplication->m_pMainWnd->DrawMenuBar();
+
+Regards,
+Jim LW
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dong Chen -- <A HREF="mailto:d_chen@ix.netcom.com">d_chen@ix.netcom.com</A>
+Thursday, November 28, 1996
+</B>
+>
+>The code above is a simple illustration of the problem. If I can get
+>that to work, I have no problem with the rest.  Why doesn't this
+>code work?
+>
+>
+
+It is because you have the m_bAutoMenuEnable set as TRUE by default. There
+is nothing wrong in your code. Simply add m_bAutoMenuEnable = FALSE in your
+mainframe constructor, you will be happy. You need to take care of your
+enable/disable funcitonality yourself though.
+If the flag is set to true, in the call of OnInitMenuPopup by the framework,
+it disable and enable a menu item according to if there exists a message
+handler for that menu item. And this function is called every time the drop
+down menu is about to be shown. But the framework doesn't care about the
+check mark, so that's why the CheckMenuItem function works.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mihir Dalal -- <A HREF="mailto:m_dalal@ECE.concordia.CA">m_dalal@ECE.concordia.CA</A>
+Saturday, November 30, 1996
+</B>
+
+               Environment: VC++ 4.2-flat, NT 4.0
+> > 
+> > I am trying to disable and dim menu items using CMenu::EnableMenuItem,
+> > but I am not having any success.  The simple example below
+> > illustrates the problem:
+> > 
+> > 	CMenu* pMnuMain = GetMenu();
+> > 	CMenu mnuMain;
+> > 	mnuMain.Attach(pMnuMain->m_hMenu);
+> > 	mnuMain.EnableMenuItem(ID_SHOW_FILES, MF_BYCOMMAND | MF_GRAYED);
+> > 	mnuMain.Detach();
+> > 
+> > The result is that the menu item is neither dimmed not disabled.
+> > To test the code, I replaced the "EnableMenuItem" line with:
+> > 
+> > 	mnuMain.CheckMenuItem(ID_SHOW_FILES, MF_BYCOMMAND | MF_CHECKED);
+> > 
+> > from which I got the expected result (the item was checked).
+> > 
+> > It has been suggested that I use the ON_UPDATE_COMMAND_UI interface,
+> > but the menu items I'm trying to control reside on nested pop-up
+> > menus that are dynamically created during program initialization
+> > from information in a database.  The item command IDs are dynamically
+> > assigned during that time, and I need to control the items
+> > "by command", so that I don't have to keep track of which item
+> > position on which nested pop-up menu (a bookkeeping nightmare).
+> > 
+> > The code above is a simple illustration of the problem. If I can get
+> > that to work, I have no problem with the rest.  Why doesn't this
+> > code work?
+
+
+I have a piece of code here specifically written for enabling/disabling 
+menu items. I hope it serves your purpose.
+
+void CUnitrackView::OnUpdateBtnOn(CCmdUI* pCmdUI)
+{
+	if(Auto_Answer == 1)
+	   pCmdUI->Enable(FALSE); // Disable the menu item
+	else
+	   pCmdUI->Enable(TRUE);  // Enable  the menu item
+}
+
+Note that I am intercepting the menu message in the view class. You could 
+intercept in any other class you like. 
+
+The Auto_Answer flag is set in the command handler for the same menu item 
+like this:
+
+void CUnitrackView::OnBtnOn()
+{
+    Auto_Answer = 1; 
+    ::PostMessage(HWND_BROADCAST, WM_USER+5,0,0); // For Comm Window 
+    .....
+    .....
+    .....
+}
+
+You could set this flag in any other message handler you like.
+A similar pair for the menu item "BtnOff" which sets the Auto_Answer flag 
+to 0 makes the BtnOn  & BtnOff menu items toggle their state, which 
+means only one of the two remains enabled at a time. If set to BtnOn it 
+is disabled by the OnUpdateBtnOn handler, & similarly for the BtnOff
+
+Mihir Dalal
+(University Researcher)
+
+----------------------------------------------------------------------
+ Mihir Dalal                        phone : 1-514-274-4430
+ M.Engg(Electrical) Student         fax   : 1-514-421-1166
+ Concordia University               emails: m_dalal@ece.concordia.ca
+ 1455, De Masseuneuve Blvd.   ///             dalal@vlsi.concordia.ca
+ Montreal QC CANADA          (o o)          m_dalal@alcor.concordia.ca
+--------------------------ooO-(_)-Ooo---------------------------------
+   
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

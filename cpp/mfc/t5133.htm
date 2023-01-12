@@ -1,0 +1,492 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+A CPropertySheetView Class?
+</B></FONT>
+<BR>
+<PRE>
+<B>
+<A HREF="mailto:madmagi@gnn.com">madmagi@gnn.com</A>
+Sunday, May 12, 1996
+</B>
+VC++ 4.1
+W95/WNT 3.51+
+
+We need to implement a property sheet view, with the ability to add
+pages to the view.  In investigating the MFC internals we have not
+found an easy way to perform this.
+
+Any help would be greatly appreciated.
+
+madmagi
+"Wouldn't a wizard be better here?"
+
+"I call it a wizard blizzard"
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:MICHAEL@datatree.com">MICHAEL@datatree.com</A>
+Tuesday, May 14, 1996
+</B>
+[Mini-digest: 4 responses]
+
+michael says...
+Use Component Gallery to add Property
+Sheets and Property Pages. Select menu
+items Insert -> Component.
+
+Review the VC++ 4.1 sample files in
+\SAMPLES\GENERAL\PROPDLG
+for additional help.
+
+-----From: MJDALAL <mjdalal@bechtel.com>
+
+--------------- propview.txt -------------------------
+
+Notes.
+
+1. This is for MFC 4.0. Your mileage will undoubtedly vary with other versions
+of MFC.
+
+2. The debugger reports that two exceptions occur in COMCTL32.DLL during the
+creation/use of the class (I have been told that these are something to do with
+Win95 vs NT and can be ignored.)
+
+3. You have to derive a class from CPropertySheetView to actually add pages to
+the CPropertySheet. My code does this in the constructor of
+the derived class. (I'm not using the standard template mechanism to create the
+view, so all the data my pages need is accessible at this point).
+
+4. It works for me... No warranties, no support. Bug reports welcome,
+but please remember that I'm producing applications not class libraries
+for a living... So don't expect an immediate acknowledgement or the
+addition of new features. However, if you send money.. $:-)
+
+-- Mike -- <mbell@quadrillion.com>
+
+--------------- propview.h ----------------------------
+#ifndef _PROPVIEW_H
+#define _PROPVIEW_H
+
+// ====================================================================
+//
+//                                              CPropSheetView
+//
+// This class represents a view that consists of a (modeless) CPropertySheet
+//
+// Derive from it to add pages.
+//
+// Mike Bell, April 96 <mbell@quadrillion.com>
+// ====================================================================
+
+class CPropSheetView : public CView
+{
+protected:
+        CPropSheetView();           // protected constructor used by dynamic
+creation
+        DECLARE_DYNCREATE(CPropSheetView)
+
+// Attributes
+public:
+
+// Operations
+public:
+        // Provide access to underlying CPropertySheet
+        int GetPageCount() const;
+        CPropertyPage* GetActivePage() const;
+        int GetActiveIndex() const;
+        CPropertyPage* GetPage(int nPage) const;
+        int GetPageIndex(CPropertyPage* pPage);
+        BOOL SetActivePage(int nPage);
+        BOOL SetActivePage(CPropertyPage* pPage);
+
+        void AddPage(CPropertyPage* pPage);
+        void RemovePage(CPropertyPage* pPage);
+        void RemovePage(int nPage);
+
+// Overrides
+        // ClassWizard generated virtual function overrides
+        //{{AFX_VIRTUAL(CPropSheetView)
+        public:
+        virtual BOOL Create(LPCTSTR lpszClassName, LPCTSTR lpszWindowName,
+DWORD
+dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID, CCreateContext* pContext
+= NULL);
+        protected:
+        virtual void OnDraw(CDC* pDC);      // overridden to draw this view
+        //}}AFX_VIRTUAL
+
+// Implementation
+protected:
+        virtual ~CPropSheetView();
+#ifdef _DEBUG
+        virtual void AssertValid() const;
+        virtual void Dump(CDumpContext& dc) const;
+#endif
+
+        // Generated message map functions
+protected:
+        //{{AFX_MSG(CPropSheetView)
+        afx_msg void OnSize(UINT nType, int cx, int cy);
+        //}}AFX_MSG
+        DECLARE_MESSAGE_MAP()
+
+protected:
+        CPropertySheet m_propSheet;                     // The property sheet
+};
+
+#endif // _PROPVIEW_H
+
+-------------------- propview.cpp -----------------------
+// ====================================================================
+//
+//                                              CPropSheetView
+//
+// A class which is a view and displays a property sheet.
+//
+// IMPLEMENTATION NOTES
+//
+// 1.   The intention is to
+//              provide an equivalent to CFormView, but if you look at how that
+class
+//              is implemented, you find a number of hidden APIs are used to
+//              accomplish the desired effect.
+//
+// 2.   The above is accomplished by creating a CPropertySheet and arranging
+//              for it to fully occupy the area of the CView. This is
+//              accomplished via the Create and OnSize calls. The initial size
+of the
+//              frame window is adjusted to match the size of the property
+sheet
+//
+// 3.   A possible problem is that COMCTL32.DLL throws an Access Violation
+//              exception on the first creation of the property sheet. I can't
+find
+//              a reason for this. However, it appears (at the moment) to be
+harmless.
+//              It may even be a feature. Rumour has it that it relates to
+Win95 vs
+//              WinNT
+//
+//      Mike Bell, April 96 <mbell@quadrillion.com>
+
+#include "stdafx.h"
+#include "qy.h"
+#include "propview.h"
+
+#ifdef _DEBUG
+#define new DEBUG_NEW
+#undef THIS_FILE
+static char THIS_FILE[] = __FILE__;
+#endif
+
+// ====================================================================
+// CPropSheetView
+// ====================================================================
+
+IMPLEMENT_DYNCREATE(CPropSheetView, CView)
+
+CPropSheetView::CPropSheetView()
+{
+        // Derived classes should call AddPage here
+}
+
+CPropSheetView::~CPropSheetView()
+{
+}
+
+// ====================================================================
+//                      CPropSheetView CPropertySheet wrappers
+// ====================================================================
+
+int CPropSheetView::GetPageCount() const
+{
+        return m_propSheet.GetPageCount();
+};
+
+CPropertyPage* CPropSheetView::GetActivePage() const
+{
+        return m_propSheet.GetActivePage();
+};
+
+int CPropSheetView::GetActiveIndex() const
+{
+        return m_propSheet.GetActiveIndex();
+};
+
+CPropertyPage* CPropSheetView::GetPage(int nPage) const
+{
+        return m_propSheet.GetPage( nPage );
+};
+
+int CPropSheetView::GetPageIndex(CPropertyPage* pPage)
+{
+        return m_propSheet.GetPageIndex( pPage );
+};
+
+BOOL CPropSheetView::SetActivePage(int nPage)
+{
+        return m_propSheet.SetActivePage( nPage );
+};
+
+BOOL CPropSheetView::SetActivePage(CPropertyPage* pPage)
+{
+        return m_propSheet.SetActivePage( pPage );
+};
+
+void CPropSheetView::AddPage( CPropertyPage* pPage )
+{
+        m_propSheet.AddPage( pPage );
+};
+
+void CPropSheetView::RemovePage( CPropertyPage* pPage )
+{
+        m_propSheet.RemovePage( pPage );
+};
+
+void CPropSheetView::RemovePage(int nPage)
+{
+        m_propSheet.RemovePage( nPage );
+};
+
+BEGIN_MESSAGE_MAP(CPropSheetView, CView)
+        //{{AFX_MSG_MAP(CPropSheetView)
+        ON_WM_SIZE()
+        ON_WM_SETFOCUS()
+        //}}AFX_MSG_MAP
+END_MESSAGE_MAP()
+
+// ====================================================================
+// CPropSheetView drawing
+
+void CPropSheetView::OnDraw(CDC* pDC)
+{
+        CDocument* pDoc = GetDocument();
+        // Completely eclipsed by m_propSheet (we hope!)
+};
+
+// ====================================================================
+// CPropSheetView diagnostics
+
+#ifdef _DEBUG
+void CPropSheetView::AssertValid() const
+{
+        CView::AssertValid();
+}
+
+void CPropSheetView::Dump(CDumpContext& dc) const
+{
+        CView::Dump(dc);
+}
+#endif //_DEBUG
+
+// ====================================================================
+//                      CPropSheetView overrides
+// ====================================================================
+
+//
+// What we are trying to do here is:
+//              (a) create the default view CWnd
+//              (b) create a property sheet that is a child of this view
+//              (c) Adjust the size of the parent frame so that it matches
+//                      the normal size of the child
+//
+//
+BOOL CPropSheetView::Create(LPCTSTR lpszClassName, LPCTSTR lpszWindowName,
+DWORD
+dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID, CCreateContext*
+pContext)
+
+{
+        if (!CWnd::Create(lpszClassName, lpszWindowName,
+                                dwStyle|WS_CLIPCHILDREN, rect, pParentWnd, nID,
+pContext)) {
+                return FALSE;
+        }
+        if (!m_propSheet.Create( this,
+                                                                        //     
+DS_MODALFRAME|
+                                                                               
+DS_3DLOOK|DS_CONTEXTHELP|
+                                                                               
+DS_SETFONT|
+                                                                               
+WS_CHILD|WS_VISIBLE
+                                                                               
+ )) {
+                return FALSE;
+        }
+
+        // Adjust initial size of frame to match the property sheet
+        CRect rectIdeal;
+        m_propSheet.GetWindowRect( rectIdeal );
+
+        CFrameWnd* pFrame = GetParentFrame();
+        ASSERT_VALID(pFrame);                                           // Calc
+frame size given
+        pFrame->CalcWindowRect( rectIdeal );            // client
+        pFrame->SetWindowPos( NULL, 0,0,
+                                        rectIdeal.Width(), rectIdeal.Height(),
+                        SWP_NOMOVE|SWP_NOZORDER|SWP_NOACTIVATE);
+
+        return TRUE;
+};
+
+// ====================================================================
+//                      CPropSheetView message handlers
+// ====================================================================
+
+//
+// Position the property sheet size (if it exists) to cover
+// the entire area of the view
+//
+void CPropSheetView::OnSize(UINT nType, int cx, int cy)
+{
+        if (IsWindow(m_propSheet.m_hWnd)) {
+                // May not have been created when first called!
+                m_propSheet.SetWindowPos( NULL, 0, 0, cx, cy,
+                                                       
+SWP_NOZORDER|SWP_NOACTIVATE );
+        }
+        CView::OnSize(nType, cx, cy);
+};
+
+// We don't want the focus, so give it to our CPropertySheet
+// to handle
+void CPropSheetView::OnSetFocus(CWnd* pOldWnd)
+{
+        CView::OnSetFocus(pOldWnd);
+        m_propSheet.SetFocus();
+};
+
+-------------------------------------------------------------------------------
+--
+Hope this helps,
+
+:-) 
+Manish Dalal
+mjdalal@bechtel.com
+
+-----From: John Moulder <jm@wg.icl.co.uk>
+
+This question keeps on coming up...
+
+Make the property sheet a modeless child window of the CView object. I do
+this and it works fine.
+
+I have developed an MDI property sheet. This is a modeless property sheet
+that is a child window of a CView derived class in an MDI child window. The
+window hierarchy is:
+
+MDI child window 
+ |
+ + - AfxFrameOrView window (the view)
+     |
+     + - Modeless Property sheet
+         |
+         + - Tab control (to switch between pages)
+         | - Property page
+         |   |
+         |   + control(s) in each page
+         |
+         + - Property page(s)...
+
+
+class CMDIPropertySheetView : public CView
+{
+protected:
+    // property sheet
+    CMyPropertySheet            m_PropSheet;
+    
+    // pages for property sheet
+    CMyPageOne                  m_Page1;
+    CMyPageTwo                  m_Page2;
+    CMyPageThree                m_Page3;
+
+    // etc
+}
+
+  
+In my CPropertySheet derived class I reimplemented the RecalcLayout() to
+resize the view owning the sheet to be just big enough to enclose the sheet.
+The property sheet window is placed in the client area of the view window.
+The reimplemented RecalcLayout() is called from the CPropertySheet::OnCreate(). 
+
+I found that I had to reimplement the original CPropertySheet::OnCreate() to
+do various things specific to my implementation.
+
+When the CView window changes size (remember it is an MDI child window) I
+resize the property sheet to fit the MDI child window (View).
+
+My environment is windows 3.1, MSVC 1.5x, MFC 2.??, MFC CPropertySheet (16 bit).
+
+Hope this helps.
+
+-----From: "David W. Gillett" <DGILLETT@expertedge.com>
+
+  What I have done is implement a trivial CFormView-derivative with a 
+modeless CPropertySheet-derivative as a child.  Resize the sheet 
+(drop its lower edge) to encompass the buttons (initially invisible 
+and disabled because the sheet is modeless), and resize the view to 
+fit the sheet.  I expose most of the public methods of the child 
+CPropertySheet as methods of the derived CPropertySheetView class, 
+including of course AddPage().
+  My child sheet is actually of a class derived from CPropertySheet
+(in order to add the DS_CONTROL and WS_EX_CONTROLPARENT styles in
+its OnInitDialog).
+  The only tricky bit is to hook up the OK/Cancel buttons so they both
+get signalled to the pages, and dismiss the view.  I don't actually 
+enable/show the sheet's buttons, but provide OK and Cancel buttons on 
+a dialog template for the CFormView, move and resize them to sit 
+right over the hidden/disabled property sheet buttons, and use 
+PressButton() to notify the sheet when they are clicked (and invoke 
+the sheet logic which notifies the pages in turn).  Those handlers 
+will need to call any final code in specific derived view classes.
+CPropertyPage objects may be members of these derived classes, or 
+not.
+
+Dave
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

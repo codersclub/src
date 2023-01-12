@@ -1,0 +1,352 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Cursor is not changing to HOURGLASS
+</B></FONT>
+<BR>
+<PRE>
+<B>
+<A HREF="mailto:vempati@wiproge.med.ge.com">vempati@wiproge.med.ge.com</A>
+Monday, January 29, 1996
+</B>
+HI All,
+
+   I am using VC++ 1.0, MFC 2.0 and Windows 3.1.
+
+  My project is  Client-Server based application. I am using WINSOCK.DLL for the 
+  functions like send and recv. I am writing Client application.
+
+  As soon as I send some request to server I wanted to change my cursor shape
+  to hourglass  till I get the response from server.
+  
+  I tried in the following two ways:
+
+     1. hCursorSave = SetCursor((LoadCursor(NULL, IDC_WAIT));
+	send(.....)  // send request to server
+
+        ......      // wait till you get data from server(while loop)
+                    // Here I want's to change the cursor position to hour glass
+
+        recv(....)
+        SetCursor(hCursorSave);
+
+     2. BegineWaitCursor();
+        send(...)
+
+        ......      // wait till you get data from server(while loop)
+                    // Here I want's to change the cursor position to hour glass
+
+       recv(....)
+       EndWaitCursor(). 
+
+
+     In both ways I am not getting the hourglass shape.
+
+    The cursor shape is changing into hourglass shape and disappearing Immediately.
+    As soon as the program flow reaches to send the hourglass shape is getting
+    disappearing.(means coming to normal shape).
+
+   Will the send cuase any problem to cursor shape? Where I am doing  wrong?
+   Any other methods are there to change my cursor position to hourglass?
+   
+   Please help me in coming out of this problem?
+   Thanks in advance.
+
+   Regards,
+   Venkateswarlu
+
+----------------------------------------------------------------------------
+Venkateswarlu Vempati                          Tel : (91)-80-5263121
+Senior Design Engineer                                    extn:265, 266.
+Wipro GE Medical Systems                     
+A-1, Golden Enclave                         
+Airport road  
+Bangalore - 560 017 INDIA
+
+e-mail : vempati@wiproge.med.ge.com
+---------------------------------------------------------------------------
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Roger Lamb RAS+ 95 -- <A HREF="mailto:rasplus@lambsoftware.com">rasplus@lambsoftware.com</A>
+Monday, January 29, 1996
+</B>
+[Mini-digest: 8 responses]
+
+I had this problem also... the first call to CWinApp::OnIdle() will blow
+away your effort to draw a hourglass..
+
+I setup a member variable in my FrameWindow m_bCursorOn which would get set
+to TRUE when you want to show an hourglass... 
+
+Then override CWnd::OnSetCursor
+
+BOOL CMyFrame::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
+{
+        if(!m_bCursorOn)
+        {
+                ::SetCursor(AfxGetApp()->LoadStandardCursor(IDC_WAIT));
+                return 1;
+        }
+
+        return CMDIChildWnd::OnSetCursor(pWnd, nHitTest, message);
+}
+
+Seemed to work ok then with no flash.
+
+Sincerely,
+Roger C. Lamb Jr.
+
+Lamb Software Inc.
+Email: rasplus@lambsoftware.com
+Upates: http://www.lambsoftware.com
+
+-----From: Dicky Singh <Dicky@landmark.com>
+
+Add a handler for WM_SETCURSOR and modify the code as follows, 
+set/reset  m_bShowingStandardCursor elsewhere as required.
+
+BOOL CWorkspaceView::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT iMsg)
+{
+    if (m_bShowingStandardCursor)
+        return CView::OnSetCursor(pWnd, nHitTest, iMsg);
+
+    CApp *pApp=(CApp *)AfxGetApp();
+    ASSERT(pApp);
+    ::SetCursor(pApp->LoadStandardCursor(IDC_WAIT));
+    return TRUE;  // remember to return TRUE
+}
+-Dicky
+PS Should work with MFC 2.0. Can't say for sure.
+
+------------------------------
+// Dicky
+// Dicky@Landmark.com
+
+-----From: Mike Lainhart <lainhart@amelia.sp.trw.com>
+
+Are you setting a breakpoint in that area?  I've done the same thing and
+thought it wasn't working, but it was the debugger that had changed the
+cursor back.
+
+>   Will the send cuase any problem to cursor shape? Where I am doing  wrong?
+>   Any other methods are there to change my cursor position to hourglass?
+
+I'm sure a lot of people have better answers about your cursor problem, but
+I wanted to mention another issue that arose for me when doing winsock
+programming and using the debugger.  Don't do it!  The network just keeps on
+going while you've stopped in the debugger; I believe that buffers get full
+and the communication hangs up totally and does not GO when you say so in
+the debugger. If someone knows a way around this I would sure like to hear
+about it.
+
+Mike__
+
+-----From: Ron Birk <rbirk@ctp.com>
+
+Hi there,
+
+>   My project is  Client-Server based application. I am using WINSOCK.DLL
+for
+>   the functions like send and recv. I am writing Client application.
+> 
+>   As soon as I send some request to server I wanted to change my cursor
+shape
+>   to hourglass  till I get the response from server.
+>   ...
+
+The problem is that strange things happens when using winsock routines send
+and recv. As win31 have coopretaive multitasking, the winsock routines will
+switch process while waiting for results. This will cause another "thread"
+running in the background. This "thread" will notice, hey whats going on,
+the cursor of this window should be a regular arrow, lets change it back.
+
+What I did is to set a flag when the hourglass should be on, and in
+OnSetCursor() do a RestoreWaitCursor() when the flag is on. You will also
+have to take care of reentrancy in your code, because of this new "thread".
+
+Ron
+
+--
+ /\/\   Ron Birk                        Email:     rbirk@ctp.com
+/ /_ \  Horizontal Solutions            Tel:       +46 8 744 6119
+\  / /  Cambridge Technology Partners   Fax:       +46 8 744 9933
+ \/\/   Stockholm, Sweden               Voicemail: +1 617 374 2081
+
+-----From: CShafer <gwa1@usa.nai.net>
+
+Venkateswarlu,
+
+Try CWinApp::DoWaitCursor or the wait cursor class CWaitCursor.
+Not sure if these exist in MFC 2.0 but this should put you on 
+the right trail.
+-----From: kitk@mudshark.sunquest.com (Kit Kauffmann)
+
+Yes: WinSock apparently uses SendMessage or other calls which give Windows a 
+chance to get in there and change the cursor.  The best you can do is give 
+your window a temporary cursor change with ON_WM_SETCURSOR and code like:
+
+BOOL YourMainWindow::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
+{
+        if( YouWantAnHourglass )
+        {
+                ::SetCursor( ::LoadCursor( NULL, IDC_WAIT ) );
+                return TRUE;
+        }
+        else
+                return CFrameWnd::OnSetCursor( pWnd, nHitTest, message );
+}
+
+HTH!
+
+-----From: Ludek Slegr <ludek.slegr@munich.ixos.de>
+
+
+Hi,
+
+We had the problem too. The cause is "too clever" implementation of the 
+windows sockets under 16-bit Windows. The blocking operations can 
+theoretically last quite long - at least from the user's point of view. 
+Therefore it is not desired to leave all Windows disabled, which would with 
+16-bit Windows definetely happen. So, while you are waiting for a blocking 
+sockets call, window messages are still processed and the functionality of 
+the wait cursor is voided. Our solution was to implement a hook as described 
+in the description of windows sockets (for example MSDL CD).
+
+Hope it helps.
+
+Regards,
+Ludek
+-----From: Seth Goldstein <seth@mathworks.com>
+
+I had a similar problem with the hourglass when using DDE.
+The problem had to do with DDE starting up its own message
+loop (and hidden window?, memory fails...) which would take
+over the cursor.
+
+The workaround for us was to wrap the send and receive calls 
+with SetCapture and ReleaseCapture.
+
+Side note: the safest way to do this is to make a class whose 
+constructor does the Set and destructor does the Release, then 
+allocate one of those suckers on the stack.
+
+Hope this helps,
+Seth
+-- 
++------------------------------------------------------+
+|   Seth Goldstein         email: seth@mathworks.com   |
+|   The Mathworks, Inc.    http://www.mathworks.com    |
+|                          info: info@mathworks.com    |
+|------------------------------------------------------|
+| PGP Public Key on server                             |
+|   http://www-swiss.ai.mit.edu/~bal/pks-toplev.html   |
++------------------------------------------------------+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Timothy Purves -- <A HREF="mailto:tpurves@noc.hfh.edu">tpurves@noc.hfh.edu</A>
+Friday, February 02, 1996
+</B>
+We had this problem in one of our apps, and I solved it with the following code.
+
+In the app class.
+
+class CTheApp : public CWinApp
+{
+...
+public:
+    // the following uses an undocumented member of CWinApp (works for MFC
+2.x-MFC 4.0)
+    int GetWaitCursorCount() { return m_nWaitCursorCount; }
+};
+
+#define TheApp ((CTheApp*)AfxGetApp())
+
+In the Frame class.
+
+BOOL CTheAppFrame::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
+{
+     // if in a wait condition, restore the wait cursor
+     if(TheApp->GetWaitCursorCount() > 0)
+        {
+        AfxGetApp()->RestoreWaitCursor();
+        return TRUE;
+        }
+    return CMDIFrameWnd::OnSetCursor(pWnd, nHitTest, message);
+}
+
+A helper class.
+
+#ifndef WIN32
+class CWaitCursor
+{
+public:
+    CWaitCursor()
+        { AfxGetApp()->BeginWaitCursor(); }
+    ~CWaitCursor()
+        { AfxGetApp()->EndWaitCursor(); }
+    void Restore()
+        { AfxGetApp()->RestoreWaitCursor(); }
+};
+#endif
+
+And to use....
+
+CWaitCursor wait;
+
+-tim
+
+---------------------------------------------------
+    Timothy Purves              tpurves@noc.hfh.edu
+    Lead Programmer Analyst
+    Henry Ford Health System
+    Rochester Hills, MI
+    USA
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

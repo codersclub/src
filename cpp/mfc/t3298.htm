@@ -1,0 +1,209 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Interuptable listbox
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Fredrik Gunne -- <A HREF="mailto:fge@ada.agema.se">fge@ada.agema.se</A>
+Thursday, January 04, 1996
+</B>
+Consider this hypothetical situation: A dialog with one "Fill Listbox"-button and
+one user-drawn listbox. When the user presses the button, the
+listbox is filled with filenames in the current directory (using
+CListBox::Dir).
+
+In CMyListBox::DrawItem the kind of the file is determined, and if a BMP,
+the BMP is drawn in the listbox.
+
+This works fine.
+
+Now, suppose the user presses the button again. (Perhaps the files in the current
+directory has changed) Well, he just have to sit back and wait until all the files
+in the visible part of the listbox have been processed (i.e. painted). With a
+not-so-powerful PC, this may take some time. The reason is simply that the the
+LBUTTON-messages that go to the button won't be processed until the listbox is 
+finished.
+
+To solve this (in my case, which is a much more complicated dialog) I've done the 
+following:
+
+In CMyListBox::DrawItem, I save the DRAWITEMSTRUCT in an array
+(which takes almost no time)
+In CMyListBox::OnPaint, I empty the array, calls CListBox::OnPaint and
+start a timer (Yuck!)
+In CMyListBox::OnTimer a take the first entry in the array an process it. Then 
+I delete that entry. 
+
+What I have achieved is that the DrawItem-messages that stops the LBUTTON-messages
+are processed rapidly. Then, when a timer-message comes along, I do the job.
+Since both WM_TIMER and WM_LBUTTON... messages are queued, they have equal chance
+of being processed.
+ 
+It works, but PLEASE tell me there's a better way to do this! For instance, what 
+happens if I can't get a timer (there are only 5 in Windows 3.x, aren't there?). 
+Well, I have to keep the old code to cover that case.
+
+Any ideas?
+Fredrik
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+David W. Gillett -- <A HREF="mailto:DGILLETT@expertedge.com">DGILLETT@expertedge.com</A>
+Friday, January 05, 1996
+</B>
+> What I have achieved is that the DrawItem-messages that stops the
+> LBUTTON-messages are processed rapidly. Then, when a timer-message
+> comes along, I do the job. Since both WM_TIMER and WM_LBUTTON...
+> messages are queued, they have equal chance of being processed. 
+
+  Actually, WM_TIMER messages are not -- they're like WM_PAINT 
+messages in that you will not receive one until your message queue is 
+empty, and there can never be more than one pending to you.
+
+> It works, but PLEASE tell me there's a better way to do this! For
+> instance, what happens if I can't get a timer (there are only 5 in
+> Windows 3.x, aren't there?). 
+
+  16, actually.  5 is the number of cached DCs.
+
+
+  Instead of using a timer to send yourself a message (it's a 
+WM_TIMER, but all you really need is "WM_OK_TO_DO_NEXT_ITEM"), why 
+not just, at the end of your "draw one item" code, use PostMessage to 
+queue a message to yourself to draw the next, if there is one.  Any 
+messages that have accumulated in the queue while you were drawing 
+the item will get dispatched first, but as soon as they clear the 
+queue you'll get it without waiting for a timer.
+
+  Another possibility -- the canonical one -- is to insert a 
+PeekMessage loop in your code....
+
+Dave
+
+ 
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+David Stidolph -- <A HREF="mailto:stidolph@magnet.com">stidolph@magnet.com</A>
+Friday, January 05, 1996
+</B>
+[Mini-digest: 3 responses]
+
+It sounds like what you want is to stop the list box from being drawn =
+until you are finished making changes, then redraw the new listbox.  Is =
+that correct?  If it is, then you want to use the following CWnd call =
+(remember the CListBox is derived from CWnd and thus has this function):
+
+void SetRedraw( BOOL bRedraw =3D TRUE );
+ =20
+Parameters
+bRedraw   Specifies the state of the redraw flag. If this parameter is =
+TRUE, the redraw flag is set; if FALSE, the flag is cleared.
+Remarks
+An application calls SetRedraw to allow changes to be redrawn or to =
+prevent changes from being redrawn.=20
+This member function sets or clears the redraw flag. While the redraw =
+flag is cleared, the contents will not be updated after each change and =
+will not be repainted until the redraw flag is set. For example, an =
+application that needs to add several items to a list box can clear the =
+redraw flag, add the items, and then set the redraw flag. Finally, the =
+application can call the Invalidate or InvalidateRect member function to =
+cause the list box to be repainted.
+
+I have used this function for exactly this reason -- I was creating a =
+tree control a couple of years ago (before Windows 95 and the tree =
+control) and I had to insert a lot of items (when a folder was opened).  =
+I called SetRedraw(FALSE) at the beginning of the insertion and =
+SetRedraw(TRUE) after I was done.
+
+Good luck.
+
+-----From: bibhas@hermes (Bibhas Bhattacharya)
+
+> Now, suppose the user presses the button again. (Perhaps the files in the current
+> directory has changed) Well, he just have to sit back and wait until all the files
+> in the visible part of the listbox have been processed (i.e. painted). With a
+> not-so-powerful PC, this may take some time. The reason is simply that the the
+> LBUTTON-messages that go to the button won't be processed until the listbox is 
+> finished.
+
+Try loading the BMP's one after another from the application idle function.
+
+Bibhas.
+
+-----From: Tim Irwin <timi@interlinq.com>
+
+You can implement a message processing function such as the following, which 
+will allow the system to check the messages in the queue.
+
+BOOL CClassWithLongProcess::PassMessages(CDialog *dlg)
+{
+    MSG msg;
+    BOOL retVal;
+    while (retVal = PeekMessage(&msg, NULL, NULL, NULL, PM_REMOVE))
+    {
+        if (!IsWindow(dlg->m_hWnd) || !dlg->IsDialogMessage(&msg))
+        { // if the dialog didn't handle the message, pass it on through the 
+system
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+    }
+    return retVal;
+}
+
+Note: there is another function similar to PeekMessage called GetMessage 
+which waits for a message to appear in the queue before returning, this can 
+really slow down the processing unless, say, the mouse is moving (i.e. "For 
+best performance, move mouse vigorously.").
+
+Hope this helps.
+Tim Irwin
+timi@interlinq.com
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

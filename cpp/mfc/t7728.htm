@@ -1,0 +1,403 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+How to find and terminate all the dialogs created by an app
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Simon Young -- <A HREF="mailto:young_simon@jpmorgan.com">young_simon@jpmorgan.com</A>
+Thursday, November 14, 1996
+</B>
+Environment: NT 3.51,VC++ 4.0
+
+I have an app which is heavily asynchronous with timers and socket comms (using 
+CAsyncSocket).
+
+It also displays several dialogs invoked from within each other (so you could 
+have three or four dialogs
+displayed on top of each other).
+
+My problem is, when I get a certain event (for example, socket disconnect) I 
+want to kill all the dialogs 
+I have on display from this app.
+
+Firstly, how do I find them, given that neither the parent or owner window of a 
+dialog is the parent passed to the 
+dialog constructor (it appears to be modified by Windows to be the root window)?
+
+Secondly, if I do manage to find a dialog and then kill it, how would it exit 
+into the calling  routine - given that I have
+killed it probably from a message handler somewhere within the dialog message 
+handler itself?
+
+(Note - this is not multithreaded code because I need to port to WIN32S as 
+well.)
+
+Regards
+
+Simon
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Bryan McKay -- <A HREF="mailto:Bryan_McKay@msn.com">Bryan_McKay@msn.com</A>
+Friday, November 15, 1996
+</B>
+[Mini-digest: 2 responses]
+
+You could keep a global list of all the window handles for the dialog boxes 
+you create (and of course remove them from the list when you destroy them).  
+Then you could post a WM_CLOSE message to all the handles that are left when 
+you want to destroy them all.
+
+----------
+From: 	owner-mfc-l@majordomo.netcom.com on behalf of Simon Young
+Sent: 	Friday, November 15, 1996 5:57 AM
+To: 	mfc-l
+Subject: 	How to find and terminate all the dialogs created by an app
+
+Environment: NT 3.51,VC++ 4.0
+
+I have an app which is heavily asynchronous with timers and socket comms 
+(using 
+CAsyncSocket).
+
+It also displays several dialogs invoked from within each other (so you could 
+have three or four dialogs
+displayed on top of each other).
+
+My problem is, when I get a certain event (for example, socket disconnect) I 
+want to kill all the dialogs 
+I have on display from this app.
+
+Firstly, how do I find them, given that neither the parent or owner window of 
+a 
+dialog is the parent passed to the 
+dialog constructor (it appears to be modified by Windows to be the root 
+window)?
+
+Secondly, if I do manage to find a dialog and then kill it, how would it exit 
+into the calling  routine - given that I have
+killed it probably from a message handler somewhere within the dialog message 
+handler itself?
+
+(Note - this is not multithreaded code because I need to port to WIN32S as 
+well.)
+
+Regards
+
+Simon
+
+
+-----From: Dave_Rabbers@Quinton-Eng.CCMAIL.CompuServe.COM
+
+> Firstly, how do I find them, given that neither the parent or
+> owner window of a dialog is the parent passed to the dialog
+> constructor (it appears to be modified by Windows to be the
+> root window)?
+
+Look at EnumThreadWindows
+
+> Secondly, if I do manage to find a dialog and then kill it,
+> how would it exit into the calling  routine - given that I
+> have killed it probably from a message handler somewhere within
+> the dialog message handler itself?
+
+Either SendMessage or PostMessage a command or message the dialog understands, 
+such as IDCANCEL or WM_CLOSE.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Sunday, November 17, 1996
+</B>
+[Mini-digest: 2 responses]
+
+At 04:32 11/14/96, Simon Young wrote:
+>Environment: NT 3.51,VC++ 4.0
+
+>It also displays several dialogs invoked from within each other (so you could 
+>have three or four dialogs displayed on top of each other).
+
+>My problem is, when I get a certain event (for example, socket disconnect) I 
+>want to kill all the dialogs I have on display from this app.
+
+Won't your users find this a bit startling?
+
+>Firstly, how do I find them, given that neither the parent or
+>owner window of a dialog is the parent passed to the dialog constructor
+
+Yes, it is.  According to the documentation, the CDialog constructor looks like
+this:
+
+CDialog( LPCTSTR lpszTemplateName, CWnd* pParentWnd = NULL );
+CDialog( UINT nIDTemplate, CWnd* pParentWnd = NULL );
+CDialog();
+
+Neglecting the default constructor, you can see that a pointer to the parent
+window is passed as the second parameter.  If you don't specify it, it defaults
+to NULL.  If it's NULL, or if MFC thinks the window you've specified is unsafe,
+it will try to use the main window of your application.  If there's no main
+window of your application (that is, AfxGetMainWnd() returns NULL or identifies
+a CWnd objectw ith an uncreated window), MFC will use NULL--and that has
+Windows use the desktop as the parent of your box.
+
+Otherwise, the parent is sent to the window you've specified.
+
+To make things easy, ClassWizard usually produces a CDialog-derived class that
+doesn't worry about the parent.  For almost all applications, this is just
+fine.
+
+> (it appears to be modified by Windows to be the root window)?
+
+What is "the root window"? I've never heard that term before.
+
+I'm using Window NT Workstation 4.0, but I can create an unmodified MFC
+AppWizard application and have it pop up its About Box.  Using Spy++, I can
+verify that the dialog's owner and parent are the main window of my application.
+
+So, I guess the answer to your question is to walk the hierarchy of windows
+in your application.  You can call GetWindow() and GetNextWindow() to do that.
+
+>Secondly, if I do manage to find a dialog and then kill it, how would it exit 
+>into the calling  routine - given that I have killed it probably from a
+>message handler somewhere within the dialog message handler itself?
+
+Given the window handle, I would post it a WM_COMMAND message with lParam == 0
+and wParam == IDCANCEL.  That would invoke the OnCancel() handler of the
+window, and that'll let you clean up everything.
+
+If you post this message, you'll make an entry in the message queue and
+continue executing.  If you send this message, you won't return until the
+dialog box closing message is completely processed.  The dialog box closing
+message usually ends just after calling EndDialog(), and _does not conitnue
+executing_ by returning to whoever called DoModal().
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+I'm afraid I've become some sort of speed freak.
+These words are my own. I do not speak on behalf of Microsoft.
+
+-----From: "Christopher C. Remington" <sci@ids2.idsonline.com>
+
+Look at the MFC source code examples for GetNextWindow(), GetTopWindow(), 
+GetParentWindow()..etc. it's kind of tricky, but with a little patience
+you'll get it.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Simon Young -- <A HREF="mailto:young_simon@jpmorgan.com">young_simon@jpmorgan.com</A>
+Tuesday, November 19, 1996
+</B>
+Environment: NT 3.51,VC++ 4.0
+
+mikeblas @ nwlink.com (Mike Blaszczak) @ SMTP wrote:
+
+>>It also displays several dialogs invoked from within each other (so you could 
+>>have three or four dialogs displayed on top of each other).
+>
+>>My problem is, when I get a certain event (for example, socket disconnect) I 
+>>want to kill all the dialogs I have on display from this app.
+>
+>Won't your users find this a bit startling?
+
+Sometimes its good to startle users :-)
+
+Seriously, I hope not, particularly if I tell them what just happened (i.e. 
+your server exited, 
+please try again). The 100% correct way of doing this would be to attempt to 
+recover
+the environment when the server restarted, but this application is not critical 
+enough for
+it to be worth doing that.
+
+>>Firstly, how do I find them, given that neither the parent or
+>>owner window of a dialog is the parent passed to the dialog constructor
+>
+>Yes, it is.  According to the documentation, the CDialog constructor looks like
+>this:
+
+Oh no it's no-ot...
+
+>
+>CDialog( LPCTSTR lpszTemplateName, CWnd* pParentWnd = NULL );
+>CDialog( UINT nIDTemplate, CWnd* pParentWnd = NULL );
+>CDialog();
+>
+>Neglecting the default constructor, you can see that a pointer to the parent
+>window is passed as the second parameter.  If you don't specify it, it defaults
+>to NULL.  If it's NULL, or if MFC thinks the window you've specified is unsafe,
+>it will try to use the main window of your application.  If there's no main
+>window of your application (that is, AfxGetMainWnd() returns NULL or identifies
+>a CWnd objectw ith an uncreated window), MFC will use NULL--and that has
+>Windows use the desktop as the parent of your box.
+>
+>Otherwise, the parent is sent to the window you've specified.
+
+This is what you might think. This is what I thought. But it is not the case. 
+It turns out that the parent passed into the constructor of CDialog may _not_ 
+in fact be either the parent or the owner of the dialog. Windows changes it. 
+
+>I'm using Window NT Workstation 4.0, but I can create an unmodified MFC
+>AppWizard application and have it pop up its About Box.  Using Spy++, I can
+>verify that the dialog's owner and parent are the main window of my 
+application.
+>
+>So, I guess the answer to your question is to walk the hierarchy of windows
+>in your application.  You can call GetWindow() and GetNextWindow() to do that.
+
+If you read the knowledge base article Q118610 you will see
+
+"SUMMARY
+=======
+ 
+The window object returned by CWnd::GetParent in a modal dialog box is the
+top-level window that owns the dialog box, usually the main window. It is
+not necessarily the window object that has been passed to the constructor
+or Create() of the CDialog object. If you need to access the parent window
+that was passed in the constructor of the dialog-box object, then you need
+to save a copy of this pointer in the dialog-box object."
+
+So for my application, creating dialogs from MDI views gave the above 
+behaviour. This was the root of my problem. 
+I have now solved it using EnumThreadWindows as was suggested in another post.
+
+Thanks
+
+Simon
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Simon Young -- <A HREF="mailto:young_simon@jpmorgan.com">young_simon@jpmorgan.com</A>
+Tuesday, November 19, 1996
+</B>
+Environment: NT 3.51,VC++ 4.0
+
+mikeblas @ nwlink.com (Mike Blaszczak) @ SMTP wrote:
+
+>>It also displays several dialogs invoked from within each other (so you could 
+>>have three or four dialogs displayed on top of each other).
+>
+>>My problem is, when I get a certain event (for example, socket disconnect) I 
+>>want to kill all the dialogs I have on display from this app.
+>
+>Won't your users find this a bit startling?
+
+Sometimes its good to startle users :-)
+
+Seriously, I hope not, particularly if I tell them what just happened (i.e. 
+your server exited, 
+please try again). The 100% correct way of doing this would be to attempt to 
+recover
+the environment when the server restarted, but this application is not critical 
+enough for
+it to be worth doing that.
+
+>>Firstly, how do I find them, given that neither the parent or
+>>owner window of a dialog is the parent passed to the dialog constructor
+>
+>Yes, it is.  According to the documentation, the CDialog constructor looks like
+>this:
+
+Oh no it's no-ot...
+
+>
+>CDialog( LPCTSTR lpszTemplateName, CWnd* pParentWnd = NULL );
+>CDialog( UINT nIDTemplate, CWnd* pParentWnd = NULL );
+>CDialog();
+>
+>Neglecting the default constructor, you can see that a pointer to the parent
+>window is passed as the second parameter.  If you don't specify it, it defaults
+>to NULL.  If it's NULL, or if MFC thinks the window you've specified is unsafe,
+>it will try to use the main window of your application.  If there's no main
+>window of your application (that is, AfxGetMainWnd() returns NULL or identifies
+>a CWnd objectw ith an uncreated window), MFC will use NULL--and that has
+>Windows use the desktop as the parent of your box.
+>
+>Otherwise, the parent is sent to the window you've specified.
+
+This is what you might think. This is what I thought. But it is not the case. 
+It turns out that the parent passed into the constructor of CDialog may _not_ 
+in fact be either the parent or the owner of the dialog. Windows changes it. 
+
+>I'm using Window NT Workstation 4.0, but I can create an unmodified MFC
+>AppWizard application and have it pop up its About Box.  Using Spy++, I can
+>verify that the dialog's owner and parent are the main window of my 
+application.
+>
+>So, I guess the answer to your question is to walk the hierarchy of windows
+>in your application.  You can call GetWindow() and GetNextWindow() to do that.
+
+If you read the knowledge base article Q118610 you will see
+
+"SUMMARY
+=======
+ 
+The window object returned by CWnd::GetParent in a modal dialog box is the
+top-level window that owns the dialog box, usually the main window. It is
+not necessarily the window object that has been passed to the constructor
+or Create() of the CDialog object. If you need to access the parent window
+that was passed in the constructor of the dialog-box object, then you need
+to save a copy of this pointer in the dialog-box object."
+
+So for my application, creating dialogs from MDI views gave the above 
+behaviour. This was the root of my problem. 
+I have now solved it using EnumThreadWindows as was suggested in another post.
+
+Thanks
+
+Simon
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,325 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Resize CSplitterWnd panes
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Kefah Ibrahim -- <A HREF="mailto:KIbrahim_Ideal@nets.com.jo">KIbrahim_Ideal@nets.com.jo</A>
+Thursday, February 13, 1997
+</B>
+Environment: VC++ 4.0; Win 95
+
+I have nested splitter windows created from  a child frame window using
+CreateStatic in OnCreateClient function of the child frame class (as appears
+in the following code fragment), my problem that I can't initialize the size 
+of the splitters i.e the size of the created panes. the first pane in the
+sequence i.e splitter1(0,0) takes the whole window always, and the only way
+to show the other panes is manually, isn't there any hint that solve the this
+problem.
+I've tried the following:
+- Initialize the pane size by passing the size parameters to the CreateView
+function (they are nPaneX,nPaneY in the example bellow)and it didn't work
+- Use explicit call to SetRowInfo and SetColumnInfoin respond to
+ActivateFrame (and in other places) and yet it didn't work
+- I've tried to use the normal MoveWindow for resizeing and it didn't work
+too.
+
+please advice !!!!
+
+BOOL CChildFrame::OnCreateClient(LPCREATESTRUCT lpcs, CCreateContext*
+pContext)
+{
+	-----
+	-----
+	-----
+	m_wndSplitter.CreateStatic( this, 2, 1,	WS_CHILD | WS_VISIBLE | WS_BORDER,
+								AFX_IDW_PANE_FIRST);
+	// add the second splitter pane - which is a nested splitter with 2 cols
+	if (!m_wndSplitter2.CreateStatic(
+		&m_wndSplitter,     
+		1, 2,               // the new splitter is 2 columns , 1 row
+		WS_CHILD | WS_VISIBLE | WS_BORDER, 
+		m_wndSplitter.IdFromRowCol(0, 0)
+			// new splitter is in the first row, 1st column of first splitter
+	   ))
+
+	//----------------------------
+
+	if(!m_wndSplitter3.CreateStatic(
+		&m_wndSplitter2,2, 1,               // the new splitter is 2 rows, 1 column
+		WS_CHILD | WS_VISIBLE | WS_BORDER,  
+		m_wndSplitter2.IdFromRowCol(0, 0)
+			// new splitter is in the first row, 1st column of first splitter
+	   ))
+
+	//---------------------------------------------------------------
+
+	if (!m_wndSplitter3.CreateView(0, 0,
+		RUNTIME_CLASS(CMyView1), CSize(nPaneX,nPaneY), pContext))
+	{
+		return FALSE;
+	}
+
+	//----------------------------
+
+	if (!m_wndSplitter3.CreateView(1, 0,
+		RUNTIME_CLASS(CMyView2), CSize(nPaneX,nPaneY), pContext))
+	{
+		return FALSE;
+	}
+
+	//----------------------------
+
+	if (!m_wndSplitter2.CreateView(0, 1,
+		RUNTIME_CLASS(CMyView3), CSize(nPaneX, nPaneY), pContext))
+	{
+		return FALSE;
+	}
+
+	//----------------------------
+				if(!m_wndSplitter.CreateView(1,0,RUNTIME_CLASS(CMyView4),CSize(nPaneX,nPaneY),pContext))
+
+
+	//----------------------------
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Syed -- <A HREF="mailto:sxs296@psu.edu">sxs296@psu.edu</A>
+Sunday, February 16, 1997
+</B>
+At 06:19 PM 2/13/97 GMT, you wrote:
+>Environment: VC++ 4.0; Win 95
+>
+>I have nested splitter windows created from  a child frame window using
+>CreateStatic in OnCreateClient function of the child frame class (as appears
+>in the following code fragment), my problem that I can't initialize the size 
+>of the splitters i.e the size of the created panes. the first pane in the
+>sequence i.e splitter1(0,0) takes the whole window always, and the only way
+>to show the other panes is manually, isn't there any hint that solve the this
+>problem.
+use the member function SetRowInfo & SetColumnInfo while you are still in
+your OnCreateClient member function. It will work I bet ya!
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Jim Lawson Williams -- <A HREF="mailto:jimlw@mail.ccur.com.au">jimlw@mail.ccur.com.au</A>
+Monday, February 17, 1997
+</B>
+At 18:19 13-02-97 GMT, Kefah Ibrahim wrote:
+>Environment: VC++ 4.0; Win 95
+>
+>I have nested splitter windows created from  a child frame window using
+>CreateStatic in OnCreateClient function of the child frame class (as appears
+>in the following code fragment), my problem that I can't initialize the size 
+>of the splitters i.e the size of the created panes. the first pane in the
+>sequence i.e splitter1(0,0) takes the whole window always, and the only way
+>to show the other panes is manually, isn't there any hint that solve the this
+>problem.
+>I've tried the following:
+>- Initialize the pane size by passing the size parameters to the CreateView
+>function (they are nPaneX,nPaneY in the example bellow)and it didn't work
+>- Use explicit call to SetRowInfo and SetColumnInfoin respond to
+>ActivateFrame (and in other places) and yet it didn't work
+>- I've tried to use the normal MoveWindow for resizeing and it didn't work
+>too.
+>
+>please advice !!!!
+>
+>
+G'day!
+
+Consider something like
+
+void CFredSplitView::OnInitialUpdate()
+{
+    CSize doc = GetDocument()->GetDocSize();
+    int mode  = GetDocument()->GetDocMapMode();
+    SetScrollSizes(mode,doc);
+    GetParentFrame()->RecalcLayout();
+    ResizeParentToFit();
+    CScrollView::OnInitialUpdate();
+
+    //decide where to scroll:
+     <snip>
+
+    SetScrollRange(SB_HORZ,0,doc.cx,/*REDRAW=*/FALSE);
+    SetScrollRange(SB_VERT,0,doc.cy,/*REDRAW=*/FALSE);
+    ScrollToPosition(CPoint(ptScroll->x,ptScroll->y));
+	
+    SCROLLINFO si;			
+    si.cbSize=sizeof(SCROLLINFO);
+
+    GetScrollInfo(SB_HORZ, (LPSCROLLINFO) &si);
+    si.nMax=m_totalDev.cx;//a protected member of the Base
+    SetScrollInfo(SB_HORZ, (LPSCROLLINFO) &si);
+    GetScrollInfo(SB_VERT, (LPSCROLLINFO) &si);
+    si.nMax=m_totalDev.cy;
+    SetScrollInfo(SB_VERT, (LPSCROLLINFO) &si);
+}
+
+As I've hacked this out of several methods and jammed it into 1,
+I'd be suprised if it works "as is".
+
+Good luck!
+Jim LW    
+
+
+
+>From the BBC's "Barchester Chronicles":
+
+    "I know that ultimately we are not supposed to understand.
+    But I also know that we must try."
+
+       -- the Reverend Septimus Harding, 
+          tax-consultant, crypt-analyst, clog-dancer, C++ programmer
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Raja Segar -- <A HREF="mailto:rsz@pc.jaring.my">rsz@pc.jaring.my</A>
+Monday, February 17, 1997
+</B>
+[Mini-digest: 2 responses]
+
+At 08:22 17/02/1997 +1100, you wrote:
+>At 18:19 13-02-97 GMT, Kefah Ibrahim wrote:
+>>Environment: VC++ 4.0; Win 95
+>>
+>>I have nested splitter windows created from  a child frame window using
+>>CreateStatic in OnCreateClient function of the child frame class (as appears
+>>in the following code fragment), my problem that I can't initialize the size 
+>>of the splitters i.e the size of the created panes. the first pane in the
+>>sequence i.e splitter1(0,0) takes the whole window always, and the only way
+>>to show the other panes is manually, isn't there any hint that solve the this
+>>problem.
+>>I've tried the following:
+>>- Initialize the pane size by passing the size parameters to the CreateView
+>>function (they are nPaneX,nPaneY in the example bellow)and it didn't work
+>>- Use explicit call to SetRowInfo and SetColumnInfoin respond to
+>>ActivateFrame (and in other places) and yet it didn't work
+>>- I've tried to use the normal MoveWindow for resizeing and it didn't work
+>>too.
+>>
+>>please advice !!!!
+>>
+>>
+>G'day!
+>
+   Try this man ...
+   Mine is a splitter like the following
+  |                          | 
+  |         1                |
+  |__________________________|
+  |           |              |
+  |     2     |     3        | 
+  |           |              |
+
+   m_wndSplitter.SetRowInfo(0, m_iSplitRowSize, 10);
+   m_wndSplitter2.SetColumnInfo(0, m_iSplitColumnSize, 10);
+   m_wndSplitter.RecalcLayout();
+   m_wndSplitter2.RecalcLayout();
+
+  This code will resize all 3 splitter panes. Try it.
+ 
+ 
+ (  _ \/ __)(_   )
+  )   /\__ \ / /_ 
+ (_)\_)(___/(____)@pc.jaring.my
+
+-----From: KIbrahim_Ideal@nets.com.jo (Kefah Ibrahim)
+
+mfc-l@netcom.com,Internet writes:
+At 06:19 PM 2/13/97 GMT, you wrote:
+>Environment: VC++ 4.0; Win 95
+>
+>I have nested splitter windows created from  a child frame window using
+>CreateStatic in OnCreateClient function of the child frame class (as appears
+>in the following code fragment), my problem that I can't initialize the size
+
+>of the splitters i.e the size of the created panes. the first pane in the
+>sequence i.e splitter1(0,0) takes the whole window always, and the only way
+>to show the other panes is manually, isn't there any hint that solve the
+this
+>problem.
+use the member function SetRowInfo & SetColumnInfo while you are still in
+your OnCreateClient member function. It will work I bet ya!
+
+
+I've already used them and it didn't work, the problem it ignores every
+thing, and gives the first pane in the nested panes the whole size of the
+child window. Here is the code I'm using:
+
+	SetActiveView(((CMyView1 *) m_wndSplitter.GetPane(1,0)));
+	m_wndSplitter.SetRowInfo(1,paneY1,0);
+	m_wndSplitter.SetColumnInfo(0,paneX1,0);
+	m_wndSplitter.RecalcLayout( );
+  
+	SetActiveView(((CMyView2 *) m_wndSplitter2.GetPane(0,1)));
+	m_wndSplitter2.SetRowInfo(0,paneY2,0);
+	m_wndSplitter2.SetColumnInfo(1,paneX2,0);
+	m_wndSplitter2.RecalcLayout( );
+  
+	SetActiveView(((CMyView3 *) m_wndSplitter3.GetPane(1,0)));
+	m_wndSplitter3.SetRowInfo(1,paneY3,0);
+	m_wndSplitter3.SetColumnInfo(0,paneX3,0);
+	m_wndSplitter3.RecalcLayout( );
+
+	SetActiveView(((CMyView4 *) m_wndSplitter3.GetPane(0,0)));
+	m_wndSplitter3.SetRowInfo(0,paneY3,0);
+	m_wndSplitter3.SetColumnInfo(0,paneX3,0);
+	m_wndSplitter3.RecalcLayout( );
+
+Kefah Jizmawi
+e-mail: KIbrahim_Ideal@nets.com.jo
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+    <A HREF="http://www.digiday.com/mfcpro/joinmfcl.htm">Become an MFC-L member</A>
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

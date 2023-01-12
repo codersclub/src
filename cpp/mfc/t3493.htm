@@ -1,0 +1,941 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Exception handling
+</B></FONT>
+<BR>
+<PRE>
+<B>
+<A HREF="mailto:ens@edisun.cb.att.com">ens@edisun.cb.att.com</A>
+Wednesday, January 17, 1996
+</B>
+
+I got bit today, and wanted to vent a little, flame a little, offer some
+advice and ask for comment.
+
+I was working my way through Denning's "OLE Controls Inside/Out",
+slightly changing the code along the way to be more in tune with my
+style of coding.  One thing I did was discard the exception handling
+macros for the real thing.  Exceptions weren't being caught, here's why.
+
+Lets look at the possible ways of throwing the exception CMyException,
+and how it might be caught:
+
+try {
+     throw CMyException();     // throw by value
+}
+catch(CMyException e) {}  // catch by value
+
+ - or -
+
+try {
+     throw CMyException();     // throw by value
+}
+catch(CMyException& e) {}     // catch by reference
+
+You might think the second case would prevent a copy, but with
+VC++4.0's compiler, a copy isn't generated in the "catch by value"
+case.  pretty cool.
+
+
+Now, using C++ exceptions you can throw anything, ints, arbitrary
+classes (as in the CMyException case above) or pointers, if you
+
+try {
+     throw new CMyException();     // throw a pointer
+}
+catch(CMyException e) {}      // won't catch it here!
+catch(CMyException* pe) {}         // will catch it here.
+
+The compiler looks for the first catch that matches what's being
+thrown, similar to overloaded function call resolution.  In this case,
+a CMyException* is NOT a CMyException and the first catch won't be
+entered.
+
+What am I driving at?  If my understanding of history is correct, in
+16-bit C++, there is no C++ exception handling, so MFC implemented its
+own mechanism that emulated it with macros.  The catch was (whoops, is
+that a pun?), you could only throw a pointer to a CException or
+something derived from it.
+
+Trouble is, the "common style" for throwing exceptions is by value.
+If I purchase/author a library, it is likely to throw by value and I
+must catch by reference or value.  In the stuff I write, I will throw
+by value, I have enough trouble keeping track of memory without
+worrying about exceptions.  On the other hand, I need to remember that
+CException exceptions are probably thrown as pointers.  I could catch
+both:
+
+try {
+     something();
+}
+catch(CException_derived* ep){
+    // handling code here
+    ep->Delete();   // (this sort of thing bothers me too...)
+}
+catch(CException_derived e){
+    // exact same handling code here
+}
+
+
+since I might not know where or how the exception was thrown,
+but that seems awful.  Too bad the THROW macro didn't take a type and
+hide the allocation.  Does it seem strange to you that I throw a
+pointer and catch a value?
+
+TRY {
+     THROW(new CException);
+}
+CATCH(CException, e) {}
+
+
+
+Anyway, I suspect I will catch and throw CException derived exceptions
+as pointers to heap objects and deal with everything else by value.
+
+And by the way, how does operator new allocate a CMemoryException to
+indicate its out of memory?
+
+What do you think?
+
+ -   Ed Schiebel
+    e.n.schiebel@att.com
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@msn.com">mikeblas@msn.com</A>
+Saturday, January 20, 1996
+</B>
+Schiebel, Ed wrote:
+
+> Trouble is, the "common style" for throwing exceptions is by value.
+
+Common among what group or set of people or club or company?
+
+To me, "common [programming] style" seems like an oxymoron.
+
+> If I purchase/author a library, it is likely to throw by value and I
+> must catch by reference or value.
+
+It's likely, but it also might not.  You need to check the facts instead of 
+making assumptions.  You were burned by making an assumption, not by MFC.
+
+> One thing I did was discard the exception handling
+> macros for the real thing.
+
+If you gave me this assigment, I think I would try to go hunting for the 
+definition of the macros and not make any assumptions on how the macros ought 
+to work just because _I_ would have implemented them a particular way.
+
+>Does it seem strange to you that I throw a pointer and catch a value?
+
+Yes.  I noticed it pronto.
+
+ > And by the way, how does operator new allocate a
+ > CMemoryException to indicate its out of memory?
+
+It doesn't.  There are static exceptions built into the MFC libraries.
+
+.B ekiM
+TCHAR szDisc[] = _T("These words are my own; I don't speak for Jill Hennessy.")
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:ens@edisun.cb.att.com">ens@edisun.cb.att.com</A>
+Wednesday, January 24, 1996
+</B>
+
+[Moderator:  while the specific discussion going on here does not attempt to 
+solve anyone's specific mfc problem, I believe it addresses some serious 
+problems developers will encounter as they try integrating exception 
+handling into their code.  Exception handling is extraordinarily difficult 
+to get correct (I can give you references) and the twist introduced by MFC 
+makes it even more problematic]
+
+>Schiebel, Ed wrote:
+>
+>> Trouble is, the "common style" for throwing exceptions is by value.
+>
+>Common among what group or set of people or club or company?
+>
+>To me, "common [programming] style" seems like an oxymoron.
+
+Common among everything I've read on exception handling including
+The C++ Primer (Lippman),  The C++ Programming Language (Stroustrup),
+C++ Strategies and Tactics (Murray), Designing and Coding Reusable C++
+(Carroll and Ellis), as well as articles on exception handling in the
+C++ Report, code snippets from articles in the Journal of Object
+Oriented Programming.  I am not coming at this out of left field.
+
+>
+>> If I purchase/author a library, it is likely to throw by value and I
+>> must catch by reference or value.
+>
+>It's likely, but it also might not.  You need to check the facts instead of 
+
+>making assumptions.  You were burned by making an assumption, not by MFC.
+Guilty as charged.
+
+>
+>> One thing I did was discard the exception handling
+>> macros for the real thing.
+>
+>If you gave me this assignment, I think I would try to go hunting for the
+>definition of the macros and not make any assumptions on how the macros 
+ought
+>to work just because _I_ would have implemented them a particular way.
+>
+>>Does it seem strange to you that I throw a pointer and catch a value?
+>
+>Yes.  I noticed it pronto.
+>
+> > And by the way, how does operator new allocate a
+> > CMemoryException to indicate its out of memory?
+>
+>It doesn't.  There are static exceptions built into the MFC libraries.
+Yes, and you'd better call "e->Delete()", not "delete e"!
+
+>
+>.B ekiM
+>TCHAR szDisc[] = _T("These words are my own; I don't speak for Jill
+>Hennessy.")
+
+I've been thinking about this a bit:
+
+     1. Due to a strong desire on Microsoft's part to maintain
+        backward compatibility (good) developers must deal with a
+        lot of old baggage (bad).  I applaud the MFC developers for
+        developing an exception handling scheme that works where
+        the compiler doesn't supported it.
+        If only we could shed some of the baggage when it is no
+        longer useful.  It seems that MFC 4.0 would have been a good
+        point it time to make some changes.  Since it's not available for
+        the 16-bit compiler it could have shed some of its warts.
+
+     2. Since you object to references to "common style", I will
+        say that MFC developers have a style of programming that is
+        different from most C++ code I have been exposed to.  I
+        believe that MFC was developed by very talented C
+        programmers...if only those developers were more in tune with
+        the C++ industry.  Yes, I have spent the last 10 years
+        writing C++ code in a UNIX environment and I do bring
+        biases to my new work in an NT world, but you've got to admit,
+        MFC doesn't look like any C++ code you've seen anywhere else.
+     
+     3. I am also troubled by the lack of consistency within
+        Microsoft.  Have you noticed that while MFC throws pointers
+        to exceptions the DAO SDK throws by value?  What does this
+        mean to me if I am using MFC DAO objects?  I looked at the
+        DAO source and the MFC DAO Objects source (DAOCORE.CPP) and
+        found that MFC often does CATCH_ALL(e), performs some cleanup
+        and rethrows the exception (pointer) e.  the CATCH_ALL(e) macro
+        is defined as catch(CException* e), so it doesn't catch all
+        at all, but only CException based exception pointers.  Since
+        it doesn't catch CDbExceptions thrown by the DAO SDK, any
+        cleanup in the CATCH_ALL block won't be done.  If I'm wrong here,
+        please let me know.
+
+Enough said.  I love the new direction my career has taken lately and
+I will be happily developing Windows NT and MFC applications for some
+time, albeit grumbling under my breath at times.
+
+Thanks for listening.
+
+ -   Ed Schiebel
+    e.n.schiebel@att.com
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@msn.com">mikeblas@msn.com</A>
+Saturday, January 27, 1996
+</B>
+ > Exception handling is extraordinarily difficult 
+ > to get correct (I can give you references) and the twist
+ > introduced by MFC  makes it even more problematic]
+
+What twist are you referring to?
+
+ > Common among everything I've read on exception handling including
+
+The list you give doesn't include anything about particular platforms.
+
+How do people like Carroll and Ellis, by the way, recommend that you throw an 
+exception by value when there is little memory around?  (If you're out of 
+stack space, how do you create something on the stack?)
+
+>  I am not coming at this out of left field.
+
+I never said you were... I'm just saying that some standards are not as global 
+as you'd like.
+
+> Yes, and you'd better call "e->Delete()", not "delete e"!
+
+Right.  The function is well-documented.
+
+>        If only we could shed some of the baggage when it is no
+>        longer useful.  It seems that MFC 4.0 would have been a good
+>        point it time to make some changes.
+
+Why do you feel that MFC 4.0 was good point?
+
+> Since it's not available for
+>        the 16-bit compiler it could have shed some of its warts.
+
+MFC 3.0 wasn't available for any 16-bit compilers, either.  This isn't much of 
+a division point, of course--you should be able to easily migrate from Win16 
+to Win32.  I don't think that issue needs to be complicated further by 
+changing the way exeptions work.
+
+It's funny making these decisions, you know. You're damned if you do (by 
+people who's code you've busted) and you're damned if you don't (by people who 
+read someplace that it "should" be done a certain other way). Just look at how 
+many people are clinging to Win16 and VC++ 1.5x and 16-bit DLLs!  Hopefully, 
+soon, it'll be possible to start ignoring the folks who's code will break so 
+we can make some progress.
+
+>     2. Since you object to references to "common style", I will
+>        say that MFC developers have a style of programming that is
+>       different from most C++ code I have been exposed to.
+
+This sort of sounds like a xenophobic argument, doesn't it?  To MFC 
+programmers, the style of throwing exceptions by reference is quite "common", 
+and people who throw exceptions by value seem a little strange.  Folks in the 
+United States wonder how the Japanese can sit on tatami mats all day.  But the 
+irony is that the Japanese can't quite figure out why Americans love big, 
+overstuffed, expensive, leather couches.
+
+> Yes, I have spent the last 10 years
+>        writing C++ code in a UNIX environment and I do bring
+>        biases to my new work in an NT world, but you've got to admit,
+>        MFC doesn't look like any C++ code you've seen anywhere else.
+
+Maybe this is the root of the problem.  Your Unix experience hid certain 
+problems which PC developers have long faced, while my primarily PC-based 
+background has kept me out of problems Unix programmers have solved for years. 
+ The issue isn't only one that involves C++; if you have a look at C code that 
+was written for Windows, it doesn't look like C code you'd likely find in 
+/etc/source.
+     
+>     3. I am also troubled by the lack of consistency within
+>        Microsoft.
+
+It really excites me.  Imagine working someplace where you can think up your 
+own solutions without having to be clamped by some silly "standard" some twit 
+who works in some other building decided was good enough for everyone, even 
+though htey didn't know what your problems are!  Maybe this is one reason why 
+Microsoft is pretty successful. I spent a few hours today writing code; I 
+certainly didn't spend _any_ time begging someone for permission to throw an 
+exception a certain way.  If, on the other hand, one of my heros (like JohnEls 
+or DeanM) comes by and points out why throwing an exception a certain way is a 
+pretty dopey idea, I'll reevaluate my decision.
+
+This whole issue just comes down to there being two ways to do things.  Either 
+you'll make an effort to understand the other way, or you won't.  Either 
+you'll learn to skate, or you'll curse the ice.
+
+> Have you noticed that while MFC throws pointers
+>        to exceptions the DAO SDK throws by value?  What does this
+>        mean to me if I am using MFC DAO objects?
+
+I'm not sure I understand your question.  Are you saying you want to mix DAO 
+SDK objects and MFC objcets?  If that's true, then you _do_ need to worry 
+about the way the DAO classes throw exceptions.  Most people who are MFC 
+programmers stick with MFC.  There's suggestions about which set of objects to 
+pick within the first couple topics of the DAO SDK reference.
+
+.B ekiM
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:ens@edisun.cb.att.com">ens@edisun.cb.att.com</A>
+Monday, January 29, 1996
+</B>
+[Mini-digest: 2 responses]
+
+
+[Moderator:  while the specific discussion going on here does not attempt to 
+
+solve anyone's specific mfc problem, I believe it addresses some serious
+problems developers will encounter as they try integrating exception
+handling into their code.  Exception handling is extraordinarily difficult
+to get correct (I can give you references) and the twist introduced by MFC
+makes it even more problematic]
+
+>Schiebel, Ed wrote:
+>
+>> Trouble is, the "common style" for throwing exceptions is by value.
+>
+>Common among what group or set of people or club or company?
+>
+>To me, "common [programming] style" seems like an oxymoron.
+
+Common among everything I've read on exception handling including
+The C++ Primer (Lippman),  The C++ Programming Language (Stroustrup),
+C++ Strategies and Tactics (Murray), Designing and Coding Reusable C++
+(Carroll and Ellis), as well as articles on exception handling in the
+C++ Report, code snippets from articles in the Journal of Object
+Oriented Programming.  I am not coming at this out of left field.
+
+>
+>> If I purchase/author a library, it is likely to throw by value and I
+>> must catch by reference or value.
+>
+>It's likely, but it also might not.  You need to check the facts instead of 
+
+
+>making assumptions.  You were burned by making an assumption, not by MFC.
+Guilty as charged.
+
+>
+>> One thing I did was discard the exception handling
+>> macros for the real thing.
+>
+>If you gave me this assignment, I think I would try to go hunting for the
+>definition of the macros and not make any assumptions on how the macros
+ought
+>to work just because _I_ would have implemented them a particular way.
+>
+>>Does it seem strange to you that I throw a pointer and catch a value?
+>
+>Yes.  I noticed it pronto.
+>
+> > And by the way, how does operator new allocate a
+> > CMemoryException to indicate its out of memory?
+>
+>It doesn't.  There are static exceptions built into the MFC libraries.
+Yes, and you'd better call "e->Delete()", not "delete e"!
+
+>
+>.B ekiM
+>TCHAR szDisc[] = _T("These words are my own; I don't speak for Jill
+>Hennessy.")
+
+I've been thinking about this a bit:
+
+     1. Due to a strong desire on Microsoft's part to maintain
+        backward compatibility (good) developers must deal with a
+        lot of old baggage (bad).  I applaud the MFC developers for
+        developing an exception handling scheme that works where
+        the compiler doesn't supported it.
+        If only we could shed some of the baggage when it is no
+        longer useful.  It seems that MFC 4.0 would have been a good
+        point it time to make some changes.  Since it's not available for
+        the 16-bit compiler it could have shed some of its warts.
+
+     2. Since you object to references to "common style", I will
+        say that MFC developers have a style of programming that is
+        different from most C++ code I have been exposed to.  I
+        believe that MFC was developed by very talented C
+        programmers...if only those developers were more in tune with
+        the C++ industry.  Yes, I have spent the last 10 years
+        writing C++ code in a UNIX environment and I do bring
+        biases to my new work in an NT world, but you've got to admit,
+        MFC doesn't look like any C++ code you've seen anywhere else.
+
+     3. I am also troubled by the lack of consistency within
+        Microsoft.  Have you noticed that while MFC throws pointers
+        to exceptions the DAO SDK throws by value?  What does this
+        mean to me if I am using MFC DAO objects?  I looked at the
+        DAO source and the MFC DAO Objects source (DAOCORE.CPP) and
+        found that MFC often does CATCH_ALL(e), performs some cleanup
+        and rethrows the exception (pointer) e.  the CATCH_ALL(e) macro
+        is defined as catch(CException* e), so it doesn't catch all
+        at all, but only CException based exception pointers.  Since
+        it doesn't catch CDbExceptions thrown by the DAO SDK, any
+        cleanup in the CATCH_ALL block won't be done.  If I'm wrong here,
+        please let me know.
+
+Enough said.  I love the new direction my career has taken lately and
+I will be happily developing Windows NT and MFC applications for some
+time, albeit grumbling under my breath at times.
+
+Thanks for listening.
+
+ -   Ed Schiebel
+    e.n.schiebel@att.com
+-----From: dhoward@kset.com
+
+> From mikeblas@msn.com:
+>
+>read someplace that it "should" be done a certain other way). Just look at how 
+>many people are clinging to Win16 and VC++ 1.5x and 16-bit DLLs!  Hopefully, 
+>soon, it'll be possible to start ignoring the folks who's code will break so 
+>we can make some progress.
+>
+
+No matter how many times that I hear this argument is always sounds feeble 
+to me.  The only reason that developers use Win16, VC++ 1.5x and 16-bit DLLs 
+is because our customers demand them.  Microsoft still sells 16-bit versions 
+of its products.  Why?  They sell it because customers buy it.  Apparently, 
+Microsoft feels that everybody else should give up on the Win16 market, even 
+though they won't do it themselves.
+
+This double-standard is glaringly self-serving.
+
+If you think that any programmer wants to use Windows 3.1 or VC++ 1.5x, 
+you're naive.  We don't insist on it, our customers do.  Apparently, you 
+think that we would be better off with VC++ 4.0 and no customers.  What 
+color is the sky in your little world?
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@interserv.com">mikeblas@interserv.com</A>
+Tuesday, January 30, 1996
+</B>
+[Mini-digest: 3 responses]
+
+[Moderator's note:  I'm letting Mike get equal time on this, but only
+because I screwed up and let the insults through.  Let's keep it
+civil, folks.]
+
+>-----From: dhoward@kset.com
+
+>If you think that any programmer wants to use Windows 3.1 or VC++ 1.5x, 
+>you're naive.  We don't insist on it, our customers do.  Apparently, you 
+>think that we would be better off with VC++ 4.0 and no customers.  What 
+>color is the sky in your little world?
+
+I'm not sure what you're problem is.
+
+.B ekiM
+--
+TCHAR szDisc[] = _T("These words are my own; I do not speak for Microsoft.");
+
+-----From: mikeblas@interserv.com
+
+>-----From: dhoward@kset.com
+>
+>> From mikeblas@msn.com:
+>>
+>>read someplace that it "should" be done a certain other way). Just
+>>look at how 
+>>many people are clinging to Win16 and VC++ 1.5x and 16-bit DLLs!  
+>>Hopefully, 
+>>soon, it'll be possible to start ignoring the folks who's code will break 
+>>so we can make some progress.
+
+>No matter how many times that I hear this argument is always sounds feeble 
+>to me. 
+
+What argument are you talking about, speicifically?  The argument that 
+Microsoft is evolutionary and not revolutionary and puts some thought into 
+ditching older tools and platforms and investments of our users, or the 
+argument that Win32 is better than Win16?
+
+>The only reason that developers use Win16, VC++ 1.5x and 16-bit DLLs 
+>is because our customers demand them. 
+
+Why do your customers demand to run their software on a slower platform?  
+AutoDesk has been shipping 32-bit versions of AutoCAD for more than a year.  
+PSpice is 32-bits. Even Maixs is shipping 32-bit games!
+
+>Microsoft still sells 16-bit versions 
+>of its products. 
+
+Certainly, some Microsoft products are still 16-bit-based, but they'll either 
+be discontinued or upgraded to Win32 in the next release.
+
+But in leafing through the latest "Microsystems Warehouse" catalog, as well 
+as a December issue of the "PC Connection" catalog, I don't see _any_ 16-bit 
+products from Microsoft.
+
+>Why?  They sell it because customers buy it.
+
+I'll look into it, but I'm pretty sure I remember reading that Microsoft took 
+all 16-bit products off the Microsoft Select corporate program.  So, again, 
+I'm not sure where you're getting this information which you're twirling 
+about as if it was undeniably true.
+
+>Apparently, 
+>Microsoft feels that everybody else should give up on the Win16 market, even 
+>though they won't do it themselves.
+
+Since it seems like your premises are very wounded, it's hard to give your 
+conclusion any weight.
+
+>This double-standard is glaringly self-serving.
+
+As I've pointed out, your little tirade seems kind of vague to me.  I'm not 
+sure what this has to do with throwing exceptions by value or by reference.
+
+Further, I'm prepared to spend my personal time answering questions for 
+people on the list.  Sometimes, I'm frustrated by people who won't look up 
+things in a manual or try stepping into source code we carefully ship to 
+learn what's going on.
+
+But I have no use for people, like you, who don't want to be helped and are 
+interested only in antagonizing me and my colleagues. I don't have time to 
+personally defend the marketing decisions of a multi-billion dollar, 
+Fortune-100 company, and anyone with common sense would know and respect 
+that. 
+
+Of course, I usually _do_ understand those decisions because I'm part of the 
+company which implements them.  I see things first hand, and deal with them 
+every day--things which affect these decisions, things which dictate the 
+direction of the company.  And because I see these things every day, I know 
+that the decisions aren't arbitrary, or anything like the trumpep-up 
+marketing falsehoods self-appointed "experts" (and primadonnas) like to 
+accuse us of.
+
+>If you think that any programmer wants to use Windows 3.1 or VC++ 1.5x, 
+>you're naive.  We don't insist on it, our customers do.
+
+Again, why would your customers demand a less impressive platform for their 
+software?  Certainly, many larger companies have problems upgrading, but it's 
+only a matter of time before the upgrades happen and Win32 has a stronger 
+foothold on the corporate desktop.
+
+>Apparently, you 
+>think that we would be better off with VC++ 4.0 and no customers. 
+
+I never said any such thing--you're putting these words in my mouth as a 
+result of a long string of non sequiturs on your part.
+
+>What color is the sky in your little world?
+
+It's the same color as your mom's slippers.
+
+.B ekiM
+--
+TCHAR szDisc[] = _T("These words are my own; I do not speak for Microsoft.");
+
+-----From: Rud Merriam <merriam@platinum.com>
+
+
+At 12:40 AM 1/27/96 -0600, Mike Blaszczak wrote:
+>
+> > Exception handling is extraordinarily difficult 
+> > to get correct (I can give you references) and the twist
+> > introduced by MFC  makes it even more problematic]
+>
+>What twist are you referring to?
+>
+
+I see two twists on MFC exceptions:
+
+1. The use of their own exceptions for standards. To wit CMemoryException
+instead of xalloc. Regardless of whether xalloc is the final standard name
+other libraries and code are already depending on it. In my code I need to
+check for both which is silly.
+
+2. The use of pointers for throwing exceptions instead of values. See below
+for details.
+
+>
+>> Yes, and you'd better call "e->Delete()", not "delete e"!
+>
+>Right.  The function is well-documented.
+
+But dumb. Consider:
+
+        try {
+                //....
+                }
+        catch (...) {
+                ????->Delete(); // memory leak time
+                }
+
+Basically MFC picked a form of exception throwing that precludes using
+standard C++ constructs for handling them. 
+
+
+>
+>>     2. Since you object to references to "common style", I will
+>>        say that MFC developers have a style of programming that is
+>>       different from most C++ code I have been exposed to.
+>
+
+Forced on them by the perversity of MFC. There is a reason Borland OWL is
+considered a technically better framework. It was written by C++ programmers
+who really know the language. 
+
+>This sort of sounds like a xenophobic argument, doesn't it?  To MFC 
+>programmers, the style of throwing exceptions by reference is quite "common", 
+>and people who throw exceptions by value seem a little strange.  
+
+I suspect you really mean throwing by pointer rather than reference since
+the latter is not possible. You can catch by reference.
+
+> The issue isn't only one that involves C++; if you have a look at C code that 
+>was written for Windows, it doesn't look like C code you'd likely find in 
+>/etc/source.
+>     
+
+As a PC developer with some contact with Unix I agree. But then Windows C
+code is different then most other C code I've seen also.
+
+>>     3. I am also troubled by the lack of consistency within
+>>        Microsoft.
+>
+>It really excites me.  Imagine working someplace where you can think up your 
+>own solutions without having to be clamped by some silly "standard" some twit 
+>who works in some other building decided was good enough for everyone, even 
+>though htey didn't know what your problems are!  
+
+There is a name for 'thinking up your own solutions": hacking. Reuse is a
+big issue and that include reusing standards. That isn't to say they should
+be blindly followed but usually there is good reasoning behind them.
+Throwing by pointers is a poor idea.
+
+>
+>> Have you noticed that while MFC throws pointers
+>>        to exceptions the DAO SDK throws by value?  What does this
+>>        mean to me if I am using MFC DAO objects?
+>
+>I'm not sure I understand your question.  Are you saying you want to mix DAO 
+>SDK objects and MFC objcets?  If that's true, then you _do_ need to worry 
+>about the way the DAO classes throw exceptions.  Most people who are MFC 
+>programmers stick with MFC.  
+>
+
+But you can't write an app solely in MFC. You have to use other libs some of
+which may be as extensive as MFC. In the case of exceptions MFC makes this
+difficult.
+
+Rud Merriam                   voice:      (713)579-5521
+PLATINUM technology, Inc.     voice mail: (800)782-5824 x6321
+Software Interfaces Lab       operator:   (713)492-0707
+1400 Broadfield, Suite 600    merriam@platinum.com
+Houston, TX 77084             CIS: 74431,1620
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@msn.com">mikeblas@msn.com</A>
+Friday, February 02, 1996
+</B>
+[Moderator's note: Hey!  Guess what time it is!  It's time to put
+this thread to bed.  Now - no more Microsoft-bashing, because it
+isn't bashing a huge corporation here, it's bashing list members and
+we're not going to have that.]
+
+> 1. The use of their own exceptions for standards. To wit
+> CMemoryException instead of xalloc. Regardless of
+> whether xalloc is the final standard name other libraries
+> and code are already depending on it. In my code I need to
+> check for both which is silly.
+
+CMemoryExtension was in use by MFC before xalloc was an itch in ANSI's pants.
+
+Maybe, when xalloc _really_ becomes a standard (the draft still _is_ a draft, 
+right? there's some standoff and it isn't ratified, last I heard...), you'll 
+see MFC embrace it.  In the meantime, MFC has to cater to the ambient standard 
+which tens of thousands of its users have been using since MFC 1.0--and that's 
+CMemoryException.  Even _after_ xalloc becomes the law of the land, it's 
+possible that you'll still see MFC toss around CMemoryExceptions as thinly 
+wrapped xallocs.
+
+I haven't looked at the standard lately, but the last time I read through it, 
+the way that memory failures were handled left lots of open questions when 
+applied to the PC architecture and to Windows, in particular.  Standards, it 
+turns out, are nice things to pursue as ideals but are often elusive in 
+practice.
+
+You're calling this silly, but I'd like to understand what you think of the 
+alternative: a relase of MFC that very suddenly drops support for 
+CMemoryExceptions and radically breaks almost all code written for MFC... and 
+then cuases backlash from users who call this kind of radical change silly.  
+What would _you_ do?
+
+ > But dumb. Consider:
+
+>        try {
+>                //....
+>                }
+>        catch (...) {
+>                ????->Delete(); // memory leak time
+>                }
+
+If you use "catch(...)", you can't do _anything_ with the exception data... 
+so, presumably, you don't care and you are just going to abort your program. 
+If you _did_ want to do something with the exception, you should catch it by 
+naming CException* explicitly.  You're completely welcome to code something 
+like this:
+
+	try {
+	// take some risks
+	}
+	catch (CException* pEx)
+	{
+		pEx->Delete();  // not memory leak time
+		DoTheCleanup();
+	}
+	catch (...)
+	{
+		DoTheCleanup();
+	}
+
+So, I guess the only thing that's "dumb" here is your own unfounded damnation 
+of MFC.
+
+> Basically MFC picked a form of exception throwing that precludes using
+> standard C++ constructs for handling them. 
+
+Your use of the word "picked" sounds like the decision was made very 
+arbitrarily and, as such, strikes me as overly derisive. It turns out that the 
+mechanism in place makes a lot of sense for a compiler which previously didn't 
+support exceptions. The code lives on in such a state only for compatibility.
+
+People like David Elliot and the originator of this thread (Ed, I think; his 
+name has scrolled from my machine) are worried enough about correctly 
+implementing exception handling _without_ having it change under their feet.  
+Why should MFC make it harder?
+
+ > Forced on them by the perversity of MFC.
+
+I think "perversity" is a bit of a strong word, Rud.  Are you actually trying 
+to make a valid point, or are you just grandstanding?
+
+> I suspect you really mean throwing by pointer rather than reference since
+> the latter is not possible. You can catch by reference.
+
+Yep--I transitioned my sentence incorrectly.  But it's interesting that you 
+neglect to respond to the point I made in that paragraph, even though you 
+understood what I meant technically.
+
+>> The issue isn't only one that involves C++; if you have a look at C code 
+that 
+>>was written for Windows, it doesn't look like C code you'd likely find in 
+>>/etc/source.
+
+> As a PC developer with some contact with Unix I agree. But then Windows C
+> code is different then most other C code I've seen also.
+
+Just so I understand, what's the difference between what you said and what I 
+said?
+
+>>     3. I am also troubled by the lack of consistency within
+>>        Microsoft.
+>
+>It really excites me.  Imagine working someplace where you can think up your 
+>own solutions without having to be clamped by some silly "standard" some twit 
+
+>who works in some other building decided was good enough for everyone, even 
+>though htey didn't know what your problems are!  
+
+> There is a name for 'thinking up your own solutions":
+
+Yep, there are several: "Creativity", "innovation", and 'lateral thinking" are 
+the three that come to my mind most readily.
+
+>hacking.
+
+So, MFC is a "dumb" framework written by a "perverse" bunch of "hackers" who 
+"pick" solutions out of thin air, huh?  Cripe, who did our interviews?
+
+To me, the definition of "hacking" that would apply here is "guessing". It's 
+really ironic that you bring this up: to me, people who aren't interested in 
+figuring out how a particular API works, try another as a guess, and then move 
+on are the real hackers.  If they're not interested in learning, then they'll 
+go on with their notions and guesses and continue to hack away at solutions, 
+blindly finding some, wildly missing others, and lucking out some of the time. 
+Perhaps the folks at 1-900-PSYCHIC provide better support for these folks than 
+MFC-L does. If Punxatawney Phil sees his shadow, maybe you should consider 
+using the /GX option on the compiler.  Books like "Debugging The Development 
+Process" discuss this kind of hacking and explain what's really, really wrong 
+with it.
+
+Things like using pointers for exceptions aren't hacks--they're innovative and 
+creative solutions to nasty problems.  They're complete, functional, and 
+reliable solutions. Dionne Warwick isn't on the MFC team.
+
+> Reuse is a
+> big issue and that include reusing standards. That isn't to say they should
+> be blindly followed but usually there is good reasoning behind them.
+
+Sometimes, there is.  Other times, standards committees end up being 
+chest-beating contests between vendors who have lots of whacky alterior 
+motives... motives which might even honestly reflect the interest of their 
+customers or their resepctive platforms, but are shot down by others because 
+they're not aware of those issues. That is, often, standards committees end up 
+being political morasses where any hope of technical advancement is lost.
+
+> Throwing by pointers is a poor idea.
+
+I disagree.  It has a couple of pitfalls, but it really isn't as incredibly 
+problematic as you're suggesting.
+
+
+> But you can't write an app solely in MFC.
+
+Uh, no.  You write applications _in_ a language (like C++ or FORTRAN).  You 
+write applications _with_ a framework, like MFC or ISML.
+
+> You have to use other libs some of
+> which may be as extensive as MFC.
+
+You _have_ to?  Do you mean, like, "must"?  Says who?
+
+> In the case of exceptions MFC makes this difficult.
+
+I'm sorry to report that many things turn out to be difficult. Winning a 
+tennis match is often difficult, as is riding a motorcycle. Playing the guitar 
+is pretty tough, and so is making sure your house plants don't die. Learning 
+to ice skate is _really_, really hard.  And, I'm afriad, making a living as a 
+software engineer, just like all of these other things, means that you'll need 
+to gain knowledge, cultivate creative thought, and learn from mistakes.
+
+It turns out, though, that MFC is the way it is. Through future releases, it 
+will get better and more extensive. You can learn to use it to your best 
+advantage, or you can sit and bitch about it.  You can blindly accept 
+CException, or you can write a little bit of code to handle things in a way 
+you'd like a little bit more.  Or, you could forego everything positive that 
+MFC gives you and start from scratch.
+
+.B ekiM
+TCHAR szDisc[] = _T("These words are my own; I do not speak for Microsoft.");
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

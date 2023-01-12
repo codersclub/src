@@ -1,0 +1,225 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+WM_RBUTTONUP in tree control
+</B></FONT>
+<BR>
+<PRE>
+<B>
+<A HREF="mailto:Paul.B.Folbrecht@JCI.Com">Paul.B.Folbrecht@JCI.Com</A>
+Tuesday, July 09, 1996
+</B>
+     MSVC 4.1, Windows95
+     
+     I've come across some strange behavior regarding WM_RBUTTONUP messages 
+     in a tree control (I'm using CTreeCtrl).  Unless the mouse is moved 
+     between pressing the button and releasing it, the handler for 
+     WM_RBUTTONUP is never called.  I confirm with Spy++ that each right 
+     click results in a WM_RBUTTONDOWN and A WM_RBUTTONUP, but the latter 
+     is somehow eaten up.  A right-double click will result in the 
+     WM_RBUTTONUP handler being called.  
+     
+     My tree control implements drag/drop with the RMB.  This works fine 
+     the way things are, but I also want to put up a context menu when an 
+     item is right clicked if there's no drag operation in progress, ala 
+     Explorer.  I set a flag in OnBeginDrag() that I check in 
+     OnLButtonUp().  This should work, but not when I'm not getting the 
+     messages!  Does anyone have a workaround/alternate solution?
+     
+     -Paul Folbrecht
+     Compuware Corp.
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Steve Mark -- <A HREF="mailto:steve@otms.com">steve@otms.com</A>
+Sunday, July 14, 1996
+</B>
+[Mini-digest: 2 responses]
+
+At 12:49 PM 7/9/96 -0600, Paul.B.Folbrecht@JCI.Com wrote:
+>     MSVC 4.1, Windows95
+>     
+>     I've come across some strange behavior regarding WM_RBUTTONUP messages 
+>     in a tree control (I'm using CTreeCtrl).  Unless the mouse is moved 
+>     between pressing the button and releasing it, the handler for 
+>     WM_RBUTTONUP is never called.  I confirm with Spy++ that each right 
+>     click results in a WM_RBUTTONDOWN and A WM_RBUTTONUP, but the latter 
+>     is somehow eaten up.  A right-double click will result in the 
+>     WM_RBUTTONUP handler being called.  
+>     
+>     My tree control implements drag/drop with the RMB.  This works fine 
+>     the way things are, but I also want to put up a context menu when an 
+>     item is right clicked if there's no drag operation in progress, ala 
+>     Explorer.  I set a flag in OnBeginDrag() that I check in 
+>     OnLButtonUp().  This should work, but not when I'm not getting the 
+>     messages!  Does anyone have a workaround/alternate solution?
+>     
+>     -Paul Folbrecht
+>     Compuware Corp.
+>
+
+I had exactly the same problem and worked around it by using OnRButtonDown.
+Try this:
+
+void NView::OnRButtonDown(UINT nFlags, CPoint point) 
+{
+	ClientToScreen(&point);
+	OnContextMenu(NULL, point);
+
+	//CTreeView::OnRButtonDown(nFlags, point);
+}
+
+Steve Mark
+On-The-Mark Systems
+
+-----From: IT GmbH <100031.1400@CompuServe.COM>
+
+Paul.B.Folbrecht wrote:
+[...] I also want to put up a context menu when an 
+item is right clicked if there's no drag operation in progress, ala 
+Explorer.  [...]
+
+
+You may use the fact that the tree control sends a WM_CONTEXTMENU message to its
+parent (owner?) window on right button up. I had no problems careting a context
+menu on this message.
+
+- Klaus
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:Paul.B.Folbrecht@JCI.Com">Paul.B.Folbrecht@JCI.Com</A>
+Wednesday, July 17, 1996
+</B>
+
+     
+
+Thanks for the responses.  Here was my solution:
+
+void CTreeViewEx::OnRButtonDown(UINT nFlags, CPoint point) 
+{
+    BOOL   bDone = FALSE;
+    POINT  oNewPt;
+
+    CTreeView::OnRButtonDown( nFlags, oPt );
+
+    // The following is a bug workaround:  the tree does not get WM_RBUTTONUP
+    // messages if no mouse movement occurs while the button is down.
+    while ( !bDone )
+    {
+        ::GetCursorPos( &oNewPt );
+        bDone = ( oPt != oNewPt ||
+                  !( ::GetAsyncKeyState( VK_RBUTTON ) & 0x8000 ) );
+    }
+
+    if ( !( ::GetAsyncKeyState( VK_RBUTTON ) & 0x8000 ) )
+    {
+         // Put up context menu.
+
+Not terribly elegant, but it works.
+
+______________________________ Reply Separator _________________________________
+Subject: Re: WM_RBUTTONUP in tree control
+Author:  steve@otms.com at Mailhub
+Date:    7/17/96 5:56 AM
+
+
+[Mini-digest: 2 responses]
+     
+At 12:49 PM 7/9/96 -0600, Paul.B.Folbrecht@JCI.Com wrote: 
+>     MSVC 4.1, Windows95
+>
+>     I've come across some strange behavior regarding WM_RBUTTONUP messages 
+>     in a tree control (I'm using CTreeCtrl).  Unless the mouse is moved
+>     between pressing the button and releasing it, the handler for
+>     WM_RBUTTONUP is never called.  I confirm with Spy++ that each right 
+>     click results in a WM_RBUTTONDOWN and A WM_RBUTTONUP, but the latter 
+>     is somehow eaten up.  A right-double click will result in the
+>     WM_RBUTTONUP handler being called. 
+>
+>     My tree control implements drag/drop with the RMB.  This works fine 
+>     the way things are, but I also want to put up a context menu when an 
+>     item is right clicked if there's no drag operation in progress, ala 
+>     Explorer.  I set a flag in OnBeginDrag() that I check in
+>     OnLButtonUp().  This should work, but not when I'm not getting the 
+>     messages!  Does anyone have a workaround/alternate solution?
+>
+>     -Paul Folbrecht
+>     Compuware Corp.
+>
+     
+I had exactly the same problem and worked around it by using OnRButtonDown. 
+Try this:
+     
+void NView::OnRButtonDown(UINT nFlags, CPoint point) 
+{
+        ClientToScreen(&point);
+        OnContextMenu(NULL, point);
+     
+        //CTreeView::OnRButtonDown(nFlags, point);
+}
+     
+Steve Mark
+On-The-Mark Systems
+     
+-----From: IT GmbH <100031.1400@CompuServe.COM>
+     
+Paul.B.Folbrecht wrote:
+[...] I also want to put up a context menu when an
+item is right clicked if there's no drag operation in progress, ala 
+Explorer.  [...]
+     
+     
+You may use the fact that the tree control sends a WM_CONTEXTMENU message to
+   its
+parent (owner?) window on right button up. I had no problems careting a
+   context
+menu on this message.
+     
+- Klaus
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,506 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Changing Splitter Rows and Columns
+</B></FONT>
+<BR>
+<PRE>
+<B>
+John Horton -- <A HREF="mailto:jhorton@unitechsys.com">jhorton@unitechsys.com</A>
+Thursday, October 10, 1996
+</B>
+     Environment: VC++ 4.2 / NT 4.0
+     
+     I have a static splitter window with two panes - one on top of the 
+     other (1 col, 2 rows).  I would like to allow the user to change the 
+     splitter so the panes are side-by-side (2 cols, 1 row).  
+     
+     Can this be done without having to create a new splitter and new 
+     views?
+     
+     Any help would be appreciated,
+     
+     John
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Kostya Sebov -- <A HREF="mailto:sebov@is.kiev.ua">sebov@is.kiev.ua</A>
+Saturday, October 12, 1996
+</B>
+>        Environment: VC++ 4.2 / NT 4.0
+>
+>        I have a static splitter window with two panes - one on top of the
+>        other (1 col, 2 rows).  I would like to allow the user to change the
+>        splitter so the panes are side-by-side (2 cols, 1 row).
+>
+>        Can this be done without having to create a new splitter and new
+>        views?
+>
+>        Any help would be appreciated,
+>
+>        John
+>
+
+I didn't find easier way than hacking the internal CSplitterWnd data
+structures (manually 'reshaping' the arrays) then changing child window ID's
+for the panes. Although this may sound too crude from the purist's view the code
+worked almost unchanged from 2.5 to 4.1.
+
+If needed I can post the code.
+
+HTH
+
+--- 
+Kostya Sebov. 
+----------------------------------------------------------------------------
+Tel: (38 044) 266-6387 | Fax: (38 044) 266-6195 | E-mail: sebov@is.kiev.ua
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Archana -- <A HREF="mailto:ARANGINANI@cerner.com">ARANGINANI@cerner.com</A>
+Friday, October 18, 1996
+</B>
+I had the same issue of allowing the user to change the splitter from
+vertical to horizontal . I got around it basically by creating two views
+.....one with horizontal splitter and other with vertical splitter.  I
+would appreciate if you can post your code 
+
+>----------
+>From: 	Kostya Sebov[SMTP:sebov@is.kiev.ua]
+>Sent: 	Saturday, October 12, 1996 12:24 PM
+>To: 	jhorton@unitechsys.com
+>Cc: 	mfc-l@netcom.com
+>Subject: 	Re: Changing Splitter Rows and Columns
+>
+>>        Environment: VC++ 4.2 / NT 4.0
+>>
+>>        I have a static splitter window with two panes - one on top of the
+>>        other (1 col, 2 rows).  I would like to allow the user to change the
+>>        splitter so the panes are side-by-side (2 cols, 1 row).
+>>
+>>        Can this be done without having to create a new splitter and new
+>>        views?
+>>
+>>        Any help would be appreciated,
+>>
+>>        John
+>>
+>
+>I didn't find easier way than hacking the internal CSplitterWnd data
+>structures (manually 'reshaping' the arrays) then changing child window
+>ID's
+>for the panes. Although this may sound too crude from the purist's view
+>the code
+>worked almost unchanged from 2.5 to 4.1.
+>
+>If needed I can post the code.
+>
+>HTH
+>
+>--- 
+>Kostya Sebov. 
+>------------------------------------------------------------------------
+>----
+>Tel: (38 044) 266-6387 | Fax: (38 044) 266-6195 | E-mail:
+>sebov@is.kiev.ua
+>
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Kostya Sebov -- <A HREF="mailto:sebov@is.kiev.ua">sebov@is.kiev.ua</A>
+Wednesday, October 30, 1996
+</B>
+>>        I have a static splitter window with two panes - one on top of the
+>>        other (1 col, 2 rows).  I would like to allow the user to change the
+>>        splitter so the panes are side-by-side (2 cols, 1 row).
+>>
+>>        Can this be done without having to create a new splitter and new
+>>        views?
+>>
+>>        Any help would be appreciated,
+>>
+>>        John
+>>
+>
+>I didn't find easier way than hacking the internal CSplitterWnd data
+>structures (manually 'reshaping' the arrays) then changing child window
+>ID's
+>for the panes. Although this may sound too crude from the purist's view
+>the code
+>worked almost unchanged from 2.5 to 4.1.
+>
+>If needed I can post the code.
+>
+
+So I'm doing this. Begging for your pardon for the delay I've also included the
+code that switches the panes' order and keeps relative widths/heights when the
+splitter is resized.
+
+Note however that I'm pasting from my source code removing specifics on the way
+so forgive me in advance if this won't compile at the very first time.
+
+The final note is that the method was used for static splitters but I think can
+be easily adapted for the dynamic ones.
+
+//RvSplit.h
+
+/////////////////////////////////////////////////////////////////////////////
+// CRvSplitter
+//
+
+class CRvSplitter : public CSplitterWnd
+{
+    DECLARE_DYNAMIC( CRvSplitter )
+
+// Construction / destruction
+public:
+    CRvSplitter();
+    virtual ~CRvSplitter();
+
+// Attributes
+protected:
+    int     m_nSplitRatio;
+    BOOL    m_bPanesSwapped;
+
+public:
+    void SetSplitRatio( int nRatio );
+
+    BOOL IsSplitHorizontally() const;
+    BOOL IsSplitVertically() const { return !IsSplitHorizontally(); }
+
+    BOOL ArePanesSwapped() const { return m_bPanesSwapped; }
+
+// Operations
+protected:
+    BOOL UpdateSplitRatio();
+
+    BOOL UpdatePanes( int cx, int cy );
+    BOOL UpdatePanes();
+
+public:
+    void Flip();
+
+    void SplitVertically();
+    void SplitHorizontally();
+
+    void SwapPanes();
+
+// Implementation
+public:
+
+protected:
+    // Generated message map functions
+    //{{AFX_MSG(CRvSplitter)
+    afx_msg void OnSize(UINT nType, int cx, int cy);
+    //}}AFX_MSG
+    DECLARE_MESSAGE_MAP()
+};
+
+/////////////////////////////////////////////////////////////////////////////
+
+============================================================================
+
+//RvSplit.cpp
+
+#include "StdAfx.h"
+#include "RvApp.h"
+
+#include "RvSplit.h"
+
+#ifdef _DEBUG
+#undef THIS_FILE
+static char BASED_CODE THIS_FILE[] = __FILE__;
+#endif
+
+/////////////////////////////////////////////////////////////////////////////
+// CRvSplitter
+//
+
+IMPLEMENT_DYNAMIC( CRvSplitter, CSplitterWnd )
+
+CRvSplitter::CRvSplitter()
+:   m_nSplitRatio( -1 ),
+    m_bPanesSwapped( FALSE )
+{
+}
+
+CRvSplitter::~CRvSplitter()
+{
+}
+
+BEGIN_MESSAGE_MAP(CRvSplitter, CSplitterWnd)
+    //{{AFX_MSG_MAP(CRvSplitter)
+    ON_WM_SIZE()
+    //}}AFX_MSG_MAP
+END_MESSAGE_MAP()
+
+void CRvSplitter::SetSplitRatio( int nRatio )
+{
+    m_nSplitRatio = nRatio;
+}
+
+BOOL CRvSplitter::IsSplitHorizontally() const
+{
+    ASSERT(( m_nRows > 1 ) != ( m_nCols > 1 ));
+    ASSERT( max( m_nRows, m_nCols ) == 2 ); // This assertion comes from my specifics.
+                                            // Hopefully it can be removed for more than 2 panes.
+
+    return ( m_nCols > 1 );
+}
+
+void CRvSplitter::SplitHorizontally()
+{
+    if( IsSplitHorizontally())
+        return;
+
+    ASSERT( m_nCols = 1 );
+    ASSERT( m_nRows = 2 );
+
+    // Get the last pane.
+    // We need one to change its child ID later but not to produce the assertion
+    //    falure in the IdFromRowCol.
+    // There's no need to change ID for the first one.
+    CWnd* pPane = GetDlgItem( IdFromRowCol( 1, 0 ));
+    ASSERT( pPane );
+
+    // swap the H/V information
+    m_nMaxCols = m_nCols = 2;
+    m_nMaxRows = m_nRows = 1;
+
+    CRowColInfo* pTmp = m_pColInfo;
+    m_pColInfo = m_pRowInfo;
+    m_pRowInfo = pTmp;
+
+    // change the last pane's ID reference
+    pPane->SetDlgCtrlID( IdFromRowCol( 0, 1 ));
+    ASSERT( GetPane( 0, 1 )->GetSafeHwnd() == pPane->GetSafeHwnd() );
+
+    if( UpdatePanes())
+        RecalcLayout();
+}
+
+void CRvSplitter::SplitVertically()
+{
+    if( IsSplitVertically())
+        return;
+
+    ASSERT( m_nCols = 2 );
+    ASSERT( m_nRows = 1 );
+
+    // Get the last pane.
+    // We need one to change its child ID later but not to produce the assertion
+    //    falure in the IdFromRowCol.
+    // There's no need to change ID for the first one.
+    CWnd* pPane = GetDlgItem(IdFromRowCol( 0, 1 ));
+    ASSERT( pPane );
+
+    // swap the H/V information
+    m_nMaxCols = m_nCols = 1;
+    m_nMaxRows = m_nRows = 2;
+
+    CRowColInfo* pTmp = m_pColInfo;
+    m_pColInfo = m_pRowInfo;
+    m_pRowInfo = pTmp;
+
+    // change the last pane's ID reference ( no need to change ID for the first one )
+    pPane->SetDlgCtrlID( IdFromRowCol( 1, 0 ));
+    ASSERT( GetPane( 1, 0 )->GetSafeHwnd() == pPane->GetSafeHwnd() );
+
+    if( UpdatePanes())
+        RecalcLayout();
+}
+
+void CRvSplitter::Flip()
+{
+    if( IsSplitHorizontally())
+        SplitVertically();
+    else
+    {
+        ASSERT( IsSplitVertically());
+
+        SplitHorizontally();
+    }
+}
+
+void CRvSplitter::SwapPanes()
+{
+    if( IsSplitHorizontally())
+    {
+        ASSERT( m_nCols = 2 );
+        ASSERT( m_nRows = 1 );
+
+        CWnd* pLeft = GetDlgItem( IdFromRowCol( 0, 0 ));
+        ASSERT( pLeft );
+        CWnd* pRight = GetDlgItem(IdFromRowCol( 0, 1 ));
+        ASSERT( pRight );
+
+        pLeft ->SetDlgCtrlID( IdFromRowCol( 0, 1 ));// will be right
+        pRight->SetDlgCtrlID( IdFromRowCol( 0, 0 ));// will be left
+
+        ASSERT( GetPane( 0, 0 )->GetSafeHwnd() == pRight->GetSafeHwnd() );
+        ASSERT( GetPane( 0, 1 )->GetSafeHwnd() == pLeft->GetSafeHwnd() );
+
+    }
+    else
+    {
+        ASSERT( IsSplitVertically());
+
+        ASSERT( m_nCols = 1 );
+        ASSERT( m_nRows = 2 );
+
+        CWnd* pUpper = GetDlgItem( IdFromRowCol( 0, 0 ));
+        ASSERT( pUpper );
+        CWnd* pLower = GetDlgItem( IdFromRowCol( 1, 0 ));
+        ASSERT( pLower );
+
+        pUpper->SetDlgCtrlID( IdFromRowCol( 1, 0 ));// will be lower
+        pLower->SetDlgCtrlID( IdFromRowCol( 0, 0 ));// will be upper
+
+        ASSERT( GetPane( 0, 0 )->GetSafeHwnd() == pLower->GetSafeHwnd() );
+        ASSERT( GetPane( 1, 0 )->GetSafeHwnd() == pUpper->GetSafeHwnd() );
+
+    }
+
+    m_bPanesSwapped = ~m_bPanesSwapped;
+
+    if( UpdatePanes())
+        RecalcLayout();
+}
+
+int CRvSplitter::UpdateSplitRatio()
+{
+    CRowColInfo* pPanes;
+    int czSplitter;
+    if( IsSplitHorizontally())
+    {
+        pPanes     = m_pColInfo;
+        czSplitter = m_cxSplitter;
+    }
+    else
+    {
+        pPanes     = m_pRowInfo;
+        czSplitter = m_cySplitter;
+    }
+
+
+    TRACE( "CRvSplitter::UpdateSplitRatio: 1:%i, 2:%i\n",
+           pPanes[0].nCurSize, pPanes[1].nCurSize
+         );
+
+    if(( pPanes[0].nCurSize != -1 ) &&
+       ( pPanes[0].nCurSize + pPanes[1].nCurSize != 0 )
+      )
+    {
+        m_nSplitRatio = CProfile::splitResolution * pPanes[0].nCurSize /
+                            ( pPanes[0].nCurSize + pPanes[1].nCurSize + czSplitter );
+
+    }
+
+    TRACE("m_nSplitRatio=%i\n", m_nSplitRatio );
+    return m_nSplitRatio;
+}
+
+BOOL CRvSplitter::UpdatePanes()
+{
+    CRect rcClient;
+    GetClientRect( rcClient );
+
+    return ( !rcClient.IsRectEmpty() &&
+             UpdatePanes( rcClient.Width(), rcClient.Height())
+           );
+}
+
+BOOL CRvSplitter::UpdatePanes( int cx, int cy )
+{
+    TRACE("UpdatePanes: cx=%i, cy=%i\n", cx, cy );
+
+    CRowColInfo* pPanes;
+    int cz;
+
+    if( IsSplitHorizontally())
+    {
+        pPanes = m_pColInfo;
+        cz     = cx;
+    }
+    else
+    {
+        pPanes = m_pRowInfo;
+        cz     = cy;
+    }
+
+    BOOL bRes = UpdateSplitRatio();
+
+    if( m_nSplitRatio >= 0 )
+    {
+        ASSERT( (ULONG)m_nSplitRatio * cz / CProfile::splitResolution <= (ULONG)INT_MAX );
+        pPanes[0].nIdealSize =
+            int( (ULONG)m_nSplitRatio * cz / CProfile::splitResolution );
+    }
+
+    return bRes;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// CRvSplitter message handlers
+//
+
+void CRvSplitter::OnSize( UINT nType, int cx, int cy )
+{
+    TRACE("CRvSplitter::OnSize: cx:%i, cy:%i\n", cx, cy );
+    if(( nType != SIZE_MINIMIZED )&&( cx > 0 )&&( cy > 0 ))
+        UpdatePanes( cx, cy );
+
+    CSplitterWnd::OnSize( nType, cx, cy );
+}
+
+--- 
+Kostya Sebov. 
+----------------------------------------------------------------------------
+Tel: (38 044) 266-6387 | Fax: (38 044) 266-6195 | E-mail: sebov@is.kiev.ua
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

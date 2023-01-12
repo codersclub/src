@@ -1,0 +1,246 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Manually Creating View Windows
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Scott Daniels -- <A HREF="mailto:scottdfl@sprynet.com">scottdfl@sprynet.com</A>
+Thursday, October 17, 1996
+</B>
+Environment: Win95, Visual C++ 4.1
+
+Hi,
+
+The app I am writing is a MDI app with one project window (similar to
+Developer Studio). The problem is I want to create additional views to
+display portions of the project document. The examples I have looked at
+thus far show creating multiple views of the same document. What I need is
+similar, but the metaphor is totally different. What is the best way to
+accomplish this task?
+
+Thanks very much in advance for the help,
+
+Scott
+
+Scott Daniels             scottdfl@sprynet.com
+"Life appears the way you choose to see it."
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Simon Salter -- <A HREF="mailto:Simon@chersoft.co.uk">Simon@chersoft.co.uk</A>
+Saturday, October 19, 1996
+</B>
+[Mini-digest: 3 responses]
+
+I like to consider a view as 'a way of looking at something'. So in 
+this sense what you want is several ways of looking at the same 
+'thing'. In MFC parlance that is several different views of the same 
+document. One type would show a particular portion of the document in 
+a particular way and so on. In other words you do want multiple views 
+of a document, but different types of view.
+
+There has been a fair bit of discussion here lately about ways to 
+achieve this. One fairly straightforward way is to create several 
+document templates attaching the different types of view to the same 
+document type and then use the templates to create additional views as 
+needed.
+
+In your CMainFrame you might have a method like this (which is loosely 
+based on the TANGRAM sample):
+
+void CMyFrame::CreateOrActivateFrame(CRuntimeClass *pViewClass)
+{
+	CMDIChildWnd* pMDIActive = MDIGetActive();
+	CDocument *pDoc = pMDIActive->GetActiveDocument();
+
+	// First we try to activate an existing view
+	CView *pView = NULL;
+	BOOL bActivatedView = FALSE;
+	POSITION pos = pDoc->GetFirstViewPosition();
+	while(!bActivatedView && pos != NULL)
+	{
+		pView = pDoc->GetNextView(pos);
+		if(pView->IsKindOf(pViewClass)) // Found one
+		{
+			TRACE0("Activating existing frame");
+			pView->GetParentFrame()->ActivateFrame(); 
+			bActivatedView = TRUE;
+		}
+	}
+
+	if(!bActivatedView) // Got to create a new one
+	{
+		CDocTemplate *pTemplate = GetDocTemplate(pViewClass);
+		if(pTemplate != NULL)
+		{
+			CMDIChildWnd *pNewFrame = (CMDIChildWnd 
+*)(pTemplate->CreateNewFrame(pDoc,NULL));
+			if(pNewFrame != NULL)
+			{
+				ASSERT(pNewFrame->IsKindOf(RUNTIME_CLASS(CMDIChildWnd)));
+				pTemplate->InitialUpdateFrame(pNewFrame,pDoc);
+			}
+			else
+				TRACE0("Failed to create new frame");
+		}
+	}
+}
+
+Where GetDocTemplate(pViewClass) is implemented in your CWinApp 
+derived class. What it does it to go through the list of templates set 
+up on InitApplication() and return the appropriate one for that view.
+
+Note that the new view is attached to the active document so you get a 
+different type of view of the document. Ta da!
+
+Simon
+
+
+----------
+From:  Scott Daniels[SMTP:scottdfl@sprynet.com]
+Sent:  18 October 1996 04:30
+To:  MFC Mailing List
+Subject:  Manually Creating View Windows
+
+Environment: Win95, Visual C++ 4.1
+
+Hi,
+
+The app I am writing is a MDI app with one project window (similar to
+Developer Studio). The problem is I want to create additional views 
+to
+display portions of the project document. The examples I have looked 
+at
+thus far show creating multiple views of the same document. What I 
+need is
+similar, but the metaphor is totally different. What is the best way 
+to
+accomplish this task?
+
+Thanks very much in advance for the help,
+
+Scott
+
+Scott Daniels             scottdfl@sprynet.com
+"Life appears the way you choose to see it."
+
+-----From: "Shrikanth Swaminathan" <sshri@csi-gmbh.de>
+
+Hi !!,
+I am starting on a similar application, and will keep tell u as things
+develop.
+However, the following article in MSDN u should find interesting...
+The Human Factor: It's Windows 95: 
+Do You Know Where Your Child Windows Are?
+
+Books and Periodicals->MS Dev Net News->Nov1994, No 6->Standard Cols.
+
+-------------------------------------------------------------------
+S.Shrikanth  sshri@csi-gmbh.de
+Ph (o) +49-231-55707214 (h) +49-231-7270030
+-------------------------------------------------------------------
+We are what we repeatedly do,
+Excellence, then is not an act, but a habit
+Aristotel
+-------------------------------------------------------------------
+
+-----From: Tomas Gudmundsson <thg@dhi.dk>
+
+Do this in your Doc class :
+
+  CMultiDocTemplate* pDocTemplate =
+    new CMultiDocTemplate(
+      IDR_XXXTYPE,
+      RUNTIME_CLASS(CXXXDoc),
+      RUNTIME_CLASS(CXXXFrame),
+      RUNTIME_CLASS(CXXXView));
+  CFrameWnd *pFrame =
+    pDocTemplate->CreateNewFrame(this,NULL);
+  pDocTemplate->InitialUpdateFrame(pFrame,this,TRUE);
+
+It would be better to create the DocTemplate once and for all somewhere else.
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Niels Ull Jacobsen -- <A HREF="mailto:nuj@kruger.dk">nuj@kruger.dk</A>
+Tuesday, October 22, 1996
+</B>
+
+
+>>> "Scott Daniels" <scottdfl@sprynet.com> 18-10-96 04.29 >>>
+Environment: Win95, Visual C++ 4.1
+
+Hi,
+
+>The app I am writing is a MDI app with one project window (similar to
+>Developer Studio). The problem is I want to create additional views to
+>display portions of the project document. The examples I have looked at
+>thus far show creating multiple views of the same document. What I need
+>is
+>similar, but the metaphor is totally different. What is the best way to
+>accomplish this task?
+
+I don't see how this is "totally different". You basically just want to enforce
+that the user only has one document open. This can be done by overriding
+CWinApp::OnFileNew and CWinApp::OnFileOpen, forcing them to close
+the previous document before opening the next.
+
+You can create the views yourself using the method shown in the
+ChkBook sample. If you need different types of view, use multiple
+document templates - otherwise just use one.
+
+>Thanks very much in advance for the help,
+
+>Scott
+
+Scott Daniels             scottdfl@sprynet.com
+"Life appears the way you choose to see it."
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

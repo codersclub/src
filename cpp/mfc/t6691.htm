@@ -1,0 +1,377 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Using CListViewEx in a dialog
+</B></FONT>
+<BR>
+<PRE>
+<B>
+<A HREF="mailto:DAVISTOD@gw2k.com">DAVISTOD@gw2k.com</A>
+Monday, September 09, 1996
+</B>
+Form: Memo
+Text: (23 lines follow)
+Environment:  VC++ 4.1, Win 95, NT 3.51
+
+I have an old dialog-based application originally developed with VC++ 2.2.  
+The dialog had a list box that simulated multiple columns of information 
+using tabs.
+
+I'm brushing the dust off of it and would like to make the list box into a 
+list control.  However, I would also like to be able to use the type of list 
+control that the ROWLIST sample implements, which lets the user 'select' an 
+entire row in report mode.
+
+The problem is that ROWLIST uses a class derived from CListView and I'm used 
+to placing CListCtrl (or derived types) on my dialogs and form views.  
+Obviously, this example has chosen to override some of the painting done in 
+order to simulate full row selection.
+
+Is there a way to get this type of list control on my dialog using 
+CListViewEx?  Or, if I go with CFormView instead, is it possible to still 
+include this extended list control view?  Or should I be looking at a dialog 
+bar for the dialog part?  
+
+Todd Davis
+Gateway 2000
+Use Proportional Font: true
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+IK 23 -- <A HREF="mailto:Cunningham@tgd.swissptt.ch">Cunningham@tgd.swissptt.ch</A>
+Tuesday, September 10, 1996
+</B>
+This code is simply taken from the rowlist example all that changes is
+that there is no need to get a ListCtrl cause you are already in one.
+hth
+
+//-----------------------------------------------------------------------
+-
+void CExtListCtrl::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
+//-----------------------------------------------------------------------
+-
+{
+//	CListCtrl& ListCtrl=GetListCtrl();
+	CDC* pDC=CDC::FromHandle(lpDrawItemStruct->hDC);
+	CRect rcItem(lpDrawItemStruct->rcItem);
+	UINT uiFlags=ILD_TRANSPARENT;
+	CImageList* pImageList;
+	int nItem=lpDrawItemStruct->itemID;
+	BOOL bFocus=(GetFocus()==this);
+	COLORREF clrTextSave, clrBkSave;
+	COLORREF clrImage=m_clrBkgnd;
+	static _TCHAR szBuff[MAX_PATH];
+	LPCTSTR pszText;
+
+// get item data
+
+	LV_ITEM lvi;
+	lvi.mask=LVIF_TEXT | LVIF_IMAGE | LVIF_STATE;
+	lvi.iItem=nItem;
+	lvi.iSubItem=0;
+	lvi.pszText=szBuff;
+	lvi.cchTextMax=sizeof(szBuff);
+	lvi.stateMask=0xFFFF;		// get all state flags
+	GetItem(&lvi);
+
+	BOOL bSelected=(bFocus || (GetStyle() & LVS_SHOWSELALWAYS)) &&
+lvi.state & LVIS_SELECTED;
+	bSelected=bSelected || (lvi.state & LVIS_DROPHILITED);
+
+// set colors if item is selected
+
+	CRect rcAllLabels;
+	GetItemRect(nItem,rcAllLabels,LVIR_BOUNDS);
+	CRect rcLabel;
+	GetItemRect(nItem,rcLabel,LVIR_LABEL);
+	rcAllLabels.left=rcLabel.left;
+	if(m_bClientWidthSel && rcAllLabels.right<m_cxClient)
+		rcAllLabels.right=m_cxClient;
+
+	if(bSelected)
+	{
+		clrTextSave=pDC->SetTextColor(::GetSysColor(COLOR_HIGHLIGHTTEXT));
+		clrBkSave=pDC->SetBkColor(::GetSysColor(COLOR_HIGHLIGHT));
+
+		pDC->FillRect(rcAllLabels,&CBrush(::GetSysColor(COLOR_HIGHLIGHT)));
+	}
+	else
+		pDC->FillRect(rcAllLabels,&CBrush(m_clrTextBk));
+
+// set color and mask for the icon
+
+	if(lvi.state & LVIS_CUT)
+	{
+		clrImage=m_clrBkgnd;
+		uiFlags|=ILD_BLEND50;
+	}
+	else if(bSelected)
+	{
+		clrImage=::GetSysColor(COLOR_HIGHLIGHT);
+		uiFlags|=ILD_BLEND50;
+	}
+
+// draw state icon
+
+	UINT nStateImageMask=lvi.state & LVIS_STATEIMAGEMASK;
+	if(nStateImageMask)
+	{
+		int nImage=(nStateImageMask>>12)-1;
+		pImageList=GetImageList(LVSIL_STATE);
+		if(pImageList)
+			pImageList->Draw(pDC,nImage,CPoint(rcItem.left,rcItem.top),ILD_TRANSPA
+RENT);
+	}
+
+// draw normal and overlay icon
+
+	CRect rcIcon;
+	GetItemRect(nItem,rcIcon,LVIR_ICON);
+
+	pImageList=GetImageList(LVSIL_SMALL);
+	if(pImageList)
+	{
+		UINT nOvlImageMask=lvi.state & LVIS_OVERLAYMASK;
+		if(rcItem.left<rcItem.right-1)
+			ImageList_DrawEx(pImageList->m_hImageList,lvi.iImage,pDC->m_hDC,rcIcon
+.left,rcIcon.top,16,16,m_clrBkgnd,clrImage,uiFlags | nOvlImageMask);
+	}
+
+// draw item label
+
+	GetItemRect(nItem,rcItem,LVIR_LABEL);
+	rcItem.right-=m_cxStateImageOffset;
+
+	pszText=MakeShortString(pDC,szBuff,rcItem.right-rcItem.left,2*OFFSET_FIR
+ST);
+
+	rcLabel=rcItem;
+	rcLabel.left+=OFFSET_FIRST;
+	rcLabel.right-=OFFSET_FIRST;
+
+	pDC->DrawText(pszText,-1,rcLabel,DT_LEFT | DT_SINGLELINE | DT_NOPREFIX
+| DT_NOCLIP | DT_VCENTER);
+
+// draw labels for extra columns
+
+	LV_COLUMN lvc;
+	lvc.mask=LVCF_FMT | LVCF_WIDTH;
+
+	for(int nColumn=1; GetColumn(nColumn,&lvc); nColumn++)
+	{
+		rcItem.left=rcItem.right;
+		rcItem.right+=lvc.cx;
+
+		int nRetLen=GetItemText(nItem,nColumn,szBuff,sizeof(szBuff));
+		if(nRetLen==0) continue;
+
+		pszText=MakeShortString(pDC,szBuff,rcItem.right-rcItem.left,2*OFFSET_OT
+HER);
+
+		UINT nJustify=DT_LEFT;
+
+		if(pszText==szBuff)
+		{
+			switch(lvc.fmt & LVCFMT_JUSTIFYMASK)
+			{
+			case LVCFMT_RIGHT:
+				nJustify=DT_RIGHT;
+				break;
+			case LVCFMT_CENTER:
+				nJustify=DT_CENTER;
+				break;
+			default:
+				break;
+			}
+		}
+
+		rcLabel=rcItem;
+		rcLabel.left+=OFFSET_OTHER;
+		rcLabel.right-=OFFSET_OTHER;
+
+		pDC->DrawText(pszText,-1,rcLabel,nJustify | DT_SINGLELINE |
+DT_NOPREFIX | DT_NOCLIP | DT_VCENTER);
+	}
+
+// draw focus rectangle if item has focus
+
+	if(lvi.state & LVIS_FOCUSED && bFocus)
+		pDC->DrawFocusRect(rcAllLabels);
+
+// set original colors if item was selected
+
+	if(bSelected)
+	{
+	        pDC->SetTextColor(clrTextSave);
+		pDC->SetBkColor(clrBkSave);
+	}
+}
+
+
+
+Graham Cunningham
+00 41 31 338 0633
+
+>----------
+>From: 	DAVISTOD@gw2k.com[SMTP:DAVISTOD@gw2k.com]
+>Sent: 	Montag, 9. September 1996 16:45
+>To: 	mfc-l@netcom.com
+>Subject: 	Using CListViewEx in a dialog
+>
+>
+>Form: Memo
+>Text: (23 lines follow)
+>Environment:  VC++ 4.1, Win 95, NT 3.51
+>
+>I have an old dialog-based application originally developed with VC++
+>2.2.  
+>The dialog had a list box that simulated multiple columns of
+>information 
+>using tabs.
+>
+>I'm brushing the dust off of it and would like to make the list box
+>into a 
+>list control.  However, I would also like to be able to use the type of
+>list 
+>control that the ROWLIST sample implements, which lets the user
+>'select' an 
+>entire row in report mode.
+>
+>The problem is that ROWLIST uses a class derived from CListView and I'm
+>used 
+>to placing CListCtrl (or derived types) on my dialogs and form views.  
+>Obviously, this example has chosen to override some of the painting
+>done in 
+>order to simulate full row selection.
+>
+>Is there a way to get this type of list control on my dialog using 
+>CListViewEx?  Or, if I go with CFormView instead, is it possible to
+>still 
+>include this extended list control view?  Or should I be looking at a
+>dialog 
+>bar for the dialog part?  
+>
+>Todd Davis
+>Gateway 2000
+>Use Proportional Font: true
+>
+>
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Sunil -- <A HREF="mailto:Sunil.Veluvali@aspect.com">Sunil.Veluvali@aspect.com</A>
+Tuesday, September 10, 1996
+</B>
+[Mini-digest: 2 responses]
+
+>Environment:  VC++ 4.1, Win 95, NT 3.51
+
+      You can modify the CListViewEx class to be derived from CListCtrl.
+And, of course, just remove all calls to  
+GetListCtrl() function. Then you can place a list control on your dialog
+and subclass it to be derived from your CListCtrlEx class.
+
+Hope this helps
+Sunil.	
+
+>----------
+>From: 	DAVISTOD@gw2k.com[SMTP:DAVISTOD@gw2k.com]
+>Sent: 	Monday, September 09, 1996 7:45 AM
+>To: 	mfc-l@netcom.com
+>Subject: 	Using CListViewEx in a dialog
+>
+>Form: Memo
+>Text: (23 lines follow)
+>Environment:  VC++ 4.1, Win 95, NT 3.51
+>
+>I have an old dialog-based application originally developed with VC++ 2.2.  
+>The dialog had a list box that simulated multiple columns of information 
+>using tabs.
+>
+>I'm brushing the dust off of it and would like to make the list box into a 
+>list control.  However, I would also like to be able to use the type of list 
+>control that the ROWLIST sample implements, which lets the user 'select' an 
+>entire row in report mode.
+>
+>The problem is that ROWLIST uses a class derived from CListView and I'm used 
+>to placing CListCtrl (or derived types) on my dialogs and form views.  
+>Obviously, this example has chosen to override some of the painting done in 
+>order to simulate full row selection.
+>
+>Is there a way to get this type of list control on my dialog using 
+>CListViewEx?  Or, if I go with CFormView instead, is it possible to still 
+>include this extended list control view?  Or should I be looking at a dialog 
+>bar for the dialog part?  
+>
+>Todd Davis
+>Gateway 2000
+>Use Proportional Font: true
+>
+>
+-----From: Dicky Singh <Dicky@Landmark.COM>
+
+This may work:
+It is probably easy to derive a class from CListCtrl (e.g 
+CListCtrlExtended)  and put in the logic from CListView (RowList Sample) in 
+it.
+
+To use it, define in .h
+CListCtrlExtended  m_ListEx;
+
+In .Cpp in InitDialog for your dialog use:
+	m_ListEx.SubclassDlgItem(IDC_LISTCTRL, this);
+
+where IDC_LISTCTRL is a List ctrl in your dialog
+
+
+BTW: The new ListCtrl from IE4.0/Nashville (You need ComCtl32.h and Lib 
+from activeX SDK and ComCtl.dll from IE3.0 to use the features) supports 
+(or is supposed to support) full line selection, the way you want.
+
+-Dicky
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

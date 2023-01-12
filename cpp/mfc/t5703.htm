@@ -1,0 +1,238 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Dynamic toolbars
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Lars Martinsson -- <A HREF="mailto:lmn@agema.se">lmn@agema.se</A>
+Thursday, July 04, 1996
+</B>
+Env: VC4.1, NT3.51
+
+I'm developing an application where the user dynamically add/remove
+buttons from a toolbar. The toolbar buttons represents controls and
+insertable objects read from the registry.
+
+There is no problems with the controls, I read the ToolboxBitmap32 key
+and extract a bitmap handle which a then add as a toolbar button.
+
+My problem is the insertable objects, they have a DefaultIcon key.
+I use the ExtractIcon API to get a HICON and then I'm stucked.
+
+I also have problems with the tooltips for the toolbar. I've tried to
+receive TTN_NEEDTEXT without any success.
+
+Is there any knowledge out there how do to this I would be the happiest
+MFC programmer in the nortern suburbs of Stockholm ;-)
+
+Lars Martinsson
+lmn@agema.se
+lars.martinsson@lamar.se
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Vincent Mascart -- <A HREF="mailto:100425.1337@compuserve.com">100425.1337@compuserve.com</A>
+Saturday, July 06, 1996
+</B>
+>From: 	"Lars Martinsson"
+>Sent: 	samedi 6 juillet 1996 5:02
+>To: 	INTERNET:MFC-L@NETCOM.COM
+>Subject: 	Dynamic toolbars
+>
+>Env: VC4.1, NT3.51
+>
+>I'm developing an application where the user dynamically add/remove
+>buttons from a toolbar.
+>
+>[snip]
+>
+>I also have problems with the tooltips for the toolbar. I've tried to
+>receive TTN_NEEDTEXT without any success.
+>
+>Is there any knowledge out there how do to this I would be the happiest
+>MFC programmer in the nortern suburbs of Stockholm ;-)
+>
+>Lars Martinsson
+>lmn@agema.se
+>lars.martinsson@lamar.se
+
+If you want to provide tool tips under NT,  you'll have to add a handler for
+TTN_NEEDTEXTW and TTN_NEEDTEXTA.
+
+Vincent Mascart
+100425.1337@compuserve.com
+
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dan Kirby -- <A HREF="mailto:dkirby@accessone.com">dkirby@accessone.com</A>
+Friday, July 05, 1996
+</B>
+[Mini-digest: 2 responses]
+
+>>>I also have problems with the tooltips for the toolbar. I've tried to
+receive TTN_NEEDTEXT without any success.<<<
+
+
+TTN_NEEDTEXT is handled automatically by CFrameWnd.  Look in WINFRM.CPP and 
+you will see the  CFrameWnd::OnToolTipText handler. So since your toolbar 
+is a most likely a child of a CFrameWnd, you can use the built-in tooltip 
+handling. In the handler, you can see that it loads the tooltip text from a 
+string resource:
+
+AfxLoadString(nID, szFullText);
+// this is the command id, not the button index
+AfxExtractSubString(strTipText, szFullText, 1, '\n');
+
+For cases where your not using the default  handling of tooltips, you might 
+want to look at Q140595 in the Microsoft Knowledgebase which talks about 
+enabling tooltips for any child window.
+
+--dan
+-----From: "Manos D. Anastasiadis" <manos@ced.tuc.gr>
+
+
+In Answer to  Lars Martinsson[SMTP:lmn@agema.se]
+---------------------------------------------------------
+
+(Env: VC4.1, NT3.51)
+
+Although your description of the problem with ExtractIcon does not
+contain enough info :-), I hope that the code snippet found below
+will give you a little help. It is a piece of code used by a Dialog box
+that splashes when the app is started, allowing the user to
+select a file from a ListView based implementation of the MRU file list,
+or to open/create another document; similar to the typical stuff found 
+in many apps nowadays (I hate it personally). If anybody's interested
+in getting the full source, just drop me a line...
+
+As long as the tooltips are concerned, you can have a look at the
+common controls sample in \MSDEV\SAMPLES\MFC\GENERAL\CMNCTRLS
+which works quite fine (and you get a demo of all the common controls as a plus).
+
+//
+// GetTemplateIcon()
+// Used to extract the icon associated with a specific CDocTemplate
+// of the ones "we" use in our application
+//
+static HICON msGetTemplateIcon(CDocTemplate* pTemplate)
+{
+	CString strFileTypeId;
+	if (!pTemplate->GetDocString(strFileTypeId, CDocTemplate::regFileTypeId)
+		|| strFileTypeId.IsEmpty())
+		return NULL;
+
+	// Find the document template's icon container executable
+	CString strDefaultIcon;
+	static const TCHAR szDefaultIconFmt[] = _T("%s\\DefaultIcon");
+	strDefaultIcon.Format(szDefaultIconFmt, strFileTypeId);
+
+	TCHAR szDefaultIconValue[_MAX_PATH];
+	LONG lcbValue = sizeof(szDefaultIconValue);
+	
+	if (::RegQueryValue(HKEY_CLASSES_ROOT, strDefaultIcon,
+				szDefaultIconValue, &lcbValue)
+		!= ERROR_SUCCESS)
+		return NULL;
+
+	UINT nIconIndex = 0;
+	LPTSTR lpszTerminator = _tcschr(szDefaultIconValue, _T(','));
+	if (lpszTerminator != NULL)
+	{
+		*lpszTerminator++ = _T('\0');
+		nIconIndex = (UINT) (*lpszTerminator - _T('0'));
+	}
+	
+	return ::ExtractIcon(AfxGetInstanceHandle(),
+				szDefaultIconValue, nIconIndex);
+}
+
+/*==================================*
+ * Manos D. Anastasiadis            *
+ * Computer Engineering Dept.       *
+ * Technical University of Crete    *
+ * Mu.S.I.C.                        *
+ * manos@ced.tuc.gr                 *
+ * Chania-Salonica-Kwnstantinoypolh *
+ *==================================*/
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Kevin Bentley -- <A HREF="mailto:kevinb@globaltrav.com">kevinb@globaltrav.com</A>
+Thursday, December 05, 1996
+</B>
+
+Environment: Windows 95, MSVC 4.0
+
+I have an application in which I would really like to be able to add a   
+dynamic toolbar. Ideally, I would like the user to be able to drag an   
+icon from explorer, and have *that* icon be added to the toolbar. I would   
+like the toolbar to be dockable too. Then I would have a configuration   
+option, that would configure exactly what happens when you click on that   
+button.
+
+I thought about using a CDialogBar, and resizing it depending on how many   
+icons I had to draw. I would have to do quite a bit manually, but I think   
+that would work.
+
+The problems I am having are:
+1) How can I implement drag & drop in a Toolbar, or Dialogbar?
+2) How can I dynamically add buttons, and how do I get notified when they   
+are clicked? I haven't been able to find any examples of this.
+
+Thanks for your help,
+
+Kevin
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

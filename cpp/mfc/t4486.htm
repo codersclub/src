@@ -1,0 +1,297 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+4.1 dynamic_cast bug?
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Robert -- <A HREF="mailto:rcobb@deerssv1.MED.OSD.MIL">rcobb@deerssv1.MED.OSD.MIL</A>
+Friday, March 29, 1996
+</B>
+[Moderator's note: Robert found the answer, which is included below.]
+
+[Platform: MSVC 4.1, NT 3.51 sp 3, Pentium 60]
+
+Line 3 of the following code snippet causes:
+
+error C2682: cannot use dynamic_cast to convert from 'const class CObject *'
+to 'const class CStringList *'
+
+......
+    const CObject *anObject;
+    const CStringList *aList;
+    aList = dynamic_cast<const CStringList *>(anObject);
+........
+
+-  This code compiles fine under 4.0. 
+-  The error is only generated when casting const objects.
+
+QUESTION:  Why is this an error?  I know Microsoft fixed the hole that
+allowed dynamic_cast to cast off const, did they break this legal cast in
+the process?
+
+To answer my own inquiry:  A support call to Microsoft revealed that this is
+a bug in 4.1 to be fixed in 4.2.  Suggestions for work-arounds:
+1.  Go back to 4.0 (no thanks)
+2.  Use C style casts (absolutely not)
+3.  Cast away the const and comment heavily to remove the unneeded casts
+when a fix is available.
+
+Example of suggestion #3:
+......
+    const CStringList *aList;
+    const CObject *aObject = aList;
+    CObject *aNonConstObject;
+    aNonConstObject = const_cast<CObject*>(aObject);
+    aList = dynamic_cast<CStringList *>(aNonConstObject);
+...........
+
+- Robert Cobb
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mats Mеnhav -- <A HREF="mailto:manhav@connectum.skurup.se">manhav@connectum.skurup.se</A>
+Sunday, March 31, 1996
+</B>
+-- [ From: Mats Manhav * EMC.Ver #2.5.02 ] --
+
+The #3 solution suggested heavy commenting.
+I suggest using _MSC_VER like this
+
+#define FIXFORVERSION 1000
+#if (_MSC_VER != FIXFORVERSION)
+#error "New version. Maybe the bugfix can be removed.
+#endif
+
+Whenever the compiler is updated you will get the error. Check if the bug
+has been fixed and 
+either remove the #if and the bugfix or update the FIXFORVERSION with the
+new compiler version number.
+
+-------- REPLY, Original message follows --------
+
+> Date: Friday, 29-Mar-96 10:51 AM
+> 
+> From: Cobb, Robert             \ Internet:    (rcobb@deerssv1.med.osd.mil)
+> To:   MFCList                  \ Internet:    (mfc-l@netcom.com)
+> 
+> Subject: 4.1 dynamic_cast bug?
+> 
+> [Moderator's note: Robert found the answer, which is included below.]
+> 
+> [Platform: MSVC 4.1, NT 3.51 sp 3, Pentium 60]
+> 
+> Line 3 of the following code snippet causes:
+> 
+> error C2682: cannot use dynamic_cast to convert from 'const class CObject
+*'
+> to 'const class CStringList *'
+> 
+> ......
+>     const CObject *anObject;
+>     const CStringList *aList;
+>     aList = dynamic_cast<const CStringList *>(anObject);
+> ........
+> 
+> -  This code compiles fine under 4.0. 
+> -  The error is only generated when casting const objects.
+> 
+> QUESTION:  Why is this an error?  I know Microsoft fixed the hole that
+> allowed dynamic_cast to cast off const, did they break this legal cast in
+> the process?
+> 
+> To answer my own inquiry:  A support call to Microsoft revealed that this
+is
+> a bug in 4.1 to be fixed in 4.2.  Suggestions for work-arounds:
+> 1.  Go back to 4.0 (no thanks)
+> 2.  Use C style casts (absolutely not)
+> 3.  Cast away the const and comment heavily to remove the unneeded casts
+> when a fix is available.
+> 
+> Example of suggestion #3:
+> ......
+>     const CStringList *aList;
+>     const CObject *aObject = aList;
+>     CObject *aNonConstObject;
+>     aNonConstObject = const_cast<CObject*>(aObject);
+>     aList = dynamic_cast<CStringList *>(aNonConstObject);
+> ...........
+> 
+> - Robert Cobb
+> 
+
+-------- REPLY, End of original message --------
+
+
+--
+==========================================================================
+Mats Mеnhav (Mats Manhav for 7-bit people)
+email:manhav@connectum.skurup.se   WWW: http://connectum.skurup.se/~manhav
+FAX:  (int) 46 (0) 414 243 05      Phone: (int) 46 (0) 414 243 05         
+==========================================================================
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Jeff Dickey -- <A HREF="mailto:jdickey@sevensigma.com">jdickey@sevensigma.com</A>
+Sunday, March 31, 1996
+</B>
+Mats,
+
+Good idea, but instead of doing
+
+   #error "New version. Maybe the bugfix can be removed.
+
+I suggest:
+
+   #pragma message( "New version. Maybe the bugfix can be removed." )
+
+This way, you see the message without tripping the compiler up on a bogus
+"error".
+
+Just my $0.01978962398 (damn Pentium bug!)
+
+Jeff
+
+
+At 23:37 3/31/96 -0500, Mats Manhav wrote:
+>-- [ From: Mats Manhav * EMC.Ver #2.5.02 ] --
+>
+>The #3 solution suggested heavy commenting.
+>I suggest using _MSC_VER like this
+>
+>#define FIXFORVERSION 1000
+>#if (_MSC_VER !=3D FIXFORVERSION)
+>#error "New version. Maybe the bugfix can be removed.
+>#endif
+>
+>Whenever the compiler is updated you will get the error. Check if the bug
+>has been fixed and=20
+>either remove the #if and the bugfix or update the FIXFORVERSION with the
+>new compiler version number.
+>
+>-------- REPLY, Original message follows --------
+>
+>> Date: Friday, 29-Mar-96 10:51 AM
+>>=20
+>> From: Cobb, Robert             \ Internet:   =
+ (rcobb@deerssv1.med.osd.mil)
+>> To:   MFCList                  \ Internet:    (mfc-l@netcom.com)
+>>=20
+>> Subject: 4.1 dynamic_cast bug?
+>>=20
+>> [Moderator's note: Robert found the answer, which is included below.]
+>>=20
+>> [Platform: MSVC 4.1, NT 3.51 sp 3, Pentium 60]
+>>=20
+>> Line 3 of the following code snippet causes:
+>>=20
+>> error C2682: cannot use dynamic_cast to convert from 'const class CObject
+>*'
+>> to 'const class CStringList *'
+>>=20
+>> ......
+>>     const CObject *anObject;
+>>     const CStringList *aList;
+>>     aList =3D dynamic_cast<const CStringList *>(anObject);
+>> ........
+>>=20
+>> -  This code compiles fine under 4.0.=20
+>> -  The error is only generated when casting const objects.
+>>=20
+>> QUESTION:  Why is this an error?  I know Microsoft fixed the hole that
+>> allowed dynamic_cast to cast off const, did they break this legal cast in
+>> the process?
+>>=20
+>> To answer my own inquiry:  A support call to Microsoft revealed that this
+>is
+>> a bug in 4.1 to be fixed in 4.2.  Suggestions for work-arounds:
+>> 1.  Go back to 4.0 (no thanks)
+>> 2.  Use C style casts (absolutely not)
+>> 3.  Cast away the const and comment heavily to remove the unneeded casts
+>> when a fix is available.
+>>=20
+>> Example of suggestion #3:
+>> ......
+>>     const CStringList *aList;
+>>     const CObject *aObject =3D aList;
+>>     CObject *aNonConstObject;
+>>     aNonConstObject =3D const_cast<CObject*>(aObject);
+>>     aList =3D dynamic_cast<CStringList *>(aNonConstObject);
+>> ...........
+>>=20
+>> - Robert Cobb
+>>=20
+>
+>-------- REPLY, End of original message --------
+>
+>
+>--
+>=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D
+>Mats M=E5nhav (Mats Manhav for 7-bit people)
+>email:manhav@connectum.skurup.se   WWW: http://connectum.skurup.se/~manhav
+>FAX:  (int) 46 (0) 414 243 05      Phone: (int) 46 (0) 414 243 05        =
+=20
+>=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D
+>
+>
+----
+Jeff Dickey
+Seven Sigma Software and Services
+PGP-secured mail encouraged!
+'http://www.sevensigma.com/keylist.html' or finger 'jdickey@sevensigma.com'
+       for PGP public key
+
+Key fingerprint =3D  99 CA 69 E5 2C 95 E8 4E  7E B2 59 5E FB A5 C2 FD
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

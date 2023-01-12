@@ -1,0 +1,290 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Использование anonymous pipes для перехвата StdIn/StdOut дочернего процесса.</h3>
+    <p style="MARGIN-LEFT: 20px">Автор: Borland Developer Support Staff <br>
+    Перевод: Валерий Вотинцев </p>
+    <p><b>&nbsp;</p>
+    <p>Тема:</b> </p>
+    <p style="MARGIN-LEFT: 20px">О том, как создать дочерний
+    процесс и передать управление его потоком
+    ввода-вывода родительскому процессу за счет
+    переадресации StdIn/StdOut. </p>
+    <p><b>&nbsp;</p>
+    <p>Введение:</b> </p>
+    <p style="MARGIN-LEFT: 20px">В настоящей статье объясняется,
+    как запустить дочернее консольное приложение и
+    переадресовать его стандартный ввод/вывод с
+    использованием неименованных пайпов. <br>
+    <br>
+    Неименованные пайпы используются для передачи
+    данных только в одном направлении (только чтение
+    или только запись). Зачем это может понадобиться?
+    Для того, чтобы запустить какую-нибудь внешнюю
+    утилиту и управлять ее поведением из своей
+    программы. Например, это может быть
+    телнет-сервер, который запускает DOS Shell и все, что
+    выводится в шелле, передает через сокеты на
+    удаленный хост. <br>
+    <br>
+    Для начала мы поговорим о самих пайпах. Пайп в
+    Windows - это просто один из методов коммуникации
+    между процессами. В SDK дается следующее
+    определение для пайпов: &quot;пайп - это
+    коммуникационный шлюз с двумя концами; некий
+    процесс через дескриптор (handle) на одном конце
+    пайпа может передавать данные другому процессу,
+    находящемуся на другом конце пайпа.&quot; <br>
+    <br>
+    В данном случае мы используем неименованные
+    пайпы (&quot;anonymous&quot; pipes), т.е. однонаправленные
+    пайпы, которые &quot;передают данные между
+    родительским и дочерним процессами или между
+    двумя дочерними процессами одного и того же
+    родительского процесса.&quot; <br>
+    Образно говоря, пайп - это &quot;труба&quot;, по которой
+    между двумя процессами перетекают данные. <br>
+    <br>
+    Для создания пайпа мы будем использовать функцию
+    <b>CreatePipe</b>, которая вернет нам два дескриптора:
+    дескриптор для записи и дескриптор для чтения. <br>
+    Обратите внимание, что нам придется создать <b>два</b>
+    пайпа: один для stdin и второй для stdout. <br>
+    <br>
+    Далее мы будем следить за состоянием
+    &quot;читабельного конца&quot; пайпа stdout для того,
+    чтобы перехватить все, что будет там выведено, и
+    отобразить в своем собственном окне. <br>
+    Кроме того, мы будем проверять, введено ли
+    что-нибудь в нашем приложении, и все, что введено,
+    будем посылать в &quot;записываемый конец&quot; пайпа
+    stdin. </p>
+    <p><b>&nbsp;</p>
+    <p>Исходник:</b><br>
+    </p>
+    <pre style="MARGIN-LEFT: 20px">
+//------------Пример использования CreateProcess и Anonymous Pipes------
+
+// childspawn.cpp
+// Приложение запускает shell и перехватывает его ввод/вывод
+
+//---------------------use freely---------------------------------------
+
+#include &lt;windows.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;conio.h&gt;
+#include &lt;string.h&gt;
+#pragma hdrstop
+#include &lt;condefs.h&gt;
+
+
+
+#define bzero(a) memset(a,0,sizeof(a)) //для сокращения писанины
+
+
+
+bool IsWinNT()  //проверка запуска под NT
+{
+  OSVERSIONINFO osv;
+  osv.dwOSVersionInfoSize = sizeof(osv);
+  GetVersionEx(&amp;osv);
+  return (osv.dwPlatformId == VER_PLATFORM_WIN32_NT);
+}
+
+
+
+void ErrorMessage(char *str)  //вывод подробной информации об ошибке
+{
+
+  LPVOID msg;
+
+  FormatMessage(
+    FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
+    NULL,
+    GetLastError(),
+    MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), // язык по умолчанию
+    (LPTSTR) &amp;msg,
+    0,
+    NULL
+  );
+
+  printf(&quot;%s: %s\n&quot;,str,msg);
+  LocalFree(msg);
+
+}
+
+
+
+//----------------------------------------------------------------------
+
+void main()
+
+{
+
+  char buf[1024];           //буфер ввода/вывода
+
+
+
+  STARTUPINFO si;
+  SECURITY_ATTRIBUTES sa;
+  SECURITY_DESCRIPTOR sd;        //структура security для пайпов
+  PROCESS_INFORMATION pi;
+
+  HANDLE newstdin,newstdout,read_stdout,write_stdin;  //дескрипторы
+                                                      // пайпов
+
+
+  if (IsWinNT())        //инициализация security для Windows NT
+  {
+    InitializeSecurityDescriptor(&amp;sd,SECURITY_DESCRIPTOR_REVISION);
+    SetSecurityDescriptorDacl(&amp;sd, true, NULL, false);
+    sa.lpSecurityDescriptor = &amp;sd;
+  }
+
+  else sa.lpSecurityDescriptor = NULL;
+
+  sa.nLength = sizeof(SECURITY_ATTRIBUTES);
+  sa.bInheritHandle = true;       //разрешаем наследование дескрипторов
+
+
+  if (!CreatePipe(&amp;newstdin,&amp;write_stdin,&amp;sa,0))   //создаем пайп
+                                                   // для stdin
+  {
+    ErrorMessage(&quot;CreatePipe&quot;);
+    getch();
+    return;
+  }
+
+  if (!CreatePipe(&amp;read_stdout,&amp;newstdout,&amp;sa,0)) //создаем пайп
+                                                  // для stdout
+  {
+    ErrorMessage(&quot;CreatePipe&quot;);
+    getch();
+    CloseHandle(newstdin);
+    CloseHandle(write_stdin);
+    return;
+  }
+
+
+
+  GetStartupInfo(&amp;si);      //создаем startupinfo для
+                            // дочернего процесса
+
+  /*
+
+  Параметр dwFlags сообщает функции CreateProcess
+  как именно надо создать процесс.
+
+  STARTF_USESTDHANDLES управляет полями hStd*.
+  STARTF_USESHOWWINDOW управляет полем wShowWindow.
+
+  */
+
+  si.dwFlags = STARTF_USESTDHANDLES|STARTF_USESHOWWINDOW;
+  si.wShowWindow = SW_HIDE;
+  si.hStdOutput = newstdout;
+  si.hStdError = newstdout;   //подменяем дескрипторы для
+  si.hStdInput = newstdin;    // дочернего процесса
+
+  char app_spawn[] = &quot;d:\\winnt\\system32\\cmd.exe&quot;; //это просто
+                                                     // пример,
+                                                     //замените на то,
+                                                     // что вам нужно
+
+
+
+  //создаем дочерний процесс
+
+  if (!CreateProcess(app_spawn,NULL,NULL,NULL,TRUE,CREATE_NEW_CONSOLE,
+                     NULL,NULL,&amp;si,&amp;pi))
+  {
+    ErrorMessage(&quot;CreateProcess&quot;);
+    getch();
+    CloseHandle(newstdin);
+    CloseHandle(newstdout);
+    CloseHandle(read_stdout);
+    CloseHandle(write_stdin);
+    return;
+  }
+
+
+
+  unsigned long exit=0;  //код завершения процесса
+  unsigned long bread;   //кол-во прочитанных байт
+  unsigned long avail;   //кол-во доступных байт
+
+
+
+  bzero(buf);
+
+  for(;;)      //основной цикл программы
+  {
+    GetExitCodeProcess(pi.hProcess,&amp;exit); //пока дочерний процесс
+                                           // не закрыт
+    if (exit != STILL_ACTIVE)
+      break;
+
+    PeekNamedPipe(read_stdout,buf,1023,&amp;bread,&amp;avail,NULL);
+
+    //Проверяем, есть ли данные для чтения в stdout
+
+    if (bread != 0)
+    {
+      bzero(buf);
+      if (avail &gt; 1023)
+      {
+        while (bread &gt;= 1023)
+        {
+          ReadFile(read_stdout,buf,1023,&amp;bread,NULL);  //читаем из
+                                                       // пайпа stdout
+          printf(&quot;%s&quot;,buf);
+          bzero(buf);
+        }
+      }
+
+      else {
+        ReadFile(read_stdout,buf,1023,&amp;bread,NULL);
+        printf(&quot;%s&quot;,buf);
+      }
+    }
+
+    if (kbhit())      //проверяем, введено ли что-нибудь с клавиатуры
+    {
+      bzero(buf);
+      *buf = (char)getche();
+
+      //printf(&quot;%c&quot;,*buf);
+
+      WriteFile(write_stdin,buf,1,&amp;bread,NULL); //отправляем это
+                                                // в stdin
+
+      if (*buf == '\r') {
+        *buf = '\n';
+        printf(&quot;%c&quot;,*buf);
+        WriteFile(write_stdin,buf,1,&amp;bread,NULL); //формирум конец
+                                                  //строки, если нужно
+
+      }
+    }
+  }
+
+  CloseHandle(pi.hThread);
+  CloseHandle(pi.hProcess);
+  CloseHandle(newstdin);            //небольшая уборка за собой
+  CloseHandle(newstdout);
+  CloseHandle(read_stdout);
+  CloseHandle(write_stdin);
+}
+
+//----------------------------EOF-----------------------------------
+
+//------------------------------------------------------------------</pre>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

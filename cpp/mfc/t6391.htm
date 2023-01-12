@@ -1,0 +1,258 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CWinThread extensions
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Bob Weidman -- <A HREF="mailto:bobfox@primenet.com">bobfox@primenet.com</A>
+Thursday, August 22, 1996
+</B>
+Environment: VC++ 4.1, Win 95, NT 3.51+
+
+I am (trying) to write a TAPI / MAPI program.
+
+I would like to have 2 separate threads created to read / write to the =
+Modem.
+It would be so much easier (for me) to send a message to the read thread =
+to "Look for" a certain string, and have the thread send my main thread =
+a message when it finds it or something else.
+
+How can I change the UI thread to handle this?
+
+Plus I do not need a window attached to the other two threads, they are =
+actually worker threads, but they need their own message loop, as well =
+as use MFC objects.
+
+The class wizard will not allow me to create User Messages, and if I =
+manually add them to the=20
+//{{AFX_MSG... loop
+ the compiler will not allow me to do this.
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Alistair Israel -- <A HREF="mailto:aisrael@hotmail.com">aisrael@hotmail.com</A>
+Sunday, August 25, 1996
+</B>
+[Mini-digest: 4 responses]
+
+If you'll only be sending 'command' type messages to the read
+thread, you should get by with PostThreadMessage().  As far as I know,
+Classwizard does in fact allow you to code message handlers for
+CWinThread-derived classes, but only of the WM_COMMAND type.  That is,
+you should be able to create some custom ID_xx command that's not 
+really on your menu, but can be seen by Classwizard and that gets 
+handled by your thread class.
+
+So you simply make your UI/primary thread post a WM_COMMAND message,
+use the custom ID_xx command.  The worker thread can then send a 
+notification message back to the main UI/primary thread.
+
+Now if you need to send more 'complex' user-defined messages, (of the WM_APP +
+something kind), then you'll really need a window as a 'target' of your
+messages.  This is the technique we use for our multi-threaded sockets apps.
+
+Good luck!
+
+Sincerely,
+
+Alistair Israel
+aisrael@hotmail.com
+
+----------------------------------------------------------------------
+The original message follows:
+
+>Environment: VC++ 4.1, Win 95, NT 3.51+
+>
+>I am (trying) to write a TAPI / MAPI program.
+>
+>I would like to have 2 separate threads created to read / write to 
+>the Modem. It would be so much easier (for me) to send a message to 
+>the read thread to "Look for" a certain string, and have the thread 
+>send my main thread a message when it finds it or something else.
+>
+>How can I change the UI thread to handle this?
+>
+>Plus I do not need a window attached to the other two threads, they 
+>are actually worker threads, but they need their own message loop, as 
+>well as use MFC objects.
+>
+>The class wizard will not allow me to create User Messages, and if I 
+>manually add them to the=20
+>//{{AFX_MSG... loop
+> the compiler will not allow me to do this.
+
+
+
+---------------------------------------------------------
+Get Your *Web-Based* Free Email at http://www.hotmail.com
+---------------------------------------------------------
+-----From: Niels Ull Jacobsen <nuj@kruger.dk>
+
+If the worker threads only needs to look for one string at a time, you ca=
+n
+either put the string in a common,=20
+semaphore-protected variable, or post a message telling it which string t=
+o
+look for.
+If you post a message, let the worker thread hold a list of strings to lo=
+ok
+for as well as
+HWND's of the windows which would like notifications for them. Remember, =
+you
+can't pass
+CWnd's between threads.
+
+You'll probably want to use PostThreadMessage to communicate betweeen the
+threads.
+
+>
+>How can I change the UI thread to handle this?
+>
+>Plus I do not need a window attached to the other two threads, they are
+actually worker threads, but they need their own message loop, as well as
+use MFC objects.
+
+>
+
+>The class wizard will not allow me to create User Messages, and if I
+manually add them to the=20
+>//{{AFX_MSG... loop
+> the compiler will not allow me to do this.
+
+Eh? Are you adding an ON_MESSAGE macro in the BEGIN_MESSAGE_MAP ..
+END_MESSAGE_MAP block?
+Put it outside //AFX.. comments so as not to confuse ClassWizard.
+Does your message handler function have the correct type? afx_msg LONG
+memberFxn( UINT, LONG );
+
+
+
+
+
+>
+>
+>
+Niels Ull Jacobsen, Kr=FCger A/S (nuj@kruger.dk)
+Everything stated herein is THE OFFICIAL POLICY of the entire Kruger=20
+group and should be taken as legally binding in every respect.=20
+Pigs will grow wings and fly.
+
+
+
+
+
+-----From: "Rommel Songco" <rsongco@spectrasoft.com>
+
+Hello there!
+
+>The class wizard will not allow me to create User Messages, and if I
+manually >add them to the 
+>//{{AFX_MSG... loop
+> the compiler will not allow me to do this.
+
+	Right.  Your CWinThread class cannot handle custom messages.  What you can
+do is to attach a window to your CWinThread object and direct all your
+messages there.  Create a CWnd-derived object and assign it to the
+m_pMainWnd member of your thread object.
+
+	BTW, there's a sample of a TAPI application in the MSDN called "tapicomm".
+
+Regards,
+
+Rommel
+rsongco@spectrasoft.com
+-----From: Mike Blaszczak <mikeblas@nwlink.com>
+
+Are you saying that the UI thread is the "main" thread, or are you saying
+that the UI thread is the "read" thread?  You use two different terms
+between your question and the first paragraph.
+
+>Plus I do not need a window attached to the other two threads,
+>they are actually worker threads, but they need their own message loop,
+>as well as use MFC objects.
+
+Then you should code a message loop for them.  The easiest way to do this is
+to borrow MFC's for free by creating a hidden window.
+
+>The class wizard will not allow me to create User Messages, and if I
+manually add them to the 
+>//{{AFX_MSG... loop the compiler will not allow me to do this.
+
+In MFC 4.1, to trap thread messages, you need to override
+PreTranslateMessage() in your CWinThread-derived class.  There are thread
+message macros and functions in MFC 4.2, but ClassWizard still doesn't
+support them.
+
+.B ekiM
+http://www.nwlink.com/~mikeblas/
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Steve Mark -- <A HREF="mailto:steve@otms.com">steve@otms.com</A>
+Wednesday, August 28, 1996
+</B>
+>...There are thread
+>message macros and functions in MFC 4.2, but ClassWizard still doesn't
+>support them.
+>
+>.B ekiM
+>http://www.nwlink.com/~mikeblas/
+>These words are my own. I do not speak on behalf of Microsoft.
+>
+
+Mike:
+
+Can you elaborate on the new thread message macros and functions in 4.2?  Is
+there any documentation for them?
+
+Steve Mark
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

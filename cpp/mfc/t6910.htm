@@ -1,0 +1,338 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+About Memory
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Monday, September 23, 1996
+</B>
+Frequently, there seems to be many questions about memory allocation
+on this list.  Lots of the questions stem from not understanding the
+different memory allocation schemes available to Win32 programmers
+using C++.
+
+Let's try to clear up some of those issues:
+
+
+First off, a memory manager is just that: it manages memory.  A memory
+manager doesn't need to expose much of an interface--it just needs to
+have some way to allocate some memoyr and  release that memory.
+More complicated memory managers might offer extra bells and whistles
+to get the status of free memory, to do error checking, or other
+stuff.
+
+Most memory managers implement their allocation and release interfaces
+in the same way: they accept a request for memory by getting a size
+of the desired memory block and return a pointer to that new block.
+They might accept some flags which affect the way the allocation might
+work.  The release request accepts, as a parameter, a pointer to one
+of the blocks that it previously handed out.
+
+The memory manager needs to keep a bunch of lists. It keeps a list of
+memory blocks that're already allocated, and a list of memory blocks
+that are available for use.  Most modern memory managers use a very
+simple list-oriented data structure to get this work done.  The pointer
+returned by an allocation request is just that: a pointer to the requested
+memory.  But, usually, just before that memory, is data private to the
+memory manager. The data usually indicates the state of the block--its
+size, a flag indicating wether it is allocated or freed, and a pointer
+to the next block.
+
+If you use the C runtime library, you can use the calls malloc() and
+free() to get memory.  You might allocate a kilobyte of memory by
+coding:
+
+	void* pMemory = malloc(1024);
+
+upon return, pMemory either holds NULL indicating there's no memory to
+be had, or a pointer to that kilobyte of memory. If you get a pointer
+to the kilobyte of memory, the bytes just before the referenced memory
+is preamble information that the memory manager uses by itself.  If
+the pointer you got back was 0x1000, for example, the four bytes before
+your memory block would actually be at 0x0FFC thru 0x0FFF.
+
+If you needed to release this memory, you could code:
+
+	free(pMemory);
+
+The first thing the implementation of free() does is to step back
+from the pointer you gave it and look at that preamble block to make
+sure it's valid.  If it isn't valid, the implementation of free()
+might emit a trace message to tell you, the developer who's carefully
+debugging their code, that something is bogus.
+
+These are all implementation details: it is possible to implement
+a memory manager without this mechanism, but most people do it this
+way.  The preamble meomry might be zero bytes in length, then, or
+it might be a kilobyte in size.
+
+Since the implementation of these routines is left to the designers 
+of the library, you need to make sure your program only uses the
+appropriate calls on the appropriate memory blocks.  If you were using
+C++, you could allocate a kilobyte of memory by doing something like
+this:
+
+	unsigned char* pMemory = new unsigned char[1024];
+
+You'd still get a usable pointer to a block of a kilobyte of memory,
+but you'd have to be careful to correctly free the memory with a call
+like this;
+
+	delete [] pMemory;
+
+if you used, instead, this call:
+
+	free(pMemory);
+
+you'd be in trouble because free() might or might not understand the
+preamble that the new operator put on the memory before returning it
+to you. While this code might work for now on whatever compiler
+you're using, it might not work on other versions of the same runtime
+library--and that's a risk you shouldn't take.  You should correctly
+use delete with new, and free with malloc() (and its friends).
+
+There is no reason to worry about mixing the use of free/malloc and
+new/delete within the same program, as long as you're careful to use
+the right functions on the right pointers.  There's nothing at all
+wrong with this code:
+
+	void* pMem1 = malloc(1024);
+	unsigned char* pMem2 = new unsigned char[1024];
+	// ... use the memory for something ...
+	delete [] pMem2;
+	free(pMem1);
+
+If, on the other hand, you tried to free pMem2 by calling free(), or
+delete pMem1 by using delete, you'd be in trouble.
+
+If you _do_ mistakenly mix the functions, you'll end up getting errors
+from the debug heap manager.  You'll probably end up crashing the
+release version of the heap manager.
+
+Since the preamble block, by the way, is up to the implementer, different
+versions of the implementation might have slightly different versions of
+the preamble block. The retail version of the Microsoft CRTL, for example,
+has a tiny preamble that's optimized to high heaven.  The debug version,
+on the other hand, has a much bigger block that carries lots of debug
+and diagnostic information.  It's okay if it is slow: it's for debugging
+only.
+
+(In the libraries that ship with Visual C++ 4.2, the preamble size
+is about 26 bytes.  So, our request for 1024 bytes really turns into
+a request for 1060 bytes, and we get a pointer to the 27th byte back.
+You, as the developer, never get to see those first 26 bytes--they're
+reserved for use by the implementation of the library.  But since
+you've read this far, you know that there's 26 bytes of someone
+else's memory starting at pMemory-26.)
+
+But this difference means that the debug version of free() can't be used
+on memory gained with the release version of malloc(), and vice-versa,
+and the same is true for debug and release versions of new and delete.
+
+If you can be perfectly sure that you're not mixing these pointers, you
+can use the different versions in different modules of your program.
+But it's not that easy to control which you're using.  And, if you use
+MFC, you simply can't solve the problem: MFC wants to pass pointers to
+dynamically allocated memory throughout the program without prejudice
+or restriction.
+
+
+That covers everything you can do in C and C++ themselves.  But Windows
+offers yet another variant: Windows, being an operating system,
+provides its own memory management services. It turns out that the
+Microsoft versions of the C and C++ runtime libraries end up calling
+the operating system to get their memory.
+
+You, as a developer, can directly call those same APIs if you want to.
+Sometimes, it's very necessary to do so--if you're playing with OLE,
+for example, or using the clipboard to pass a block of data to another
+program.
+
+The same rules apply here: you can't get some memory with a call to
+the Windows API and then release it with a call to free() or an invocation
+of the delete operator.
+
+The implementation of any algorithm lends subtle characteristics to
+the functionality intended by the algorithm. You might notice, for
+example, that certain memory managers are bad at allocations of a small
+size but very good at handling large allocations.  Most library vendors
+do their best to make the library handle "normal" memory allocations
+very well.  That makes the characteristics of the library very
+complicated: maybe you only notice a performance degredation after 
+allocating lots and lots of small blocks, one more big one, and then
+freeing all but two of the small ones and then expanding the big one by
+a tiny amount.  Since "big" and "small" are inspecific and relative
+terms, you really can't be sure that you'll find any problems at all.
+
+It is sometimes appropriate to mix different memory managers in the
+same program. You must be careful not to use pointers to memory gained
+from one memory manager with another memory manager, however.  And
+that's all there is to it.
+
+
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+Don't look at my hands: look at my _shoulders_!
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Niels Ull Jacobsen -- <A HREF="mailto:nuj@kruger.dk">nuj@kruger.dk</A>
+Thursday, September 26, 1996
+</B>
+[Mini-digest: 2 responses]
+
+At 23:34 23-09-96 -0700, Mike Blaszcak wrote:
+
+>Frequently, there seems to be many questions about memory allocation
+>on this list.  Lots of the questions stem from not understanding the
+>different memory allocation schemes available to Win32 programmers
+>using C++.
+[Most of a large, informative article left out - any hope of it showing u=
+p
+on MSDN  or in the MSVC docs or KB ?]=20
+
+> It is sometimes appropriate to mix different memory managers in the
+> same program. You must be careful not to use pointers to memory gained
+> from one memory manager with another memory manager, however.  And
+> that's all there is to it.
+
+One more case, where you might run into problems: DLL's.
+
+If a DLL is statically linked to the C RTL, memory blocks allocated by=20
+the DLL must be freed by the DLL. Even if the application and the DLL
+are using identical memory managers, and they are operating in the same
+address space, they are using two different copies of the memory manager.
+So you must keep track of who allocated what to use the correct free().
+
+The simplest solution is to use the shared DLL version of the RTL, but if
+your DLL is small and it will be called by non-VC programs, a statically
+linked version may prove handier.
+
+Niels Ull Jacobsen [MVP], Kr=FCger A/S (nuj@kruger.dk)
+Everything stated herein is THE OFFICIAL POLICY of the entire Kruger=20
+group and should be taken as legally binding in every respect.=20
+Pigs will grow wings and fly.
+
+
+
+
+
+-----From: "Dave Ryan" <ryan@ymi.com>
+
+Thanks for a well informed article on memory allocation. However I believe
+that the main reason for using delete with new is so the C++ compiler can
+call the destructor of the object in order for the destructer to do
+addition clean up for example deleting any other memory blocks allocated
+with new if I'm correct. I was allways curious about the preamble block of
+memory after an allocation while viewing the memory block in VC++. Thanks
+and have a good day.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Saturday, September 28, 1996
+</B>
+At 09:27 9/26/96 +0200, Niels Ull Jacobsen wrote:
+
+>[Most of a large, informative article left out - any hope of it showing up
+>on MSDN  or in the MSVC docs or KB ?] 
+
+I don't know. It seems like most of the information is already on the CD,
+if you look carefully.
+
+>If a DLL is statically linked to the C RTL, memory blocks allocated by 
+>the DLL must be freed by the DLL. Even if the application and the DLL
+>are using identical memory managers, and they are operating in the same
+>address space, they are using two different copies of the memory manager.
+
+Strictly, this isn't true: if the DLL uses GlobalAlloc() and passes the
+resulting handle or pointer back to the application, the applicaiton can
+call GlobalFree() (or GlobalAnythingElse() on it), without hesitation.
+
+This limitation _does_ exist if you're using different memory managers:
+the DLL might be getting memory out of a heap allocated and managed by it's
+copy of the runtime.  If it passes it to another module that's using the
+same runtime code but expects to see memory in a different heap, then
+there's problems.
+
+If you'd said "... memory blocks allocated by the 4.x versions of
+the Visual C++ runtime library in the DLL ...", you'd've hit the bull
+on the head.
+
+>Thanks for a well informed article on memory allocation. However I believe
+>that the main reason for using delete with new is so the C++ compiler can
+>call the destructor of the object in order for the destructer to do
+>addition clean up for example deleting any other memory blocks allocated
+>with new if I'm correct.
+
+
+If you're think you're a tough guy, you can always do this:
+       
+        CVerbose* pVerbose;
+        pVerbose = malloc(sizeof(CVerbose));
+        pVerbose->CVerbose::CVerbose();
+
+and then, later,
+
+        pVerbose->CVerbose::~CVerbose();
+        free(pVerbose);
+
+and you could expect it to work.  Your friends might think you're a kook,
+though.
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+Don't look at my hands: look at my _shoulders_!
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

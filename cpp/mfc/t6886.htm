@@ -1,0 +1,482 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Problem using CTreeView and my CTreeCtrl derivative
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Milind Changire -- <A HREF="mailto:mrc@corus.com">mrc@corus.com</A>
+Monday, September 23, 1996
+</B>
+
+
+Environment: VC++ 4.0, WinNT 3.51
+---------------------------------
+
+Hello People!
+
+I have implemented class CTreeCtrlEx : public CTreeCtrl
+for handling the MULTIPLE SELECTION and retrieving the selected items.
+
+I have also implemented class CDirTreeCtrlEx : public CTreeCtrlEx
+to add the necessary DIR and FILE items.
+
+I wrote a test application in which I developed these classes. The test 
+involved a DIALOG box on which the tree control was placed. Every thing 
+works perfectly fine here.
+
+The problem is, now I want to use this (CDirTreeCtrlEx) control in a View.
+I also want a splitter in the dialog in the following manner:
+
+		+------------------------------------+
+		|_|___________Dialog_________________|
+		|		  |		     |
+		|		  |                  |
+		|                 |                  |
+		|     Tree View   |    List View     |
+		|                 |                  |
+                |                 |                  |
+                |                 |                  |
+                |                 |                  |
+                |                 |                  |
+                |                 |                  |
+                +------------------------------------+
+				  ^
+		Vertical Splitter between TreeView and ListView
+
+ HOW DO I DO THIS?
+
+
+
+
+-Milind
+
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+rwagner -- <A HREF="mailto:rwagner@genre.com">rwagner@genre.com</A>
+Tuesday, September 24, 1996
+</B>
+[Mini-digest: 2 responses]
+
+Milind
+
+In your mainFrame class (I'm using SDI, but I don't see why this should not 
+work in a dialog), override OnCreateClient as follows.
+
+CSplitterWnd wndSplitter1 and wndSplitter2 are protected members of
+mySDIFrame class.  The .h files where your views are defined must be
+#included before this point as well.
+
+BOOL mySDIFrame::OnCreateClient( LPCREATESTRUCT lpcs,
+ CCreateContext* pContext)
+{
+    wndSplitter1.CreateStatic( this, 2, 1 );  // 2 rows, one column.
+
+    // add the second splitter pane - nested splitter with 2 columns:
+    wndSplitter2.CreateStatic( &wndSplitter1, 1, 2,
+  WS_CHILD | WS_VISIBLE | WS_BORDER,
+  wndSplitter1.IdFromRowCol(0, 0) );
+    
+    // add the first splitter pane - a tree view in column 0
+    wndSplitter2.CreateView( 0, 0, pContext->m_pNewViewClass,
+        CSize(0, 0),  pContext );               
+
+    // add the second splitter pane - a list view in column 1
+    wndSplitter2.CreateView( 0, 1, RUNTIME_CLASS(IFListView), 
+        CSize(0, 0), pContext );
+    
+    wndSplitter2.SetColumnInfo( 0, 300, 50 ); //int col, int cxIdeal, int cyMin
+
+   // add the third splitter pane - 'news' view in column 0
+    wndSplitter1.CreateView( 1, 0, RUNTIME_CLASS(IFNewsView), 
+        CSize(0, 0), pContext );
+                           
+    // trial and error:
+    wndSplitter1.SetRowInfo( 0, 400, 0 ); //int row, int cyIdeal, int cyMin
+    wndSplitter1.SetRowInfo( 1,  10, 5 );
+
+    // you may or may not elect to use the following line, try first WITHOUT:
+    // SetActiveView( (CView*)wndSplitter2.GetPane(0,1) );
+
+    return TRUE;
+}
+
+I cut this from working code.  Alter to produce as many or as few views as you 
+want, this is the basic idea.
+
+Cheers, Rob
+
+You wrote:
+___________\
+I have implemented class CTreeCtrlEx : public CTreeCtrl
+for handling the MULTIPLE SELECTION and retrieving the selected items.
+
+I have also implemented class CDirTreeCtrlEx : public CTreeCtrlEx
+to add the necessary DIR and FILE items.
+
+I wrote a test application in which I developed these classes. The test 
+involved a DIALOG box on which the tree control was placed. Every thing 
+works perfectly fine here.
+
+The problem is, now I want to use this (CDirTreeCtrlEx) control in a View.
+I also want a splitter in the dialog in the following manner:
+
+  +------------------------------------+
+  |_|___________Dialog_________________|
+  |    |       |
+  |    |                  |
+  |                 |                  |
+  |     Tree View   |    List View     |
+  |                 |                  |
+                |                 |                  |
+                |                 |                  |
+                |                 |                  |
+                |                 |                  |
+                |                 |                  |
+                +------------------------------------+
+      ^
+  Vertical Splitter between TreeView and ListView
+
+ HOW DO I DO THIS?
+
+
+
+
+-Milind
+
+
+
+
+
+-----From: Milind Changire <mrc@corus.com>
+
+
+Environment: VC++ 4.0, WinNT 3.51
+---------------------------------
+
+Hello People!
+
+Thanks for your reply Wagner!
+But this was functional even before I posted here.
+
+----------------------------------------------------------------------
+IMPORTANT:
+	CMyTreeView is the main view of the SDI application. Instead of 
+	deriving out of CView, I have directly used CTreeView.
+----------------------------------------------------------------------
+I have pasted my code below:
+
+BOOL CMyTreeView::Create(LPCTSTR lpszClassName, LPCTSTR lpszWindowName, 
+	DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID, 
+	CCreateContext* pContext) 
+{
+	// TODO: Add your specialized code here and/or call the base class
+	m_pTempTree = new CDirTreeCtrlEx();
+	m_pTempTree->Create(dwStyle, rect, pParentWnd, nID);
+	CWnd::m_hWnd = m_pTempTree->GetSafeHwnd();
+
+	SetWindowLong(CWnd::m_hWnd, GWL_STYLE,
+		GetWindowLong(CWnd::m_hWnd, GWL_STYLE) | TVS_HASLINES | 
+		TVS_LINESATROOT | TVS_HASBUTTONS | TVS_SHOWSELALWAYS);
+
+	m_pTempTree->SetDblClkHandler(pParentWnd->GetSafeHwnd());
+	
+	return TRUE;
+	
+	//return CWnd::Create(lpszClassName, lpszWindowName, dwStyle, 
+	//	rect, pParentWnd, nID, pContext);
+}
+----------------------------------------------------------------------
+
+This works real fine in the SDI view, but not in a dialog. To make it run 
+in a dialog I have dont the following:
+CDialog
+  CFrame (created a frame on the dialog)
+    CSplitterWnd (Created a splitter on the frame)
+      CTreeView (left pane of the splitter using CreateStatic)
+      CListView (right pane of the splitter using CreateStatic)
+
+Here I even get the user message on CMainFrame as the parent of the View 
+is the MainFrame.
+----------------------------------------------------------------------
+
+The problem is my CTreeCtrlEx class member is getting corrupt. It is 
+always getting reset to zero [NULL].
+I dont want client of CTreeCtrlEx or derivative to handle NM_DBLCLK. So I 
+post a user message (using ResgisterWindowMessage) to the parent window.
+To keep the base class as general as possible I have a HWND m_DblClkHandler
+as a member, so that I can post the user defined DBLCLK message to this 
+window. I have added a method to set the handler window and used it as 
+follows:
+        m_pTempTree->SetDblClkHandler(pParentWnd->GetSafeHwnd());
+
+This works real fine i.e. the member is set correctly (while stepping 
+through the code.) But is reset to zero, I don't know when. I set a 
+conditional break point to m_DblClkHandler == 0. First I get this 
+breakpoint in the ctor. This is fine. But I get it again in OnClick, when 
+I click an item in the TreeCtrl.
+
+======================================================================
+You people have any idea about this weird behaviour?
+
+I'll send out the executable if anybody requires to take a look at it.
+This is the SDI implementation.
+======================================================================
+
+BTW, if I use CDirTreeCtrlEX directly on the Dialog with the 
+SetDblClkHandler() method then m_DblClkHandler doesn't get corrupt. I get 
+the user message and everything works fine as required.
+
+HELP!
+
+TIA
+
+-Milind
+
+On 24 Sep 1996, rwagner wrote:
+
+> Milind
+> 
+> In your mainFrame class (I'm using SDI, but I don't see why this should not 
+> work in a dialog), override OnCreateClient as follows.
+> 
+> CSplitterWnd wndSplitter1 and wndSplitter2 are protected members of
+> mySDIFrame class.  The .h files where your views are defined must be
+> #included before this point as well.
+> 
+> BOOL mySDIFrame::OnCreateClient( LPCREATESTRUCT lpcs,
+>  CCreateContext* pContext)
+> {
+>     wndSplitter1.CreateStatic( this, 2, 1 );  // 2 rows, one column.
+> 
+>     // add the second splitter pane - nested splitter with 2 columns:
+>     wndSplitter2.CreateStatic( &wndSplitter1, 1, 2,
+>   WS_CHILD | WS_VISIBLE | WS_BORDER,
+>   wndSplitter1.IdFromRowCol(0, 0) );
+>     
+>     // add the first splitter pane - a tree view in column 0
+>     wndSplitter2.CreateView( 0, 0, pContext->m_pNewViewClass,
+>         CSize(0, 0),  pContext );               
+> 
+>     // add the second splitter pane - a list view in column 1
+>     wndSplitter2.CreateView( 0, 1, RUNTIME_CLASS(IFListView), 
+>         CSize(0, 0), pContext );
+>     
+>     wndSplitter2.SetColumnInfo( 0, 300, 50 ); //int col, int cxIdeal, int cyMin
+> 
+>    // add the third splitter pane - 'news' view in column 0
+>     wndSplitter1.CreateView( 1, 0, RUNTIME_CLASS(IFNewsView), 
+>         CSize(0, 0), pContext );
+>                            
+>     // trial and error:
+>     wndSplitter1.SetRowInfo( 0, 400, 0 ); //int row, int cyIdeal, int cyMin
+>     wndSplitter1.SetRowInfo( 1,  10, 5 );
+> 
+>     // you may or may not elect to use the following line, try first WITHOUT:
+>     // SetActiveView( (CView*)wndSplitter2.GetPane(0,1) );
+> 
+>     return TRUE;
+> }
+> 
+> I cut this from working code.  Alter to produce as many or as few views as you 
+> want, this is the basic idea.
+> 
+> Cheers, Rob
+> 
+> You wrote:
+> ___________\
+> I have implemented class CTreeCtrlEx : public CTreeCtrl
+> for handling the MULTIPLE SELECTION and retrieving the selected items.
+> 
+> I have also implemented class CDirTreeCtrlEx : public CTreeCtrlEx
+> to add the necessary DIR and FILE items.
+> 
+> I wrote a test application in which I developed these classes. The test 
+> involved a DIALOG box on which the tree control was placed. Every thing 
+> works perfectly fine here.
+> 
+> The problem is, now I want to use this (CDirTreeCtrlEx) control in a View.
+> I also want a splitter in the dialog in the following manner:
+> 
+                +------------------------------------+
+                |_|___________Dialog_________________|
+                |                 |                  |
+                |                 |                  |
+                |                 |                  |
+                |     Tree View   |    List View     |
+                |                 |                  |
+                |                 |                  |
+                |                 |                  |
+                |                 |                  |
+                |                 |                  |
+                |                 |                  |
+                +------------------------------------+
+                                  ^
+                Vertical Splitter between TreeView and ListView
+
+>  HOW DO I DO THIS?
+> 
+> 
+> 
+> 
+> -Milind
+> 
+> 
+> 
+> 
+> 
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+K.V.R.M.Rao -- <A HREF="mailto:kvrmrao@OPTIMASW.COM">kvrmrao@OPTIMASW.COM</A>
+Thursday, September 26, 1996
+</B>
+[Mini-digest: 2 responses]
+
+Milind,
+
+You can do it in two ways. 1) Derive CTreeCtrlEx from CTreeView 
+instead of from CTreeCtrl. Create a static splitter in your frame 
+window's OnCreateClient. Create a CDirTreeCtrlEx in the left pane and 
+CListView(or its derived class) in the right pane.
+
+Of course, you have to use GetTreeCtrl() whenever you access tree
+control within CTreeCtrlEx and CDirTreeCtrlEx classes.
+
+2) You can use CControlView or its derived class and use 
+CDirTreeCtrlEx as the control.
+
+You can see the documentation of CControlView class and MFC examples, 
+like VIEWEX, for splitter implementation.
+
+Good luck.
+
+Rammohan
+
+
+Milind wrote on  Mon, 23 Sep 1996 17:56:41,
+
+> 
+> Environment: VC++ 4.0, WinNT 3.51
+> ---------------------------------
+> 
+> Hello People!
+> 
+> I have implemented class CTreeCtrlEx : public CTreeCtrl
+> for handling the MULTIPLE SELECTION and retrieving the selected items.
+> 
+> I have also implemented class CDirTreeCtrlEx : public CTreeCtrlEx
+> to add the necessary DIR and FILE items.
+> 
+> I wrote a test application in which I developed these classes. The test 
+> involved a DIALOG box on which the tree control was placed. Every thing 
+> works perfectly fine here.
+> 
+> The problem is, now I want to use this (CDirTreeCtrlEx) control in a View.
+> I also want a splitter in the dialog in the following manner:
+> 
+> 		+------------------------------------+
+> 		|_|___________Dialog_________________|
+> 		|		  |		     |
+> 		|		  |                  |
+> 		|                 |                  |
+> 		|     Tree View   |    List View     |
+> 		|                 |                  |
+>                 |                 |                  |
+>                 |                 |                  |
+>                 |                 |                  |
+>                 |                 |                  |
+>                 |                 |                  |
+>                 +------------------------------------+
+> 				  ^
+> 		Vertical Splitter between TreeView and ListView
+> 
+>  HOW DO I DO THIS?
+> 
+> 
+> 
+> 
+> -Milind
+> 
+> 
+> 
+> 
+> 
+> 
+-----From: Kostya Sebov <sebov@is.kiev.ua>
+
+Just an idea (I assume you're going to create split-separated controls in the
+_DIALOG_):
+1. Create normal dialog with the controls placed in the dialog template next
+to each other so they _look_ like split-separated.
+2. In the dialog class create message handler for WM_SETCURSOR, where hit-test
+whether the mouse is between the controls and chenge the cursor to the spliting
+one, something like: <-|->
+3. Create WM_LMOUSEDOWN, WM_MOUSEMOVE and WM_LMOUSEUP handlers and perform classical
+tracking scenario that ends with two callls to SetWindowPos for the two child controls.
+
+This is rather easy and will yeld _exact_ splitting look and feel without using
+CSplitterWnd. This class is of course is capable of much more things (like
+dynamic split) but they are not necessary in your case (IMO).
+
+Two more consideretion for the recipe above.
+- You may handle setting cursor in the WM_MOUSEMOVE handler but I prefer more
+"self-explaining" way
+- To be correct you should also provide a handler for WM_CANCELMODE, which is
+supposed to cancel the tracking.
+
+--- 
+Kostya Sebov. 
+----------------------------------------------------------------------------
+Tel: (38 044) 266-6387 | Fax: (38 044) 266-6195 | E-mail: sebov@is.kiev.ua
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

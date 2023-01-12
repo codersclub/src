@@ -1,0 +1,227 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Size of splitter windows.
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Syed -- <A HREF="mailto:sxs296@psu.edu">sxs296@psu.edu</A>
+Monday, November 04, 1996
+</B>
+Environment : Visual C++ 4.0, Win 95
+
+Hi there,
+I try to create three panes from two splitter windows in a CMainFrame and
+set up the size of the panes relative to the size of the application as below :-
++------------------------------------+
+|       |                            |
+|       |                            |
+|   1   |             3              |
+|       |                            |
+|       |                            |
+|       |                            |
++-------+                            +
++---2---+----------------------------+
+<-.33--><---------.66---------------->
+
+So, in CMainFrame::OnCreateClient, 
+CRect rcRect;
+GetClientRect(&rcRect);
+        if (!m_wndSplitter1.CreateStatic(this, 1, 2) ||
+	       !m_wndSplitter1.CreateView(0,1, RUNTIME_CLASS(CFileView),
+		CSize((rcRect.Width()*2)/3, rcRect.Height()), pContext) ||
+		!m_wndSplitter2.CreateStatic(&m_wndSplitter1, 2, 1) ||
+		!m_wndSplitter2.CreateView(0,0, RUNTIME_CLASS(CDirectoryTree),
+		CSize(rcRect.Width()/3, rcRect.Height()-10), pContext) ||
+		!m_wndSplitter2.CreateView(1,0, RUNTIME_CLASS(CDirectoryTree),
+		CSize(rcRect.Width()/3, 10), pContext))
+		return FALSE;
+	return TRUE;
+
+*CFileView & CDirectoryTree are derived from CListView and CTreeView
+respectively.*
+
+However the problem is all the panes are not sized correctly. The #3 pane
+occupies all of the client area leaving #1 & #2 panes with the dimension of
+only 1 pixel x 1 pixel. What goes wrong.? I didn't include the line
+CFrameWnd::OnCreateClient because the result would be very strange.
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Alex Sevugan -- <A HREF="mailto:asevugan@csci.csc.com">asevugan@csci.csc.com</A>
+Wednesday, November 06, 1996
+</B>
+[Mini-digest: 3 responses]
+
+Hi,
+
+ Use the SetColumnInfo function for m_wndSplitter1 Splitter Window to
+set
+the required width for for Pane 1 and Pane 2. Do this immediately after
+creating the splitter windows and before returning from OnCreateClient
+function.
+
+ 
+Syed wrote:
+> 
+> Environment : Visual C++ 4.0, Win 95
+> 
+> Hi there,
+> I try to create three panes from two splitter windows in a CMainFrame and
+> set up the size of the panes relative to the size of the application as below :-
+> +------------------------------------+
+> |       |                            |
+> |       |                            |
+> |   1   |             3              |
+> |       |                            |
+> |       |                            |
+> |       |                            |
+> +-------+                            +
+> +---2---+----------------------------+
+> <-.33--><---------.66---------------->
+> 
+> So, in CMainFrame::OnCreateClient,
+> CRect rcRect;
+> GetClientRect(&rcRect);
+>         if (!m_wndSplitter1.CreateStatic(this, 1, 2) ||
+>                !m_wndSplitter1.CreateView(0,1, RUNTIME_CLASS(CFileView),
+>                 CSize((rcRect.Width()*2)/3, rcRect.Height()), pContext) ||
+>                 !m_wndSplitter2.CreateStatic(&m_wndSplitter1, 2, 1) ||
+>                 !m_wndSplitter2.CreateView(0,0, RUNTIME_CLASS(CDirectoryTree),
+>                 CSize(rcRect.Width()/3, rcRect.Height()-10), pContext) ||
+>                 !m_wndSplitter2.CreateView(1,0, RUNTIME_CLASS(CDirectoryTree),
+>                 CSize(rcRect.Width()/3, 10), pContext))
+>                 return FALSE;
+>         return TRUE;
+> 
+> *CFileView & CDirectoryTree are derived from CListView and CTreeView
+> respectively.*
+> 
+> However the problem is all the panes are not sized correctly. The #3 pane
+> occupies all of the client area leaving #1 & #2 panes with the dimension of
+> only 1 pixel x 1 pixel. What goes wrong.? I didn't include the line
+> CFrameWnd::OnCreateClient because the result would be very strange.
+
+-- 
+
+-----------------------------------------------
+ Alaks Sevugan           CSC CIS        
+ Technical Consultant    115 North Neil Street
+ (217) 351-8250 (2161)   Champaign, Illinois 
+ asevugan@csci.csc.com   61820 	   	  
+-----------------------------------------------
+-----From: "Stephen R. Husak" <husak@sgsn01.nmg.sms.siemens.com>
+
+I just did this : 
+
+look into:
+	SetRowInfo and SetColumnInfo...
+
+My code is:
+
+{	BOOL bResult = TRUE;	// result of the creates of the splitters
+	RECT rect;		// screen coordinates of the window
+	INT nHeight;		// height of the window
+	INT nWidth;		// width of the window
+	
+	GetWindowRect(&rect);
+	nHeight = rect.bottom - rect.top - (2 * GetSystemMetrics(SM_CYSIZEFRAME))
+- GetSystemMetrics(SM_CYCAPTION) - GetSystemMetrics(SM_CYMENU);
+	nWidth = rect.right - rect.left - (2 * GetSystemMetrics(SM_CYSIZEFRAME));
+
+	// create horizontal splitter and set initial row height for other
+splitter area
+	if (m_wndHorizSplitter.CreateStatic(this, 2, 1) == 0)
+		bResult = FALSE;
+	// calculate size of upper portion (a little bit greater than half of
+total height)
+	m_wndHorizSplitter.SetRowInfo(0, ((nHeight * 5) / 8), 0);
+
+	// create the command edit view - fits into bottom 3/7 of screen
+	if (m_wndHorizSplitter.CreateView(1, 0, RUNTIME_CLASS(CCommandEditView), 
+									CSize(nWidth, ((nHeight * 3) / 8)), pContext) == 0)
+		bResult = FALSE;
+
+	// create the horizontal splitter
+	if (m_wndVertSplitter.CreateStatic(&m_wndHorizSplitter, 1, 2,
+								 WS_CHILD | WS_VISIBLE | WS_BORDER,
+								 m_wndHorizSplitter.IdFromRowCol(0,0)) == 0)
+		bResult = FALSE;
+
+	// create the tree and list views respectively - tree is 1/4 of the width
+	if (m_wndVertSplitter.CreateView(0, 0, RUNTIME_CLASS(CCodewalkTreeView), 
+									CSize(((nWidth * 1) / 4), ((nHeight * 5) / 8)), pContext) == 0)
+		bResult = FALSE;
+
+	// list view fills in rest of area
+	if (m_wndVertSplitter.CreateView(0, 1, RUNTIME_CLASS(CCodewalkListView), 
+									CSize(((nWidth * 3) / 4), ((nHeight * 5) / 8)), pContext) == 0)
+		bResult = FALSE;
+
+	// return the result of this creation
+	return bResult;
+}
+
+------------------------
+Stephen R. Husak
+Sr. Software Engineer
+Siemens Medical Systems
+-----From: Srinivas Vanga <srini@concentra.com>
+
+Don't try to set the size of views while creating them with CreateView() method.
+Once after creating the view, set splitter pane's  size parameters using SetRowInfo()
+and SetColumnInfo().
+
+Example:
+m_wndSplitter.CreateView(0,0, RUNTIME_CLASS(CDirectoryTree),
+		   CSize(0,0), pContext);
+
+m_wndSplitter.SetRowInfo();
+m_wndSplitter.SetColumnInfo();
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

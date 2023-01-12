@@ -1,0 +1,336 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CPropertySheet in CDialog
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Rogas -- <A HREF="mailto:rogas@ip.krakow.pl">rogas@ip.krakow.pl</A>
+Tuesday, October 01, 1996
+</B>
+Hello,
+
+Environment: VC++4.2, Win 95
+
+I have a problem. I put a modeless CPropertySheet to a modal CDialog.
+There is an CEdit control on the dialog, some buttons and the
+CPropertySheet as a child of the dialog. Property pages are set up as
+Help says they should be.
+
+It works fine, until I focus one of controls on one of property pages on
+the sheet, and switch to another application. I cant get the focus on
+this dialog again, and it hangs (has also problems with redrawing).
+I spied it and it came out that the sheet falls into an endless loop
+{
+WM_GETDLGOCODE
+WM_SETDLGCODE
+}
+
+When I focus the dialog before switching to another application, there
+are no such problems.
+
+Has anybody done such thing?
+
+Here is part of the code of dialog:
+
+CNiveauChargementDialog::CNiveauChargementDialog(CWnd* pParent *=NULL*/)
+	: CDialog(CNiveauChargementDialog::IDD, pParent)
+{
+	m_PSheet = new CNiveauChargementPSheet("Sheet", this);
+	
+}
+
+
+CNiveauChargementDialog::~CNiveauChargementDialog()
+{
+	delete m_PSheet;
+}
+
+
+
+BOOL CNiveauChargementDialog::OnInitDialog() 
+{
+	CDialog::OnInitDialog();
+
+	m_PSheet->AddPage(&m_Vent);
+	m_PSheet->AddPage(&m_Autres);
+
+	
+
+	CRect rectPSheet;
+	
+	m_PSheet->Create(this, WS_CHILD | WS_VISIBLE );
+	m_PSheet->GetClientRect(&rectPSheet);
+	m_PSheet->MoveWindow(7,
+                        24,
+                        rectPSheet.right,
+                        rectPSheet.bottom,
+                        FALSE);
+	// TODO: Add extra initialization here
+ 
+	return TRUE;  // return TRUE unless you set the focus to a control
+	              // EXCEPTION: OCX Property Pages should return FALSE
+}
+
+Thanks in advance
+
+Rogas
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+IK 23 -- <A HREF="mailto:Cunningham@tgd.swissptt.ch">Cunningham@tgd.swissptt.ch</A>
+Thursday, October 03, 1996
+</B>
+[Mini-digest: 3 responses]
+
+This was on the list quite a while ago I include the note that Niels Ull
+Jacobsen sent out.
+regards
+
+I found the following in my Usenet clippings (posted by "Alice" - I lost
+the
+rest of her name).=20
+It may help you.
+Basically, you need to give your sheet the WS_EX_CONTROLPARENT style.
+
+-- snatched from usenet.
+> Unpublished article from Microsoft:
+> ---------------------------------------------------------------------
+>=20
+> Subject:
+>   Date:
+>         Fri, 1 Mar 96 09:11:28 TZ
+>   From:
+>         Sergey Zarembsky (Stream) <v-sergez@microsoft.com>
+>     To:
+>         mplante@versus.com
+>=20
+> .TITLE:                Child CPropertySheet Hangs If Focus Is Switched
+> .VERSION(S):         4.00
+> .OPERATING SYSTEM(S):WINDOWS NT
+>=20
+> =
+-----------------------------------------------------------------------
+> The information in this article applies to:
+>=20
+>  - The Microsoft Foundation Classes (MFC), included with:
+>    Microsoft Visual C++, 32-bit Edition, version 4.0
+> =
+-----------------------------------------------------------------------
+>=20
+> SYMPTOMS
+> =3D=3D=3D=3D=3D=3D=3D=3D
+>=20
+> If a CPropertySheet is a child of a CDialog or another CPropertySheet,
+> and focus is placed in a control inside the child CPropertySheet, when
+> you switch focus to another window, the program will hang. The program
+> will also hang if focus is on a control and you close the sheet. The
+> child CPropertySheet continually gets a WM_GETDLGCODE.
+>=20
+> CAUSE
+> =3D=3D=3D=3D=3D
+>=20
+> By default, CPropertyPages will have a style of WS_EX_CONTROLPARENT.
+> CPropertySheets will not have this style.  This style allows a user to
+> tab from a control inside the page to one in the sheet.
+>=20
+> When focus is switched from the parent sheet, code which handles
+> default push buttons loops through all the controls in the pages and
+> the sheet.  Cycling through controls is done using =
+GetNextDlgTabItem().
+> The loop cycles through controls in the page in the child
+> CPropertySheet and finds its way to controls in the parent page or
+> parent dialog.  At this point, GetNextTabItem() is not able to find
+> controls inside the child CPropertySheet since it doesn't have a style
+> of WS_EX_CONTROLPARENT.  The loop never ends because it never finds =
+the
+> original control that had focus.
+>=20
+> RESOLUTION
+> =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D
+>=20
+> Override OnInitDialog() for the child CPropertySheet and add the
+> WS_EX_CONTROLPARENT style.
+>=20
+> STATUS
+> =3D=3D=3D=3D=3D=3D
+>=20
+> Microsoft has confirmed this to be a bug in the Microsoft products
+> listed at the beginning of this article. We are researching this bug
+> and will post new information here in the Microsoft Knowledge Base as
+> it becomes available.
+>=20
+> MORE INFORMATION
+> =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D
+>=20
+> REFERENCES
+> =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D
+>=20
+> Sample Code
+> -----------
+>=20
+> // CMySheet is derived from CPropertySheet
+> BOOL CMySheet::OnInitDialog()
+> {
+>   ModifyStyleEx (0, WS_EX_CONTROLPARENT);
+>=20
+>   return CPropertySheet::OnInitDialog();
+> }
+>=20
+> /* Compile options needed: default
+>=20
+> This article might help you!
+>
+>Michael L. Thal
+>Data Tree Corporation
+>voice: (619) 231-3300
+>fax:      (619) 231-3301
+>
+>
+>
+>
+Niels Ull Jacobsen, Kr=FCger A/S
+nuj@kruger.dk
+
+Graham Cunningham
+00 41 31 338 0633
+
+>----------
+>From: 	Rogas[SMTP:rogas@ip.krakow.pl]
+>Sent: 	Dienstag, 1. Oktober 1996 11:16
+>To: 	mfc-l@netcom.com
+>Subject: 	CPropertySheet in CDialog
+>
+>Hello,
+>
+>Environment: VC++4.2, Win 95
+>
+>I have a problem. I put a modeless CPropertySheet to a modal CDialog.
+>There is an CEdit control on the dialog, some buttons and the
+>CPropertySheet as a child of the dialog. Property pages are set up as
+>Help says they should be.
+>
+>It works fine, until I focus one of controls on one of property pages
+>on
+>the sheet, and switch to another application. I cant get the focus on
+>this dialog again, and it hangs (has also problems with redrawing).
+>I spied it and it came out that the sheet falls into an endless loop
+>{
+>WM_GETDLGOCODE
+>WM_SETDLGCODE
+>}
+>
+>When I focus the dialog before switching to another application, there
+>are no such problems.
+>
+>Has anybody done such thing?
+>
+>Here is part of the code of dialog:
+>
+>CNiveauChargementDialog::CNiveauChargementDialog(CWnd* pParent
+>*=3DNULL*/)
+>	: CDialog(CNiveauChargementDialog::IDD, pParent)
+>{
+>	m_PSheet =3D new CNiveauChargementPSheet("Sheet", this);
+>=09
+>}
+>
+>
+>CNiveauChargementDialog::~CNiveauChargementDialog()
+>{
+>	delete m_PSheet;
+>}
+>
+>
+>
+>BOOL CNiveauChargementDialog::OnInitDialog()=20
+>{
+>	CDialog::OnInitDialog();
+>
+>	m_PSheet->AddPage(&m_Vent);
+>	m_PSheet->AddPage(&m_Autres);
+>
+>=09
+>
+>	CRect rectPSheet;
+>=09
+>	m_PSheet->Create(this, WS_CHILD | WS_VISIBLE );
+>	m_PSheet->GetClientRect(&rectPSheet);
+>	m_PSheet->MoveWindow(7,
+>                        24,
+>                        rectPSheet.right,
+>                        rectPSheet.bottom,
+>                        FALSE);
+>	// TODO: Add extra initialization here
+>=20
+>	return TRUE;  // return TRUE unless you set the focus to a control
+>	              // EXCEPTION: OCX Property Pages should return FALSE
+>}
+>
+>Thanks in advance
+>
+>Rogas
+>
+-----From: Andi Giri <agiri@ctiis.com>
+
+Hello
+
+Embedding a CPropertySheet object in a CDialog has been dealt with in
+the book,Visual C++ 4 MasterClass, by WROX Press.  The authors have a
+CDialogExtension class derived from CDialog, where they embed a property
+page.
+
+Andi
+
+-----From: Jim Hudson <JimH@datastorm.com>
+
+I ran into the same thing.  Thank Gosh for Spy++, use ModifyStyleEx(0,
+WS_EX_CONTROLPARENT); to change the property sheet style and that should   
+    
+
+make it work quite nicely for you.  Later Jim Hudson
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

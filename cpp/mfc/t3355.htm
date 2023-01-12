@@ -1,0 +1,304 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+How to Increase the stack?
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Uma Shankar -- <A HREF="mailto:shankar@sriven.scs.co.in">shankar@sriven.scs.co.in</A>
+Tuesday, January 09, 1996
+</B>
+hi
+  
+
+The call stack for one particular function is a bit large in my project and
+it gave  stack overflow error at runtime.  Changed the staksize of     exe
+to 59k and it worked. 
+ But the problem is down the stack, the segment and address of pointers is
+getting chnged arbitararily.  
+The code is like this
+        {
+        char* szName = GetName(); // Lets assume szName is "Test"
+        foo(szName);  //the value of szName in foo is junk instead of "Test"..
+        }
+
+
+So, can you please let me know how to solve this problem.  I can't increase
+the stack beyond 59k due to 64 k limitation on stack + heap+ static
+data(windows 3.1).
+
+How do i circumvent this problem in Microsoft Visual  C++ compiler (Version
+1.5).  Is it any way dependent on Compiler options and if so, please let me
+know the options
+
+thanks in advance
+
+shanky
+
+
+
+
+
+I 
+***************************************************************************
+* Uma Shankar	S.V				          *
+*    Sr.Software Engineer						  *
+* Quality Software Engineering Tool Technology Group			  *	
+*								          *									
+* Off.: Sriven Computer Solutions Pvt Limited, Suite 507,508,607, 	  *
+*       Software Technology Park, Maitrivanam, Ameerpet, Hyderabad, India.*
+*  			 						  *	
+* Phones : 91-40-294930							  *
+* Internet :shankar@sriven.scs.co.in					  *
+***************************************************************************
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+David Stidolph -- <A HREF="mailto:stidolph@magnet.com">stidolph@magnet.com</A>
+Wednesday, January 10, 1996
+</B>
+[Not-so-Mini Digest: 8 responses]
+
+Stack usage comes from calling functions and is used up by local data and parameters.  To reduce stack usage try these steps.
+	1.  Check for recursion and remove it
+	2.  Reduce the number of parameters to functions.  Declare structures and pass pointers
+	     rather than multiple parameters.
+	3.  If you are using C++ move the local data to the class declaration.  If you cannot, make 
+	     arrays static so they are put in the code segment instead of on the stack.
+
+-----From: LeRoy Baxter <lbaxter@cinfo.com>
+
+Sounds to me like a 'dangling pointer'.  Check your GetName() function.
+Is it returning a pointer to static (or heap) memory? or to a memory location
+on the stack?
+
+-----From: Martijn Vels <Vels0020@exact.nl>
+
+Don't mind me saying it, but 59k of stack sounds a little silly to me.
+There must be something terribly wrong with your app if you need that 
+amounts of stack!
+
+But if you want to change the stack, do it properly.
+I have some assembly if you want to Push and Pop a new stack into place 
+preserving local stack frame and parameters passed as an argument.
+
+M.
+(vels0020@exact.nl --> beware!!! Chickens fly low this year!)
+
+-----From: Geoffrey Reynolds <reynoldsg@cclink.tfn.com>
+
+What exactly is GetName returning?  What is probably happening is that the value
+returned by GetName is invalid by the time you make the call to foo (szName).  
+You could try something similar to the following:
+
+        {
+        // Copy the name into szName
+        CString szName = GetName ();
+
+        // Get a standard character pointer to our string
+        char *szBuffer = szName.GetBuffer (0);
+
+        // Do stuff to the string
+        foo (szBuffer);
+        
+        // This call only needed if foo modifies the contents of the string
+        szName.ReleaseBuffer ();
+        }
+
+Hope this helps,
+Jeff Reynolds
+
+-----From: Christophe.Nasarre@col.bsf.alcatel.fr
+
+I'm not sure that the code is right
+
+            v--- it is a pointer not allocated
+   char* szName = GetName(); // Lets assume szName is "Test"
+   
+if you don't allocate memory in GetName(), things will begin to get hard for you...
+in "foo(szName);"
+
+
+If you are too short on stack, you should take a look at your local variables in
+function calls like big structures or recursive calls with lot of parameters. 
+
+As I remember from school, a recursive algorithm may always be translated into a non
+recursive loop...
+
+
+Good luck
+
+   -- a poor lonely frenchie --
+
+-----From: "Kang Lee" <kang@spica.dis.ricoh.com>
+
+Problem is not the compiler, but your code.  You did not allocate memory for
+the name.  You just got the pointer to the name variable in the GetName() 
+function.  Unless you allocated memory in the heap and copied the name there,
+once you return from the GetName() function, the stack pointer is restored
+and the name that was GetName() function's local variable is gone.  
+The szName points to got knows where.  To fix your problem, following should 
+work.
+	
+	{
+		char the_name[40];
+
+		GetName(the_name); // here copy the name stored in local 
+				   // variable to the parameter "the_name"
+		foo(the_name);
+	}
+
+Kanghoon
+
+-----From: "David W. Gillett" <DGILLETT@expertedge.com>
+
+  59K???
+
+  You're suffering from an extreme case of stack abuse.  You need to 
+move some of the data that is currently on the stack to somewhere 
+else, somewhere "far".
+  It may make sense to declare buffers and arrays as "static far" 
+rather than leaving them automatic.  The "extern and uninitialized 
+data as far" project option may help, too.  
+  Structs and objects should be allocated with _fmalloc or new.  You 
+need to make sure that your free or delete them when you're done with 
+them, but you need to move them off the stack!
+
+  A typical well-written .EXE should be able to get by with a stack 
+of about 10-12K.  Poorly-written code might need this expanded to 
+20K, but by then it's time to start going back and applying these 
+kinds of methods to reduce stack usage.  59K is somewhere way beyond 
+"excessive".
+
+
+>  But the problem is down the stack, the segment and address of pointers is
+> getting chnged arbitararily.  
+
+  So it didn't actually work.  In addition to probably having too 
+much junk on the stack, you've got some other problem going on.  The 
+most likely scenario is that something is writing past the end of a 
+buffer on the stack, and corrupting adjacent items.  But that's not 
+the only thing that could be wrong....
+
+
+> The code is like this
+>         {
+>         char* szName = GetName(); // Lets assume szName is "Test"
+>         foo(szName);  //the value of szName in foo is junk instead of "Test"..
+>         }
+
+  I'll bet that if you look inside GetName(), you'll find that the 
+pointer that it returns is the address of a local (automatic) char 
+array that goes out of scope when the function returns.  So the 
+return address for foo() gets stored at the same point on the stack 
+as the buffer inside GetName was when it returned.
+
+  [CodeView will be little help in tracking this down, because it 
+stores the register values on top of the stack when you break to the 
+debugger.  There was a version of ANIBUTTON.VBX that was returning a 
+pointer to a local structure like this, and I was able to patch 
+around it by bumping SP with inline assembler, copying the struct 
+data off to somewhere safe, and restoring SP; but if you have the 
+option of fixing the function code, that's a better choice.]
+
+  Making the buffer that GetName returns "static" should quickly fix 
+this problem.  Making it "static far" could be even better.  static 
+buffers can cause mysterious problems when they're re-used, though, 
+and so it could be even better for GetName() to allocate the buffer 
+with _fmalloc() and for the code that calls GetName to free() the 
+buffer when it's done (i.e. after foo() returns).
+
+Dave
+
+-----From: mikeblas@interserv.com
+
+Right.  You can't increase the stack segment to be more than 64K.  Because of 
+some other stuff stored in the same stack segment, the effective size ends up 
+being around 58K.
+
+>How do i circumvent this problem in Microsoft Visual  C++ compiler (Version
+>1.5).  Is it any way dependent on Compiler options and if so, please let me
+>know the options
+
+There are no such options--you just can't have a bigger stack.  You have two 
+choices:
+
+a) Dynamically create your own stack and use it during this part of your 
+program.  Pretty hard, but it would work.
+
+b) Figure out why your application sucks so much stack space and fix it.  
+This is much easier, and even more likely to work.  If you're doing very deep 
+recursion, you'll need to find a better algorithm.  If you're just being very 
+sloppy about allocating locals on the stack, you need to clean them up.
+
+One of the simplest changes I've ever made in my programming career also made 
+a huge performance improvement. The work involved visiting a client site 
+where folks had written a pretty impressive accounting tool.  It logged into 
+DB2 on a mainframe, figured out what report you wanted, and blasted the 
+report over to Excel.
+
+They had some performance problems, though.  It turned out one function, 
+which was called for each report line, had a local initialized array of 
+structures.  That is, this array never changed and was used just to look 
+things up--but because of the way it was coded, it allocated about five 
+kilobytes on the stack and copied a few thousand structure entries over to 
+the stack.  It did this every time the function was called!
+
+If you're not careful, you can have similar sucking holes in the performance 
+of your program.  At the very least, it sounds like you're allocating lots of 
+arrays on the stack by using local variables.  You should either make them 
+"static", if you dont' care about reentrancy or they're initialized and 
+constant, or you should make them dynamically allocated if they're 
+uninitialized or dynamic.  
+
+> [huge .sig deleted]
+
+.B ekiM
+--
+TCHAR szDisc[] = _T("These words are my own; I do not speak for Microsoft.");
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

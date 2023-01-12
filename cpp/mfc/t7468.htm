@@ -1,0 +1,267 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Modeless Dlg Tooltips sans F
+</B></FONT>
+<BR>
+<PRE>
+<B>
+PP mail system -- <A HREF="mailto:LAWSONW@sydney.ccur.com">LAWSONW@sydney.ccur.com</A>
+Tuesday, October 29, 1996
+</B>
+G'day!
+No joy, I'm afraid.
+
+1)  "OnToolHitTest()" doesn't get invoked in the ToolBarCtrl,
+the dialog that owns it, or the MainFrame.
+
+2)  I can find no TTN_ALWAYSTIP in my 4.1 MVC, but there is a TTS_ and a
+
+TTF_ defined.  Adding these singly & in combination, e.g.,
+
+
+ok=m_pBar->Create(WS_CHILD | WS_VISIBLE |
+                  CCS _NOPARENTALIGN|CCS_NORESIZE|
+                  TBSTYLE_TOOLTIPS|TBSTYLE_WRAPABLE|TTF_ALWAYSTIP,
+                  rectBar,this,IDR_LINES);
+
+had no effect.
+
+Thanks for consideration.
+Jim LW
+
+
+                          Forwarded Mail Item.
+========================================================================
+Subject:Re: Modeless Dlg Tooltips sans F   Created by: /Gateway ocpt
+Message:Message-Id: <199610251551.LAA21125@mail3.voicenet.com>
+        X-Sender: jimt1@voicenet.com
+        X-Mailer: Windows Eudora Version 1.4.4
+        Mime-Version: 1.0
+        Content-Type: text/plain; charset="us-ascii"
+        To: mfc-l@netcom.com
+        Subject: Re: Modeless Dlg Tooltips sans Focus
+        Errors-To: owner-mfc-l@majordomo.netcom.com
+========================================================================
+Send to:  LAWSONW
+
+
+Dated at:  11:51    on 25 October 96
+Precedence: bulk
+Reply-To: mfc-l@netcom.com
+Sender: owner-mfc-l@majordomo.netcom.com
+From: jimt1@voicenet.com (Jim Tannenbaum)
+
+[Mini-digest: 2 responses]
+
+>Problem:  How to get Tooltips displayed when the owning modeless
+>          dialog does not have the focus?
+>
+
+Jim,
+
+        Enable the TTN_ALWAYSTIP attribute for ToolTips.
+
+Jet
+
+
+
+JJM Systems, Inc                 Phone: (215) 672-3660
+1 Ivybrook Blvd, Suite 190       Fax:   (215) 672-5702
+Ivyland, PA  19874               Net:   jimt1@voicenet.com
+
+
+-----From: Dong Chen <d_chen@ix.netcom.com>
+
+Try to overwrite the OnToolHitTest() function.
+Inside the function, use ChildWindowFromPoint() to get a CWnd* pointer.
+It
+will ensure you get one no matter if it has the focus. Then display your
+tooltip.
+This worked in my App Bar application.
+Hope this help.
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mario Contestabile -- <A HREF="mailto:Mario_Contestabile.UOS__MTL@UOSMTL2.universal.com">Mario_Contestabile.UOS__MTL@UOSMTL2.universal.com</A>
+Thursday, October 31, 1996
+</B>
+[Mini-digest: 2 responses]
+
+>2)  I can find no TTN_ALWAYSTIP in my 4.1 MVC, but there is a TTS_ and a
+>
+>TTF_ defined.  Adding these singly & in combination, e.g.,
+>
+>ok=m_pBar->Create(WS_CHILD | WS_VISIBLE |
+>                 CCS _NOPARENTALIGN|CCS_NORESIZE|
+>                  TBSTYLE_TOOLTIPS|TBSTYLE_WRAPABLE|TTF_ALWAYSTIP,
+>                  rectBar,this,IDR_LINES);
+>
+>had no effect.
+
+With a CToolBarCtrl you should use TBSTYLE_TOOLTIPS style for creation
+and handle OnNotify() for tooltips. Although you won't have tooltips when it 
+doesn't
+have the focus, this seems to be the standard (aka MSVC, IE 3.1).
+Note this is #defined in commctrl.h to be 0x100 [line 534].
+
+Eg:
+YourCToolBarDerivedClass::OnNotify(WPARAM wParam, LPARAM lParam, LRESULT* 
+pResult)
+{
+ NMHDR* pNMHDR       = (NMHDR*)lParam;
+ LPTOOLTIPTEXTA TTextA = (LPTOOLTIPTEXTA)lParam;
+ LPTOOLTIPTEXTW TTextW = (LPTOOLTIPTEXTW)lParam;
+ if(pNMHDR->code == TTN_NEEDTEXTA || pNMHDR->code == TTN_NEEDTEXTW){
+ }
+}
+
+In your case, you're using TTF_ALWAYSTIP as a style bit. That flag should be 
+used
+only for the TOOLINFO::uFlags structure. What you might of done is
+use 
+YourCToolBarCtrl::SetToolInfo(&ti);
+making sure you set ti.uFalgs to TTF_ALWAYSTIP.
+
+I guess it can get confusing. You got
+CBRS_TOOLTIPS              // Use for CToolBar creation         [afxres.h]
+TBSTYLE_TOOLTIPS      // Use for CToolBarCtrl creation  [commctrl.h]
+TTS_ALWAYSTIP             //  [winres.h] ??
+TTF_ALWAYSTIP             //  Use with CToolBarCtrl::SetToolInfo()  [afxwin.h]
+
+mcontest@universal.com
+
+
+
+-----From: PP mail system <LAWSONW@sydney.ccur.com>
+
+G'day!
+I takes me hat off to you, Mario.  You're a better man than I.
+Throwing the TTF ALWAYSTIP into the CToolBarCtrl::Create() was
+more in hope than anticipation.  I'd chucked Get/SetToolInfo
+into the Too-Hard basket because the Documentation starts off
+
+BOOL GetToolInfo( LPTOOLINFO lpToolInfo, CWnd* pWnd, UINT nIDTool = 0)
+                                                          ^^^^^^^
+Return Value
+Nonzero if successful; otherwise 0.
+Parameters
+lpToolInfo   Pointer to a TOOLINFO structure.
+pWnd         Pointer to the window that contains the tool.
+nIDText   ID of the string resource that contains the text for the tool.
+^^^^^^^
+and then it gets confusing.  Follow the instructions by defining a
+TOOLINFO and you get
+
+error C2664: 'GetToolInfo' : cannot convert parameter 1 from 'struct
+tagTOOLINFOA' to 'class CToolInfo &' (new behavior; please see help)
+
+So I've pressed on:  code-slab follows.  But you still have to click
+somewhere on the damn dialog for the tips to become available.
+
+How DID you get this thing to work????
+
+Yours in extreme puzzlement,
+Jim LW
+
+
+static UINT BASED_CODE button[] =
+{
+    // same order as in the bitmap 'fredtoolbar.bmp'
+    ID_BUTTON_1,
+    ID_BUTTON_2,
+    <snip>
+    ID_BUTTON_LAST
+};
+
+////////////////////////////////////////////////////////////////////////
+// CFredToolBar message handlers
+
+BOOL CFredToolBar::Create(DWORD dwStyle, const RECT& rect,
+                   CWnd* pParentWnd, UINT nID,
+                   CCreateContext* pContext)
+{
+    // TODO: Add your specialized code here and/or call the base class
+    BOOL ok;
+    ok= CToolBarCtrl::Create(dwStyle, rect, pParentWnd, nID);
+    if (!ok)
+       return -1;
+
+    int nButtons = sizeof(button)/sizeof(button[0]);
+    m_pTBButtons = new TBBUTTON[nButtons];
+
+
+    for  (int i=0;i<nButtons;i++)
+    {
+        m_pTBButtons[i].iBitmap = i;
+        m_pTBButtons[i].idCommand= button[i];
+        m_pTBButtons[i].fsState = 0;
+        m_pTBButtons[i].fsStyle = TBSTYLE_BUTTON;
+        m_pTBButtons[i].dwData = 0;
+        m_pTBButtons[i].iString = NULL;//no better result with button[i]
+    }
+
+    i = AddBitmap(nButtons,IDR_FRED);
+    if  (i != 0)
+        return -1;
+    ok=AddButtons(nButtons,m_pTBButtons);
+    if  (!ok)
+        return -1;
+
+    CToolTipCtrl* pTipCtrl=GetToolTips();
+    CToolInfo toolInfo;
+
+    for  (i=0;i<nButtons;i++)
+    {
+        ok=pTipCtrl->GetToolInfo(toolInfo,this,button[i]);
+        if  (!ok)
+            return -1;
+        toolInfo.uFlags|=TTF_ALWAYSTIP;
+        pTipCtrl->SetToolInfo(&toolInfo);
+    }
+
+    return ok;
+}
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

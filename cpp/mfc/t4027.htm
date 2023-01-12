@@ -1,0 +1,461 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Using CListCtrl as a mulicolumn listbox problem width delete
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Leif Terje Fonnes -- <A HREF="mailto:fonlei-b.pcb@gmail.gar.no">fonlei-b.pcb@gmail.gar.no</A>
+Tuesday, February 20, 1996
+</B>
+Env : Visual C++ 4.0 / NTS 3.51
+
+I am trying to use CListCntrl as a mulicolumn listbox.
+It is quite easy to build up the columns, but when it comes to
+finding the selected items its difficult.
+I have tried varius combination of the following :
+
+m_tlvAttr mapped against ac CListCtrl in a dialogbox width report view.
+
+for(int i=m_tlvAttr.GetItemCount()-1;i>=0;i--)
+{
+  LV_ITEM lv;
+  lv.mask = LVIF_TEXT|LVIF_PARAM|LVIF_STATE;
+  lv.iItem = i;
+  lv.iSubItem = 0;
+  if(m_tlvAttr.GetItem( &lv))
+  {
+    if((lv.state & LVIS_SELECTED))
+    {
+      // Control never comes here
+      CString strText;
+      strText.Format("Item %d selected",i);
+      AfxMessageBox(strText);
+    }
+  }
+}
+
+When you look at the documentation you can get the impression that this should work.
+
+
+Leif Terje Fonnes
+ProgramArkitekten AS
+Norway
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Matt Gradwohl -- <A HREF="mailto:Matt_Gradwohl@msn.com">Matt_Gradwohl@msn.com</A>
+Wednesday, February 21, 1996
+</B>
+[Mini-digest: 5 responses]
+
+Try something like this...
+
+	int iItem;
+	CObject* pObejct;
+
+	CListCtrl& theListCtrl=GetListCtrl();
+	iNextFocus=iItem=theListCtrl.GetNextItem( -1, LVNI_SELECTED);
+	while (iItem != -1)
+	{
+		pObject= (CObject*) theListCtrl.GetItemData(iItem);
+		ASSERT (pObject);
+		// Do something with object, like pObject->Method();
+		// Or pDoc->DeleteItem( pObject );
+		iItem=theListCtrl.GetNextItem( -1, LVNI_SELECTED);
+	}
+
+-Matt
+-----From: Peter Andersson <peter.andersson@interbizz.se>
+
+To get a selected item in a CListCtrl:
+
+GetNextItem(-1,LVNI_SELECTED);
+
+(Finds the first selected item in the control.
+The first argument is the starting index. -1 starts at the beginning.)
+
+Look at the documentation for GetNextItem.
+
+Hope this helps......
+/Peter
+
+-----From: Alok Khanna <alok@clarit.com>
+
+What you are missing is setting the stateMask. Set it to
+LVIS_SELECTED and it will work. Please look at the
+documentation of LVM_GETITEM and you will understand what I am saying. Hope
+this helps. Another way of going the same things is:
+
+if (LVIS_SELECTED == m_tlvAttr.GetItemState(i, LVIS_SELECTED)) {
+.......
+}
+
+>  lv.iItem = i;
+>  lv.iSubItem = 0;
+>  if(m_tlvAttr.GetItem( &lv))
+>  {
+>    if((lv.state & LVIS_SELECTED))
+>    {
+>      // Control never comes here
+>      CString strText;
+>      strText.Format("Item %d selected",i);
+>      AfxMessageBox(strText);
+>    }
+>  }
+>}
+>
+>When you look at the documentation you can get the impression that this should work.
+>
+>
+>Leif Terje Fonnes
+>ProgramArkitekten AS
+>Norway
+>
+
+Let me know if this works. 
+
+Alok Khanna
+CLARITECH Corporation.
+-----From: Klaus Kurzawa <klausk@saruman.cadpoint.se>
+
+
+Hi Leif,
+
+You can't do it Your way because let say that You have 5 items and item 3 and 4 
+are selected You never get the selected items.
+
+
+Here is how You should do:
+
+int iSelected = -1;
+while ((iSelected=m_tlvAttr.GetNextItem(iSelected, LVNI_SELECTED)) != -1)
+{
+        // Control should come here
+        CString strText;
+        strText.Format("Item %d selected",iSelected); 
+        AfxMessageBox(strText);
+}
+
+/Klaus Kurzawa
+ klausk@cadpoint.se
+
+-----From: Mario Contestabile <Mario_Contestabile.UOS__MTL@UOSMTL2.universal.com>
+
+[Snip()]
+I am trying to use CListCntrl as a mulicolumn listbox.
+It is quite easy to build up the columns, but when it comes to
+finding the selected items its difficult.
+I have tried varius combination of the following :
+
+m_tlvAttr mapped against ac CListCtrl in a dialogbox width report view.
+
+for(int i=m_tlvAttr.GetItemCount()-1;i>=0;i--)
+{
+  LV_ITEM lv;
+  lv.mask = LVIF_TEXT|LVIF_PARAM|LVIF_STATE;
+  lv.iItem = i;
+  lv.iSubItem = 0;
+  if(m_tlvAttr.GetItem( &lv))
+  {
+    if((lv.state & LVIS_SELECTED))
+    {
+      // Control never comes here
+      CString strText;
+      strText.Format("Item %d selected",i);
+      AfxMessageBox(strText);
+    }
+  }
+}
+[End->Snip()]
+
+Assuming you allow multiple selection (thus the LVS_SINGLESEL was not used) in 
+the
+control, you can obtain all the selected items like this:
+
+void yourlistview::OnRButtonDown(UINT nFlags, CPoint point) 
+{
+ CListView::OnRButtonDown(nFlags, point);
+
+ LV_HITTESTINFO lvh;
+ lvh.pt = point;
+
+ if(m_ListCtrl.HitTest(&lvh) == -1) return; // m_ListCtrl is a class member of 
+type CLIstCtrl& initialized in CTOR with GetListCtrl()
+
+ INT nSelected = m_ListCtrl.GetSelectedCount();
+ if( nSelected > 1){ // multiple selection 
+  CMapIntToString mapSelection;
+  INT state = -1; // start from top 
+  for(INT done = 0; done < nSelected; done++){
+   if( (state = m_ListCtrl.GetNextItem(state, LVNI_SELECTED)) != -1){    
+    mapSelection[done] = m_ListCtrl.GetItemText(state, 0);
+    TRACE1("%s is selected\n", m_ListCtrl.GetItemText(state, 0) );
+   }else{
+    break;
+   }
+  }
+ }
+
+The mapSelection CMap would contain the text of the selected items.
+
+mcontest@universal.com
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Josef Haslinger -- <A HREF="mailto:hasling@art.at">hasling@art.at</A>
+Wednesday, February 21, 1996
+</B>
+[Mini-digest: 5 responses]
+
+>I am trying to use CListCntrl as a mulicolumn listbox.
+>It is quite easy to build up the columns, but when it comes to
+>finding the selected items its difficult.
+>I have tried varius combination of the following :
+
+>m_tlvAttr mapped against ac CListCtrl in a dialogbox width report view.
+
+>for(int i=3Dm_tlvAttr.GetItemCount()-1;i>=3D0;i--)
+>{
+>  LV_ITEM lv;
+>  lv.mask =3D LVIF_TEXT|LVIF_PARAM|LVIF_STATE;
+>  lv.iItem =3D i;
+>  lv.iSubItem =3D 0;
+>  if(m_tlvAttr.GetItem( &lv))
+>  {
+>    if((lv.state & LVIS_SELECTED))
+>    {
+>      // Control never comes here
+>      CString strText;
+>      strText.Format("Item %d selected",i);
+>      AfxMessageBox(strText);
+>    }
+>  }
+>}
+
+>When you look at the documentation you can get the impression that this =
+>should work.
+
+I agree with you, that the documentation for the common controls is not =
+"very good". IMHO you have to try a lot, to find out how these controls =
+really work. If someone ever finds out all the secrects of list/tree =
+views
+please write them down (and post'em to me!)
+
+In your example you have to specifiy the address and the length of the =
+buffer where the found items text will be stored in lv.pszText and =
+lv.cchTextMax.
+
+It is good practice to do a=20
+memset( &lv, sizeof( lv )); =20
+before setting the fields of the struct.
+
+
+BTW: If you just want to find the current selected item(s) use
+
+  int nCurSel =3D  m_tlv.GetNextItem( -1, LVNI_SELECTED );
+or=20
+  int nCurSel =3D  m_tlv.GetNextItem( nStartFromHere, LVNI_SELECTED );
+
+I hope this helps.
+
+hasling@art.at (Josef Haslinger)
+
+-----From: "Mike Blaszczak" <mikeblas@msn.com>
+
+From: 	owner-mfc-l@netcom.com on behalf of Leif Terje Fonnes
+Sent: 	Tuesday, February 20, 1996 07:29
+
+
+> Env : Visual C++ 4.0 / NTS 3.51
+
+Thanks.
+
+ > When you look at the documentation you can get the impression that this 
+should work.
+
+I don't think you would--the documentation says that you need to set stateMask 
+if you want to play with state. I think your code isn't working because you're 
+not setting stateMask.
+
+It's also far more efficient to use CListCtrl::GeNextItem(LVNI_SELECTED) to 
+find selected items.
+
+.B ekiM
+const TCHAR sz[] = _T("Out on the porch 'cause I lost my house key.");
+
+-----From: Maurice Jeter <mauricej@katie.vnet.net>
+
+I use this piece of code to iterate one of my listview controls:
+
+selindex=m_list.GetNextItem(-1,LVNI_SELECTED); /* Finds first selected item */
+while(selindex>=0) {
+   ..do something..
+   selindex=m_list.GetNextItem(selindex,LVNI_BELOW|LVNI_SELECTED); /* Finds
+the rest */
+   }
+
+It just finds all selected items in m_list and assigns the index to selindex.
+
+Maurice
+http://www.vnet.net/users/mauricej
+
+-----From: Leif Terje Fonnes <fonlei-b.pcb@gmail.gar.no>
+
+Thanks for the help. I works. Btw. you are quite right that I had
+forgotten to assign lv.pszText and lv.cchTextMax. It made my program crash
+at the end of the procedure and it where quite difficult to spot the
+error. So using my original code the solutions can be someting like this
+
+char szBuffer[100]
+for(int i=m_tlvAttr.GetItemCount()-1;i>=0;i--)
+{
+  LV_ITEM lv;
+  lv.mask = LVIF_TEXT|LVIF_PARAM|LVIF_STATE;
+  lv.iItem = i;
+  lv.iSubItem = 0;
+
+  // New lines
+  lv.statemask = LVIS_SELECTED;
+  lv.pszText = szBuffer;
+  lv.cchMaxText = 100;
+  // New lines end
+
+  if(m_tlvAttr.GetItem( &lv))
+  {
+    if((lv.state & LVIS_SELECTED))
+    {
+      // Control never comes here
+      CString strText;
+      strText.Format("Item %d selected",i);
+      AfxMessageBox(strText);
+    }
+  }
+}
+
+But your example using
+int nCurSel =  m_tlv.GetNextItem( nStartFromHere, LVNI_SELECTED );
+are probaly somewhat faster.
+
+
+
+Leif Terje Fonnes
+ProgramArkitekten As
+Norway
+-----From: Lee Thompson <lee@usa.nai.net>
+
+Use GetNextItem to get each item with a specified state.
+
+	CListCtrl	m_ListCtrl;
+
+	int current_index = m_ListCtrl.GetNextItem(-1,LVNI_SELECTED);
+	if(current_index == -1)
+		return;
+
+
+Lee Thompson,
+Lee Software
+
+Modified Stolen Disclaimer:
+--
+TCHAR szDisc[] = _T("These words are my own; I do not speak, I type!");
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@msn.com">mikeblas@msn.com</A>
+Saturday, February 24, 1996
+</B>
+----------
+From: 	owner-mfc-l@netcom.com on behalf of Josef Haslinger
+Sent: 	Friday, February 23, 1996 01:03
+
+> I agree with you, that the documentation for the common controls is not
+> "very good". IMHO you have to try a lot, to find out how these controls
+> really work. If someone ever finds out all the secrects of list/tree
+> views please write them down (and post'em to me!)
+
+There are many books you can buy which cover the details of the controls; I 
+wrote one of them. You can also go to the MSDN library and read the MSJ 
+article series on the common controls.
+
+I disagree with you: there is plenty of documentation on the controls. 
+stateMask is well-documented. Pulling stunts with controls is something you 
+have to read about elsewhere or learn on your own, just like WinWord describes 
+how to format paragraphs without teaching you whatever language you're using.
+
+If you don't like the MFC documentation on the classes, you can always check 
+with the SDK documentation. It's generally very complete and quite clear. It 
+also has the advantage of being updated more often than the MFC documentation. 
+Translating from the documentation on the underlying controls to the 
+interfaces supplied by the classes is pretty trivial, I think.
+
+If you stumble on those errors, by the way, you should write to 
+vcdocs@microsoft.com to make sure the documentation team can get them fixed. I 
+think that, outside of MSDN itself, the VC++ documentaiton is the largest doc 
+set that Microsoft ships.
+
+> In your example you have to specifiy the address and the length of the =
+> buffer where the found items text will be stored in lv.pszText and =
+> lv.cchTextMax.
+
+Yep, since LVIF_TEXT is specified in the flags, the original poster should 
+have done this, too. That's also a well-documented fact.
+
+.B ekiM
+#ifdef _IMPOSTER
+TCHAR szDisc[] = _T("These words are my own; I do not speak, I type!");
+#else
+TCHAR szError[] = _T("Not yet implemented: try again later.");
+#endif
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,241 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CSocket and threads
+</B></FONT>
+<BR>
+<PRE>
+<B>
+John Addis -- <A HREF="mailto:jaddis@erols.com">jaddis@erols.com</A>
+Saturday, March 30, 1996
+</B>
+Environment:
+  NT 3.51,  VC++ 4.0, _AFXDLL,  sockcore.cpp line 709
+  '95,      VC++ 4.1, _AFXDLL,  sockcore.cpp line 694
+
+Here's the scenario; typical client/server development. When a client 
+connects I want to create a new thread (and a socket to go along with 
+it) to service the client. 
+
+The accept() call works okay and MFC creates a *new* CSocketWnd to go 
+along with my CSocket object. The _AFX_SOCK_THREAD_STATE for the new 
+thread *is*  different from that of the main thread. The m_hSocketWindow 
+members are also different.
+
+However... when notifications come in for the socket in the _child 
+thread_ they go to the CSocketWnd for the socket in the _main thread_. 
+(I discovered this by tracing through in the debugger.) When 
+CAsyncSocket::DoCallBack() uses LookupHandle() to map the hSocket 
+(wParam) to a CSocket* it fails -- it is looking in the map for the 
+wrong thread.
+
+Anybody have any ideas on how to fix this? Is it simply not possible to 
+use CSocket in this manner? 
+
+Abbreviated code follows:
+------------------------
+void CTestSock::OnAccept(int n)
+{
+  CSocket::OnAccept(n);
+  ::AfxBeginThread( ::ThreadProc, this );
+}
+UINT ThreadProc(LPVOID pParm)
+{
+  CSocket* pListener = (CSocket*)pParm;
+  CServerSock sock;
+  pListener->Accept( sock );
+
+  BOOL bMore = TRUE;
+  while( bMore )
+  {
+    if (::WaitMessage())
+    {
+      // process the message
+    }
+  }
+  return 0;
+}
+
+tia (even if your answer sucks, Mike)
+
+-- 
+John Addis        Master of Time and Space
+jaddis@erols.com  C++, MFC, Win32, Win95, TCP/IP
+"Invalid or missing REALITY.COM Universe halted."
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dean McCrory -- <A HREF="mailto:deanm@microsoft.com">deanm@microsoft.com</A>
+Sunday, March 31, 1996
+</B>
+You can't pass CSocket* between threads like that (as you have
+discovered...).
+
+Instead of passing the CSocket*, you should instead pass the handle to
+the socket to the other thread.
+
+>void CTestSock::OnAccept(int n)
+>{
+>  CSocket::OnAccept(n);
+>  ::AfxBeginThread( ::ThreadProc, m_hSocket );
+>}
+>UINT ThreadProc(LPVOID pParm)
+>{
+        CAsyncSocket listener;
+        listener.Attach((SOCKET)pParam);
+        CServerSock sock;
+        listener.Accept(sock);
+        listener.Detach();
+        ....
+
+// Dean McCrory
+// Team Jakarta
+
+>----------
+>From: 	John Addis[SMTP:jaddis@erols.com]
+>Sent: 	Friday, March 29, 1996 10:04 PM
+>To: 	mfc-l@netcom.com
+>Subject: 	CSocket and threads
+>
+>Environment:
+>  NT 3.51,  VC++ 4.0, _AFXDLL,  sockcore.cpp line 709
+>  '95,      VC++ 4.1, _AFXDLL,  sockcore.cpp line 694
+>
+>Here's the scenario; typical client/server development. When a client 
+>connects I want to create a new thread (and a socket to go along with 
+>it) to service the client. 
+>
+>The accept() call works okay and MFC creates a *new* CSocketWnd to go 
+>along with my CSocket object. The _AFX_SOCK_THREAD_STATE for the new 
+>thread *is*  different from that of the main thread. The
+>m_hSocketWindow 
+>members are also different.
+>
+>However... when notifications come in for the socket in the _child 
+>thread_ they go to the CSocketWnd for the socket in the _main thread_. 
+>(I discovered this by tracing through in the debugger.) When 
+>CAsyncSocket::DoCallBack() uses LookupHandle() to map the hSocket 
+>(wParam) to a CSocket* it fails -- it is looking in the map for the 
+>wrong thread.
+>
+>Anybody have any ideas on how to fix this? Is it simply not possible to
+>
+>use CSocket in this manner? 
+>
+>Abbreviated code follows:
+>------------------------
+>void CTestSock::OnAccept(int n)
+>{
+>  CSocket::OnAccept(n);
+>  ::AfxBeginThread( ::ThreadProc, this );
+>}
+>UINT ThreadProc(LPVOID pParm)
+>{
+>  CSocket* pListener = (CSocket*)pParm;
+>  CServerSock sock;
+>  pListener->Accept( sock );
+>
+>  BOOL bMore = TRUE;
+>  while( bMore )
+>  {
+>    if (::WaitMessage())
+>    {
+>      // process the message
+>    }
+>  }
+>  return 0;
+>}
+>
+>tia (even if your answer sucks, Mike)
+>
+>-- 
+>John Addis        Master of Time and Space
+>jaddis@erols.com  C++, MFC, Win32, Win95, TCP/IP
+>"Invalid or missing REALITY.COM Universe halted."
+>
+>
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Les -- <A HREF="mailto:Les.Hill@FMR.Com">Les.Hill@FMR.Com</A>
+Monday, April 01, 1996
+</B>
+[Mini-digest: 2 responses]
+
+To use CAsyncSocket here is what I have done in the past (I image
+CSocket would be similar):
+
+use ::accept() to get a raw SOCKET create your new thread passing the
+raw socket use Attach to make the connection from the raw Socket to
+CAsyncSocket (this will create the CSocketWnd as well)
+
+Another key point: because a socket inherits its parents async select
+settings, the parent should only be getting accept notifications (you
+then set the child's settings in the select call -- this is probably
+all you need to do to get your code working).
+
+Les Hill
+leh@cybercom.net
+
+-----From: odecio@ISF.COM
+
+     I'll give it a try. The problem is that you are sending the *this* 
+     pointer to the working thread, and accept()-ing the socket referencing 
+     it. That is probably the reason why you receive the notifications in 
+     the _main_ thread. 
+     
+     As I remember, a working thread does not deal with Windows messages. 
+     (and the socket notifications are such). Maybe you should use 
+     CWinThread as a basis for a new class that contains a CSocket, and 
+     your main thread keeps a list of them.
+     
+     Hope this helps.
+     
+     Otavio
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,231 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CCheckListBox DeleteString problem
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Prasenjit Bardhan -- <A HREF="mailto:bardhan@mariposa.xo.com">bardhan@mariposa.xo.com</A>
+Friday, February 14, 1997
+</B>
+I have a CheckListBox in a dialogbox(CMyDialog ) which I created using the
+Dialog Editor as a ListBox with the following properties:
+Selection - single
+Owner draw - Fixed
+Has Strings - Yes
+Sort - No
+Multi Column - No
+Vertical Scroll - Yes
+No integral height - Yes
+
+I use the class wizard to crate a member variable to CMyDialog class and
+change it to CCheckListBox type:
+
+CCheckListBox	m_listCheck;
+
+The following class wizard generated code helps in communicating with the
+CheckList box:
+void CMyDialog::DoDataExchange(CDataExchange* pDX)
+{
+	// IDC_LIST is the resource ID of the List Box.
+	DDX_Control(pDX, IDC_LIST, m_listCheck);
+}
+
+I fill in the Checklist Box with three strings in OnInitDialog():
+void CMyDialog::OnInitDialog()
+{
+	Cdialog::OnInitDialog();
+	m_listCheck.AddString("String1");
+	m_listCheck.AddString("String2");
+	m_listCheck.AddString("String3");
+}
+I have a "Delete" button in the dialog box for  the user to delete a string
+from the Checklist Box.
+// Delete only selected string
+void CMyDialog::OnDelete() 
+{
+	int nSel = m_listCheck.GetCurSel();
+	if (nSel != LB_ERR)
+		VERIFY(m_listCheck.DeleteString(nSel) != LB_ERR);
+}
+
+The CheckListBox works fine till I delete the first string using the
+"delete" button.
+
+I get an unhandled exception in the following code(winctrl3.cpp) as soon as
+I click on any item in the CheckList Box after deleting the first
+string("String1") by selecting the first string and clicking on the Delete
+button:
+void CCheckListBox::PreDrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct) 
+{
+	if (drawItem.itemData != 0)
+	{
+		AFX_CHECK_DATA* pState = (AFX_CHECK_DATA*)drawItem.itemData;
+		drawItem.itemData = pState->m_dwUserData; // exception at this line
+	}
+}
+called by CCheckListBox::OnChildNotify();
+The itemData and itemID of lpDrawItemStruct are both ffffffff. The CtlId is
+correct(IDC_LIST). 
+
+There is no problem if I delete the first string last.
+
+Environment: VC++ 4.2b, Win 95, NT 4.0
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Friday, February 14, 1997
+</B>
+At 00:10 2/14/97 -0800, Prasenjit Bardhan wrote:
+
+>Environment: VC++ 4.2b, Win 95, NT 4.0
+>I get an unhandled exception in the following code(winctrl3.cpp) as soon as
+>I click on any item in the CheckList Box after deleting the first
+>string("String1") by selecting the first string and clicking on the Delete
+>button:
+
+Does this really happen in both Windows 95 _and_ in Windows NT 4.0?
+
+In Windows NT, the item data is initialized differently for some owner-drawn
+listbox messages.  I'm trying to convince the Windows NT guys that it's a
+bug in Windows NT, but, in the meantime, we've worked around it in MFC.
+I'm pretty sure the fixed version of MFC won't be available for a while,
+though.
+
+I've never been able to reproduce the behaviour you describe in Windows 95,
+though.
+
+
+.B ekiM
+  Crotch Rocket   / Full-Body Rocket / <A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+95 Honda VFR-750F /   94 Mazda RX-7  / Trip Report Central!
+               I am bored of this talk. It is time now for the dancing!
+  These words are my own - I do not speak on behalf of Microsoft.
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dulepov Dmitry -- <A HREF="mailto:dima@ssm6000.samsung.ru">dima@ssm6000.samsung.ru</A>
+Monday, February 17, 1997
+</B>
+        [Mailer: "Groupware E-Mail". Version 1.03.000]
+
+>        [From: Mike Blaszczak
+>        [Address: mikeblas@nwlink.com
+>        [To: mfc-l@netcom.com
+>        [Date: Mon Feb 17 08:07:51 1997
+>At 00:10 2/14/97 -0800, Prasenjit Bardhan wrote:
+>
+>>Environment: VC++ 4.2b, Win 95, NT 4.0
+>>I get an unhandled exception in the following code(winctrl3.cpp) as soon as
+>>I click on any item in the CheckList Box after deleting the first
+>>string("String1") by selecting the first string and clicking on the Delete
+>>button:
+>
+>Does this really happen in both Windows 95 _and_ in Windows NT 4.0?
+>
+>In Windows NT, the item data is initialized differently for some owner-drawn
+>listbox messages.  I'm trying to convince the Windows NT guys that it's a
+>bug in Windows NT, but, in the meantime, we've worked around it in MFC.
+>I'm pretty sure the fixed version of MFC won't be available for a while,
+>though.
+>
+>I've never been able to reproduce the behaviour you describe in Windows 95,
+>though.
+>
+>
+>..B ekiM
+
+I'm glad to here about this problem. Sometime ago I tried to port CCheckListBox to a Win16 MFC and found one more problem. CCheckListBox::PreDeleteItem() has a comment:
+
+    // WINBUG: The following if block is required because Windows NT
+    // version 3.51 does not properly fill out the LPDELETEITEMSTRUCT.
+
+I had the following problem in Win NT 3.51 with a new shell, and in Win 3.1 this code does not work too. "deleteItem.itemData" = 0, and LB_GETITEMDATA returns NULL in Win NT 3.51 and delirious value under Win 3.1. I know that Windows developers does not recommend to ship any programs for NT 3.51 new shell but we make our program to work in any environment. In Win 3.1 I have to make more complex handling of data to correctly delete them.
+
+I know that SOMEONE will say I should not port CCheckListBox to Win 3.1, I should not use NT 3.51 new shell, I should not...
+
+Any comments, Mike ?
+
+Dmitry A. Dulepov
+Samsung Electronics Co., Ltd.
+Russian Research Center
+Phone: +7 (095) 213-9207
+Fax: +7 (095) 213-9196
+E-mail: dima@src.samsung.ru
+====================================
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Monday, February 17, 1997
+</B>
+At 09:23 2/17/97, Dmitry A. Dulepov wrote:
+
+ > I know that SOMEONE will say I should not port CCheckListBox
+ > to Win 3.1, I should not use NT 3.51 new shell, I should not...
+ > Any comments, Mike ?
+
+I guess it will have to be me.  The new shell upgrade for Windows NT 3.51
+is not a supported platform.  It's beta, prerelease software.  That means
+that you can't expect a service pack release, and that the only answer
+to your question will always be: "Upgrade to Windows NT 4.0".
+
+
+
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+These words are my own. I do not speak on behalf of Microsoft.
+           This performance was not lip-synched.
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+    <A HREF="http://www.digiday.com/mfcpro/joinmfcl.htm">Become an MFC-L member</A>
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

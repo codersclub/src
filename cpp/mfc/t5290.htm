@@ -1,0 +1,328 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+How can I display different dialogs in a tab control?
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Lum Dave RVMK20 -- <A HREF="mailto:dlum@devmail.sps.mot.com">dlum@devmail.sps.mot.com</A>
+Thursday, May 23, 1996
+</B>
+
+     Environment: MSDEV 4.1 / NT,95,Win32s 
+     
+     WHAT I WANT TO DO:
+     
+     I have added a tab control to one of my dialogs.  I would like to 
+     create a different dialog resource for each tab and be able to display 
+     it inside the appropriate tab control when the tab is selected.  How 
+     do I connect a dialog resource to a tab and display it when it is 
+     selected?  
+     
+     The "FIRE" sample does not help because it displays the same thing 
+     with different colors for each tab.  I am not trying to change the 
+     colors of the tabs.  I am trying to change the controls that are 
+     displayed when switching between tabs.  The FIRE example only changes 
+     the color of the "fire" in the control within the tab control.  Which 
+     is trivial, and has no relation to what I want to do. 
+     
+     I want to display a different modeless child dialog for each tab.  I 
+     also want to be able to "tab" through the controls on my modeless 
+     child dialog that is embedded in the tab control, and then continue 
+     tabbing out of the child dialog into the parent dialog (you know, the 
+     one that owns the tab control) just like they do in the MSDEV 
+     breakpoint dialog.
+     
+     I am not using a CProperySheet because I need other controls within 
+     the dialog that are outside the property sheet, and that do not refer 
+     to the controls within it.  (See the Breakpoint dialog in MSDEV.)  
+     
+     Plus, I want to use the tab control because it's there.  I would like 
+     to know why it was added to the resource compiler as a common control 
+     if there was no SIMPLE way to display child dialogs within it.
+     
+     Furthermore, I want to be able to do all this using MFC CDialog 
+     derived classes, and not SDK calls IF THAT IS POSSIBLE.
+     
+     ALTERNATIVES I DID NOT LIKE:
+     
+     I can hide and display dialog controls depending on which tab is 
+     selected, but I think this may get too "messy" in the resource 
+     editor. 
+     
+     I could also use the SDK method in "Creating a Tabbed Dialog Box" 
+     presented in the Win32 SDK:Win32, Overviews, Windows, but  then I am 
+     not using MFC.
+     
+     I can also stretch the bottom of a property sheet to include the 
+     additional controls needed outside the property sheet, but this seems 
+     too brutal and too reliant on the SDK.
+     
+     I could embed a CProperty sheet into another CProperty sheet, but this 
+     does not fix the tabbing problem.  This looks like my best 
+     alternative. and I can look for a tab key down event once I get into a 
+     specific control, but I still don't LIKE it.
+     
+     HINT?:
+     
+     It was suggested that I could: "do this with entire dialogs.  Check 
+     out the WS_CONTROL style," but WS_CONTROL is not present in the Visual 
+     C++ Books Online, or the January '96 MSDN library.
+     
+     Thanks,
+     Dave Lum,  
+     dlum@devmail.sps.mot.com
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+David W. Gillett -- <A HREF="mailto:DGILLETT@expertedge.com">DGILLETT@expertedge.com</A>
+Wednesday, May 29, 1996
+</B>
+[Mini-digest: 5 responses]
+
+On 23 May 96 at 9:33, Lum Dave RVMK20 wrote:
+
+> I am not using a CProperySheet because I need other controls
+> within the dialog that are outside the property sheet, and that do
+> not refer to the controls within it.  (See the Breakpoint dialog
+> in MSDEV.)  
+
+  Poor excuse.  By adding the DS_CONTROL and WS_EX_CONTROLPARENT 
+styles to a WS_CHILD modeless property sheet, you get the 
+tab-key-from-control-to-control functionality you want.
+
+> Plus, I want to use the tab control because it's there.  I would
+> like to know why it was added to the resource compiler as a common
+> control if there was no SIMPLE way to display child dialogs within
+> it.
+
+  Poor excuse.  *Displaying* the child dialogs is trivial.  What the 
+property sheet gives you is creation of the child dialogs only as 
+needed, and reflection of the tab control notifications (sent to the 
+tab control's parent) into the child dialogs using the interface 
+provided by property pages.  You may enjoy recreating this 
+functionality from scratch.  What it doesn't give you, out of the 
+box, is embeddability in a parent dialog, but that's pretty easy to 
+add. 
+
+> The "FIRE" sample does not help because it displays the same thing
+> with different colors for each tab.  I am not trying to change the
+> colors of the tabs.
+
+  Perhaps the tab control was added in order that cases like this, 
+where property pages are overkill or otherwise unsuitable, could 
+be handled.  Perhaps this example demonstrates that the cases when 
+using a "naked" tab control is most appropriate do not include your 
+scenario.
+
+> Furthermore, I want to be able to do all this using MFC CDialog
+> derived classes, and not SDK calls IF THAT IS POSSIBLE.
+
+  CPropertyPage is derived from CDialog, adding interface to handle 
+notification reflection and dialog creation management implemented in 
+CPropertySheet.
+
+> I could embed a CProperty sheet into another CProperty sheet, but
+> this does not fix the tabbing problem.  This looks like my best
+> alternative. and I can look for a tab key down event once I get
+> into a specific control, but I still don't LIKE it.
+
+  The styles suggested above allow a sheet to be embedded in a 
+*dialog*, functioning as a control which happens to contain other 
+controls.  The parent dialog *could* be a page, but that's kind of 
+perverse (and embedding a sheet in a sheet sounds worse).  The styles 
+take care of the tab key issue, though. 
+
+  If you're determined to use a raw CTabControl, the best published 
+example I know of is in the SAMS "Windows 95 Programming Unleashed" 
+monster.  It's not adequately explained in the text, but if you 
+torture the code for a while, it *will* confess.
+
+Dave
+-----From: Terry Wellmann <wellmatl@cs.purdue.edu>
+
+Dave,
+
+I recently posted a very similar problem and here's what I came up with. I
+am also sending this to the MFC-l list as the solution to my problem with
+the subject: "Implementing CTabCtrl in a dialog app"
+
+First of all create your dialog resources, derive them from CDialog -- this
+way you'll be able to hook the dialog messages.  Since I created a Dialog
+app I set up my CTabCtrl in my OnInitDialog function.  Here's some of my
+sample code:
+
+	// allocate the dialog page objects
+	m_pSearchRange = new CSearchRange;
+	m_pSearchKeyWords = new CSearchKeyWords;
+
+ < ect ... >
+
+	// set up the tab control
+	// ******************************
+	// Set-up search range page
+	// ******************************
+	TabItem.mask = TCIF_PARAM | TCIF_TEXT;
+	TabItem.lParam = (LPARAM)m_pSearchRange;
+	VERIFY(m_pSearchRange->Create(CSearchRange::IDD, &m_SettingsTabCtrl));
+	TabItem.pszText = "Search Range";
+	m_SettingsTabCtrl.InsertItem(iPages++,&TabItem);
+
+	// position the dialog page in the tab control
+	m_pSearchRange->SetWindowPos(NULL, 10, 30, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+
+< this magic location above was found by trial and error.  If you wanted to do 
+a little better you could get the area of the tab control and subtract from
+it to get the settings. This was suggested by Paolo Savelli>
+
+	// show this page and strip the border
+	m_pSearchRange->ModifyStyle (WS_CAPTION, 0);
+	m_pSearchRange->ShowWindow(SW_SHOW);
+	m_pSearchRange->EnableWindow(TRUE);
+
+< this is the first window I want active so I set it active above >
+< below is the setup for the second dialog >
+
+	// ******************************
+	// set up the search keyword page
+	// ******************************
+	TabItem.mask = TCIF_PARAM | TCIF_TEXT;
+	TabItem.lParam = (LPARAM)m_pSearchKeyWords;
+
+	VERIFY(m_pSearchKeyWords->Create(CSearchKeyWords::IDD, &m_SettingsTabCtrl));
+	TabItem.pszText = "Search KeyWords";
+	m_SettingsTabCtrl.InsertItem(iPages++,&TabItem);
+
+	// Position the dialog page in the tab control
+	m_pSearchKeyWords->SetWindowPos(NULL, 10, 30, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+
+	// don't show this window strip the border
+	m_pSearchKeyWords->ModifyStyle (WS_CAPTION, 0);
+	m_pSearchKeyWords->ShowWindow(SW_HIDE);
+	m_pSearchKeyWords->EnableWindow(FALSE);
+
+< this window is not currently active so don't show it yet. You would do 
+do something similar for more pages. >
+
+< when I've set up my pages I set the first page active >
+
+	// ******************************
+	// show the first tab
+	// ******************************
+	m_SettingsTabCtrl.SetCurSel(0);
+	m_iLastPage = 0;
+
+< I keep track of the page the user came from >
+
+< Then in the OnSelchangeSettingsTabCtrl function I've got a big switch
+statement that first hides the page they came from, then by calling: >
+
+	m_SettingsTabCtrl.GetCurSel();
+
+I get the new page and again in a switch statement I "unhide" it and show it.
+
+Since you implement the pages of the control as dialog based you can do
+whatever you like inside of them just as if they were a normal dialog box.
+
+This should give you what you want.
+
+Terry
+
+-----------------------------------------------------------------------
+|                          Terry Wellmann                             |
+|                  CS Major - Purdue University                       |
+|             Programmer/Systems Analyst - M.A.I.L.code Inc.          |
+|                   E-Mail: wellmatl@cs.purdue.edu                    |
+|              http://www.cs.purdue.edu/people/wellmatl               |
+|=====================================================================|
+|                                                                     |
+| " ..655,360 bytes is more than enough for any application we could  |
+|     ever develop."         - Bill Gates in PC Monthly, Aug. 1983    |
+|                                                                     |
+-----------------------------------------------------------------------
+
+-----From: Paolo Savelli <paolo@entire.com>
+
+boy, does that sound familiar, I've been wrestling with this issue now 
+for six/eight weeks.  Finally, I've managed to cobble togethor an 
+answer (with timely help from two other mfc list subscribers).
+
+In short, make your 'page' CDialogs borderless and titleless.
+In your initdialog for your main CDialog, Create() your page CDialogs
+and AddItem() them to your tab control.  Call ShowWindow() and 
+EnableWindow( TRUE ) for the first page CDialog.  
+
+You're going to need to capture the WM_MOVE (OnMove) of your main 
+CDialog so you can move the 'page' CDialogs, and you're going to have 
+to process the OnSelChanging() function ( generate this with Class 
+Wizard), to show and hide the appropriate dialog boxes for each tab.
+
+A few caveats:
+
+This works well, but it isn't perfect.  With this system you can tab 
+thru the controls within each page CDialog, but you can't tab to the 
+controls outside of the page CDialog (at least I can't ). Also, when 
+focus is in one of the page CDialogs, the title bar of the main 
+CDialog assumes the not focused color.  
+
+Paolo
+
+Hope this helps.  If you need more info, I can zip up the 'test' 
+project that I've cobbled togethor, and e-mail it to you.
+-----From: George Roberts/Bos/Teradyne
+
+Try the sheridan tab control.  It is either an OCX or VBX.  It works
+beautifully!  It comes with enterprised edition of visual basic.  I've
+never tried it with MSVC, but it should work.
+
+- George Roberts
+george.roberts@teradyne.com
+-----From: Ian Hegerty <ihegerty@sina.demon.co.uk>
+
+I spent about a week on this, and I couldn't find a way to do it; I had to resort to manually
+creating the controls. I found an MSDN article that said this was the only way to do it, but I
+didn't make a note of it., (Sorry!)
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

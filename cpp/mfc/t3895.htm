@@ -1,0 +1,350 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Possibly a bug in MFC?
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Dale Wilson -- <A HREF="mailto:dale@dra.com">dale@dra.com</A>
+Friday, February 09, 1996
+</B>
+
+In MFC 4.0 VC 2.2 on NT3.51.
+
+Very near the beginning of COccManager::IsDialogMessage is the following 
+code:
+
+     CWnd* pWndFocus = CWnd::GetFocus();
+     HWND hWndFocus = pWndFocus->GetSafeHwnd();
+
+near the end of this routine appears:
+
+     if (::IsWindow(hWndFocus))
+     {
+          UIDeactivateIfNecessary(pWndFocus, CWnd::GetFocus());
+
+Eventually UIDeactivate triggers ASSERT(::IsWindow(m_hWnd)); where m_hWnd is 
+pWndFocus->m_hWnd and m_hWnd is most often 0xfeeefeee [as in "...fieefiee 
+foeefoee fummfumm", but that's another story]
+
+By breaking on (pWndFocus->m_hWnd != hWndFocus) I have discovered that the 
+damage is done in a call
+               UIActivateControl(CWnd::GetFocus());
+
+appearing shortly before the second code snippet above.  In other words, if 
+the test was:
+
+     if (::IsWindow(pWndFocus->m_hWnd))
+
+then  UIDeactivateIfNecessary would not be called.
+
+Apparently the CWnd pointed to by pWndFocus is being changed (probably being 
+deleted!?).
+
+BTW, although OleControl Containment is enabled, the CFormView involved has 
+NO OCX's.  The triggering event is a mouse click on the form background (not 
+on any control).  It is very reproducable in my program, but I haven't been 
+able to reproduce it in any other program--hence I suspect something I'm 
+doing is wrong, or triggering a bug in MFC (or both).  My program has grown 
+a LONG way from the original Wizard generated MDI/CFormView/ OCX Enabled 
+/OLE Container application.
+
+So the questions are:
+  1) is this a bug in MFC and/or
+  2) what have I done to trigger it (how's that for an easy question 
+(grin)?)?
+
+I'm open to suggestions, help, abuse, anything!?
+
+dale@dra.com
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dale Wilson -- <A HREF="mailto:dale@dra.com">dale@dra.com</A>
+Monday, February 12, 1996
+</B>
+
+The plot thins...
+
+Friday I wrote about code in COccManager::IsDialogMessage:
+
+     CWnd* pWndFocus = CWnd::GetFocus();
+     HWND hWndFocus = pWndFocus->GetSafeHwnd();
+
+     <SNIP>
+
+    if (!bResult)
+    {
+        bResult = ::IsDialogMessage(pWndDlg->m_hWnd, lpMsg);
+        if (bResult && (CWnd::GetFocus() != pWndFocus))
+            UIActivateControl(CWnd::GetFocus());
+    }
+
+    if (::IsWindow(hWndFocus))
+    {
+        UIDeactivateIfNecessary(pWndFocus, CWnd::GetFocus());
+    ...
+
+which caused (eventually) an ASSERT(::IsWindow(m_hWnd)); because the CWnd 
+pointed to by pWndFocus was no longer valid.  I reported that the damage was 
+done during:
+
+               UIActivateControl(CWnd::GetFocus());
+
+Alas, I lied.  The damage actually happens in:
+
+        bResult = ::IsDialogMessage(pWndDlg->m_hWnd, lpMsg);
+
+(silly me, I assumed that if it didn't reference pWndFocus or the focused 
+window it couldn't *possibly* be causing the problem, so I didn't break on 
+that line )
+
+The answers to my questions are:
+  1) Is this a bug in MFC?
+Answer:  Yes!  See the answer to question 2...
+
+  2) What have I done to trigger it?
+
+Answer: In my OnLButtonDblClk routine I instantiate a CRectTracker, then 
+call TrackRubberBand.  At some point (I am speculating here) during the 
+handling of TrackRubberBand, the MFC idle time stuff gets called and 
+"garbage collects" the temporary CWnd pointed to by pWndFocus.  Upon return 
+we have a pointer to nowhere and...
+
+Thank goodness (and the MFC developers) for asserts.   Thanks, also, to Phil 
+Shaw..a coworker of mine who made me put a breakpoint on EVERY line in the 
+suspicious region.
+
+As a work-around, I plan to disable the "drag and select" feature of my 
+program (sigh).  Can anyone suggest a method to work around this problem 
+short of rebuilding the MFC dll's?
+
+PS: Whiile tracking this down, I also uncovered a minor defect in the 
+compiler itself (it should have generated a warning message for the 
+following "typographic error" in my code
+
+     CWnd *pChild = m_pChildControl;
+     UINT ID = CWnd->GetDlgCtrlID(); // <- {I'm sure I didn't really type 
+that, [blush]}
+
+which called GetDlgCtrlID for the CFormView rather than for pChild, but 
+shouldn't have called anything at all!
+
+What's the best way to report such anomolies to the VC compiler development 
+folks?  A half duplex reporting channel is fine.  I don't need a fix.  I 
+just thought they outta know.
+
+dale@dra.com
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Brad Wilson -- <A HREF="mailto:bradw@netnet.net">bradw@netnet.net</A>
+Wednesday, February 14, 1996
+</B>
+> As a work-around, I plan to disable the "drag and select" feature of my 
+> program (sigh).  Can anyone suggest a method to work around this problem 
+> short of rebuilding the MFC dll's?
+
+Instead of doing the TrackRubberBand in response to the message, post
+yourself a message to tell yourself to do the work.
+
+> PS: Whiile tracking this down, I also uncovered a minor defect in the 
+> compiler itself (it should have generated a warning message for the 
+> following "typographic error" in my code
+>
+>      CWnd *pChild = m_pChildControl;
+>      UINT ID = CWnd->GetDlgCtrlID(); // <- {I'm sure I didn't really type 
+> that, [blush]}
+>
+> which called GetDlgCtrlID for the CFormView rather than for pChild, but 
+> shouldn't have called anything at all!
+
+There was a thread, long ago, about this.  Mike B. told me in Email that
+he had reported the bug (it's a parser error, and you would see that
+the line there would have generated no code).
+
+Good luck!
+Brad
+
+--
+class CBradWilson : public CWorldWatchProgrammingTeam {
+  public:
+    void GetInetAddr  ( CString& s ) { s = "bradw@exptech.com";      }
+    void GetE164Addr  ( CString& s ) { s = "+1 (810) 620-9803";      }
+    void GetURL       ( CString& s ) { s = "http://www.exptech.com"; }
+    void GetDisclaimer( CString& s ) { s = "All I say is fact :-p";  }
+};
+
+//  QOTW:  "Music nowadays is merely the art of executing difficulties and in
+//          the end that which is only difficult ceases to please."
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dale Wilson -- <A HREF="mailto:dale@dra.com">dale@dra.com</A>
+Friday, February 23, 1996
+</B>
+
+A couple of weeks ago (my how time flies) I wrote about a bug in 
+COccManager::IsDialogMessage which resulted in an ASSERT out of MFC. The 
+problem appears when MFC mismanages a temporary CWind returned by 
+GetFocus().   Brad (thanks, Brad) suggested this work around....
+
+> Instead of doing the TrackRubberBand in response to the message, post
+> yourself a message to tell yourself to do the work.
+
+At first I thought that this wouldn't work because the posted message goes 
+thru IsDialogMessage and would  trigger the same problem.  Upon further 
+reflection I realized that by the time the  posted message was processed, 
+focus would have  been given to the FormView for which MFC has a permanent 
+CWnd, and therefore the work around would work.  However, there is always 
+the possibility that some other message could trigger the same symptom, so I 
+wasn't very comfortable with this approach.
+
+Fortunately, I have developed both a reliable way to reproduce the problem, 
+and a "solid" work around, so I no longer need to hold my breath while 
+demoing this work-in-progress.  [The reason two weeks have elapsed since my 
+last message is we had a significant dog-and-pony show today [which went 
+quite well, thank you] and I didn't have time to send this].  So, here is 
+how you reproduce the problem, and my work-around...
+
+Recreating the problem:
+
+1) Run appwizard with all defaults except:
+    a) enable OLE Control containment and
+    b) use CFormView
+
+2) Convert the application to UNICODE (may not be necessary).
+
+3) Edit the dialog template for the form view to add two controls:
+    a) an edit control
+    b) your choice of OLE Control (circle works fine)
+
+DO NOT ATTACH THE EDIT CONTROL TO THE FORM VIEW! If you do then there will 
+be a permanent CWnd for the Edit control and GetFocus will return that 
+rather than creating a temporary CWnd.  Note that the OLE Control is 
+necessary to force the trip through  COccManager::IsDialogMessage.
+
+4) Add a WM_LBUTTONDOWN handler containing the following code:
+
+void CJunqueView::OnLButtonDown(UINT nFlags, CPoint point)
+{
+     CRect rBox(point,CSize(0,0));
+     CRectTracker Tracker(&rBox, CRectTracker::dottedLine);
+     Tracker.TrackRubberBand(this, rBox.TopLeft());
+}
+
+5) Build and run
+6) Click on the edit control to give it focus.
+7) LButton down outside both controls.  Drag the tracker box around. 
+ LButton up
+ ----ASSERT HAPPENS----
+
+The work around:
+
+Add a CWinApp::PreTranslateMessage override containing:
+
+BOOL CJunqueApp::PreTranslateMessage(MSG* pMsg)
+{
+    // The following is a workaround for a bug in MFC 4.0
+    static BOOL BeenHere = FALSE;
+    HWND hFocus = ::GetFocus();
+    CWnd* pFocus = NULL;
+
+    if(hFocus != NULL)
+    {
+        pFocus = CWnd::FromHandlePermanent( hFocus );
+        if(pFocus == NULL)
+        {
+            // Make a permanent handle
+            pFocus = new CWnd;
+            pFocus->Attach(hFocus);
+            if(! BeenHere)
+            {
+                TRACE(_T("WARNING:  WORKAROUND FOR MFC 4.0 BUG IN 
+PLACE\n"));
+                TRACE(_T("IS THIS STILL NECESSARY?\n"));
+                TRACE(_T("Attach permanent CWnd %lX to %lX\n"), 
+(DWORD)(void*)pFocus, (DWORD)hFocus);
+            }
+        }
+        else
+        {
+            // found a permanent CWnd.
+            // forget it, all is well.
+            pFocus = NULL;
+        }
+    }
+
+    BOOL bResult = CWinApp::PreTranslateMessage(pMsg);
+
+    if(pFocus != NULL)
+    {
+        // If we attached it...
+        // detach it
+        if(! BeenHere)
+        {
+            TRACE(_T("  Detach permanent CWnd %lX from %lX\n"),
+                (DWORD)(void*)pFocus, (DWORD)pFocus->m_hWnd);
+            BeenHere = TRUE;
+        }
+        pFocus->Detach();
+        delete pFocus;
+    }
+    return bResult;
+}
+ ----------------------
+
+dale@dra.com
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

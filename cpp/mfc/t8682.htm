@@ -1,0 +1,164 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Not getting TTN_NEEDTEXT called for tooltips
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Peter A. Vanvliet -- <A HREF="mailto:pvanvlie@neosoft.com">pvanvlie@neosoft.com</A>
+Friday, December 27, 1996
+</B>
+Hi,
+
+Environment: VC++ 4.1, NT3.51
+
+I have a CPropertyPage-derived class
+within which I have a CTooltipCtrl. I am only getting TTN_NEEDTEXT callback
+calls for static controls, not for any other control. Why?
+
+As an aside, I
+also have a CTooltipCtrl working in both my CFormView and CDialog derived
+classes. There it works for all controls *except* for static
+controls.
+
+Note: You can discover the CPropertyPage problem by adding a
+button to the CToolBarCtrlPage class/resource of the CMNCTRLS sample
+application that comes with VC++. After adding the necessary code for having
+the tooltip recognize the button (calling "m_ToolTip.AddTool(), etc."), you
+will not see a tooltip for the button.
+
+I have tried the following:
+1.
+Created a TTN_NEEDTEXT handler in the page class.
+2. Overridden
+WindowProc() in the page class calling m_tipCtrl.RelayEvent(&msg);
+3.
+Overridden PreTranslateMessage() in the page class calling
+m_tipCtrl.RelayEvent(pMsg);
+
+Any help would be much appreciated.
+
+Peter
+A. Vanvliet
+Engineering Software Consultant
+NanoSoft Corporation, Houston,
+Texas
+http:\\www.nanocorp.com\
+pvanvlie@neosoft.com
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Roger Onslow/Newcastle/Computer Systems Australia/
+Monday, December 30, 1996
+</B>
+Peter,
+
+>I have a CPropertyPage-derived class
+>within which I have a CTooltipCtrl. I am only getting TTN_NEEDTEXT callback
+>calls for static controls, not for any other control. Why?
+[snip about using CTooltipCtrl etc]
+
+Why do all this?
+
+MFC does tool tips for you - all you have to do is turn on the support and 
+provide the callback.
+
+Also, for property pages, you need a simple override of PreTranslateMessage 
+(because of the way property pages work)
+
+You simply add string resources to your project with the same ID as the control 
+for which you want help.
+
+Here is (a snippet of) my code (you can guess .h file etc):
+
+BEGIN_MESSAGE_MAP(CMyPropertyPage, CPropertyPage)
+    //{{AFX_MSG_MAP(CMyPropertyPage)
+    //}}AFX_MSG_MAP
+    ON_NOTIFY_EX_RANGE(TTN_NEEDTEXT,0,0xFFFF,OnToolTipNotify)
+END_MESSAGE_MAP()
+
+BOOL CMyPropertyPage::OnInitDialog() {
+    BOOL ok = CPropertyPage::OnInitDialog();
+    EnableToolTips(TRUE);
+    return ok;
+}
+
+BOOL CMyPropertyPage::OnToolTipNotify( UINT /*id*/, NMHDR * pNMHDR, LRESULT * 
+/*pResult*/ ) {
+    TOOLTIPTEXT *pTTT = static_cast<TOOLTIPTEXT*>(pNMHDR);
+    UINT nID =pNMHDR->idFrom;
+    if (pTTT->uFlags & TTF_IDISHWND) {
+        // idFrom is actually the HWND of the tool
+        nID = ::GetDlgCtrlID(reinterpret_cast<HWND>(nID));
+        if(nID) {
+            pTTT->lpszText = MAKEINTRESOURCE(nID);
+            pTTT->hinst = AfxGetResourceHandle();
+            return(TRUE);
+        }
+    }
+    return(FALSE);
+}
+
+BOOL CMyPropertyPage::PreTranslateMessage(MSG* pMsg) {
+ return CWnd::PreTranslateMessage(pMsg);
+}
+
+Hope this helps
+
+============================================================
+    Roger Onslow
+ Software Development Manager - Quisine Division
+   Computer Systems Australia
+------------------------------------------------------------
+Ph:   +61 49 675266
+Fax:   +61 49 675554
+Personal  <A HREF="mailto:Roger_Onslow@compsys.com.au">mailto:Roger_Onslow@compsys.com.au</A>
+Quisine info <A HREF="mailto:Quisine@compsys.com.au">mailto:Quisine@compsys.com.au</A>
+Visit us at  <A HREF="http://www.compsys.com.au">http://www.compsys.com.au</A>
+============================================================
+  Quisine - Designing for the Future
+============================================================
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

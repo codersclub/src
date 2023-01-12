@@ -1,0 +1,172 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+MFC ShellSpace Browser Eample Problem
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Raja Segar -- <A HREF="mailto:rsz@pc.jaring.my">rsz@pc.jaring.my</A>
+Sunday, February 09, 1997
+</B>
+Environment : Visual C++ 4.2b , Win95, NT 4.0 Workstation
+
+Hi there..
+ I am sure many of you have tried out the enum shellspace example
+ provided in Win32Dev website. MFCENUM (nam2255c.zip)
+
+ The problem is it works fine under win95 but under NT all the names
+ get truncated to 5 character. I am running the same ANSI executable
+ under win95 & NT.=20
+
+ For example "My Computer" becomes "My Co=87=87"
+ That's My Co followed by 2 block characters.
+
+ I tracked down the problem the following function:-
+
+ if (!GetName(lpsf, lpi, SHGDN_NORMAL, szBuff))
+
+ BTW szBuff is declared as char szBuff[256].
+
+/***************************************************************************=
+*
+ *
+ *    FUNCTION: GetName(LPSHELLFOLDER lpsf,LPITEMIDLIST  lpi,DWORD dwFlags,
+ *                     LPSTR lpFriendlyName)
+ *    PURPOSE:  Gets the friendly name for the folder=20
+ *
+=
+ ***************************************************************************=
+*/
+ BOOL CMfcenumView::GetName(LPSHELLFOLDER lpsf,
+                            LPITEMIDLIST  lpi,
+		            DWORD dwFlags,
+                            LPSTR lpFriendlyName)
+ {
+   BOOL   bSuccess=3DTRUE;
+   STRRET str;
+
+   if (NOERROR=3D=3Dlpsf->GetDisplayNameOf(lpi,dwFlags, &str))
+   {
+      switch (str.uType)
+      {
+         case STRRET_WSTR:          // <- Under NT this block gets Executed
+
+            WideCharToMultiByte(CP_ACP,                 // CodePage
+                                0,		        // dwFlags
+                                str.pOleStr,            // lpWideCharStr
+                                -1,                     // cchWideChar
+                                lpFriendlyName,         // lpMultiByteStr
+                                sizeof(lpFriendlyName), // cchMultiByte,
+                                NULL,                   // lpDefaultChar,
+                                NULL);                  // lpUsedDefaultChar
+
+             break;
+         case STRRET_OFFSET:
+             lstrcpy(lpFriendlyName, (LPSTR)lpi+str.uOffset);
+             break;
+         case STRRET_CSTR:  // <- Under Win95 this block gets Executed
+             lstrcpy(lpFriendlyName, (LPSTR)str.cStr);
+             break;
+         default:
+             bSuccess =3D FALSE;
+             break;
+      }
+   }
+   else
+      bSuccess =3D FALSE;
+   return bSuccess;
+}
+=20
+BTW when i changed the szBuff declaration as follows
+char szBuff[256] =3D "Testing 1234567890";
+
+All the names become as follows=20
+ // Original Declaration -> char szBuff[256];
+ "My Computer" becomes "My Co=87=87"
+
+ // Modified -> char szBuff[256] =3D "Testing 1234567890";             =20
+ "My Computer" becomes "My Cing 1234567890"
+
+Somehow null characters are getting inserted in the after the fifth=
+ character.
+
+>From here i'm lost .. i tried playing around with the parameters but no=
+ luck.
+I hope someone can shed some light on this matter.
+
+Hopefully Nancy can help out since this example was written by her.
+
+Thanks in advance.
+ (  _ \/ __)(_   )
+  )   /\__ \ / /_=20
+ (_)\_)(___/(____)@pc.jaring.my
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Syed -- <A HREF="mailto:sxs296@psu.edu">sxs296@psu.edu</A>
+Sunday, February 16, 1997
+</B>
+I have hit the same problem before and it's easy to fix - change all
+occurences of ::GetName with SHGetFileInfo. Specify that you want friendly
+name for that pidl. Remember to use fully-qualified pidl.
+At 08:37 PM 2/9/97 +0800, you wrote:
+>Environment : Visual C++ 4.2b , Win95, NT 4.0 Workstation
+>
+>Hi there..
+> I am sure many of you have tried out the enum shellspace example
+> provided in Win32Dev website. MFCENUM (nam2255c.zip)
+>
+> The problem is it works fine under win95 but under NT all the names
+> get truncated to 5 character. I am running the same ANSI executable
+> under win95 & NT.=20
+>
+> For example "My Computer" becomes "My Co=87=87"
+> That's My Co followed by 2 block characters.
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+    <A HREF="http://www.digiday.com/mfcpro/joinmfcl.htm">Become an MFC-L member</A>
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

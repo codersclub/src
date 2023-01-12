@@ -1,0 +1,282 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+<TAB> & <ENTER> Key Getting Disabled
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Nazir Mohammed S -- <A HREF="mailto:nazir@rsi.ramco.com">nazir@rsi.ramco.com</A>
+Wednesday, April 10, 1996
+</B>
+
+Hello
+
+In my application, from different main menu options I  call  modal and 
+modeless dialogboxes. When only Modal or Modeless dialogs are called, <TAB> 
+and <ENTER> keys work fine. But when I have a combination of both Modal and 
+Modeless dialogboxes, <TAB> and <ENTER> keys does not work and I have to use 
+mouse to position my cursor in different fields.
+
+Environment: VC++ 1.5,  Windows For Workgroups 3.11
+
+The calling sequence of dialogboxes are:
+
+1.   From EXE (thro' menu) Invoke Modeless dialogbox
+2.   (by clicking on a button in this modeless dialogbox)
+       Invoke a Modal dialogbox (Let's call this MODAL 1)
+3.   (thro' menu) Invoke another Modeless dialogbox
+4.   (by clicking on a button in this second modeless dialogbox)
+       Invoke another Modal dialogbox (Let's call this MODAL 2)
+
+In MODAL 2 <TAB> and <ENTER> keys work fine
+In MODAL 1 <TAB> and <ENTER> DOES NOT WORK
+In ALL Modeless Dialogboxes <TAB> and <ENTER> DOES NOT WORK
+
+Cancel MODAL 2, in MODAL 1 <TAB> and <ENTER> keys work fine
+again, In ALL Modeless Dialogboxes <TAB> and <ENTER> DOES NOT WORK
+
+What should be done to get <TAB> and <ENTER> keys enabled in all dialogboxes 
+?
+
+Much Thanks In Advance
+
+Nazir
+My id is: nazir@rsi.ramco.com
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Christophe Nasarre -- <A HREF="mailto:nasarre@col.bsf.alcatel.fr">nasarre@col.bsf.alcatel.fr</A>
+Friday, April 12, 1996
+</B>
+[Mini-digest: 4 responses]
+
+Nazir wrote:
+
+>------------------------------------------------------------------------------
+  In my application, from different main menu options I  call  modal and 
+modeless dialogboxes. When only Modal or Modeless dialogs are called, <TAB> 
+and <ENTER> keys work fine. But when I have a combination of both Modal and 
+Modeless dialogboxes, <TAB> and <ENTER> keys does not work and I have to use 
+mouse to position my cursor in different fields.
+
+Environment: VC++ 1.5,  Windows For Workgroups 3.11
+
+The calling sequence of dialogboxes are:
+
+1.   From EXE (thro' menu) Invoke Modeless dialogbox
+2.   (by clicking on a button in this modeless dialogbox)
+       Invoke a Modal dialogbox (Let's call this MODAL 1)
+3.   (thro' menu) Invoke another Modeless dialogbox
+4.   (by clicking on a button in this second modeless dialogbox)
+       Invoke another Modal dialogbox (Let's call this MODAL 2)
+
+In MODAL 2 <TAB> and <ENTER> keys work fine
+In MODAL 1 <TAB> and <ENTER> DOES NOT WORK
+In ALL Modeless Dialogboxes <TAB> and <ENTER> DOES NOT WORK
+
+Cancel MODAL 2, in MODAL 1 <TAB> and <ENTER> keys work fine
+again, In ALL Modeless Dialogboxes <TAB> and <ENTER> DOES NOT WORK
+
+What should be done to get <TAB> and <ENTER> keys enabled in all dialogboxes ?
+>------------------------------------------------------------------------------
+
+I'm surprised that in MODAL 1, ENTER and TAB does not work...
+In Visual C++ 1.5xx, DoModal() calls ::DialogBox() or ::DialodBoxIndirect()
+API which runs a private message loop with the right IsDialogMessage() call
+(I guess :-)
+
+For modeless dialogs, It is another story. In fact, IsDialogMessage() is the
+"magical" function which handle each and every keyboard oriented features of
+a dialog box. Every time your receive a message, you should call IsDialogMessage()
+to let Windows interpret it. Just for fun, if you want to add dialog box
+oriented keyboard behaviour in one of your own window (even if not a dialog), 
+just call IsDialogMessage() with the handle of your window in your message loop.
+
+To sum up, for your modeless dialog boxes, you should handle PreTranslateMessage() 
+in your main frame and call IsDialogMessage() for each modeless dialog you have
+created.
+
+But it seems strange to me because MFC automatically calls PreTranslateMessage()
+for you (take a look at [APPCORE.CPP]CWinApp::PumpMessage and PreTranslateMessage
+and at [DLGCORE.CPP]CDialog::PreTranslateMessage). Maybe, it is a question of parent...
+
+
+Good luck
+
+   -- a poor lonely frenchie --
+
+
+
+-----From: Herb Warren <warren@jws.com>
+
+Ok. I'm not sure why you can get two application MODAL dialog boxes to be
+running at the same time. I'm assuming that there's something wrong with
+calling DoModal from a modeless dialog box. It would be interesting to see
+(using spy++, perhaps) to see where the keyboard messages are really being
+processed.
+ ___________________________________________________________________________
+ Herb Warren - Junior G-Man, Rocket Scientist.  AM/FM/GIS Services
+ James W Sewall Company                         Voice:  207-827-4456
+ 147 Center Street                              Fax:    207-827-3641
+ Old Town, Maine 04468                          Email:  warren@jws.com
+ ___________________________________________________________________________
+
+-----From: "michael" <Michael@datatree.com>
+
+When I called Microsoft Support with a similar problem,
+they suggested subclassing the controls and processing
+the  WM_GETDLGCODE message. Please see the
+article I pasted from the January 1996 Developer's
+Library.
+
+Here is how I subclassed an edit control:
+
+BOOL CMyDialog::OnInitDialog() 
+{
+
+    // Edit control for  entering the number of copies
+    m_cpyEdt.SubclassDlgItem(IDC_COPIES, this);
+
+    // Update from member variables to controls
+    CDialog::OnInitDialog();
+
+    return TRUE;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+// CCPYEdt Subclass for trapping tab and enter keys 
+
+CCPYEdt::CCPYEdt()
+{
+}
+
+CCPYEdt::~CCPYEdt()
+{
+}
+
+BEGIN_MESSAGE_MAP(CCPYEdt, CEdit)
+    //{{AFX_MSG_MAP(CCPYEdt)
+    ON_WM_GETDLGCODE()
+    ON_WM_KEYDOWN()
+    //}}AFX_MSG_MAP
+END_MESSAGE_MAP()
+
+/////////////////////////////////////////////////////////////////////////////
+// CCPYEdt message handlers
+
+UINT CCPYEdt::OnGetDlgCode() 
+{
+    return DLGC_WANTALLKEYS;
+}
+
+void CCPYEdt::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags) 
+{
+    CDReqPge* pParent = (CDReqPge*)GetParent();
+
+    if (nChar == VK_TAB && GetKeyState(VK_SHIFT) & KF_UP)
+    {
+        // Process SHIFT+TAB keys
+        pParent->GotoDlgCtrl(pParent->GetDlgItem(IDC_PAGE_LIMIT));
+    }
+    else if (nChar == VK_RETURN)
+    {       
+        // Process Enter key
+        pParent->GotoDlgCtrl(pParent->GetDlgItem(IDC_SUB_REQ));
+    }
+    else if (nChar == VK_TAB)
+    {
+        // Process Tab key
+        pParent->GotoDlgCtrl(pParent->GetDlgItem(IDC_SUB_REQ));
+    }        
+    
+    CEdit::OnKeyDown(nChar, nRepCnt, nFlags);
+}
+
+Michael L. Thal
+Data Tree Corporation
+voice: (619) 231-3300
+fax:      (619) 231-3301
+
+-----From: "David W. Gillett" <DGILLETT@expertedge.com>
+
+  Through *what* menu?  Since MODAL 1 is *modal*, it should be the 
+only enabled popup/overlapped window in your app.  Is this menu part 
+of MODAL 1?
+
+> 4.   (by clicking on a button in this second modeless dialogbox)
+>        Invoke another Modal dialogbox (Let's call this MODAL 2)
+
+  At this point, MODAL 1 is (temporarily) disabled, just like any 
+other window in your app when a modal dialog is invoked, in this case 
+MODAL 2.
+ 
+> In MODAL 2 <TAB> and <ENTER> keys work fine
+> In MODAL 1 <TAB> and <ENTER> DOES NOT WORK
+> In ALL Modeless Dialogboxes <TAB> and <ENTER> DOES NOT WORK
+
+  Exactly right -- MODAL 2 is, well, *modal*.
+ 
+> Cancel MODAL 2, in MODAL 1 <TAB> and <ENTER> keys work fine
+> again, In ALL Modeless Dialogboxes <TAB> and <ENTER> DOES NOT WORK
+
+  Exactly right -- MODAL 1 is, well, *modal*.
+
+> What should be done to get <TAB> and <ENTER> keys enabled in all
+> dialogboxes?
+
+  It sounds as if maybe you want them *all* to be modeless.
+
+  It's possible that you have some really good reason for wanting 
+MODAL 1 and MODAL 2 to be modal, but it also sounds like being modal 
+is not the behaviour that you want from them.  Perhaps if you 
+describe what behaviour you want for them that you're trying to get 
+by making them modal, someone can suggest a way to do what you want.
+
+Dave
+
+ 
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,251 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Time/Date formatting malfunctioning in Tokyo timezone
+</B></FONT>
+<BR>
+<PRE>
+<B>
+<A HREF="mailto:JLangseth1@aol.com">JLangseth1@aol.com</A>
+Wednesday, October 16, 1996
+</B>
+My app is a dialog based MFC (4.2) project currently running on NT Server
+4.0.
+
+I store a UTC for each record the user creates.  When displaying the
+information I use CTime::Format to create a displayable image of the date and
+time (including the timezone with %Z).
+
+When I set the timezone in the control panel to Tokyo time (my customer is
+Japanese) Format somehow defaults to PDT (Pacific Daylight Time).  Is this a
+known bug or am I doing something wrong?  Is this routine only supported on a
+Japanese version of NT?  I set the timezone to China and Australia and the
+string was formatted correctly.
+
+I understand that CTime::Format uses "strftime()" which is the likely source
+of the problem.  I have UNICODE defined so that the wide character versions
+of system calls are being used.
+
+Thank you.
+
+Environment: MSVC/VC++ 4.2 NT 4.0
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Simon Salter -- <A HREF="mailto:Simon@chersoft.co.uk">Simon@chersoft.co.uk</A>
+Tuesday, October 22, 1996
+</B>
+CTime is a little bit limited. A quick delve into the source will show 
+you that it is really just a thin wrapper for a time_t (aka long) and 
+the C runtimes mktime() et al. This means that in the NT environment 
+it really does not know very much about what is going on. In fact 
+given the support that NT has for time zones and locales IMHO it falls 
+well short of the mark.
+
+You might consider using the API calls ::GetDateFormat() and 
+::GetTimeFormat(). They have several advantages which include using a 
+specified time zone and locale. It is a little bit of work to get all 
+the bits together. You need to build a SYSTEMTIME structure which 
+means you need the UTC value of the date/time you are dealing with. 
+These can be extracted from a valid CTime. Herein lies a problem with 
+CTime which I do not really understand; there seems to be no way to 
+explicitly create a CTime directly from UTC values. The constructors 
+always assume that the time values (hms etc.) are in the local time 
+zone and make conversions appropriately. Internally a time_t is a 
+representation of a UTC value. This then apparently leaves two 
+options:
+a) 	You can create a time_t manually and then build a CTime from that. 
+Maybe copy some of the mktime() source to do this. Obviously this 
+requires implicit knowledge of what a time_t is which breaks the 
+encapsulation of CTime.
+b) 	You can dump CTime and roll your own. At the same time extending 
+the range and precision of the class and so on... This seems to be 
+where I am headed although I suspect that a good time class 
+implementation is not trivial.
+
+Simon
+
+----------
+From:  JLangseth1@aol.com[SMTP:JLangseth1@aol.com]
+Sent:  17 October 1996 06:37
+To:  mfc-l@netcom.com
+Subject:  Time/Date formatting malfunctioning in Tokyo timezone
+
+My app is a dialog based MFC (4.2) project currently running on NT 
+Server
+4.0.
+
+I store a UTC for each record the user creates.  When displaying the
+information I use CTime::Format to create a displayable image of the 
+date and
+time (including the timezone with %Z).
+
+When I set the timezone in the control panel to Tokyo time (my 
+customer is
+Japanese) Format somehow defaults to PDT (Pacific Daylight Time).  Is 
+this a
+known bug or am I doing something wrong?  Is this routine only 
+supported on a
+Japanese version of NT?  I set the timezone to China and Australia and 
+the
+string was formatted correctly.
+
+I understand that CTime::Format uses "strftime()" which is the likely 
+source
+of the problem.  I have UNICODE defined so that the wide character 
+versions
+of system calls are being used.
+
+Thank you.
+
+Environment: MSVC/VC++ 4.2 NT 4.0
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+pjn -- <A HREF="mailto:pjn@indigo.ie">pjn@indigo.ie</A>
+Thursday, October 24, 1996
+</B>
+On Tue, 22 Oct 1996 17:44:59 +0100, you wrote:
+
+>CTime is a little bit limited. A quick delve into the source will show=20
+>you that it is really just a thin wrapper for a time_t (aka long) and=20
+>the C runtimes mktime() et al. This means that in the NT environment=20
+>it really does not know very much about what is going on. In fact=20
+>given the support that NT has for time zones and locales IMHO it falls=20
+>well short of the mark.
+>
+>You might consider using the API calls ::GetDateFormat() and=20
+>::GetTimeFormat(). They have several advantages which include using a=20
+>specified time zone and locale. It is a little bit of work to get all=20
+>the bits together. You need to build a SYSTEMTIME structure which=20
+>means you need the UTC value of the date/time you are dealing with.=20
+>These can be extracted from a valid CTime. Herein lies a problem with=20
+>CTime which I do not really understand; there seems to be no way to=20
+>explicitly create a CTime directly from UTC values. The constructors=20
+>always assume that the time values (hms etc.) are in the local time=20
+>zone and make conversions appropriately. Internally a time_t is a=20
+>representation of a UTC value. This then apparently leaves two=20
+>options:
+>a) 	You can create a time_t manually and then build a CTime from that.=20
+>Maybe copy some of the mktime() source to do this. Obviously this=20
+>requires implicit knowledge of what a time_t is which breaks the=20
+>encapsulation of CTime.
+>b) 	You can dump CTime and roll your own. At the same time extending=20
+>the range and precision of the class and so on... This seems to be=20
+>where I am headed although I suspect that a good time class=20
+>implementation is not trivial.
+>
+>Simon
+>
+>----------
+>From:  JLangseth1@aol.com[SMTP:JLangseth1@aol.com]
+>Sent:  17 October 1996 06:37
+>To:  mfc-l@netcom.com
+>Subject:  Time/Date formatting malfunctioning in Tokyo timezone
+>
+>My app is a dialog based MFC (4.2) project currently running on NT=20
+>Server
+>4.0.
+>
+>I store a UTC for each record the user creates.  When displaying the
+>information I use CTime::Format to create a displayable image of the=20
+>date and
+>time (including the timezone with %Z).
+>
+>When I set the timezone in the control panel to Tokyo time (my=20
+>customer is
+>Japanese) Format somehow defaults to PDT (Pacific Daylight Time).  Is=20
+>this a
+>known bug or am I doing something wrong?  Is this routine only=20
+>supported on a
+>Japanese version of NT?  I set the timezone to China and Australia and=20
+>the
+>string was formatted correctly.
+>
+>I understand that CTime::Format uses "strftime()" which is the likely=20
+>source
+>of the problem.  I have UNICODE defined so that the wide character=20
+>versions
+>of system calls are being used.
+>
+>Thank you.
+>
+>Environment: MSVC/VC++ 4.2 NT 4.0
+>
+>
+
+
+Having utterly given up on CTime, I decided to roll my own and I have
+implemented a complete replacement for it and a number of other date
+time classes. For those interested this package "DTime" is available
+at <A HREF="http://indigo.ie/~pjn/dtime.html">http://indigo.ie/~pjn/dtime.html</A>
+
+[Moderator's note: This package is shareware and costs US$40. This
+kind of information should always be supplied when advertising your
+own product as a solution in this forum.]
+
+
+                             '''	  =20
+                             @ @
++=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+ooO-(_)-Ooo=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D+
+|                                           PJ Naughter              |
+|                                                                    |
+| Software Developer                   Email: pjn@indigo.ie          |
+| Softech Telecom                      Tel:   +353-1-2958384         |
+|                                      Fax:   +353-1-2956290         |
+| Author of DTime - A Collection       URL:   <A HREF="http://indigo.ie/~pjn">http://indigo.ie/~pjn</A>  |
+| of Date & Time classes for MFC                                     |
+|                                                                    |
+|                  Addr: 7 Woodford, Brewery Road, Stillorgan,       |
+|                        Blackrock, Co. Dublin, Republic of Ireland  |
++=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

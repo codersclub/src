@@ -1,0 +1,305 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+DestructElements & CMap
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Ron Jacobs -- <A HREF="mailto:Ron.Jacobs@centurasoft.com">Ron.Jacobs@centurasoft.com</A>
+Thursday, April 03, 1997
+</B>
+     Environment: Win95 VC 2.2
+     
+     I am using a CMap to store a collection of objects in my application.  
+     My problem is that my override of the function DestructElements never 
+     gets called.
+     
+     // Global helpers for managing a collection of items.
+     inline void ConstructElements(CDKItem* pElements, int nCount)
+     {
+        ASSERT(nCount == 0 ||
+                AfxIsValidAddress(pElements, nCount * sizeof(CDKItem)));
+     
+         for ( int i = 0; i < nCount; i++, pElements++ )
+         {
+                // call CDKItem default constructor directly
+             pElements->CDKItem::CDKItem();
+         }
+     
+     }
+     
+     inline void DestructElements(CDKItem* pElements, int nCount)
+     {
+        ASSERT(nCount == 0 ||
+                AfxIsValidAddress(pElements, nCount * sizeof(CDKItem)));
+     
+         for ( int i = 0; i < nCount; i++, pElements++ )
+         {
+                // call CDKItem default constructor directly
+             pElements->CDKItem::~CDKItem();
+             delete pElements;
+         }
+     }
+     
+     inline UINT HashKey(CString sKey)
+     {
+       LPSTR key = sKey.GetBuffer(0);
+        UINT nHash = 0;
+        while (*key)
+                nHash = (nHash<<5) + nHash + *key++;
+        return nHash;
+     }
+     
+     typedef CMap<CString, CString&, CDKItem *, CDKItem *> 
+     CMapStringToCDKItem;
+     
+     
+     Any clues as to why this doesn't get called?
+     
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Hugh Robinson -- <A HREF="mailto:hugh@ssihou.ssii.com">hugh@ssihou.ssii.com</A>
+Thursday, April 03, 1997
+</B>
+[Mini-digest: 3 responses]
+
+
+I would suggest that the functions should be declared with an extra level   
+of indirection, i.e.
+
+   inline void ConstructElements(CDKItem** pElements, int nCount);
+   inline void DestructElements(CDKItem** pElements, int nCount);
+       
+
+
+It may also
+ ----------
+From:  owner-mfc-l
+Sent:  Thursday, April 03, 1997 10:34 AM
+To:  mfc-l
+Subject:  DestructElements & CMap
+
+     Environment: Win95 VC 2.2
+       
+
+     I am using a CMap to store a collection of objects in my   
+application.
+     My problem is that my override of the function DestructElements   
+never
+     gets called.
+       
+
+     // Global helpers for managing a collection of items.
+     inline void ConstructElements(CDKItem* pElements, int nCount)
+     {
+        ASSERT(nCount == 0 ||
+                AfxIsValidAddress(pElements, nCount * sizeof(CDKItem)));
+       
+
+         for ( int i = 0; i < nCount; i++, pElements++ )
+         {
+                // call CDKItem default constructor directly
+             pElements->CDKItem::CDKItem();
+         }
+       
+
+     }
+       
+
+     inline void DestructElements(CDKItem* pElements, int nCount)
+     {
+        ASSERT(nCount == 0 ||
+                AfxIsValidAddress(pElements, nCount * sizeof(CDKItem)));
+       
+
+         for ( int i = 0; i < nCount; i++, pElements++ )
+         {
+                // call CDKItem default constructor directly
+             pElements->CDKItem::~CDKItem();
+             delete pElements;
+         }
+     }
+       
+
+     inline UINT HashKey(CString sKey)
+     {
+       LPSTR key = sKey.GetBuffer(0);
+        UINT nHash = 0;
+        while (*key)
+                nHash = (nHash<<5) + nHash + *key++;
+        return nHash;
+     }
+       
+
+     typedef CMap<CString, CString&, CDKItem *, CDKItem *>
+     CMapStringToCDKItem;
+       
+
+       
+
+     Any clues as to why this doesn't get called?
+       
+
+
+
+-----From: =?iso-8859-1?Q?Klaus_G=FCtter?= <KG@it-gmbh.de>
+
+Ron,
+
+your class CMapStringToCDKItem contains _pointers_, not objects. As all
+MFC's collection classes containing pointers, CMap is not responsible
+for freeing the object. This is why your DestructElements is not called.
+The collection helper functions are only needed when the collection
+contains objects, e.g. 
+CMap<CString, CString&, CDKItem, const CDKItem&>.
+
+- Klaus
+
+
+>----------
+>Von: 	Ron Jacobs[SMTP:Ron.Jacobs@centurasoft.com]
+>Gesendet: 	Donnerstag, 3. April 1997 20:34
+>An: 	mfc-l@netcom.com
+>Betreff: 	DestructElements & CMap
+>
+>     Environment: Win95 VC 2.2
+>     
+>     I am using a CMap to store a collection of objects in my application.  
+>     My problem is that my override of the function DestructElements never 
+>     gets called.
+>     
+>     // Global helpers for managing a collection of items.
+>     inline void ConstructElements(CDKItem* pElements, int nCount)
+>     {
+>        ASSERT(nCount == 0 ||
+>                AfxIsValidAddress(pElements, nCount * sizeof(CDKItem)));
+>     
+>         for ( int i = 0; i < nCount; i++, pElements++ )
+>         {
+>                // call CDKItem default constructor directly
+>             pElements->CDKItem::CDKItem();
+>         }
+>     
+>     }
+>     
+>     inline void DestructElements(CDKItem* pElements, int nCount)
+>     {
+>        ASSERT(nCount == 0 ||
+>                AfxIsValidAddress(pElements, nCount * sizeof(CDKItem)));
+>     
+>         for ( int i = 0; i < nCount; i++, pElements++ )
+>         {
+>                // call CDKItem default constructor directly
+>             pElements->CDKItem::~CDKItem();
+>             delete pElements;
+>         }
+>     }
+>     
+>     inline UINT HashKey(CString sKey)
+>     {
+>       LPSTR key = sKey.GetBuffer(0);
+>        UINT nHash = 0;
+>        while (*key)
+>                nHash = (nHash<<5) + nHash + *key++;
+>        return nHash;
+>     }
+>     
+>     typedef CMap<CString, CString&, CDKItem *, CDKItem *> 
+>     CMapStringToCDKItem;
+>     
+>     
+>     Any clues as to why this doesn't get called?
+>     
+>
+>
+-----From: Stuart Downing <sdowning@fame.com>
+
+>----------
+From:  Ron Jacobs[SMTP:Ron.Jacobs@centurasoft.com]
+>Subject:  DestructElements & CMap
+>
+>     Environment: Win95 VC 2.2
+I don't have access to VC 2.2, so my answers assume that the collection
+classes haven't changed substantially since then.
+>     
+>     I am using a CMap to store a collection of objects in my application.  
+>     My problem is that my override of the function DestructElements never 
+>     gets called.
+>     
+>     inline void DestructElements(CDKItem* pElements, int nCount)
+>     {
+>        ASSERT(nCount == 0 ||
+>                AfxIsValidAddress(pElements, nCount * sizeof(CDKItem)));
+>     
+>         for ( int i = 0; i < nCount; i++, pElements++ )
+>         {
+>                // call CDKItem default constructor directly
+>             pElements->CDKItem::~CDKItem();
+>             delete pElements;
+
+Trouble: Your DestructElements should call the destructor function, but
+should NOT call delete.  You are destructing an object in place, but
+NOT freeing the associated memory. 
+
+>         }
+>     }
+>     
+>     typedef CMap<CString, CString&, CDKItem *, CDKItem *> 
+>     CMapStringToCDKItem;
+
+Your CMap is mapping CStrings to *pointers* to CDKItems.  The map
+doesn't contain CDKItems objects themselves, just the pointers.
+This collection does not own the CDKItems, and will not delete them
+for you.
+-----
+Stuart Downing
+sdowning@fame.com
+FAME Information Services, Inc.
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+    <A HREF="http://www.digiday.com/mfcpro/joinmfcl.htm">Become an MFC-L member</A>
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

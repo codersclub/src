@@ -1,0 +1,414 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3 align="center"><font color="#a0a099">ПРОГРАММА ОБМЕНА ДАННЫМИ
+    ПО FTP ПРОТОКОЛУ </font></h3>
+    <hr>
+    <p>Автор - <a href="mailto:kardashev@hotmail.com">Sciba Alexander</a></p>
+    <p><a href="winftpsource.rar">Скачать исходник - 72Кб</a></p>
+    <table>
+      <tr>
+        <td width="18%" height="526"><p style="LINE-HEIGHT: 70%" align="left"><img height="520"
+        src="cppftp.gif" width="520" border="0"></td>
+      </tr>
+      <tr>
+        <td width="18%" height="4221"><p align="justify"><font size="2">Для начала
+        дадим возможность пользователю указывать адрес,
+        к которому будем подключаться. Поставим
+        выпадающий список IDC_COMBO1 и две кнопки с
+        заголовками Add и Del для добавления и удаления
+        элементов списка соответственно. Чтобы
+        пользователь мог только пользоваться списком и
+        не мог писать по поле ввода списка, нужно задать
+        свойству Type значение DropList. По нажатию на кнопку
+        добавить напишем такой код:</font></p>
+        <table width="100%" border="0">
+<TBODY>
+          <tr>
+            <td width="100%"><font size="2">void CWinFtpDlg::OnAdd()&nbsp;<br>
+            {<br>
+            Dlg dlg;&nbsp;<br>
+            <br>
+            if(dlg.DoModal() == IDOK)<br>
+            {<br>
+            m_ftpAdress.AddString(dlg.m_string); <font color="#cc00ff">// в конец
+            списка&nbsp;</font><br>
+            <font color="#cc00ff">// m_ftpAdress.InsertString(0, dlg.m_string); // в начало
+            списка</font><font color="#d2a9ff"><br>
+            </font>}<br>
+            flagDelAdd = true;<br>
+            }</font></td>
+          </tr>
+</TBODY>
+        </table>
+        <p align="justify"><font size="2">Здесь выводится диалоговое
+        окно, в котором пользователь будет вводит нужный
+        адрес. А мы его добавляем в конец списка. Если
+        указать закомментированную строку - указанный
+        адрес будет вставляться в начало списка.
+        Диалоговое окно будет выглядеть вот так:</font></p>
+        <p align="center"><img height="98" src="newaddress.gif" width="283" border="0"></p>
+        <p align="justify"><font size="2">m_string - это переменная поля
+        ввода строкового типа.</font></p>
+        <p align="justify"><font size="2">По нажатию на кнопку Del
+        вставляем такой код:</font></p>
+        <table width="100%" border="0">
+<TBODY>
+          <tr>
+            <td width="100%"><font size="2">void CWinFtpDlg::OnDel()&nbsp;<br>
+            {<br>
+            m_ftpAdress.DeleteString(m_ftpAdress.GetCurSel());<br>
+            flagDelAdd = true;<br>
+            }</font></td>
+          </tr>
+</TBODY>
+        </table>
+        <p align="justify"><font size="2">Здесь удаляется текущий
+        элемент списка.</font></p>
+        <p align="justify"><font size="2">На кнопку подключения [Connect]
+        напишем следующий код:</font></p>
+        <table width="100%" border="0">
+<TBODY>
+          <tr>
+            <td width="100%"><font size="2">void CWinFtpDlg::OnConnect()&nbsp;<br>
+            {<br>
+            flagConnect = true;<br>
+            OnGo();<br>
+            }</font></td>
+          </tr>
+</TBODY>
+        </table>
+        <p align="justify"><font size="2">Далее добавим функцию-член к
+        классу диалога OnGo() и опишем её так:</font></p>
+        <table width="100%" border="0">
+<TBODY>
+          <tr>
+            <td width="100%"><font size="2">void CWinFtpDlg::OnGo()&nbsp;<br>
+            {<br>
+            /*<br>
+            if(flagIsConnected)<br>
+            {<br>
+            AfxMessageBox(&quot;Disconnect previous session (please)&quot;);&nbsp;<br>
+            return;<br>
+            }<br>
+            */<br>
+            BOOL res;<br>
+            <br>
+            if(flagConnect)<br>
+            {<br>
+            CString Login, Password;<br>
+            <br>
+            static CInternetSession session;<br>
+            m_ftpAdress.GetLBText(m_ftpAdress.GetCurSel(), str);<br>
+            int k = str.Find(' ');<br>
+            if(k &gt;= 0)<br>
+            str.Insert(k, '\0');<br>
+            if(str == &quot;172.17.168.170&quot; || str == &quot;172.17.168.171&quot; || str ==
+            &quot;172.17.168.172&quot;)<br>
+            Login = Password = &quot;expuser&quot;;<br>
+            else<br>
+            {<br>
+            DlgLogin dlg;<br>
+            if(dlg.DoModal() == IDOK)<br>
+            {&nbsp;<br>
+            Login = dlg.m_login;<br>
+            Password = dlg.m_password;<br>
+            }<br>
+            }&nbsp;<br>
+            cp = session.GetFtpConnection(str, Login, Password);<br>
+            cp-&gt;GetCurrentDirectory(m_directory);<br>
+            UpdateData(FALSE);<br>
+            // CFtpFileFind cf(cp);<br>
+            cf = new CFtpFileFind(cp);<br>
+            flagConnect = false;<br>
+            flagIsConnected = true;<br>
+            flagApply = true;<br>
+            <br>
+            <br>
+            //------------------------------ measure rate of transmission&nbsp;<br>
+            <br>
+            }<br>
+            //-------------------------------------<br>
+            if(flagGet)<br>
+            {<br>
+            int k=0;<br>
+            for(int i=0; i&lt;m_list.GetCount(); i++)<br>
+            if(m_list.GetSel(i))<br>
+            {<br>
+            m_list.GetText(i, str);<br>
+            k += cp-&gt;GetFile(str_list[i], m_directory2 + &quot;/&quot; + str,&nbsp;<br>
+            TRUE, FILE_ATTRIBUTE_NORMAL, FTP_TRANSFER_TYPE_BINARY, 1);<br>
+            }<br>
+            if(k &lt;= 1)<br>
+            str.Format(&quot;%2d files was copied&quot;, k);<br>
+            else<br>
+            str.Format(&quot;%2d files were copied&quot;, k);<br>
+            AfxMessageBox(str);<br>
+            flagApply2 = true;<br>
+            flagGet = false;<br>
+            }<br>
+            //------------------------------------- nash PC<br>
+            if(flagApply2)<br>
+            {<br>
+            UpdateData(TRUE);<br>
+            m_list2.ResetContent();<br>
+            res = cff2-&gt;FindFile(m_directory2 + &quot;/&quot; + m_filemask2, 0);<br>
+            res = cff2-&gt;FindFile(m_directory2 + &quot;/&quot; + m_filemask2, 0);<br>
+            if(res)<br>
+            {<br>
+            nDir2=0;<br>
+            nlist2 = 0;<br>
+            //--------------------------------fill ListBox<br>
+            while(cff2-&gt;FindNextFile())<br>
+            {<br>
+            str = cff2-&gt;GetFileName();<br>
+            if(cff2-&gt;IsDirectory())<br>
+            {<br>
+            if(nlist2 &gt; nDir2)<br>
+            for(int k=nlist2-1; k&gt;=nDir2; k--)<br>
+            str_list2[k+1] = str_list2[k];<br>
+            str_list2[nDir2] = str;<br>
+            nlist2++;<br>
+            str.MakeUpper();<br>
+            m_list2.InsertString(nDir2++, str);<br>
+            }<br>
+            else<br>
+            {<br>
+            str_list2[nlist2++] = str;<br>
+            str.MakeLower();<br>
+            m_list2.AddString(str);<br>
+            }<br>
+            }<br>
+            str = cff2-&gt;GetFileName();<br>
+            if(cff2-&gt;IsDirectory())<br>
+            {<br>
+            if(nlist2 &gt; nDir2)<br>
+            for(int k=nlist2-1; k&gt;=nDir2; k--)<br>
+            str_list2[k+1] = str_list2[k];<br>
+            str_list2[nDir2] = str;<br>
+            nlist2++;<br>
+            str.MakeUpper();<br>
+            m_list2.InsertString(nDir2++, str);<br>
+            }<br>
+            else<br>
+            {<br>
+            str_list2[nlist2++] = str;<br>
+            str.MakeLower();<br>
+            m_list2.AddString(str);<br>
+            }<br>
+            }<br>
+            flagApply2 = false;<br>
+            }<br>
+            //-------------------------------------<br>
+            if(flagPut)<br>
+            {<br>
+            // UpdateData(TRUE);<br>
+            // for(int i=0; i&lt;m_list.GetSelCount(); i++)<br>
+            int k=0;<br>
+            for(int i=0; i&lt;m_list2.GetCount(); i++)<br>
+            if(m_list2.GetSel(i))<br>
+            {<br>
+            str = str_list2[i];<br>
+            k += cp-&gt;PutFile(m_directory2 + &quot;/&quot; + str, m_directory + &quot;/&quot; + str,
+            FTP_TRANSFER_TYPE_BINARY, 1);<br>
+            }<br>
+            if(k &lt;= 1)<br>
+            str.Format(&quot;%2d files was copied&quot;, k);<br>
+            else<br>
+            str.Format(&quot;%2d files were copied&quot;, k);<br>
+            AfxMessageBox(str);<br>
+            flagApply = true;<br>
+            flagPut = false;<br>
+            }<br>
+            //------------------------------------- nash PC<br>
+            if(flagApply)<br>
+            {<br>
+            UpdateData(TRUE);<br>
+            cp-&gt;SetCurrentDirectory(m_directory);&nbsp;<br>
+            //AfxMessageBox(m_directory);<br>
+            m_list.ResetContent();<br>
+            res = cf-&gt;FindFile(m_directory + &quot;/&quot; + m_filemask, 0);<br>
+            if(res)<br>
+            {<br>
+            nDir=0;<br>
+            nlist = 0;<br>
+            //--------------------------------fill ListBox<br>
+            while(cf-&gt;FindNextFile())<br>
+            {<br>
+            str = cf-&gt;GetFileName();<br>
+            if(cf-&gt;IsDirectory())<br>
+            {<br>
+            if(nlist &gt; nDir)<br>
+            for(int k=nlist-1; k&gt;=nDir; k--)<br>
+            str_list[k+1] = str_list[k];<br>
+            str_list[nDir] = str;<br>
+            nlist++;<br>
+            str.MakeUpper();<br>
+            m_list.InsertString(nDir++, str);<br>
+            }<br>
+            else<br>
+            {<br>
+            str_list[nlist++] = str;<br>
+            str.MakeLower();<br>
+            m_list.AddString(str);<br>
+            }<br>
+            }<br>
+            str = cf-&gt;GetFileName();<br>
+            if(cf-&gt;IsDirectory())<br>
+            {<br>
+            if(nlist &gt; nDir)<br>
+            for(int k=nlist-1; k&gt;=nDir; k--)<br>
+            str_list[k+1] = str_list[k];<br>
+            str_list[nDir] = str;<br>
+            nlist++;<br>
+            str.MakeUpper();<br>
+            m_list.InsertString(nDir++, str);<br>
+            }<br>
+            else<br>
+            {<br>
+            str_list[nlist++] = str;<br>
+            str.MakeLower();<br>
+            m_list.AddString(str);<br>
+            }<br>
+            }<br>
+            //-------------------------------- qsort string<br>
+            flagApply = false;<br>
+            }<br>
+            }</font></td>
+          </tr>
+</TBODY>
+        </table>
+        <p align="justify"><font size="2">По нажатию на кнопку Apply
+        удалённого компьютера пишем такой код:</font></p>
+        <table width="100%" border="0">
+<TBODY>
+          <tr>
+            <td width="100%"><font size="2">void CWinFtpDlg::OnApply()&nbsp;<br>
+            {<br>
+            if(!flagIsConnected)<br>
+            return;<br>
+            flagApply = true;<br>
+            // flagApply2 = true;<br>
+            OnGo();<br>
+            }</font></td>
+          </tr>
+</TBODY>
+        </table>
+        <p align="justify"><font size="2">По нажатию на кнопку Apply
+        локального компьютера пишем такой код:</font></p>
+        <table width="100%" border="0">
+<TBODY>
+          <tr>
+            <td width="100%"><font size="2">void CWinFtpDlg::OnApply2()&nbsp;<br>
+            {<br>
+            flagApply2 = true;&nbsp;<br>
+            OnGo();<br>
+            }</font></td>
+          </tr>
+</TBODY>
+        </table>
+        <p align="justify"><font size="2">Обработчик кнопки Get должен
+        выглядеть так:</font></p>
+        <table width="100%" border="0">
+<TBODY>
+          <tr>
+            <td width="100%"><font size="2">void CWinFtpDlg::OnGet()&nbsp;<br>
+            {<br>
+            if(!flagIsConnected)<br>
+            return;<br>
+            flagGet = true;&nbsp;<br>
+            OnGo();<br>
+            }</font></td>
+          </tr>
+</TBODY>
+        </table>
+        <p align="justify"><font size="2">А это код кнопки Put:</font></p>
+        <table width="100%" border="0">
+<TBODY>
+          <tr>
+            <td width="100%"><font size="2">void CWinFtpDlg::OnPut()&nbsp;<br>
+            {<br>
+            if(!flagIsConnected)<br>
+            return;<br>
+            flagPut = true;&nbsp;<br>
+            OnGo();<br>
+            }</font></td>
+          </tr>
+</TBODY>
+        </table>
+        <p align="justify"><font size="2">В заголовочном файле [.h]
+        диалога должны быть объявлены следующие
+        переменные:</font></p>
+        <table width="100%" border="0">
+<TBODY>
+          <tr>
+            <td width="100%"><font size="2">CFtpConnection *cp;<br>
+            bool flagConnect;<br>
+            bool flagApply;<br>
+            bool flagApply2;<br>
+            bool flagGet;<br>
+            bool flagPut;<br>
+            bool flagDelAdd;<br>
+            bool flagIsConnected;<br>
+            void OnGo();<br>
+            CFtpFileFind *cf;<br>
+            CFileFind *cff2;<br>
+            CString str;<br>
+            CString *str_list, *str_list2;<br>
+            int nlist, nlist2;<br>
+            int nDir, nDir2;</font></td>
+          </tr>
+</TBODY>
+        </table>
+        <p align="justify"><font size="2">Инициализируем их в файле
+        реализации [.cpp] диалога следующим образом:</font></p>
+        <table width="100%" border="0">
+<TBODY>
+          <tr>
+            <td width="100%"><font size="2">flagConnect = false;<br>
+            flagApply = false;<br>
+            flagApply2 = true;<br>
+            flagGet = false;&nbsp;<br>
+            flagPut = false;&nbsp;<br>
+            flagDelAdd = false;<br>
+            flagIsConnected = false;<br>
+            cff2 = NULL;<br>
+            cf = NULL;<br>
+            cp = NULL;<br>
+            str_list = new CString[5000];<br>
+            str_list2 = new CString[5000];</font></td>
+          </tr>
+</TBODY>
+        </table>
+        <p align="justify"><font size="2">А по инициализации диалога
+        добавляем такой код:</font></p>
+        <table width="100%" border="0">
+<TBODY>
+          <tr>
+            <td width="100%"><font size="2">FILE *fr = fopen(&quot;winftp.dan&quot;, &quot;r&quot;);<br>
+            if(fr)<br>
+            {<br>
+            char *buf = new char[256];<br>
+            while(fgets(buf, 256, fr))<br>
+            {<br>
+            buf[strlen(buf)-1] = '\0';<br>
+            //fscanf(fr, &quot;%s&quot;, buf);<br>
+            m_ftpAdress.AddString(buf);<br>
+            }<br>
+            }<br>
+            cff2 = new CFileFind();</font></td>
+          </tr>
+</TBODY>
+        </table>
+        </td>
+      </tr>
+    </table>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

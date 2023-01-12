@@ -1,0 +1,358 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+List files and directories in a CTreeCtrl
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Christine Hagberg -- <A HREF="mailto:CHAGBERG@datx.com">CHAGBERG@datx.com</A>
+Monday, February 10, 1997
+</B>
+
+Environment: Win95, VC++ 4.2-flat
+
+Can anyone point me to an easy way to enumerate all files and directories   
+in a CTreeCtrl (like explorer).
+
+I was trying to find a sample someplace.  Someone must of done this   
+already.
+
+
+Thanks
+
+Chris  (chagberg@datx.com)  
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Andi Giri -- <A HREF="mailto:agiri@ctiis.com">agiri@ctiis.com</A>
+Tuesday, February 11, 1997
+</B>
+[Mini-digest: 2 responses]
+
+The following code does what u wanted, a directory picker dialog using 
+a tree control.
+
+>The include file follows: 
+>  
+>class CPickDirDlg
+>{
+>// Construction
+>public:
+>	CPickDirDlg(void) {}  // default constructor
+>	CPickDirDlg(CString strTitle, CString strStartDir);  
+>	CString GetDirectory();
+>	void SetTitle(CString& strTitle) { m_strTitle = strTitle; }
+>	void SetStartDirectory(CString& strStartDir) { m_strStartDir = strStartDir;
+>}
+>private:
+>	CString m_strTitle;
+>	CString m_strStartDir;
+>	static int WINAPI BrowseProc( HWND hwnd, UINT uMsg, LPARAM lParam,LPARAM
+>lpData);
+>};
+>
+>The .cpp file follows:
+>#include "stdafx.h"
+>#include "PickDir.h"
+>#include "shlobj.h"
+>
+>CPickDirDlg::CPickDirDlg(CString strTitle, CString strStartDir)
+>{
+>	m_strTitle = strTitle;
+>	m_strStartDir = strStartDir;
+>}
+>
+>CString CPickDirDlg::GetDirectory(void)
+>{
+>    LPMALLOC pMalloc;
+>    /* Gets the Shell's default allocator */
+>    if (::SHGetMalloc(&pMalloc) == NOERROR)
+>    {
+>        BROWSEINFO bi;
+>        char pszBuffer[MAX_PATH];
+>        LPITEMIDLIST pidl;
+>        // Get help on BROWSEINFO struct - it's got all the bit settings.
+>        bi.hwndOwner = NULL;
+>		if ( m_strStartDir.IsEmpty() )
+>		{
+>			LPITEMIDLIST pidlStart;
+>			// get the pidl for the desktop - this will be used to initialize the
+>folder
+>			SHGetSpecialFolderLocation( NULL, CSIDL_DESKTOP, &pidlStart);
+>	        bi.pidlRoot = pidlStart;
+>		}
+>		else
+>			bi.pidlRoot = NULL;
+>        bi.pszDisplayName = pszBuffer;
+>		if ( m_strTitle == _T("") )
+>			bi.lpszTitle = _T("Directory Picker");
+>		else
+>			bi.lpszTitle = m_strTitle;
+>		// Browse only file system directories, no "Control Panel" or "Printers"
+>folders.
+>        bi.ulFlags = BIF_RETURNFSANCESTORS | BIF_RETURNONLYFSDIRS;
+>        bi.lpfn = BrowseProc;
+>        if ( m_strStartDir.IsEmpty() )
+>		{
+>			bi.lParam = NULL;
+>        } else
+>		{
+>            bi.lParam = (LPARAM)((const char *)m_strStartDir);
+>        }
+>        // This next call issues the dialog box.
+>        if ((pidl = ::SHBrowseForFolder(&bi)) != NULL)
+>        {
+>            if (::SHGetPathFromIDList(pidl, pszBuffer))
+>            { 
+>            // At this point pszBuffer contains the selected path */.
+>                return pszBuffer;
+>            }
+>            // Free the PIDL allocated by SHBrowseForFolder.
+>            pMalloc->Free(pidl);
+>        }
+>        // Release the shell's allocator.
+>        pMalloc->Release();
+>    }
+>	return _T("");
+>} 
+>
+>/*
+> * This proc. has been added just in order to set the starting directory.  
+> * I looks shortsighted that the BROWSEINFO structure didn't have an
+> * easy way to set the starting place - it seems like such an obvious
+> * thing to provide.  The structure has a pidlRoot element, which takes a
+>structure of
+> * type LPITEMIDLIST, but it has kno way to take a directory name string.
+> * To this function, we pass the lParam from the BROWSEINFO in the form of
+>lpData, and
+> * while initializing, the shell browser will pick the directory whose name
+>is in lpData.
+> */
+>int WINAPI CPickDirDlg::BrowseProc( HWND hwnd, UINT uMsg, LPARAM lParam,
+>LPARAM lpData)
+>{
+>     if (uMsg == BFFM_INITIALIZED) {
+>          if (lpData) {
+>               SendMessage(hwnd, BFFM_SETSELECTION, TRUE, lpData);
+>          }
+>     }
+>     return 0;
+>}
+>
+>Subject:	List files and directories in a CTreeCtrl
+>
+>
+>Environment: Win95, VC++ 4.2-flat
+>
+>Can anyone point me to an easy way to enumerate all files and directories in
+>a CTreeCtrl (like explorer).
+>
+>I was trying to find a sample someplace.  Someone must of done this already.
+>
+>
+>Thanks
+>
+>Chris  (chagberg@datx.com)
+-----From: Mario Contestabile
+
+>Can anyone point me to an easy way to enumerate all files and directories   
+>in a CTreeCtrl (like explorer).
+
+Here's sample code I believe from MSJ Dec 96 enumerating files in a directory.
+Adding items in a tree should be no problem.
+
+WIN32_FIND_DATA fd;
+HANDLE hFind = ::FindFirstFile (szPath, &fd);
+
+if (hFind == INVALID_HANDLE_VALUE)
+        return;
+
+do {
+        if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
+            if (!AddItemToListView (fd))
+                break;
+        }
+} while (::FindNextFile (hFind, &fd));
+
+::FindClose (hFind);
+
+Retrieve 
+fd.cFileName,  fd.nFileSizeLow, fd.ftCreationTime 
+or whatever else inf. you require.
+
+mcontest@universal.com
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Rob Warner -- <A HREF="mailto:rhwarner@southeast.net">rhwarner@southeast.net</A>
+Tuesday, February 11, 1997
+</B>
+[Mini-digest: 3 responses]
+
+Jeff Prosise has an easy-to-follow sample called Windows Wanderer in his
+Programming Windows 95 with MFC (I don't have it in front of me, but I
+think that's the title).  It's published by Microsoft Press.  It just does
+directories in the CTreeCtrl, but it should get you started.
+
+----------
+> From: Christine Hagberg <CHAGBERG@datx.com>
+> To: 'MFC List' <mfc-l@netcom.com>
+> Subject: List files and directories in a CTreeCtrl
+> Date: Monday, February 10, 1997 5:29 PM
+> 
+> 
+> Environment: Win95, VC++ 4.2-flat
+> 
+> Can anyone point me to an easy way to enumerate all files and directories
+  
+> in a CTreeCtrl (like explorer).
+> 
+> I was trying to find a sample someplace.  Someone must of done this   
+> already.
+> 
+> 
+> Thanks
+> 
+> Chris  (chagberg@datx.com)  
+-----From: Drolshagen Thomas <TDrolshagen@messe.ch>
+
+Hi Christine
+Take a look at Microsoft System Journal 10/96 Wicked Code (CDriveView)=20
+or use SHBrowseForFolder.
+
+HTH
+Thomas Drolshagen
+
+-----Urspr=FCngliche Nachricht-----
+Von:	Christine Hagberg [SMTP:CHAGBERG@datx.com]
+Gesendet am:	Montag, 10. Februar 1997 23:29
+An:	'MFC List'
+Betreff:	List files and directories in a CTreeCtrl
+
+
+Environment: Win95, VC++ 4.2-flat
+
+Can anyone point me to an easy way to enumerate all files and=20
+directories in a CTreeCtrl (like explorer).
+
+I was trying to find a sample someplace.  Someone must of done this=20
+already.
+
+
+Thanks
+
+Chris  (chagberg@datx.com)
+-----From: "Serge Wautier" <serge.wautier@ontonet.be>
+
+> From: Christine Hagberg <CHAGBERG@datx.com>
+> Subject: List files and directories in a CTreeCtrl
+
+> Can anyone point me to an easy way to enumerate all files and directories
+  
+> in a CTreeCtrl (like explorer).
+
+Give a look at MSJ october 96 (Jeff Prosise's Wicked Code column) : It's
+exactly what you ask.
+If you can't find MSJ :
+1. I recommend you subscribe to it. It really worths its price.
+2. You can find the code on www.msj.com
+
+Hope this helps,
+
+Serge Wautier,
+Techno Trade s.a.
+Belgium
+serge.wautier@ontonet.be
+<A HREF="http://www.tbox.fr">http://www.tbox.fr</A>
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Shaju Mathew -- <A HREF="mailto:shajum@hpptc51.rose.hp.com">shajum@hpptc51.rose.hp.com</A>
+Wednesday, February 12, 1997
+</B>
+Chris,
+	Jeff Proise's book 'Programming Windows '95 with MFC' has a sample
+which does exactly what you want(refer Chapter 13, example Wanderer.mdp).
+	I've done a similar treectrl which maps the  disk and also the 
+network resources. If you don't want to buy the book, give me a call and 
+I'll share my code with you.
+Good luck
+	-Shaju Mathew 
+> 
+> Environment: Win95, VC++ 4.2-flat
+> 
+> Can anyone point me to an easy way to enumerate all files and directories   
+> in a CTreeCtrl (like explorer).
+> 
+> I was trying to find a sample someplace.  Someone must of done this   
+> already.
+> 
+> 
+> Thanks
+> 
+> Chris  (chagberg@datx.com)  
+> 
+
+
+--
+********************************************************************** 
+Shaju Mathew                .---.         .---.                   
+Performance Technology Lab /" "  \  WWW  /  " "\   Off:(916)785-9018 
+WCSO Group Research & Dev / / ""  \(*|*)/  "" \ \ 
+Hewlett-Packard Company  //////   '. V .`   \\\\\\Home:(916)722-4576 
+8000, Foothills Blvd    //// / // : """ : \\ \ \\\\       
+Mailstop 5723          // /   /  /`.""" '\  \   \ \\Fax:(916)785-1264 
+Roseville, CA 95747   //          //.".\\          \\         
+                       -----------UU---UU----------- 
+shajum@hpptc51.rose.hp.com       '//|||\\`        Shaju_Mathew@hp.com 
+**********************************************************************
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+    <A HREF="http://www.digiday.com/mfcpro/joinmfcl.htm">Become an MFC-L member</A>
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

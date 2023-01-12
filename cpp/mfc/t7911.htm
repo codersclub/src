@@ -1,0 +1,511 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Window titlebar with gradient colors & no flicker...
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Nick Irias -- <A HREF="mailto:cabago@netcom.com">cabago@netcom.com</A>
+Friday, November 22, 1996
+</B>
+Environment: VC++ 4.2 flat, NT4.0 SP1	
+
+> Speaking naively as someone who hasn't done this, I would think
+> this would cause lots of irritating flashing? Shouldn't these
+> type of manipulations be done by building the image offscreen
+> and using some sort of BitBlt operation?
+
+Two things must be done to avoid flicker when drawing the caption:  1) make
+sure the gradient portion is only painted once, and 2) build the gradient +
+caption text off screen and blit it in.  I have included code which works
+on Win NT 4	
+and win95. 
+
+1) Prevent the default process from drawing the area which you intend to
+paint yourself (this causes flash).  I do this by calling the default
+handler with a region which excludes the portion I will paint:
+ 
+void CGradientFrame::OnNcPaint() 
+{
+    
+	//////////
+	// Calculate exRect, the exclusion rectangle that will not be 
+	// painted by the default WM_NCPAINT handler
+	/////////
+	int bdrX, bdrY, bmpX, bmpY;
+	CRect   exRect, rect;
+	
+	GetWindowRect((LPRECT)&rect );
+	bdrX=GetSystemMetrics( SM_CXFRAME );	// 3D frame width
+	bdrY=GetSystemMetrics( SM_CYFRAME );           // 3D frame height
+	bmpX=GetSystemMetrics( SM_CXSIZE );               // width icon/caption
+button
+	bmpY=GetSystemMetrics( SM_CYSIZE );             	// height icon/caption
+button
+
+    	// TODO: should probably check whether context help button is present
+    	exRect.left = bmpX + bdrX;
+	exRect.top = bdrY;
+    	exRect.right = rect.right - rect.left - 3 * bmpX - bdrX;
+	exRect.bottom = exRect.top + bmpY;
+
+	/////////
+	// Create an update region which excludes exRect
+	////////
+	CRgn    fullRgn, exRgn, diffRgn;
+
+    	fullRgn.CreateRectRgn( rect.left, rect.top, rect.right, rect.bottom);
+	exRgn.CreateRectRgn( exRect.left+rect.left, exRect.top+rect.top,
+		                exRect.right+rect.left, exRect.bottom+rect.top );
+    	diffRgn.CreateRectRgn(rect.left, rect.top, rect.right, rect.bottom);
+
+	diffRgn.CombineRgn( &fullRgn, &exRgn, RGN_DIFF );
+
+	// Call the default handler with the region  
+	DefWindowProc( WM_NCPAINT, (WPARAM)(HRGN)diffRgn, 0 );
+	
+	...
+	code ommitted which determines whether window is active, and assigns the
+BOOL active
+	which is passed to DrawTitleBar() so that it can draw a grey gradient when
+appropriate
+	...
+
+	// Finally, draw exRect w/ the gradiant 
+	DrawTitleBar(&exRect, active);
+}
+
+2) Build a bitmap off screen and blit it in to avoid flickering of the
+caption text.  The code below draws a double gradient to the memDC.  This
+is more prestigious than the MS Office single gradient and also avoids the
+need to draw your own buttons, since the background near your buttons
+(drawn by default handlre) is the correct color w/ a double gradient.
+
+void CGradientFrame::DrawTitleBar(LPRECT rect, BOOL active)
+{
+	
+   	CDC* winDC;
+	CDC memDC;
+      
+	////////
+	// Get the Window DC, and make a compatible memDC 
+	///////
+    	winDC = GetWindowDC( );
+	BOOL success=memDC.CreateCompatibleDC(winDC);
+
+	// Size of caption background area
+	int width=rect->right-rect->left+1;
+	int height=rect->bottom-rect->top+1;
+
+	///////
+	// Create a properly sized bitmap for the memDC to manipulate
+	//////
+	CBitmap dummyBMP;
+	dummyBMP.CreateDiscardableBitmap(winDC,width, height);
+	CBitmap *oldBMP=  memDC.SelectObject(&dummyBMP);
+
+	// Get the caption color and calc the RGBs of its complement
+	DWORD capColor;
+	if(active)
+		capColor=GetSysColor(COLOR_ACTIVECAPTION);
+	else
+		capColor=GetSysColor(COLOR_INACTIVECAPTION);
+
+	BYTE sysB, sysG, sysR, newB, newG, newR;
+	sysB=GetBValue(capColor);
+	sysG=GetGValue(capColor);
+	sysR=GetRValue(capColor);
+	
+	// Calculate the complement of the caption colors 	
+	if(active)
+	{
+		newB=255-sysB;
+		newG=255-sysG;
+		newR=255-sysR;
+	}
+	else
+		newB=newG=newR=0;   // Inactive caption bar goes grey-black-grey
+	 
+  	//draw the caption background to the memDC
+     	float fStep;            // How large is each step?
+   	CBrush Brush;
+    	int i;
+      
+    	// Determine how wide each of 256  gradient bands should be
+    	fStep = (float)(width) / 256.0f;
+
+   	RECT rectFill;          // Rectangle for gradiant step
+	rectFill.top=0;
+	rectFill.bottom=height-1;
+
+    	// Start filling bands
+    	for (i = 0; i < 256; i++) 
+   	 {
+		rectFill.left= (int)(i * fStep);
+		rectFill.right= min( (int) ((i+1) * fStep) , width-1 ); 
+		
+        		// Create a brush with the appropriate color for this band
+		if(i < 128)
+	           		 Brush.CreateSolidBrush(RGB( sysR+(newR-sysR)*i/128,
+					sysG+(newG-sysG)*i/128,
+					sysB+(newB-sysB)*i/128 ));
+		else
+			Brush.CreateSolidBrush(RGB( sysR+(newR-sysR)*(255-i)/128,
+					sysG+(newG-sysG)*(255-i)/128,
+					sysB+(newB-sysB)*(255-i)/128 ));
+		    
+        		// Fill the rectangle
+       		 memDC.FillRect(&rectFill, &Brush);
+      
+        		// Get rid of the brush you created
+        		Brush.DeleteObject();
+    	}
+     
+	CString caption;
+
+	....
+	code ommitted which sets caption font, color, text   
+	...
+
+	CSize size=memDC.GetTextExtent(LPCTSTR(caption), caption.GetLength());
+	int X=GetSystemMetrics( SM_CXFRAME );  // indent a frames width worth
+	int Y=(height-size.cy)/2;
+	memDC.TextOut(X,Y,LPCTSTR(caption), caption.GetLength());
+
+	....
+	code ommitted which deselects font if reqd   
+	...
+
+	/////////
+	// finally, blit from the memDC to the winDC
+	////////
+	winDC->BitBlt(rect->left, rect->top,
+				rect->right-rect->left,
+				rect->bottom-rect->top,
+				&memDC, 0,0, SRCCOPY );
+
+	// Deselect the bitmap we put into the memDC.  Will be deleted by
+	memDC.SelectObject(oldBMP);
+
+	// No need to release or delete memDC - will be deleted by ~CDC()
+
+	ReleaseDC(winDC);
+}
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Si Cruse -- <A HREF="mailto:scruse@csfp.co.uk">scruse@csfp.co.uk</A>
+Monday, November 25, 1996
+</B>
+I have been following this thread with some interest. Having tried a few
+tests, I find I cannot catch every message needed to maintain a
+consistent look.
+
+If I just handle OnNcPaint, sometimes The frame is repainted by the
+default handler causing erratic behaviour. What else do I need to
+handle?
+
+-- 
+
+...A closed mouth gathers no foot...
+_____________________________________________________________
+Si Cruse
+Front Office IT Development, Credit Suisse Financial Products
+1 Cabot Square, London E14 4QJ
+Phone: +44 171 516 2948			Fax: +44 171 516 2688
+mailto:scruse@csfp.co.uk	 <A HREF="http://www.cruse.demon.co.uk">http://www.cruse.demon.co.uk</A>
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Strhan Mojmir -- <A HREF="mailto:strhan_m@simultan.ch">strhan_m@simultan.ch</A>
+Wednesday, November 27, 1996
+</B>
+[Mini-digest: 2 responses]
+
+
+Hi!
+>I have been following this thread with some interest. Having tried a
+>few
+>tests, I find I cannot catch every message needed to maintain a
+>consistent look.
+>
+>If I just handle OnNcPaint, sometimes The frame is repainted by the
+>default handler causing erratic behaviour. What else do I need to
+>handle?
+
+Better you download
+<A HREF="ftp://ftp.microsoft.com/SOFTLIB/MSLFILES/Msjjan97.exe">ftp://ftp.microsoft.com/SOFTLIB/MSLFILES/Msjjan97.exe</A>
+
+In C++ Q&A Mr. DiLascia describes fully functional code for shaded
+titlebar.
+
+Hope this helps.
+Mojmir.
+
+
+
+-----From: Simon Coghlan <coghlans@sharelink.com>
+
+Same Here..
+
+This is what I Did Under NT4 VC+ 4.1
+
+1) Catch the OnNcActivate and store the activation state for use in the =
+DrawTitleBar function;
+2)  Set up a timer in the OnNcActivate for a short time period ( about =
+20 millesecs works );
+3)  In the OnTimer function, kill the short timer id and then call the =
+OnNcPaint function to override the actions caused by the default =
+handler..
+
+Simon=20
+----------<- Smurf-IV ->-------------
+Tel : 0121 200 7713
+Fax : +44 (0)121 212 2546
+Email smurf-iv@sharelink.com
+Member of the 'Team of CIS' ;-)
+---------<- Fun To All ->------------
+We are what we repeatedly do, Excellence, then, is not an act, but a =
+habit.
+Aristotel
+The one who says it cannot be done, should never interrupt the one who =
+is doing it.
+The Roman Rule
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Simon Coghlan -- <A HREF="mailto:coghlans@sharelink.com">coghlans@sharelink.com</A>
+Friday, November 29, 1996
+</B>
+Under NT4/95 VC+ 4.1b
+
+I Tried the detection of the region not to be updated in a Dialog Style =
+based App as done in the example from =
+<A HREF="ftp://ftp.microsoft.com/SOFTLIB/MSLFILES/Msjjan97.exe">ftp://ftp.microsoft.com/SOFTLIB/MSLFILES/Msjjan97.exe</A>
+
+It worked fine until I brought up another dialog ( AboutBox ) and moved =
+it around.. The Following happened..
+
+1)  No initial update of shade when the dialog first appeared above =
+parent..
+2)  When moving .. Got .. 0xC00000FD: Stack Overflow. And the Stack =
+Trace ( Function call heirarchy ) showed that the OnNcPaint function had =
+been repeatedly called..
+
+This shows that the test for the update region is not as good as it =
+should be for the Cdialog based apps but may be adequate for the Frame =
+based app that demonstrates it ( Msjjan97.exe )
+
+Simon=3D20
+----------<- Smurf-IV ->-------------
+Tel : 0121 200 7713
+Fax : +44 (0)121 212 2546
+Email smurf-iv@sharelink.com
+Member of the 'Team of CIS' ;-)
+---------<- Fun To All ->------------
+
+
+----------
+From:  Strhan Mojmir[SMTP:strhan_m@simultan.ch]
+Sent:  27 November 1996 09:36
+To:  'mfc-l@netcom.com'; 'scruse@csfp.co.uk'
+Subject:  RE: Window titlebar with gradient colors & no flicker...
+
+[Mini-digest: 2 responses]
+
+
+Hi!
+>I have been following this thread with some interest. Having tried a
+>few
+>tests, I find I cannot catch every message needed to maintain a
+>consistent look.
+>
+>If I just handle OnNcPaint, sometimes The frame is repainted by the
+>default handler causing erratic behaviour. What else do I need to
+>handle?
+
+Better you download
+<A HREF="ftp://ftp.microsoft.com/SOFTLIB/MSLFILES/Msjjan97.exe">ftp://ftp.microsoft.com/SOFTLIB/MSLFILES/Msjjan97.exe</A>
+
+In C++ Q&A Mr. DiLascia describes fully functional code for shaded
+titlebar.
+
+Hope this helps.
+Mojmir.
+
+
+
+-----From: Simon Coghlan <coghlans@sharelink.com>
+
+Same Here..
+
+This is what I Did Under NT4 VC+ 4.1
+
+1) Catch the OnNcActivate and store the activation state for use in the =
+=3D
+DrawTitleBar function;
+2)  Set up a timer in the OnNcActivate for a short time period ( about =
+=3D
+20 millesecs works );
+3)  In the OnTimer function, kill the short timer id and then call the =
+=3D
+OnNcPaint function to override the actions caused by the default =3D
+handler..
+Simon=3D20
+----------<- Smurf-IV ->-------------
+We are what we repeatedly do, Excellence, then, is not an act, but a =3D
+habit.
+Aristotel
+The one who says it cannot be done, should never interrupt the one who =
+=3D
+is doing it.
+The Roman Rule
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mats Månhav -- <A HREF="mailto:manhav@connectum.skurup.se">manhav@connectum.skurup.se</A>
+Thursday, December 19, 1996
+</B>
+[Moderator's note: Mats's files are in <A HREF="ftp://advn.com/pub/mfc">ftp://advn.com/pub/mfc</A> and
+are called ShadeFrm.cpp and ShadeFrm.h.]
+
+Environment: MSVC 4.2b Windows 95
+
+I have implemented title bar with gradient colors using a file created by
+Paul DiLascia:
+(distributed in <A HREF="ftp://ftp.microsoft.com/SOFTLIB/MSLFILES/Msjjan97.exe)">ftp://ftp.microsoft.com/SOFTLIB/MSLFILES/Msjjan97.exe)</A>
+(files: C++ Q&A/mainfrm.cpp and mainfrm.h)
+
+I have modified the CMainFrame class to be
+
+class CShadeCaptionFrame : MAINFRAMEBASECLASS
+{
+...
+}
+
+where I let MAINFRAMEBASECLASS be CFrameWnd for SDI and CMDIFrameWnd for MDI
+
+[Moderator's note: This is where Mats's last two notes on this ended,
+so either it's on purpose or there's something wrong.  Mats?]
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mats Månhav -- <A HREF="mailto:manhav@connectum.skurup.se">manhav@connectum.skurup.se</A>
+Wednesday, December 25, 1996
+</B>
+[Moderator's note: This is the complete message from Mats.  The
+accompanying files are in <A HREF="ftp://advn.com/pub/mfc.]">ftp://advn.com/pub/mfc.]</A>
+
+Environment: MSVC 4.2b Windows 95
+
+I have implemented title bar with gradient colors using a file created by
+Paul DiLascia:
+(distributed in <A HREF="ftp://ftp.microsoft.com/SOFTLIB/MSLFILES/Msjjan97.exe)">ftp://ftp.microsoft.com/SOFTLIB/MSLFILES/Msjjan97.exe)</A>
+(files: C++ Q&A/mainfrm.cpp and mainfrm.h)
+
+I have modified the CMainFrame class to be
+
+class CShadeCaptionFrame : MAINFRAMEBASECLASS
+{
+...
+}
+
+where I let MAINFRAMEBASECLASS be CFrameWnd for SDI and CMDIFrameWnd
+for MDI.  I took away everything but the functions needed for the
+titlebar painting from it.
+
+
+Then I derive my CMainFrame from CShadeCaptionFrame.
+
+Pauls sample app is an SDI so it works fine for me when I use it for SDI.
+It works partly for MDI too. The Frame title bar is painted correctly. 
+However, the title bars of the Views does not get painted correctly. 
+
+  If the application is deactivated the active view is 
+  still painted as activated. 
+
+  If the application is inactive and I click on an inactive 
+  view, that is partly hidden by the active application only
+  the part of the title bar that was not hidden will be painted.
+
+I also made a trial with deriving a Shaded CMDIChildWnd and include
+that in the project.  I did this by copying the class CShadeFrameWnd
+and deriving it from CMDIChildWnd instead.  Then the the view titles
+got painted better, but not fully. When the application was out of
+focus it still had one view painted as active and if I clicked on a
+non-active view to activate the appliction none of the views would be
+painted as active.
+
+Does anyone know what I need to do to make this work for MDI too.
+The answer I need is both how to make the View title bars work at all
+and to have them gradient as well.
+
+Mats
+
+
+--
+==========================================================================
+Mats Månhav (Mats Manhav for 7-bit people)
+email:manhav@connectum.skurup.se   WWW: <A HREF="http://connectum.skurup.se/~manhav">http://connectum.skurup.se/~manhav</A>
+FAX:  (int) 46 (0) 414 243 05      Phone: (int) 46 (0) 414 243 05         
+==========================================================================
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Âåðíóòüñÿ â êîðåíü Àðõèâà</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,265 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+[help]SetActiveWindow
+</B></FONT>
+<BR>
+<PRE>
+<B>
+hIeU nGuYeN -- <A HREF="mailto:nguyenh@rohan.sdsu.edu">nguyenh@rohan.sdsu.edu</A>
+Thursday, February 22, 1996
+</B>
+hi all,
+	i'm dong a modeless dlg on VC4.0.  on my dlg there is a edit
+control field, i want to check each time the edit is killed focus.
+so i add OnKillFocus method for the edit control field in this method
+i call UpdateData( TRUE ) to update dlg's member variable.  But now
+if the value of the edit control is invalid (out of range), and i clicked
+somewhere out of my dialog.  the OnKillFocus is called and UpdateData
+is called a message window pop up warn user to reenter value.  After click
+on OK to Accept the message, i couldn't go to my dlg again, and the message
+just keep pop up and doesn't go to my dlg to fix the error.  I used
+SetActiveWindow(), SetFocus, none of them is working for me.  Does anyone
+have any sugestion?  Thank you in advance!
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@msn.com">mikeblas@msn.com</A>
+Sunday, February 25, 1996
+</B>
+[Mini-digest: 2 responses]
+
+All of the behaviour you've described is "By design".  That is, it's the way 
+that Windows is designed to work.
+
+WM_KILLFOCUS is sent when a control loses focus--it's sent wether the user 
+tabs out of the control, the control has focus and is losing it because the 
+control is being destroyed, or another window (such as a message box) in the 
+same application has come up.
+
+You should maintain some state flags in your CDialog member data. In 
+DoDataExchange, you should check this flag and react appropriately if your 
+kill focus handler is being handled. If you write DoDataExchange() to not pop 
+up an error when you're handling WM_KILLFOCUS, you'll avoid the endless loop 
+you're entering.  As it stands, your code is responding to WM_KILLFOCUS by 
+killing focus... and that just doesn't make sense. 
+
+Forcing the focus someplace else is _NOT_ the answer because that'll just make 
+more kill focus messages for your control, or make other windows not work they 
+way they're designed to work.
+
+.B ekiM
+TCHAR sz[] = _T("So, I come home to watch Cops, but figure skating is on 
+instead!");
+
+-----From: daveferg@niagara.com
+
+This is an often repeated question. The general approach to validation
+is to post a use message from OnKillFocus. This allows resolution of
+the SetFocus/KillFocus before entering into another SetFocus/KillFocus.
+There is an article on this subject on MSDN and I believe it is
+mentioned in some MFC FAQ.
+
+Although the above method works I found there were too many
+exceptions(eg.  I'm not really leaving a field requiring modification,
+I am simply moving to another application entirely). The approach I am
+now using is to maintain a linked list of controls requiring validation
+and checking this list on SetFocus. I find that doing this handles the
+exceptions and has the virtue of simplicity. Here is a code snippet,
+
+void DIEdit::OnSetFocus(CWnd* pOldWnd) 
+{
+	CMaskedEdit::OnSetFocus(pOldWnd);
+
+	PDIFormView view = View();
+
+	if (view)  view->ValidateDepControls(this);
+}
+
+BOOL DIView::ValidateDepControls (PDIEdit e)
+{
+	int  i = 0, n;
+	PDIEdit c;
+	BOOL ok = TRUE;
+
+	if (Validating() || SkipValidation())  return ok;
+	Validating(TRUE);
+	n = DepControlCount();
+	while (ok && (i < n)) {
+		c = DepControl(i++);
+		if (c && (c != e))  ok = c->Validate();
+	}
+	if (!ok) {
+		c->SetFocus();
+		c->ValidationAlert();
+	}
+
+	Validating(FALSE);
+	return ok;
+}
+
+BOOL DIEdit::Validate ()
+{
+	return IsValid();
+}
+
+void DIEdit::ValidationAlert ()
+{
+	if (!IsValid())  Alert("Validation failed !.");
+}
+
+Hope this helps,
+Dave
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Ken Freeman -- <A HREF="mailto:kfreeman@viewlogic.com">kfreeman@viewlogic.com</A>
+Tuesday, February 27, 1996
+</B>
+A third approach to data validation which I've used successfully is to
+do it during Idle processing.  You won't exercise this code when moving
+to another app, so that's not an issue.  Get a pointer to the control with
+focus, and save one to the control that had focus the last time your OnIdle
+was called.  If they differ, validate the control that previously had focus.
+
+It's easy to add some logic so you don't validate when moving to the Help or
+Cancel buttons, for example.
+
+Idle processing is also a useful place to enable/disable controls based upon
+the state of other controls (this checkbox checked, a valid string in that
+edit box, etc.)  I find this makes the logic much cleaner than handling at
+edit changed, combo box sel changed, etc.
+
+Mike Blaszczak wrote:
+> 
+> [Mini-digest: 2 responses]
+> 
+> All of the behaviour you've described is "By design".  That is, it's the way
+> that Windows is designed to work.
+> 
+> WM_KILLFOCUS is sent when a control loses focus--it's sent wether the user
+> tabs out of the control, the control has focus and is losing it because the
+> control is being destroyed, or another window (such as a message box) in the
+> same application has come up.
+> 
+> You should maintain some state flags in your CDialog member data. In
+> DoDataExchange, you should check this flag and react appropriately if your
+> kill focus handler is being handled. If you write DoDataExchange() to not pop
+> up an error when you're handling WM_KILLFOCUS, you'll avoid the endless loop
+> you're entering.  As it stands, your code is responding to WM_KILLFOCUS by
+> killing focus... and that just doesn't make sense.
+> 
+> Forcing the focus someplace else is _NOT_ the answer because that'll just make
+> more kill focus messages for your control, or make other windows not work they
+> way they're designed to work.
+> 
+> .B ekiM
+> TCHAR sz[] = _T("So, I come home to watch Cops, but figure skating is on
+> instead!");
+> 
+> -----From: daveferg@niagara.com
+> 
+> This is an often repeated question. The general approach to validation
+> is to post a use message from OnKillFocus. This allows resolution of
+> the SetFocus/KillFocus before entering into another SetFocus/KillFocus.
+> There is an article on this subject on MSDN and I believe it is
+> mentioned in some MFC FAQ.
+> 
+> Although the above method works I found there were too many
+> exceptions(eg.  I'm not really leaving a field requiring modification,
+> I am simply moving to another application entirely). The approach I am
+> now using is to maintain a linked list of controls requiring validation
+> and checking this list on SetFocus. I find that doing this handles the
+> exceptions and has the virtue of simplicity. Here is a code snippet,
+> 
+> void DIEdit::OnSetFocus(CWnd* pOldWnd)
+> {
+>         CMaskedEdit::OnSetFocus(pOldWnd);
+> 
+>         PDIFormView view = View();
+> 
+>         if (view)  view->ValidateDepControls(this);
+> }
+> 
+> BOOL DIView::ValidateDepControls (PDIEdit e)
+> {
+>         int  i = 0, n;
+>         PDIEdit c;
+>         BOOL ok = TRUE;
+> 
+>         if (Validating() || SkipValidation())  return ok;
+>         Validating(TRUE);
+>         n = DepControlCount();
+>         while (ok && (i < n)) {
+>                 c = DepControl(i++);
+>                 if (c && (c != e))  ok = c->Validate();
+>         }
+>         if (!ok) {
+>                 c->SetFocus();
+>                 c->ValidationAlert();
+>         }
+> 
+>         Validating(FALSE);
+>         return ok;
+> }
+> 
+> BOOL DIEdit::Validate ()
+> {
+>         return IsValid();
+> }
+> 
+> void DIEdit::ValidationAlert ()
+> {
+>         if (!IsValid())  Alert("Validation failed !.");
+> }
+> 
+> Hope this helps,
+> Dave
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

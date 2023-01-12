@@ -1,0 +1,405 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Multiple inheritance with MFC and especially CCommandTarget
+</B></FONT>
+<BR>
+<PRE>
+<B>
+TA -- <A HREF="mailto:siemens@inet.uni-c.dk">siemens@inet.uni-c.dk</A>
+Wednesday, January 29, 1997
+</B>
+Environment: MSVC 4.0, Windows 95
+
+I have a question on the inheritance issues with MFC that I hope someone
+could help me out with:
+Can the message map problem with multiple inheritance involving
+CCommandTarget be solved using virtual inheritance?
+
+Clarification of question by example:
+Suppose you have 2 classes, Class A and Class B, both derived at some point
+from CCommandTarget. Deriving a class, Class C, from A and B using simple
+inheritance will result in ambiguities for CCommandTarget when selecting
+the proper handler for a message, but if C is inherited from A and B using
+virtual inhertance, will the ambiguities be solved, then?
+
+I've read som KB articles found by the search string "multiple NEAR
+inheritance AND MFC" that stated that I might get problems with the
+compiler due to some compiler options like /vms /vmb and /vmg, but I was
+not able to determine if had anything directly to do with this question
+(I'm sorry, but I don't remember the ID's of the articles).
+
+Best regards,
+Mike Jakobsen
+Siemens@inet.uni-c.dk
+Siemens A/S
+Borupvang 3
+DK-2750 Ballerup
++45 4477 4477
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dave Lorde -- <A HREF="mailto:dlorde@cix.compulink.co.uk">dlorde@cix.compulink.co.uk</A>
+Friday, January 31, 1997
+</B>
+[Mini-digest: 7 responses]
+
+In-Reply-To: <199701291244.NAA01555@inet.uni-c.dk>
+
+Check out TechNote 016: Using C++ Multiple Inheritance with MFC
+
+This explains the limitations. Virtual inheritance does not resolve all 
+ambiguities, you need to take some precautions. In particular:
+
+"In order for the MFC message map system to work correctly, there are 
+two additional requirements:
+·There must be only one CWnd-derived base class.
+·The CWnd-derived base class must be the first (or left-most) 
+base class."
+
+Dave
+-----From: Kyle Green <kyle@a.crl.com>
+
+Mike,
+
+In general you have to explicitly resolve ambiguities with over-rides. With
+a diamond inheritance pattern, there are two paths to to the ancestor, and
+by over-riding the ambigous (dual) functions, you explicity control the
+path back to the ancestors function.
+
+In addition, CCommandTarget would need to be inherited virtually by both
+class A and class B, class C would not need to inherit anything virtually.
+virtual inheritance is required for objects which may appear more than once
+in an ancestor tree.
+
+These are general comments about multiple inheritance, but I don't know if
+they apply at all to your CCommandTarget situation. There may be other
+factors involved.
+
+Kyle
+
+At 01:44 PM 1/29/97 +0100, Siemens, TA wrote:
+>Environment: MSVC 4.0, Windows 95
+
+>Can the message map problem with multiple inheritance involving
+>CCommandTarget be solved using virtual inheritance?
+
+>Clarification of question by example:
+>Suppose you have 2 classes, Class A and Class B, both derived at some point
+>from CCommandTarget. Deriving a class, Class C, from A and B using simple
+>inheritance will result in ambiguities for CCommandTarget when selecting
+>the proper handler for a message, but if C is inherited from A and B using
+>virtual inhertance, will the ambiguities be solved, then?
+
+>I've read som KB articles found by the search string "multiple NEAR
+>inheritance AND MFC" that stated that I might get problems with the
+>compiler due to some compiler options like /vms /vmb and /vmg, but I was
+>not able to determine if had anything directly to do with this question
+>(I'm sorry, but I don't remember the ID's of the articles).
+
+
+
+
+-----From: Mike Blaszczak <mikeblas@nwlink.com>
+
+At 13:44 1/29/97 +0100, Siemens, TA wrote:
+>Environment: MSVC 4.0, Windows 95
+
+>Clarification of question by example:
+>Suppose you have 2 classes, Class A and Class B, both derived at some point
+>from CCommandTarget. Deriving a class, Class C, from A and B using simple
+>inheritance will result in ambiguities for CCommandTarget when selecting
+>the proper handler for a message, but if C is inherited from A and B using
+>virtual inhertance, will the ambiguities be solved, then?
+
+No.
+
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+These words are my own. I do not speak on behalf of Microsoft.
+           This performance was not lip-synched.
+
+-----From: Stephane Larocque <stephl@info.polymtl.ca>
+
+Hi,
+
+if I were you, I would avoid to use this kind of inheritance. I dont know
+how it is called in english, but in french we call it "Heritage en
+losange". Instead of this, try aggregation, like this:
+
+	class C (: public CCommandTarget)
+	{
+	public:
+	
+		class A : public CCommandTarget
+		{
+			...
+		}
+
+		class B : public CCommandTarget
+		{
+			...
+		}
+
+		...
+	}
+
+That's it. I think this will solve your problem.
+
+Stephane.
+
+-----From: hou@tfn.com (Bing Hou)
+
+
+This involves both C++ and MFC.
+
+C++ first. Ambiguity in this case is caused by functions with same names in 
+different bases, the compiler doesn't know which one you are using. Virtual 
+inheritance guarantees that only one copy of an common base is created at 
+run time, in this case, the CCmdTarget class, it doesn't help you to solve 
+ambiguous functions that you implement in class A and B at compile time. So 
+the answer is no. To overcome this, you have to carefully re-implement each 
+ambiguous function in your derived class by explictly delegating to one 
+base's implementation. For example, Derived::AmbFunc() { A::AmbFunc(); }.
+
+Then MFC. In order for the message map mechanism to work, you must have 
+only one CWnd base. Because MFC chains the message map from bottom to top, 
+you must keep this chain very clean when you inheriting away from the CWnd 
+base. Also the CWnd type base must be the first parent in your inheritance 
+construction.(The left-most parent)
+
+
+
+Bing Hou
+hou@tfn.com
+------------------------------------------------------------------------
+  The shortest distance between two points is always under construction.
+                                                         - Noelie Alito
+
+
+
+______________________________ Reply Separator _________________________________
+Subject: Multiple inheritance with MFC and especially CCommandTarget
+Author:  "Siemens; TA" <siemens@inet.uni-c.dk> at Internet
+Date:    1/29/97 1:44 PM
+
+
+Environment: MSVC 4.0, Windows 95
+     
+I have a question on the inheritance issues with MFC that I hope someone 
+could help me out with:
+Can the message map problem with multiple inheritance involving 
+CCommandTarget be solved using virtual inheritance?
+     
+Clarification of question by example:
+Suppose you have 2 classes, Class A and Class B, both derived at some point 
+from CCommandTarget. Deriving a class, Class C, from A and B using simple 
+inheritance will result in ambiguities for CCommandTarget when selecting 
+the proper handler for a message, but if C is inherited from A and B using 
+virtual inhertance, will the ambiguities be solved, then?
+     
+I've read som KB articles found by the search string "multiple NEAR 
+inheritance AND MFC" that stated that I might get problems with the 
+compiler due to some compiler options like /vms /vmb and /vmg, but I was 
+not able to determine if had anything directly to do with this question 
+(I'm sorry, but I don't remember the ID's of the articles).
+     
+Best regards,
+Mike Jakobsen
+Siemens@inet.uni-c.dk
+Siemens A/S
+Borupvang 3
+DK-2750 Ballerup
++45 4477 4477
+     
+-----From: Roma <roma@neonet.lv>
+
+Siemens, TA wrote:
+> 
+> Environment: MSVC 4.0, Windows 95
+> 
+> I have a question on the inheritance issues with MFC that I hope someone
+> could help me out with:
+> Can the message map problem with multiple inheritance involving
+> CCommandTarget be solved using virtual inheritance?
+> 
+> Clarification of question by example:
+> Suppose you have 2 classes, Class A and Class B, both derived at some point
+> from CCommandTarget. Deriving a class, Class C, from A and B using simple
+> inheritance will result in ambiguities for CCommandTarget when selecting
+> the proper handler for a message, but if C is inherited from A and B using
+> virtual inhertance, will the ambiguities be solved, then?
+ Hi again!
+ A bit more thoughts on this issue:
+
+This type of virtual inheritance:
+class A : public CCmdTarget {};
+class B : public CCmdTarget {};
+class C : public virtual A, public virtual B {};
+
+will not help you, because virtual keywords in class C declaration means
+nothing
+until you start derive from class C.
+Object of class C will have size >= sizeof(A)+sizeof(B), and there will
+be two instances
+of the CObject and two instances of CCmdTarget.
+
+If you want to have only one instance of CCmdTarget in the class C
+object, you have to 
+declare CCmdTarget class as virtual base for both class A and class B,
+but I believe
+this will not help you either:
+
+#include <afxwin.h>
+
+class A : public virtual CCmdTarget
+{
+  //...
+  DECLARE_MESSAGE_MAP();
+};
+
+class B : public virtual CCmdTarget
+{
+  //...
+  DECLARE_MESSAGE_MAP();
+};
+
+class C : public A, public B
+{
+  //...
+};
+
+//At some point you will have:
+
+BEGIN_MESSAGE_MAP(A, CCmdTarget)
+END_MESSAGE_MAP
+
+//and
+
+BEGIN_MESSAGE_MAP(B, CCmdTarget)
+END_MESSAGE_MAP
+
+
+//One note DECLARE_MESSAGE_MAP() declares two static data members in the
+class
+//( _messageEntries, messageMap ) and one virtual function
+GetMessageMap().
+
+This way you will get THREE declarations of 'messageMap' and
+_messageEntries in the C:
+one from CCmdTarget (only one - due to the virtual inheritance), one
+from class A, and one
+from class B. Also, there will be a problem with virtual function which
+is declared in
+the CCmdTarget. It's overriden in the A and B, and now both of them are
+present in the C, that's why if you'll compile above code (that's
+possible) compiler will give you the following output:
+
+error C2250: 'C' : ambiguous inheritance of 'A::GetMessageMap'
+error C2250: 'C' : ambiguous inheritance of 'B::GetMessageMap'
+
+And even if there will be no virtual function, virtual base classes will
+not help you to avoid 
+ambiguities in accessing messageMap and _messageEntries  members of the
+class C, because these
+members are declared not only in CCmdTarget, but in the derived classes
+too.
+
+-Roma
+-----From: Roma <roma@neonet.lv>
+
+Siemens, TA wrote:
+> 
+> Environment: MSVC 4.0, Windows 95
+> 
+> I have a question on the inheritance issues with MFC that I hope someone
+> could help me out with:
+> Can the message map problem with multiple inheritance involving
+> CCommandTarget be solved using virtual inheritance?
+> 
+> Clarification of question by example:
+> Suppose you have 2 classes, Class A and Class B, both derived at some point
+> from CCommandTarget. Deriving a class, Class C, from A and B using simple
+> inheritance will result in ambiguities for CCommandTarget when selecting
+> the proper handler for a message, but if C is inherited from A and B using
+> virtual inhertance, will the ambiguities be solved, then?
+> 
+> I've read som KB articles found by the search string "multiple NEAR
+> inheritance AND MFC" that stated that I might get problems with the
+> compiler due to some compiler options like /vms /vmb and /vmg, but I was
+> not able to determine if had anything directly to do with this question
+> (I'm sorry, but I don't remember the ID's of the articles).
+ Check MFC technical note #016 - it's called "Using C++ Multiple
+Inheritance 
+ with MFC"
+
+ At the bottom of the article there is an example of "Hello, world!"
+MFC-based
+ program, which uses multiple inheritance.
+ Main class in the program is declared like this:
+
+class CHelloAppAndFrame : public CFrameWnd, public CWinApp
+{
+... 
+};
+
+Both of the base classes are CCmdTarget-derived, so, at least in some
+cases, multiple inheritance from CCmdTarget based classes are possible 
+without virtual inheritance.
+
+> 
+> Best regards,
+> Mike Jakobsen
+> Siemens@inet.uni-c.dk
+> Siemens A/S
+> Borupvang 3
+> DK-2750 Ballerup
+> +45 4477 4477
+Hth,
+
+-Roma
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Âåðíóòüñÿ â êîðåíü Àðõèâà</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

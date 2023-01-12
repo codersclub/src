@@ -1,0 +1,194 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+PossibleCString_Bug
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Jody Baudoin -- <A HREF="mailto:jabaudoin@halnet.com">jabaudoin@halnet.com</A>
+Monday, January 15, 1996
+</B>
+From: jabaudoin@halnet.com
+To:   MFC-Mailing List
+
+Operating System:  Microsoft's Win-95
+Compiler:  Microsoft's Visual C ++ VERSION 4.0
+MFC     :  Microsoft's Version 4.0
+Class:     CString, operator=
+Debug Build:  Yes
+
+Problem:   If I am correct, then there may be suttle bugs in any application
+           that uses CString in version 4.0 of Microsoft's compiler.
+
+Request:   Please advise (confirm, refute or elaborate on my conjecture).
+
+Am I doing something wrong, OR is this a product defect?
+If this is a product defect, then I believe this note would be of
+great interest to any user of the product. (You could be producing
+defective software).	
+
+The following code works on version 1.52, but fails on version 4.0.
+It fails by copying the "m_pchData" pointer instead of the actual data.
+
+Version 1.52 does not have the m_pchData-pointer-copy-code in its 
+implementation.
+
+The MFC version 4.0 code that copies pointers instead of data is 
+in  \msdev\mfc\src\Strcore.cpp  at line number 253.
+The start of the function is::
+
+const CString& CString::operator=(const CString& stringSrc)
+
+::
+Any comments?  Thank you for posting this note, and for any responses
+that may ensue.
+
+/* Code that demonstrates the problem follows. */
+/* * * * * * * * * * * * * * * * * * * */
+class g
+{
+public :
+  CString m_gstr;
+ 
+  void g::SetStr(const CString & inCstr)
+  {
+     m_gstr = inCstr;
+  }
+};
+
+
+/* Class Instance declaration */
+g lg;
+
+
+void CMainFrame::OnInitMenu(CMenu* pMenu)
+/* Some test code that shows the problem */
+{
+CString lCstr;
+
+    lCstr = "Here Here";
+
+  /* m_gstr ends up with a copy of lCstr.m_pchData instead of */
+  /* the data that m_pchData points to. */
+    lg.SetStr(lCstr);
+
+    return ;
+}
+
+
+Regards, &c.,
+jabaudoin@halnet.com
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Oleg Moroz -- <A HREF="mailto:moroz@inist.ru">moroz@inist.ru</A>
+Wednesday, January 17, 1996
+</B>
+[The answer and some code to demonstrate]
+
+On Mon, 15 Jan 1996 16:03:59 -0600, jabaudoin@halnet.com (Jody
+Baudoin) wrote:
+
+> Problem:   If I am correct, then there may be suttle bugs in any application
+>            that uses CString in version 4.0 of Microsoft's compiler.
+> Request:   Please advise (confirm, refute or elaborate on my conjecture).
+
+That's not a bug, just a smart ("lazy") implementation of string
+copying. When you copy CString's, and none of them is locked (that is,
+there's no outstanding GetBuffer[SetLength] on it), MFC 4.0 optimizes
+this case by copying a pointer to actual string data and incrementing
+usage counter. When one of these strings is later destroyed, the
+reference count is decremented, and only when it goes to zero, the
+data is released. If any of strings is modified, the data is copied
+and only then modified.
+
+Oleg
+
+-----From: Mark Kramer <markkra@microsoft.com>
+
+This code will show you how CString ref counts are working.
+
+// cstr.cpp
+// check CString class
+#include <iostream.h>
+#include <afx.h>
+
+const char NL = '\n';
+
+main()
+{
+	CString a("Hello");
+	CString b;
+	b = a;
+
+	// see what we have
+	cout << "String a: " << a << NL;
+	cout << "String b: " << b << NL;
+
+	// gives us the address of the internal buffer(s)
+	cout << "String a's internal buffer: "
+		 << (void*)(LPCTSTR)a << NL
+		 << "String b's internal buffer: "
+		 << (void*)(LPCTSTR)b << NL;
+
+	// change b
+	b += ", World!";
+
+	// now see what we have
+	cout << "String a: " << a << NL;
+	cout << "String b: " << b << NL;
+
+	// gives us the address of the internal buffer(s)
+	cout << "String a's internal buffer: "
+		 << (void*)(LPCTSTR)a << NL
+		 << "String b's internal buffer: "
+		 << (void*)(LPCTSTR)b << endl;
+
+	return 0;
+}
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

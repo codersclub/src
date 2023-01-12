@@ -1,0 +1,210 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Registry entries for CToolbar
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Roland Pasternack -- <A HREF="mailto:rpasternack@MSERVER2.Legato.COM">rpasternack@MSERVER2.Legato.COM</A>
+Wednesday, December 20, 1995
+</B>
+I am using VC++ 4.0.  I have created a vanilla dockable toolbar derived from 
+CToolBar, and a status bar that is a CStatusBar.  I am using the MFC provided 
+functions LoadBarState() and SaveBarState() to get and save the positions, 
+visibility, etc. of these bars.  The problem is that I have noticed that the 
+registry entries, totally maintained by MFC, keep getting bigger and bigger.  
+All that I am doing is moving the dockable toolbar to different sides of the 
+frame window.  It seems that every time the toolbar is moved, new entries are 
+created within the registry.  MFC maintains several keys named Toolbar-BarN 
+where the last 'N' is 0, 1, 2.  Sometimes it will create a '3' after a while.  
+Within Toolbar-Bar1, there are entires named Bar#N where N is initially 0, 1, 
+and 2.  Every time I move the toolbar to a different position, MFC adds 3 more 
+entries, incrementing this N value.
+
+I stepped through their SaveBarState() code in the debugger, but I couldn't 
+figure out what the source of the problem was.  Does anybody know what is 
+going on, and how to fix it?
+
+Thanks in advance,
+Roland
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Karl Buchegger -- <A HREF="mailto:kbuchegg@gascad.co.at">kbuchegg@gascad.co.at</A>
+Thursday, January 18, 1996
+</B>
+
+> I am using VC++ 4.0.  I have created a vanilla dockable toolbar derived from
+> CToolBar, and a status bar that is a CStatusBar.  I am using the MFC
+> provided functions LoadBarState() and SaveBarState() to get and save the
+> positions, visibility, etc. of these bars.  The problem is that I have
+[stuff deleted]
+> I stepped through their SaveBarState() code in the debugger, but I couldn't
+> figure out what the source of the problem was.  Does anybody know what is
+> going on, and how to fix it?
+
+Hi.
+I ran into the same problem a few weeks ago, and delayed it until today.
+The good news: I think a found the bug, it is not in SaveBarState.
+The bad news: It is impossible to fix the bug without recompilation
+    of MFC-4.0
+The realy good news: I cam up with a workaround. Let MFC create the
+    wrong informations and correct them afterwards.
+
+In CMainFrame add the following after SaveBarState.
+
+  SaveBarState( "Toolbars" );
+  FixupBarState( "Toolbars" );
+  .
+  .
+
+void CMainFrame::FixupBarState( char const * lpszProfileName )
+{
+
+#if _MFC_VER == 0x0400
+
+  CDockState state;
+  state.LoadState( lpszProfileName );
+
+  for (int i = 0; i < state.m_arrBarInfo.GetSize(); i++) {
+    CControlBarInfo* pInfo = (CControlBarInfo*)state.m_arrBarInfo[i];
+
+    int nSize = pInfo->m_arrBarID.GetSize();
+    for( int j = 0; j < nSize - 1; ++j ) {
+      if( (DWORD)(pInfo->m_arrBarID[j])     >= (DWORD)65536 &&
+          (DWORD)(pInfo->m_arrBarID[j + 1]) >= (DWORD)65536 ) {
+        pInfo->m_arrBarID.RemoveAt( j );
+        nSize--;
+        j--;
+      }
+    }
+  }
+
+  state.SaveState( lpszProfileName );
+
+#endif
+
+}
+
+Karl Buchegger
+## CrossPoint v3.02 ##
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Roland Pasternack -- <A HREF="mailto:rpasternack@MSERVER2.Legato.COM">rpasternack@MSERVER2.Legato.COM</A>
+Monday, January 22, 1996
+</B>
+After soliciting feedback from mfc-l (I posted the original question below), I 
+pursued this with Microsoft.  They acknowledged that it was a problem and said 
+that it would be fixed in a future release (i.e. post 4.0).
+
+
+-Roland
+______________________________ Reply Separator _________________________________
+Subject: Re: Registry entries for CToolbar
+Author:  mfc-l@netcom.com at LEGATO_SMTP
+Date:    1/20/96 6:44 PM
+
+
+> I am using VC++ 4.0.  I have created a vanilla dockable toolbar derived from 
+> CToolBar, and a status bar that is a CStatusBar.  I am using the MFC
+> provided functions LoadBarState() and SaveBarState() to get and save the 
+> positions, visibility, etc. of these bars.  The problem is that I have 
+[stuff deleted]
+> I stepped through their SaveBarState() code in the debugger, but I couldn't 
+> figure out what the source of the problem was.  Does anybody know what is
+> going on, and how to fix it?
+
+Hi.
+I ran into the same problem a few weeks ago, and delayed it until today. 
+The good news: I think a found the bug, it is not in SaveBarState.
+The bad news: It is impossible to fix the bug without recompilation
+    of MFC-4.0
+The realy good news: I cam up with a workaround. Let MFC create the
+    wrong informations and correct them afterwards.
+
+In CMainFrame add the following after SaveBarState.
+
+  SaveBarState( "Toolbars" );
+  FixupBarState( "Toolbars" );
+  .
+  .
+
+void CMainFrame::FixupBarState( char const * lpszProfileName ) 
+{
+
+#if _MFC_VER == 0x0400
+
+  CDockState state;
+  state.LoadState( lpszProfileName );
+
+  for (int i = 0; i < state.m_arrBarInfo.GetSize(); i++) {
+    CControlBarInfo* pInfo = (CControlBarInfo*)state.m_arrBarInfo[i];
+
+    int nSize = pInfo->m_arrBarID.GetSize(); 
+    for( int j = 0; j < nSize - 1; ++j ) {
+      if( (DWORD)(pInfo->m_arrBarID[j])     >= (DWORD)65536 &&
+          (DWORD)(pInfo->m_arrBarID[j + 1]) >= (DWORD)65536 ) {
+        pInfo->m_arrBarID.RemoveAt( j );
+        nSize--;
+        j--;
+      }
+    }
+  }
+
+  state.SaveState( lpszProfileName );
+
+#endif
+
+}
+
+Karl Buchegger
+## CrossPoint v3.02 ##
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

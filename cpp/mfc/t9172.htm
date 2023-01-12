@@ -1,0 +1,180 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Assert when calling MFC DLL from VB
+</B></FONT>
+<BR>
+<PRE>
+<B>
+<A HREF="mailto:Lawrence_Chan@pcmailap.japan.ml.com">Lawrence_Chan@pcmailap.japan.ml.com</A>
+Thursday, January 23, 1997
+</B>
+     Environment: NT3.51 VC++ 4.1
+     
+     I am building a VB application that will display .avi files 
+     continously. To do that, I created a MFC Dll with the following 
+     functions,
+     
+     BOOL CAnmApp::InitAnimation(HWND hwnd, LPSTR lpszFile)
+     {
+        CWnd* pFrame;
+        pFrame= pFrame->FromHandle(hwnd);
+        ASSERT(pFrame);
+        CRect rect;
+        pFrame->GetClientRect(&rect);
+        m_ctlAnm.Create(WS_CHILD|WS_VISIBLE|WS_BORDER|ACS_CENTER, rect,     
+                        pFrame, 89);
+     
+     
+        m_ctlAnm.Open(lpszFile);       
+        m_ctlAnm.Play(0, -1, -1);
+        return TRUE;
+     }
+        
+     and 
+     
+     extern "C" BOOL FAR PASCAL EXPORT InitAnimation(HWND hwnd, LPSTR 
+     lpszFileName)
+     {
+        TRY
+        {
+                
+            return ((CAnmApp *) AfxGetApp())->InitAnimation(hwnd,           
+                        lpszFileName);
+                
+        }
+        END_TRY 
+        return FALSE;
+     }
+     
+     
+     No problem when the calling app is a MFC application. However, when I 
+     call InitAnimation from VB it gives an assertion fault at file 
+     afxwin2.inl line 92. Apparently it fails at the create statement of 
+     CAnimateCtrl.
+     
+     
+     the declaration in VB is like that
+     
+     Declare Function InitAnimation Lib 
+     "c:\msdev\projects\anm\debug\anm.dll" (hwnd As Long, ByVal filename As 
+     String) As Boolean
+     
+     
+     Any comments.
+     Thanks.
+     Lawrence
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Friday, January 24, 1997
+</B>
+[Mini-digest: 2 responses]
+
+At 16:56 1/23/97 JST, Lawrence_Chan@pcmailap.japan.ml.com wrote:
+>     Environment: NT3.51 VC++ 4.1
+
+>     BOOL CAnmApp::InitAnimation(HWND hwnd, LPSTR lpszFile)
+>     {
+>        CWnd* pFrame;
+>        pFrame= pFrame->FromHandle(hwnd);
+>        ASSERT(pFrame);
+>        CRect rect;
+>        pFrame->GetClientRect(&rect);
+
+
+>     No problem when the calling app is a MFC application. However, when I 
+>     call InitAnimation from VB it gives an assertion fault at file 
+>     afxwin2.inl line 92. Apparently it fails at the create statement of 
+>     CAnimateCtrl.
+
+Is it, really?  What's the stack trace look like? 
+
+The assertion you site is for GetClientRect() to determine if the CWnd
+object really has a window or not.  If you're tripping this assertion,
+the CWnd object is invalid.
+
+It looks like you call GetClientRect() yourself against pFrame.  Is that
+the call that causes the assertion, or is it somewhere during the
+creation of the animation control?  It would surprise me if CAnimate::Create()
+was calling CWnd::GetClientRect().
+
+I think you've mis-diagnosed this problem.  A stack trace at the assertion
+would confirm or eliminate your diagnosis.
+
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+Why does the "new" Corvette look like a 1993 RX-7?
+These words are my own. I do not speak on behalf of Microsoft.
+
+-----From: David Razzetti <raz@jump-jet.demon.co.uk>
+
+Laurence -=20
+
+You don't provide enough information about your DLL.
+
+How have you linked it to the MFC libraries ?
+If you created the app using ApWizard, you should have chosen one of
+:-
+	Regular DLL with MFC statically linked
+	Regular DLL using shared MFC dll
+
+You have not allowed for module state information management inside
+your exported fuction.
+You "probably" need to add the line :-
+
+	AFX_MANAGE_STATE( AfxGetStaticModuleState() );
+
+so that its the first line executed in your function.  See the VC++
+help article named "Managing the state data of MFC modules".  Its very
+informative.
+
+Dave Razzetti
+raz@jump-jet.demon.co.uk
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

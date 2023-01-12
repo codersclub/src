@@ -1,0 +1,242 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Strange ASSERT failure.
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Joern Dahl-Stamnes -- <A HREF="mailto:Jorn.Dahl-Stamnes@fysel.ntnu.no">Jorn.Dahl-Stamnes@fysel.ntnu.no</A>
+Friday, February 21, 1997
+</B>
+Environment: NT 3.51, VC++ 1.52
+
+I have this strange problem in a program.
+
+In the CMyView::OnDraw() function I have this code:
+
+{
+	static char*	pSymbols = "BRSWL";
+	int		i, xpos, ypos;
+
+	// ...
+	// i is within range!
+	pDC->TextOut (xpos,ypos,&pSymbols[i],1);
+	// ...
+}
+
+As long as !pDC->IsPrinting() it work without problem in both debug and
+in release mode. But when I, in debug mode, do a Print Preview or a
+Print, I get an Assert failed in CPreviewDC::ExtTextOut(). The line
+with the ASSERT statement says:
+
+	ASSERT(AfxIsValidAddress(lpszString, nCount));
+
+If I look at the lpszString is say "BRSWL" and nCount say 1. This is
+correct!
+
+Now, if I change my OnDraw() to:
+
+{
+	static char*	pSymbols = "BRSWL";
+	int		i, xpos, ypos;
+	char		buffer[8];
+
+	// ...
+	// i is within range!
+	buffer[0] = pSymbols[i];
+	pDC->TextOut (xpos,ypos,buffer,1);
+	// ..
+}
+
+It work in Print Preview and in Print too! Why??????
+-- 
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+| Joern Yngve Dahl-Stamnes, Norwegian University of Science and Technology  |
+| e-mail: Jorn.Dahl-Stamnes@fysel.ntnu.no                                   | 
+| phone : +73 59 44 12, fax: +73 59 14 41                                   |
+| Surfing the net? Try <A HREF="http://www.fysel.ntnu.no/dahls/dahls.html">http://www.fysel.ntnu.no/dahls/dahls.html</A>            |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Jim Lawson Williams -- <A HREF="mailto:jimlw@mail.ccur.com.au">jimlw@mail.ccur.com.au</A>
+Sunday, February 23, 1997
+</B>
+At 10:38 21-02-97 +0100, Joern Dahl-Stamnes wrote:
+>Environment: NT 3.51, VC++ 1.52
+>
+>I have this strange problem in a program.
+>
+>In the CMyView::OnDraw() function I have this code:
+>
+>{
+>	static char*	pSymbols = "BRSWL";
+>	int		i, xpos, ypos;
+>
+>	// ...
+>	// i is within range!
+>	pDC->TextOut (xpos,ypos,&pSymbols[i],1);
+>	// ...
+>}
+>
+G'day!
+>From "Books Online", re CDC::TextOut()  --
+
+virtual BOOL TextOut( int x, int y, LPCTSTR lpszString, int nCount );
+  
+BOOL TextOut( int x, int y, const CString& str );
+
+"char*" and "CString" are not synonymous.
+
+Regards,
+Jim LW
+
+
+
+
+>From the BBC's "Barchester Chronicles":
+
+    "I know that ultimately we are not supposed to understand.
+    But I also know that we must try."
+
+       -- the Reverend Septimus Harding, 
+          tax-consultant, crypt-analyst, clog-dancer, C++ programmer
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+David Lowndes -- <A HREF="mailto:David.Lowndes@bj.co.uk">David.Lowndes@bj.co.uk</A>
+Monday, February 24, 1997
+</B>
+[Mini-digest: 2 responses]
+
+>But when I, in debug mode, do a Print Preview or a
+Print, I get an Assert failed in CPreviewDC::ExtTextOut(). The line
+with the ASSERT statement says:
+
+	ASSERT(AfxIsValidAddress(lpszString, nCount));
+<
+
+This is because the ASSERT in several of the MFC wrappers for TextOut &
+associated routines was incorrect! It's only recently been addressed and
+some are still outstanding (see below). It's testing the string as
+having read-write access, where it should only test for read-access.
+Where the compiler can optimise the string and place it in a const
+segment you will get this ASSERT occurring. The ASSERT should have been:
+
+	ASSERT( AfxIsValidAddress( lpszString, nCount, FALSE ) );
+
+Mike B - I think you'll find the problem still exists in:
+
+CMetaFileDC::ExtTextOut
+CPreviewDC::TabbedTextOut
+
+>Dave Lowndes
+-----From: kenn@owl.co.uk (Ken Nicolson)
+
+On Fri, 21 Feb 1997 10:38:49 +0100 (MET), you wrote:
+
+>Environment: NT 3.51, VC++ 1.52
+>
+>I have this strange problem in a program.
+>
+>In the CMyView::OnDraw() function I have this code:
+>
+>{
+>	static char*	pSymbols =3D "BRSWL";
+>	int		i, xpos, ypos;
+>
+>	// ...
+>	// i is within range!
+>	pDC->TextOut (xpos,ypos,&pSymbols[i],1);
+>	// ...
+>}
+>
+>As long as !pDC->IsPrinting() it work without problem in both debug and
+>in release mode. But when I, in debug mode, do a Print Preview or a
+>Print, I get an Assert failed in CPreviewDC::ExtTextOut(). The line
+>with the ASSERT statement says:
+>
+>	ASSERT(AfxIsValidAddress(lpszString, nCount));
+>
+>If I look at the lpszString is say "BRSWL" and nCount say 1. This is
+>correct!
+
+This looks like a bug in VC 1.52 and CPreviewDC - it should be the
+test:
+
+    ASSERT(AfxIsValidAddress(lpszString, nCount, FALSE));
+
+as the final parameter, defaulting to TRUE, is to test if the pointer
+is writable too. As you've got a static char *, the compiler probably
+puts the "BRSWL" string into a read-only segment, so it is not
+writable. The prototype for TextOut is:
+
+    BOOL TextOut( int x, int y, LPCTSTR lpszString, int nCount );
+
+so the string can be const, therefore the MFC should not fail with an
+unwritable string.
+
+Try declaring your string like:
+
+   char pSymbols[] =3D "BRSWL";
+
+as this will place the string in writable memory, or you would better
+fixing the ASSERT() in the MFC code, as other TextOut()s like:
+
+   pDC->TextOut (xpos,ypos,"literal string",14);
+
+will spew too.
+
+HTH
+
+Ken
+--=20
+Ken Nicolson, Panasonic OWL: kenn@owl.co.uk <A HREF="http://www.owl.co.uk">http://www.owl.co.uk</A>
+       At Home: ken@ride.demon.co.uk <A HREF="http://www.ride.demon.co.uk">http://www.ride.demon.co.uk</A>
+#include <disclaim>
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+    <A HREF="http://www.digiday.com/mfcpro/joinmfcl.htm">Become an MFC-L member</A>
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

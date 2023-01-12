@@ -1,0 +1,197 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Question : Where to capture WM_CHAR message from parent
+</B></FONT>
+<BR>
+<PRE>
+<B>
+<A HREF="mailto:edwardlau@hactl.com.hk">edwardlau@hactl.com.hk</A>
+Thursday, October 17, 1996
+</B>
+     Environment: MSVC 4.0 / Win95
+     
+     After reading from many discussions on the steps for creating in-place 
+     editing of list control, I have finally made it. I can update any 
+     subitems when EN_KILLFOCUS is captured. In addition, I want it to be 
+     updated when Enter is pressed in the in place edit box. I think 
+     WM_CHAR should be captured to check for enter key pressed, but where 
+     and how can I capture the WM_CHAR message?? I don't want to derive a 
+     new CEditinplace class and subclass it to the edit control of my list 
+     control, since I only use it here and nowhere else. 
+     
+     By the way, how can I achieve the effect that when the number of 
+     characters entered into the edit box exceed the length of the box, the 
+     box will expand automatically instead of auto HSCROLL, just like the 
+     default CListCtrl implementation on the edit label box?? Do I have to 
+     handle it in WM_CHAR also???
+     
+     Thanks in advance..
+     
+     Edward , PEI, edwardlau@hactl.com.hk
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Ravi -- <A HREF="mailto:Bikkula@albpig.cho.ge.com">Bikkula@albpig.cho.ge.com</A>
+Thursday, October 17, 1996
+</B>
+[Mini-digest: 3 responses]
+
+
+You need to override pretranslatemessage for that. And that will solve   
+your problem.
+
+...................................................................
+Ravi Kumar Bikkula
+Off :
+GE Fanuc Automation
+Albany, NY 12203 5189
+Ph #  (518) 464-4695
+mail :              Bikkula@albpig.cho.ge.com
+ -------------------------------------------------------------------------
+
+     Environment: MSVC 4.0 / Win95
+       
+
+     After reading from many discussions on the steps for creating   
+in-place
+     editing of list control, I have finally made it. I can update any
+     subitems when EN_KILLFOCUS is captured. In addition, I want it to be   
+
+     updated when Enter is pressed in the in place edit box. I think
+     WM_CHAR should be captured to check for enter key pressed, but where   
+
+     and how can I capture the WM_CHAR message?? I don't want to derive a   
+
+     new CEditinplace class and subclass it to the edit control of my   
+list
+     control, since I only use it here and nowhere else.
+       
+
+     By the way, how can I achieve the effect that when the number of
+     characters entered into the edit box exceed the length of the box,   
+the
+     box will expand automatically instead of auto HSCROLL, just like the   
+
+     default CListCtrl implementation on the edit label box?? Do I have   
+to
+     handle it in WM_CHAR also???
+       
+
+     Thanks in advance..
+       
+
+     Edward , PEI, edwardlau@hactl.com.hk
+
+-----From: "Randy Taylor" <randy_taylor@ebt.com>
+
+Environment: MSVC 4.2 WinNT 4.0
+
+You have two reasons to use a CEdit derivative:
+1. You wish to use the DC::GetTextExtent to measure
+    the text in the CEdit to determine whether to "grow" the CEdit
+    to the right when the user types a lot of text.
+2. You need to grow the CEdit to the right.
+The best way is to derive from CEdit.
+
+randy_taylor@ebt.com
+
+
+-----From: Mario Contestabile
+
+Given you can capture a click on any column & retrieve the item text,
+you call "fct(pszItemText);" where fct is a hypothetical function name.
+
+fct(pszItemText){
+
+ RECT rect;
+ INT result = YourListCtl.GetItemRect(Item, &rect, LVIR_LABEL);
+ EditClass* pEdit = new EditClass;
+ rect.bottom += 4;  // Either this or remove the WS_BORDER for a good look 
+under 1024x768
+ pEdit->Create(WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL, 
+  rect, YourListCtl.FromHandlePermanent(YourListCtl.m_hWnd), (UINT)-1);
+ CFont* pFont = GetFont();
+ pEdit->SetFont(pFont);
+ pEdit->SetWindowText(string);
+ pEdit->SetFocus();
+}
+
+EditClass is derived from CEdit and has the following members.
+
+void EditClass::OnKillFocus(CWnd*) 
+{
+ PostMessage(WM_CLOSE, 0, 0);
+}
+
+// "override" base class member function
+void EditClass::PostNcDestroy() 
+{
+ delete this;
+}
+
+// "augment" base class member function
+BOOL EditClass::PreTranslateMessage(MSG* pMsg) 
+{
+ if(pMsg->wParam == VK_RETURN){
+  CString string;
+  GetWindowText(string);  
+  NotifyOwner(string);
+  PostMessage(WM_CLOSE, 0, 0);
+  return TRUE;
+ }else if(pMsg->wParam == VK_ESCAPE){
+  PostMessage(WM_CLOSE, 0, 0);
+  return TRUE;
+ } 
+ 
+ return CEdit::PreTranslateMessage(pMsg); 
+}
+
+NotifyOwner() can tell the parent CWnd the string that was entered,
+and YourListCtrl can modify the item's text...
+
+mcontest@universal.com
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

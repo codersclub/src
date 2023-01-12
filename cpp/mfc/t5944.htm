@@ -1,0 +1,269 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Template class derived from a Template class???
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Norman L Covington -- <A HREF="mailto:doubleM@cris.com">doubleM@cris.com</A>
+Monday, July 22, 1996
+</B>
+Dear List Members:
+
+Environment: MSVC++ 4.1/WinNT 3.51 (Service Pack 4)
+
+I have a base class as follows:
+
+template<class T>
+class CdMPerson : public CObject
+{
+// Constructor(s)
+public:
+  CdMPerson();                      // Default Constructor
+  CdMPerson(CdMPerson<T>& rPerson); // Copy Constructor
+  ~CdMPerson();
+
+  ...
+};
+
+In the same header file (taking CMap... in AfxTempl.h as an example to
+follow) I define the Constructor as follows:
+
+template<class T>
+CdMPerson<T>::CdMPerson()
+{
+  m_szTitle = _T("");
+  m_szFirst = _T("");
+  m_szMiddle = _T("");
+  m_szLast = _T("");
+  m_szSuffix = _T("");
+  m_szNameExt = _T("");
+  m_pID = new T();
+  ASSERT(m_pID != NULL);
+}
+
+I then derive a class as follows:
+
+template<class T>
+class CdMContact : public CdMPerson<T>
+{
+// Constructor(s)
+public:
+  CdMContact();                        // Default Constructor
+  CdMContact(CdMContact<T>& rContact); // Copy Constructor
+  ~CdMContact();
+  
+  ...
+};
+
+The constructor is as follows (It should be noted the template T is used for
+the base class CdMPerson<T> rather than within the CdMContact<T> class):
+
+template<class T>
+CdMContact<T>::CdMContact() : CdMPerson<T>()
+{
+  m_szJobPosition = _T("");
+
+  m_wPhoneKey = 0x0;
+  m_wAddressKey = 0x0;
+  m_pmapPhones = NULL;
+  m_pmapAddresses = NULL;
+}
+
+Again all template declarations and definitions are within the same header file.
+
+Following is the implementation within a derived CPropertySheet to test the
+template classes:
+
+  ...
+
+  CdMStrValue* pWContactID1 = new CdMStrValue();
+  ASSERT(pWContactID1 != NULL);
+  pWContactID1->SetValue(_T("WContactID1"));
+  CdMContact<CdMStrValue> pWContact1 = new CdMContact<CdMStrValue>();
+  pWContact1->SetID(pWContactID1);
+  pWContact1->SetName(_T("Mr"), _T("Adam"), _T("A"), _T("Adamson"), NULL, NULL);
+  pWContact1->SetJobPosition(_T("Clerk"));
+
+  ...
+
+My addition reference other than that provided by books online is chapter
+14, Mastering Templates, The Most Complete Reference Special Edition Using
+Visual C++ 4, Que Publishing. Upon compiling the CPropertySheet derived
+class to test these templates I get the following errors:
+
+error C2664: 'CdMContact<class CdMStrValue>::CdMContact<class
+CdMStrValue>(class CdMContact<class CdMStrValue> &)' : cannot convert
+parameter 1 from 'class CdMContact<class CdMStrValue> *' to 'class
+CdMContact<class CdMStrValue> &' (new behavior; please see help)
+
+As depicted above I have copy constructors defined as well as the "default
+constructors." Following are the copy construct definitions:
+
+template<class T>
+CdMPerson<T>::CdMPerson(CdMPerson<T>& rPerson)
+{
+   ...
+}
+
+template<class T>
+CdMContact<T>::CdMContact(CdMContact<T>& rContact) : CdMPerson<T>(rContact)
+{
+   ...
+}
+
+Obviously because the above errors occurred an following reference to
+CdMContact<T> does not compile properly either as illustrated below:
+
+error C2819: type 'CdMContact<class CdMStrValue>' does not have an
+overloaded member 'operator ->'
+
+error C2227: left of '->SetID' must point to class/struct/union
+0
+error C2819: type 'CdMContact<class CdMStrValue>' does not have an
+overloaded member 'operator ->'
+
+error C2227: left of '->SetName' must point to class/struct/union
+
+error C2819: type 'CdMContact<class CdMStrValue>' does not have an
+overloaded member 'operator ->'
+
+error C2227: left of '->SetJobPosition' must point to class/struct/union
+
+The errors then repeat as above for each contact object instances attempted.
+
+I have looked at the code in the header where the template is
+declared/defined and within the derived CPropertySheet class
+header/implementation file. I should mention I have other templates working
+fine. It is only when I derived a class from a template base class where the
+template derived class supplies the derived class with the class type.
+
+Assistance would greatly be appreciated. Thank you for your valuable time in
+advance.
+
+Norman
+Email: doubleM@concentric.net
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Ken Nicolson -- <A HREF="mailto:kenn@owl.co.uk">kenn@owl.co.uk</A>
+Friday, July 26, 1996
+</B>
+[Mini-digest: 3 responses]
+
+On Mon, 22 Jul 1996 17:50:21 -0700, you wrote:
+
+[snip!]
+
+>  CdMContact<CdMStrValue> pWContact1 = new CdMContact<CdMStrValue>();
+
+Surely that line should be:
+
+   CdMContact<CdMStrValue> * pWContact1 = new CdMContact<CdMStrValue>();
+                           ^
+
+With the code the way you posted, the error:
+
+>
+>error C2664: 'CdMContact<class CdMStrValue>::CdMContact<class
+>CdMStrValue>(class CdMContact<class CdMStrValue> &)' : cannot convert
+>parameter 1 from 'class CdMContact<class CdMStrValue> *' to 'class
+>CdMContact<class CdMStrValue> &' (new behavior; please see help)
+>
+
+makes sense - removing all the template stuff and using, say, int, instead,
+the posted code is just:
+
+    int x = new int;
+
+Therefore my suggested fix
+
+    int * x = new int;
+
+looks correct.
+
+HTH
+
+Ken
+-----From: bop@gandalf.se
+
+Here's the problem, look below.
+
+>  pWContact1->SetID(pWContactID1);
+>  pWContact1->SetName(_T("Mr"), _T("Adam"), _T("A"), _T("Adamson"), NULL,
+> NULL);
+>  pWContact1->SetJobPosition(_T("Clerk"));
+>
+> [...snip...]
+>
+> error C2819: type 'CdMContact<class CdMStrValue>' does not have an
+> overloaded member 'operator ->'
+>
+> error C2227: left of '->SetID' must point to class/struct/union
+>
+> [...snip...]
+
+The missing "->" operator is the clue: You declared a CdMContact<CdMStrValue>
+object, not a pointer.  "pWContact1" should be " *pWContact1" !
+
+
+Bo Persson
+bop@gandalf.se
+-----From: Sajith Kumar <sajith@wallop.com>
+
+ CdMContact<CdMStrValue> pWContact1 = new CdMContact<CdMStrValue>();
+or
+ CdMContact<CdMStrValue>* pWContact1 = new CdMContact<CdMStrValue>();
+
+
+
+Sajith Kumar
+sajith@wallop.com
+1155 Triton Drive, Suite E
+Foster City, CA 94404
+(415) 341 1177x227
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

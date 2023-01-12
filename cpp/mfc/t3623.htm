@@ -1,0 +1,210 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Dynamicly loaded a MFC User DLL
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Marc H. Simkin -- <A HREF="mailto:simkinm@BankersTrust.com">simkinm@BankersTrust.com</A>
+Thursday, January 25, 1996
+</B>
+I have several MFC Classes that I have written using VC++ 4.0.  I have
+placed all these classes in 1 DLL.  I am able to statically link the
+DLL with the EXE.  However, I would like to be able to dynamically
+link to the DLL using LoadLibrary and GetProcInstance.  Will this work
+as expected, or do I need to do it another way?
+
+Thanks
+
+Marc
++---------------------------------------------------------------------+
+| Marc H. Simkin                Internet: simkinm@btco.com            |
+| Senior Prog/Analyst                     mhsimkin@panix.com          |
+| Bankers Trust Company         CIS:      72401,57                    |
+| GIS Technology - MS 2191      Work:     (212) 250 7120              |
+| 1 Bankers Trust Plaza         Fax:      (212) 250 5675              |
+| New York, NY 10006                                                  |
++---------------------------------------------------------------------+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@interserv.com">mikeblas@interserv.com</A>
+Saturday, January 27, 1996
+</B>
+[Mini-digest: 2 responses]
+
+On Thu, 25 Jan 1996, simkinm@BankersTrust.com (Marc H. Simkin) wrote:
+>However, I would like to be able to dynamically
+>link to the DLL using LoadLibrary and GetProcInstance.  Will this work
+>as expected, or do I need to do it another way?
+
+First, you need to make sure you've written an extension DLL.  The 
+instructions for the documentation.
+
+You need to do it another way (the way that's documented in Books Online, 
+too).  ESsentially, make sure your DllMain() calls AfxTerminateModule() 
+appropriately, and use AfxLoadLibrary() and AfxFreeLibrary() instead of the 
+similarly named Windows APIs.
+
+.B ekiM
+--
+TCHAR szDisc[] = _T("These words are my own; I do not speak for Microsoft.");
+
+-----From: "Albert Szilvasy" <szilvasy@almos.vein.hu>
+
+On 25 Jan 96 at 1:54, Marc H. Simkin wrote:
+
+> I have several MFC Classes that I have written using VC++ 4.0.  I have
+> placed all these classes in 1 DLL.  I am able to statically link the
+> DLL with the EXE.  However, I would like to be able to dynamically
+> link to the DLL using LoadLibrary and GetProcInstance.  Will this work
+> as expected, or do I need to do it another way?
+Yes, it will. I had the same problem, run into difficulties then 
+received the following replies for my S.O.S. on this list: (go to the 
+end of the letter, that's where I stated my problem.)
+
+[Mini-digest: 3 responses]
+
+I'd bet that your "test function" doesn't switch the module state 
+before trying to use MFC, right?
+
+You should have something like this for all exported functions:
+
+void MyTestFunction()
+{
+     AFX_MANAGE_STATE(AfxGetStaticModuleState());
+     CMyDialog dlg;
+     dlg.DoModal();
+}
+
+Also, exported functions should probably do other things as well -- 
+such as catching all exceptions so they don't pass up the chain, and 
+perhaps locking/unlocking the maps (AfxLockTempMaps/AfxUnlockTempMaps) 
+such that MFC temporary objects are deleted when they are no longer needed.
+
+// Dean
+
+----From: Kalyan Kumar Kona <kalyan@sriven.scs.co.in>
+
+Define _AFXDLL in the test program also.
+
+cheers
+
+K.Kalyan Kumar
+
+-----From: "John Elsbree" <elsbree@msn.com>
+
+Albert -
+
+You need to make sure you have the correct "module state" in effect while 
+functions in your DLL are executing. To learn more about module states, refer 
+to these two articles in the VC++ 4.0 documentation:
+
+"Managing the State Data of MFC Modules" in the MFC Encyclopedia
+"MFC Module State Implementation" in TechNote 58
+
+mfcTeam.m_johnels;	// does not represent Microsoft
+
+----------
+From: 	owner-mfc-l@netcom.com on behalf of Albert Szilvasy
+Sent: 	Monday, December 18, 1995 5:12 AM
+To: 	mfc-l@netcom.com
+Subject: 	LoadLibrary & Regular DLL with shared MFC
+
+Hi,
+
+My problem is what the subject says.
+In more detail:
+According to the MFC docs now (with 4.0) you can build regular dlls 
+(formerly USRDLL) that use  MFC in a dll.
+I tried that. I doesn't seem to work with run-time linking.
+First, I created a Appwizard DLL using (regular dll using mfc in a shared 
+library) I put a test function in it that brings up a dialog.
+Second, I created an Appwizard executable (using mfc in a static 
+library) I put a test function that loads the library and tries to 
+invoke the dll's test function.
+The thing won't work. MFC is not properly initialized. The assertion 
+that fails:
+afxwin1.inl line: 22
+
+I bet I still need to do something. Please tell me what.
+Thanks in advance.
+Albert
+--
+UofV,Hungary
+--
+UofV,Hungary
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Tim Hagemann -- <A HREF="mailto:100063.323@compuserve.com">100063.323@compuserve.com</A>
+Monday, January 29, 1996
+</B>
+Marc,
+
+>> I have several MFC Classes that I have written using VC++ 4.0.  I have
+>> placed all these classes in 1 DLL.  I am able to statically link the
+>> DLL with the EXE.  However, I would like to be able to dynamically
+>> link to the DLL using LoadLibrary and GetProcInstance.  Will this work
+>> as expected, or do I need to do it another way?
+
+Of course, it is possible to use LoadLibrary()/FreeLibrary() and
+GetProcAddress() to get a function pointer to all member functions, but because
+of the name mangling of the c++ compiler and the hidden this-pointer, this task
+is very difficult and defective.
+
+The first solution is to use ole-automation / ole-controls, which support late
+binding and 'oop' by design. 
+Another solution would be to create a c-export layer and handle all member
+function call though this layer. 
+
+Tim Hagemann
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

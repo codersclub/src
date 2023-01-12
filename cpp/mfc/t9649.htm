@@ -1,0 +1,230 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+COleDateTime.Format() fails when time is '12:00 AM'
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Jeff Hare -- <A HREF="mailto:jeff@syncinc.com">jeff@syncinc.com</A>
+Tuesday, February 18, 1997
+</B>
+
+Environment: VC++ 4.2b, NT 4.0
+
+Hello,
+
+  I'm trying to figure out what I'm doing wrong here.  I detected no 
+problems installing the 4.2b patch a few months back.  
+
+  When a file timestamp indicates 12:00, AM the decimal portion of
+DATE seems to be == nnn.0 which causes problems with the results of
+COleDateTime.Format().
+
+
+  // Gather timestamps from the Object
+  //--------------------------------------
+  CString ModifyDate = "(Timestamp Unavailable)";
+
+  // wGetTimeLastModified() returns a DATE, or a
+  // value of 0.0 if no timestamp is currently
+  // available.
+  // -------------------------------------------
+  DATE dt = pObj.wGetTimeLastModified();
+
+  if(dt != 0.0) {
+
+    // When files with timestamp of exactly 12:00 AM are
+    // encountered, the decimal portion == ddd.000 here.
+    //--------------------------------------------------
+    COleDateTime odt(dt);
+
+    // odt.Format returns a valid Date string, but the
+    // Time string is completely missing when the TIME
+    // portion of dt was == nnn.000   
+    //------------------------------------------------
+    ModifyDate = odt.Format();
+  }
+
+
+  I may have missed some critical documentation, but I thought I
+scanned MSDN and the online docs for all the info about COleDateTime
+and DATE pretty carefully.  I also didn't see this in any of the 
+open bug lists I scanned.
+
+Thanks for any tips in solving this matter.
+
+-Jeff
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Jay Nabedian -- <A HREF="mailto:jnabedian@qgraph.com">jnabedian@qgraph.com</A>
+Wednesday, February 19, 1997
+</B>
+
+
+>Environment: VC++ 4.2b, NT 4.0
+
+>  When a file timestamp indicates 12:00, AM the decimal portion of
+>DATE seems to be == nnn.0 which causes problems with the results of
+>COleDateTime.Format().
+
+>  I may have missed some critical documentation, but I thought I
+>scanned MSDN and the online docs for all the info about COleDateTime
+>and DATE pretty carefully.  I also didn't see this in any of the 
+>open bug lists I scanned.
+
+
+You're looking too deep. In the online docs for COleDateTime (and in the
+MSVC++ printed docs, Volume 3, page 1116) it is stated that "By convention, the
+date 0 (30 December 1899) is used for time-only values. Similarly, the time
+0:00 (midnight) is used for date-only values."
+
+I find this upsetting as well, but I don't see any way around it.
+
+--- 
+
+  /\  /\  /\  /  Jay W. Nabedian
+\/  \/  \/  \/   jnabedian@qgraph.com
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Brad Bruce -- <A HREF="mailto:BradBruc@ix.netcom.com">BradBruc@ix.netcom.com</A>
+Wednesday, February 19, 1997
+</B>
+I'm not positive but I believe that midnight is stored when there is only a
+date entered.  The format is trying to handle both date and date/time
+input.
+
+----------
+> From: Jeff Hare <jeff@syncinc.com>
+> To: mfc-l@netcom.com
+> Subject: COleDateTime.Format() fails when time is "12:00 AM"
+> Date: Tuesday, February 18, 1997 12:44 PM
+> 
+> 
+> Environment: VC++ 4.2b, NT 4.0
+> 
+> Hello,
+> 
+>   I'm trying to figure out what I'm doing wrong here.  I detected no 
+> problems installing the 4.2b patch a few months back.  
+> 
+>   When a file timestamp indicates 12:00, AM the decimal portion of
+> DATE seems to be == nnn.0 which causes problems with the results of
+> COleDateTime.Format().
+> 
+> 
+>   // Gather timestamps from the Object
+>   //--------------------------------------
+>   CString ModifyDate = "(Timestamp Unavailable)";
+> 
+>   // wGetTimeLastModified() returns a DATE, or a
+>   // value of 0.0 if no timestamp is currently
+>   // available.
+>   // -------------------------------------------
+>   DATE dt = pObj.wGetTimeLastModified();
+> 
+>   if(dt != 0.0) {
+> 
+>     // When files with timestamp of exactly 12:00 AM are
+>     // encountered, the decimal portion == ddd.000 here.
+>     //--------------------------------------------------
+>     COleDateTime odt(dt);
+> 
+>     // odt.Format returns a valid Date string, but the
+>     // Time string is completely missing when the TIME
+>     // portion of dt was == nnn.000   
+>     //------------------------------------------------
+>     ModifyDate = odt.Format();
+>   }
+> 
+> 
+>   I may have missed some critical documentation, but I thought I
+> scanned MSDN and the online docs for all the info about COleDateTime
+> and DATE pretty carefully.  I also didn't see this in any of the 
+> open bug lists I scanned.
+> 
+> Thanks for any tips in solving this matter.
+> 
+> -Jeff
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Richard Morris -- <A HREF="mailto:richard@softwaremachine.com">richard@softwaremachine.com</A>
+Tuesday, February 25, 1997
+</B>
+I ran into the same problem when using a COleDateTime stored in a
+COleVariant, so I do a special test and then reformat the date output for my
+need.  Here is a piece of my code.  It might give you some ideas.
+
+COleVariant var;
+//........ var value is retrieved from data source here
+// then we test for special case
+
+if (COleDateTime(var).Format(_T("%m%d%y")) == "12300/")	// time only
+        strRet = COleDateTime(var).Format(_T("%X"));//Format(_T("%c")); //
+Format(_T("%m/%d/%y %H:%M:%S"));//Format(_T("<%m %d %y>"));
+else
+        strRet = COleDateTime(var).Format(_T("%c")); // Format(_T("%m/%d/%y
+%H:%M:%S"));//Format(_T("<%m %d %y>"));
+;
+
+*********************************************
+>>   When a file timestamp indicates 12:00, AM the decimal portion of
+>> DATE seems to be == nnn.0 which causes problems with the results of
+>> COleDateTime.Format().
+****************************************************************
+Live now.
+Make now always the most precious time.
+Now will never come again.
+	 - Captain Jean-Luc Picard, U.S.S. Enterprise
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+    <A HREF="http://www.digiday.com/mfcpro/joinmfcl.htm">Become an MFC-L member</A>
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

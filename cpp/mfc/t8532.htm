@@ -1,0 +1,663 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Unresolved Externals...
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Dana M. Epp -- <A HREF="mailto:eppdm@uniserve.com">eppdm@uniserve.com</A>
+Monday, December 16, 1996
+</B>
+[Mini-digest: 2 responses]
+
+Environment: VC++ 4.2b, NT 4.0/Win 95
+
+After recently upgrading to 4.2b, I had to run through and clean up code
+changes etc from the previous compiler. I had one Linker error I could not
+remove however, and had to work around it. Yet I am curious to know what the
+true solution would be. Perhaps someone one the list knows what was going
+on. Below is a snippit of the function, as well as what I had to do to solve
+it. When building the Release version of the App, everything is fine..
+however the debug would error out. The error I was getting was...
+
+sheet.obj : error LNK2001: unresolved external symbol "public: int
+__thiscall CListCtrl::FindItem(struct _LV_FINDINFOA *,int)const
+"(?FindItem@CListCtrl@@QBEHPAU_LV_FINDINFOA@@H@Z)
+
+
+I thought maybe I had some Settings incorrect in the Compiler, however, this
+code worked FINE in 4.1, which lead me to belive the LNK2001 error is
+because the FindItem function is inline. Yet I am unsure.
+
+LRESULT CSheet::OnRemoveThreadID( WPARAM wparam, LPARAM )
+{
+	char threadid[7];
+	sprintf( threadid, "%ld", (DWORD)wparam );
+	
+	LV_FINDINFO info;
+	info.flags = LVFI_STRING;
+	info.psz = threadid;
+	// Below is the work around to make the FindItem work... I am curious to
+know why the actual call 
+        // Would be unresolved. the original line is commented out below the
+work around.	
+        int m_cnt = ::SendMessage( m_Page3.m_cThreadList.m_hWnd,
+LVM_FINDITEM, (WPARAM)-1, (LPARAM)&info );
+	//int m_cnt = m_Page3.m_cThreadList.FindItem( &info );
+	
+	m_Page3.m_cThreadList.DeleteItem( m_cnt );
+
+	return 0;
+}
+PC'ing you,                     
+Dana M. Epp          
+eppdm@uniserve.com
+<A HREF="http://bedrock.cyberhq.com/dana">http://bedrock.cyberhq.com/dana</A>
+
+     "How can one work with the technology of today, using yesterdays
+      software and methods, and still be on the leading edge tomorrow?
+      Why settle for less... I won't! "
+
+-----From: "Dana M. Epp" <eppdm@uniserve.com>
+
+Environment: VC++ 4.2flat NT 4.0/Win95
+
+Updating my previous message, I would like to point out a few things with
+the 4.2b patch that caused my problems. For those of you just joining in I
+was getting errors such as: 
+
+sheet.obj : error LNK2001: unresolved external symbol "public: int
+__thiscall CListCtrl::FindItem(struct _LV_FINDINFOA *,int)const
+"(?FindItem@CListCtrl@@QBEHPAU_LV_FINDINFOA@@H@Z)
+
+in 4.2b, on DEBUG only( Release works fine ), but had NO problems with this
+in 4.1 or 4.2flat. After researching some more, and getting some insight
+from Tim Robinson, we came to a source of information on one of the MFC
+newsgroups about differences in header files. Thanks to the insight of Jeff
+Simpson, it has been concluded that the commctrl.h file has had SIGNIFICANT
+changes to the header which causes these linker problems. The main issue is
+that the STRUCTURES themselves have been RENAMED. If you notice, 4.2 flat
+names things such as tagLV_FINDINFOA, where as the patch renames them to
+_LV_FINDINFOA. 
+
+I have a feeling the patch doesn't actually patch the debug libs for the
+controls and this is the source of the problem, and the reason why some
+people are having trouble with TV_* and LV_* unresolves.
+
+To remedy this, I have moved back to 4.2flat. I am curious to know if there
+is a way to solve my problem though, without having to alter the commctrl.h
+file itself. (Yes, if you go and rename the structs to tagLV_* it works fine...)
+
+Maybe someone can verify this. Mike B.???
+
+
+
+PC'ing you,                     
+Dana M. Epp          
+eppdm@uniserve.com
+<A HREF="http://bedrock.cyberhq.com/dana">http://bedrock.cyberhq.com/dana</A>
+
+     "How can one work with the technology of today, using yesterdays
+      software and methods, and still be on the leading edge tomorrow?
+      Why settle for less... I won't! "
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Wednesday, December 18, 1996
+</B>
+[Mini-digest: 2 responses]
+
+At 15:38 12/16/96 -0800, Dana M. Epp wrote:
+
+> I have a feeling the patch doesn't actually patch the debug libs for the
+> controls and this is the source of the problem, and the reason why some
+> people are having trouble with TV_* and LV_* unresolves.
+
+The patch works, if you install it properly.  It patches both debug and release
+versions of the DLL, the DLL import libraries, and the static libraries.  Anyone
+who says otherwise simply doesn't know what they're talking about.
+
+> To remedy this, I have moved back to 4.2flat. I am curious to know if there
+> is a way to solve my problem though, without having to alter the commctrl.h
+> file itself. (Yes, if you go and rename the structs to tagLV_* it works
+fine...)
+
+That your getting this error message means that you've not installed the patch
+properly.
+
+>sheet.obj : error LNK2001: unresolved external symbol "public: int
+>__thiscall CListCtrl::FindItem(struct _LV_FINDINFOA *,int)const
+>"(?FindItem@CListCtrl@@QBEHPAU_LV_FINDINFOA@@H@Z)
+
+This specific error message means one of a few things:
+
+1) You didn't run the patch on the files in your MSDEV directory and
+   its subdirectories, or the patch didn't find the original files and
+   aborted.  As a result, you still have the old MFC library files 
+   in your MSDEV\MFC\LIB directory.  You don't mention how you're building
+   your application, so I can't provide the name of the specific file which
+   you didn't patch correctly.
+
+2) You ran the patch on the files in your MSDEV directory, but you have
+   the file someplace else, like in your project directory.
+
+3) You ran the patch on the files in your MSDEV directory, but you have
+   the file someplace else, like in a different directrory and that
+   different directory is first on your path.
+
+Again, the patch works, if properly installed.  Perhaps you didn't 
+fully read the directions, or perhaps the files you were trying to patch
+weren't the original files shipped with the product and the patch software
+was unable to patch them.
+
+It's a common mistake to give up on the directions early: you have to run
+the patcher program twice, once on the Windows system directory and once
+on the MSDEV directory.
+
+> Maybe someone can verify this. Mike B.???
+
+Did you know that this is the eighth time I've addressed this issue on
+this list alone?  If you add in my participation on other lists, and on
+CompuServe, how much faith do you think I have in the average person's
+ability to read and follow very simple instructions?
+
+Please forward this to your friends, Tim Robinson and Jeff Simpson, so
+they quit spreading misinformation and leading people to bad conclusions.
+
+>To remedy this, I have moved back to 4.2flat. I am curious to know if there
+>is a way to solve my problem though, without having to alter the commctrl.h
+>file itself. (Yes, if you go and rename the structs to tagLV_* it works
+fine...)
+
+You shouldn't modify the file.  Maybe, because you modified the files earlier,
+the patch didn't take.  The patch actually patches the COMMCTRL.H file (and lots
+of other header files) to make sure everything works.
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+I'm afraid I've become some sort of speed freak.
+These words are my own. I do not speak on behalf of Microsoft.
+
+-----From: Carsten Schwartz <csn@dhi.dk>
+
+
+
+------ =_NextPart_000_01BBED84.3C0D6F40
+Content-Type: text/plain; charset="us-ascii"
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Tim Robinson -- <A HREF="mailto:timtroyr@ionet.net">timtroyr@ionet.net</A>
+Friday, December 20, 1996
+</B>
+At 18:41 12/18/96 -0800, Mike Blaszczak wrote:
+>At 15:38 12/16/96 -0800, Dana M. Epp wrote:
+>
+>> I have a feeling the patch doesn't actually patch the debug libs for the
+>> controls and this is the source of the problem, and the reason why some
+>> people are having trouble with TV_* and LV_* unresolves.
+>
+>The patch works, if you install it properly.  It patches both debug and release
+>versions of the DLL, the DLL import libraries, and the static libraries.
+Anyone
+>who says otherwise simply doesn't know what they're talking about.
+
+THE patch?  There are 4.  And, IMHO, it's not clear from Microsoft's web
+pages which one, or ones, or all four that you need to grab.  Whatever.  In
+any event, the patch instructions are simple enough.  Dana patched a freshly
+and normally installed 4.2, so it's not an issue of mis-placed files being
+patched.  I got the same results from 4.2 installed and in use for some time
+(but unmodified).
+
+>> To remedy this, I have moved back to 4.2flat. I am curious to know if there
+>> is a way to solve my problem though, without having to alter the commctrl.h
+>> file itself. (Yes, if you go and rename the structs to tagLV_* it works
+>fine...)
+>
+>That your getting this error message means that you've not installed the patch
+>properly.
+
+We both kinda figured that much out.  But the key to the puzzle is still
+missing.  Is it getting and running all 4 patches... all 16Meg worth?  From
+what I recall on  reading the web pages, some patches were for those messing
+with OCX's.  We're not.
+
+>This specific error message means one of a few things:
+>
+>1) You didn't run the patch on the files in your MSDEV directory and
+>   its subdirectories, or the patch didn't find the original files and
+>   aborted.  As a result, you still have the old MFC library files 
+>   in your MSDEV\MFC\LIB directory.  You don't mention how you're building
+>   your application, so I can't provide the name of the specific file which
+>   you didn't patch correctly.
+
+Dana and I are building pretty vanilla MFC apps.  The one patch we ran
+modified the .h file for the common controls.  I'm not disputing the
+validity of the changes.  However, that particular patch did not similarly
+patch the .lib file so that the functions using the modified structures had
+the correct name mangling.
+
+>2) You ran the patch on the files in your MSDEV directory, but you have
+>   the file someplace else, like in your project directory.
+
+no.
+
+>3) You ran the patch on the files in your MSDEV directory, but you have
+>   the file someplace else, like in a different directrory and that
+>   different directory is first on your path.
+
+and no.
+
+>Again, the patch works, if properly installed.  Perhaps you didn't 
+>fully read the directions, or perhaps the files you were trying to patch
+>weren't the original files shipped with the product and the patch software
+>was unable to patch them.
+
+also no.
+
+>It's a common mistake to give up on the directions early: you have to run
+>the patcher program twice, once on the Windows system directory and once
+>on the MSDEV directory.
+>
+>> Maybe someone can verify this. Mike B.???
+>
+>Did you know that this is the eighth time I've addressed this issue on
+>this list alone?  If you add in my participation on other lists, and on
+>CompuServe, how much faith do you think I have in the average person's
+>ability to read and follow very simple instructions?
+
+Regrettably, we don't get the opportunity to follow you around.  However, by
+your own observations, apparently quite a few people are missing this.  One
+of the messages I saw from a "confused" person was apparently carefully
+re-considered and re-tested.  Maybe those instructions are not so clear or
+simple as you suggest.  There is no purpose in pointing fingers when that
+happens... someone should just clear it up.
+
+>Please forward this to your friends, Tim Robinson and Jeff Simpson, so
+>they quit spreading misinformation and leading people to bad conclusions.
+
+Bad conclusions?  Like concluding I'm spreading something?  Thanks, but the
+(two) discussions were by phone with Dana as we tried to go over the
+instructions, patches, and problems to figure out what was wrong.
+
+>>To remedy this, I have moved back to 4.2flat. I am curious to know if there
+>>is a way to solve my problem though, without having to alter the commctrl.h
+>>file itself. (Yes, if you go and rename the structs to tagLV_* it works
+>fine...)
+>
+>You shouldn't modify the file.  Maybe, because you modified the files earlier,
+>the patch didn't take.  The patch actually patches the COMMCTRL.H file (and
+lots
+>of other header files) to make sure everything works.
+
+I did the modification and it was only AFTER the patching.  And it did
+indeed fix the problem.  Rather, fixed the problem well enough to get me
+through a deadline.  The patch applied affected the .h files, but not the
+.lib.  Patch diagnostics indicated all was well.
+
+Sorry for any attitude detected.  I don't take kindly to being called an
+idiot, either directly or indirectly.  Further, many of us join lists like
+this simply because it's not possible to know it all.  And we don't merely
+take, but we give when we can.  Being insulting to those who do all they can
+is cheap... no matter how good you are.
+
+Thanks for the input anyway.  We'll forge ahead.
+
+| Tim Robinson, Esquire          | Liberty  means responsibility. |
+| timtroyr@ionet.net             | That is why most men dread it. |
+| <A HREF="http://www.ionet.net/~timtroyr">http://www.ionet.net/~timtroyr</A> |            George Bernard Shaw |
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dan Kirby -- <A HREF="mailto:dkirby@accessone.com">dkirby@accessone.com</A>
+Friday, December 20, 1996
+</B>
+[Mini-digest: 2 responses]
+
+Hi,
+You can see that the patch does patch the debug libs and that the symbol
+does exist in the patched library.  Just do a simply "Dumpbin /symbols
+mfc42d.lib >out.txt" and look at the out.txt file and you should find that
+the symbol is there:
+
+?FindItem@CListCtrl@@QBEHPAU_LV_FINDINFOA@@H@Z
+
+If not, your library didn't get patched for some reason.  It got patched
+for me.  In the 4.2 libs (not 4.2b) the decorated name was different:
+?FindItem@CListCtrl@@QBEHPAUtagLVFINDINFOA@@H@Z @ 2161 NONAME
+
+Therefore if you build with the new stuff but are somehow linking with the
+older lib, you will see the error that you are seeing.
+
+Hope this helps,
+--dan
+
+
+----------
+> From: Dana M. Epp <eppdm@uniserve.com>
+> To: mfc-l@netcom.com
+> Subject: Unresolved Externals...
+> Date: Monday, December 16, 1996 3:38 PM
+> 
+> [Mini-digest: 2 responses]
+> 
+> Environment: VC++ 4.2b, NT 4.0/Win 95
+> 
+> After recently upgrading to 4.2b, I had to run through and clean up code
+> changes etc from the previous compiler. I had one Linker error I could
+not
+> remove however, and had to work around it. Yet I am curious to know what
+the
+> true solution would be. Perhaps someone one the list knows what was going
+> on. Below is a snippit of the function, as well as what I had to do to
+solve
+> it. When building the Release version of the App, everything is fine..
+> however the debug would error out. The error I was getting was...
+> 
+> sheet.obj : error LNK2001: unresolved external symbol "public: int
+> __thiscall CListCtrl::FindItem(struct _LV_FINDINFOA *,int)const
+> "(?FindItem@CListCtrl@@QBEHPAU_LV_FINDINFOA@@H@Z)
+> 
+> 
+> I thought maybe I had some Settings incorrect in the Compiler, however,
+this
+> code worked FINE in 4.1, which lead me to belive the LNK2001 error is
+> because the FindItem function is inline. Yet I am unsure.
+> 
+> LRESULT CSheet::OnRemoveThreadID( WPARAM wparam, LPARAM )
+> {
+> 	char threadid[7];
+> 	sprintf( threadid, "%ld", (DWORD)wparam );
+> 	
+> 	LV_FINDINFO info;
+> 	info.flags = LVFI_STRING;
+> 	info.psz = threadid;
+> 	// Below is the work around to make the FindItem work... I am curious to
+> know why the actual call 
+>         // Would be unresolved. the original line is commented out below
+the
+> work around.	
+>         int m_cnt = ::SendMessage( m_Page3.m_cThreadList.m_hWnd,
+> LVM_FINDITEM, (WPARAM)-1, (LPARAM)&info );
+> 	//int m_cnt = m_Page3.m_cThreadList.FindItem( &info );
+> 	
+> 	m_Page3.m_cThreadList.DeleteItem( m_cnt );
+> 
+> 	return 0;
+> }
+> PC'ing you,                     
+> Dana M. Epp          
+> eppdm@uniserve.com
+> <A HREF="http://bedrock.cyberhq.com/dana">http://bedrock.cyberhq.com/dana</A>
+> 
+>      "How can one work with the technology of today, using yesterdays
+>       software and methods, and still be on the leading edge tomorrow?
+>       Why settle for less... I won't! "
+> 
+> -----From: "Dana M. Epp" <eppdm@uniserve.com>
+> 
+> Environment: VC++ 4.2flat NT 4.0/Win95
+> 
+> Updating my previous message, I would like to point out a few things with
+> the 4.2b patch that caused my problems. For those of you just joining in
+I
+> was getting errors such as: 
+> 
+> sheet.obj : error LNK2001: unresolved external symbol "public: int
+> __thiscall CListCtrl::FindItem(struct _LV_FINDINFOA *,int)const
+> "(?FindItem@CListCtrl@@QBEHPAU_LV_FINDINFOA@@H@Z)
+> 
+> in 4.2b, on DEBUG only( Release works fine ), but had NO problems with
+this
+> in 4.1 or 4.2flat. After researching some more, and getting some insight
+> from Tim Robinson, we came to a source of information on one of the MFC
+> newsgroups about differences in header files. Thanks to the insight of
+Jeff
+> Simpson, it has been concluded that the commctrl.h file has had
+SIGNIFICANT
+> changes to the header which causes these linker problems. The main issue
+is
+> that the STRUCTURES themselves have been RENAMED. If you notice, 4.2 flat
+> names things such as tagLV_FINDINFOA, where as the patch renames them to
+> _LV_FINDINFOA. 
+> 
+> I have a feeling the patch doesn't actually patch the debug libs for the
+> controls and this is the source of the problem, and the reason why some
+> people are having trouble with TV_* and LV_* unresolves.
+> 
+> To remedy this, I have moved back to 4.2flat. I am curious to know if
+there
+> is a way to solve my problem though, without having to alter the
+commctrl.h
+> file itself. (Yes, if you go and rename the structs to tagLV_* it works
+fine...)
+> 
+> Maybe someone can verify this. Mike B.???
+> 
+> 
+> 
+> PC'ing you,                     
+> Dana M. Epp          
+> eppdm@uniserve.com
+> <A HREF="http://bedrock.cyberhq.com/dana">http://bedrock.cyberhq.com/dana</A>
+> 
+>      "How can one work with the technology of today, using yesterdays
+>       software and methods, and still be on the leading edge tomorrow?
+>       Why settle for less... I won't! "
+> 
+-----From: Mike Blaszczak <mikeblas@nwlink.com>
+
+At 03:59 12/20/96 -0600, Tim Robinson wrote:
+
+>THE patch?  There are 4.  And, IMHO, it's not clear from Microsoft's web
+>pages which one, or ones, or all four that you need to grab.
+
+MFC is a C++ library, and a such, exposes decorated C++ symbols from its
+libraries. Those symbols include exact names of types that each function
+sends or receives.  No matter how you link to MFC, you need to make sure 
+that you're using the same data type names--down to the names of each
+structure.  And that means that you need to use the same set of system
+header files that were used when building MFC.  That set is frozen in time
+on the product CD.
+
+As I've explained before, the VC++ 4.2 CD was release against beta versions
+of those header files (and, as a result, against beta versions of the
+underlying system DLLs and libraries).  That means two things:
+
+1) Since you're working against final release versions of those libraries,
+   you need to make sure that you have installed the patch.  The patch
+   gives you MFC bits that are compatible
+
+2) Since the libraries changed, and since MFC was rebuilt for the patch,
+   the headers changed. And that means you need to install those, too.
+
+You _can't_ expect MFC to work against system libraries with which it wasn't
+tested.  You _can't_ expect MFC to work when you don't have the correct set
+of headers installed.
+
+> Whatever.
+
+This sort of apathetic interjection makes me wonder if you really want to be
+helped. Assuming you do, let's forge ahead.
+
+>We both kinda figured that much out.  But the key to the puzzle is still
+>missing.  Is it getting and running all 4 patches... all 16Meg worth?  From
+>what I recall on  reading the web pages, some patches were for those messing
+>with OCX's.  We're not.
+
+The long instructions for installing the patch would go something like this:
+
+1) If you've ever modified _any_ library or header file so that it doesn't
+   match what's on the Visual C++ 4.2 product CD, you should uninstall and
+   reinstall Visula C++ 4.2, right from the product CD, first.  It doesn't 
+   matter if you have extra files lying around, but you need to have the
+   CD-version of those files installed, period.
+
+2) If you installed the "Beta" version of the patch, you _don't_ have to
+   reinstall.  If you've installed that patch and it is working just fine,
+   you can download the patch that says "Visual C++ 4.2b to upgrade from
+   Beta 1 of VC++ 4.2b (5.9 MB)" on the patch page, and skip to step 4. 
+   If the beta patch  _isn't_ working well, your best bet is to
+   uninstall and reinstall and go to step 1.
+
+3) Download the full version of the patch.  It says "Download Visual
+   C++ 4.2b (8.1 MB)" on the patch web page.
+
+4) Install the patch.  The patch file you downloaded has an INSTALL.TXT
+   file that explains what to do.  You must patch both your runtime
+   files (that is, files you have in your Windows system directory) and
+   your libraries and headers (that is, files you have in all sorts of
+   subdirectories of MSDEV).  As you let the patcher run, keep an
+   eye out for files that are skipped or unwriteable; if you see lots
+   of these, there is some problem and you need to remedy it before
+   continuing.  You will always note that a few files are skipped
+   because no installation has _all_ patchable files installed.  (Then
+   again, maybe one does: I don't have hte list of files patched here
+   at home to know for sure.)
+
+5) If you dual-boot, you need to install the runtime files patch in
+   both of your system directories.  On one of my machines at work,
+   for example, I'd need to run the patch against both the WINDOWS\SYSTEM
+   directory and the WINNT\SYSTEM32 directory.  You _don't_ need to run
+   the patch on your MSDEV directory twice.  (This is a clue about the
+   last point I made in step 4: if you're installing on Windows 95,
+   you probably won't have the Unicode libraries installed and you'll see
+   "source file not present" skip messages for all of the Unicode
+   libraries and map files and import libs and DLLs.)
+
+6) You're done.
+
+The other files on the patch page are for very special circumstances, and
+I wouldn't recommend installing them unless you were perfectly sure you know
+what you're doing and understood why you wanted them.  They're probably
+appealing because they look smaller, but they won't patch everything you
+need and you'll end up getting linker errors (or worse) if you install
+them in an inappropriate situation.
+
+Dana wrote to me privately, and that's exactly what had happened: someone
+told Dana to install one of the smaller files and _didn't_ understand
+the ramifications of their advice.
+
+>I did the modification and it was only AFTER the patching.  And it did
+>indeed fix the problem.  Rather, fixed the problem well enough to get me
+>through a deadline.  The patch applied affected the .h files, but not the
+>.lib.  Patch diagnostics indicated all was well.
+
+This makes it sound like you're using the new Win32 SDK headers and libraries
+(except for an old copy of COMMCTRL.H, which you manually downgraded) against
+unpatched MFC libraries. If that's the case, that's dangerous: the MFC code
+that ends up going outwith your application is bad and old and bogus and
+unpatched.  While your code compiled fine, you really gained nothing by
+installing the patch that the way you did.
+
+>Sorry for any attitude detected.  I don't take kindly to being called an
+>idiot, either directly or indirectly.  Further, many of us join lists like
+>this simply because it's not possible to know it all.  And we don't merely
+>take, but we give when we can.  Being insulting to those who do all they can
+>is cheap... no matter how good you are.
+
+It's amusing to me that you said this the way you did: from my side of the
+fence, it appears that you and Dana are doing exactly that. That is, you
+couldn't get something to work, got frustrated and started blaming Microsoft
+for your problem. My response sounded the way it did because that's certainly
+one of my hot buttons: insulting those who do all they can to ship a clean
+product (or patch).
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+I'm afraid I've become some sort of speed freak.
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Jim Lawson Williams -- <A HREF="mailto:jimlw@mail.ccur.com.au">jimlw@mail.ccur.com.au</A>
+Friday, December 27, 1996
+</B>
+At 08:49 PM 20/12/96 -0800, Mike B. wrote:
+
+>
+>3) Download the full version of the patch.  It says "Download Visual
+>   C++ 4.2b (8.1 MB)" on the patch web page.
+
+Progressing from the download page <A HREF="http://www.microsoft.com/kb/softlib/">http://www.microsoft.com/kb/softlib/</A> and nominating
+    "Visual C++" /"List Files"
+may seem logical.  It takes you to <A HREF="http://www.microsoft.com/isapi/support/bldqpage.idc?productPage=q_vc&productTitle=Microsoft+Visual+C%2B%2B">http://www.microsoft.com/isapi/support/bldqpage.idc?productPage=q_vc&productTitle=Microsoft+Visual+C%2B%2B</A>
+
+and presents you with (amongst other things) a choice of 4 files, each described much like this:
+
+  This patch is a technology update for Visual C++ 4.2 which updates Visual C++ 4.2 retail     installation to work with the final release of the Win32 and Activex
+  SDKs. There are four self-extraxting files available that contain different combinations of   SDK42B.exe. You should download the proper files that best suit your needs. (6145740 bytes,   published 09/26/96 ) 
+                            
+Which should you download to upgrade 4.2-flat?  Dunno  --  since I couldn't guess what would "best suit my needs", I began again, and progressed through
+ 
+  <A HREF="http://www.microsoft.com/visualc">http://www.microsoft.com/visualc</A>
+    Downloads and Patches       
+        Visual C++ 4.2b Technology Update
+            Download Visual C++ 4.2b (8.1 MB)
+
+>From Mike's comments it appears I got it right.  It would seem that there is a serious trap for the unwary...
+
+Regards,
+Jim LW
+
+
+>From the BBC's "Barchester Chronicles":
+
+    "I know that ultimately we are not supposed to understand.
+    But I also know that we must try."
+
+       -- the Reverend Septimus Harding, clog-dancer, C++ programmer
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

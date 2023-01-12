@@ -1,0 +1,253 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+SetFocus on CRichEditCtrl
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Wen Lin -- <A HREF="mailto:wen.lin@autodesk.com">wen.lin@autodesk.com</A>
+Monday, January 27, 1997
+</B>
+     Environment: NT 4.0, VC++ 4.2b
+
+
+     I have created a rich text editor control on one of the property
+     pages.  The way I created it is by adding a static control on the
+     dialog box resource, then obtain the rectangular area from it to
+     created CRichEditCtrl as below,
+     
+     BOOL CMyTextEditPage::OnInitDialog() 
+     {
+        CPropertyPage::OnInitDialog();
+        
+         // make the rich edit control
+         CWnd *pTempWnd = (CWnd*)GetDlgItem(IDC_TEXTEDITOR);
+         ASSERT(pTempWnd);
+         CRect rect;
+         pTempWnd->GetWindowRect(&rect);
+         pTempWnd->DestroyWindow();
+         ScreenToClient(&rect);
+         BOOL success =  myTextEdit.Create(WS_CHILD | WS_VISIBLE |
+                                 WS_TABSTOP | WS_BORDER | WS_VSCROLL | 
+                                 WS_HSCROLL | ES_AUTOHSCROLL |
+                                 S_AUTOVSCROLL | ES_MULTILINE |    
+                                 ES_WANTRETURN,
+                                    rect, this, IDC_TEXTEDITOR);
+         
+          .......
+     
+          myTextEdit.SetFocus();
+     
+          return FALSE;  
+     }
+     
+     I want cursor to stay on myTextEdit control whenever this property
+     page appears on top, so that user can key in characters right away.
+     But I can't seems be able to set focus to myTextEdit control by
+     SetFocus(), not even in CMyTextEditPage::OnShowWindow.
+     
+     Can someone point me if I miss any steps?
+     
+     
+     - Wen
+      
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Kit Kauffmann -- <A HREF="mailto:kitk@mudshark.sunquest.com">kitk@mudshark.sunquest.com</A>
+Tuesday, January 28, 1997
+</B>
+when i have problems like this, i'll post myself a (user-defined) message in 
+oninitdialog, and then do those actions in response to getting that message
+
+>     Environment: NT 4.0, VC++ 4.2b
+>
+>
+>     I have created a rich text editor control on one of the property
+>     pages.  The way I created it is by adding a static control on the
+>     dialog box resource, then obtain the rectangular area from it to
+>     created CRichEditCtrl as below,
+>     
+>     BOOL CMyTextEditPage::OnInitDialog() 
+>     {
+>        CPropertyPage::OnInitDialog();
+>        
+>         // make the rich edit control
+>         CWnd *pTempWnd = (CWnd*)GetDlgItem(IDC_TEXTEDITOR);
+>         ASSERT(pTempWnd);
+>         CRect rect;
+>         pTempWnd->GetWindowRect(&rect);
+>         pTempWnd->DestroyWindow();
+>         ScreenToClient(&rect);
+>         BOOL success =  myTextEdit.Create(WS_CHILD | WS_VISIBLE |
+>                                 WS_TABSTOP | WS_BORDER | WS_VSCROLL | 
+>                                 WS_HSCROLL | ES_AUTOHSCROLL |
+>                                 S_AUTOVSCROLL | ES_MULTILINE |    
+>                                 ES_WANTRETURN,
+>                                    rect, this, IDC_TEXTEDITOR);
+>         
+>          .......
+>     
+>          myTextEdit.SetFocus();
+>     
+>          return FALSE;  
+>     }
+>     
+>     I want cursor to stay on myTextEdit control whenever this property
+>     page appears on top, so that user can key in characters right away.
+>     But I can't seems be able to set focus to myTextEdit control by
+>     SetFocus(), not even in CMyTextEditPage::OnShowWindow.
+>     
+>     Can someone point me if I miss any steps?
+>     
+>     
+>     - Wen
+>      
+>
+>
+>
+Originality is the art of concealing your sources.
+
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+P.J. Tezza -- <A HREF="mailto:pj@exemplarsoftware.com">pj@exemplarsoftware.com</A>
+Wednesday, January 29, 1997
+</B>
+Exemplar Setup Toolkit manipulates the focus in its license agreement property page (which happens to have a CRichEditCtrl on it):
+
+/*
+	The CPropertyPage focus hack is based on MSVC KB Article Q148388.
+	The purpose of it is to keep the license agreement text from being 
+	highlighted when it is first presented to the user.
+*/
+
+#define WM_SETPAGEFOCUS (WM_APP+2)
+
+BOOL CLicenseAgreement::OnSetActive() 
+{
+	m_psetsht->SetWizardButtons(PSWIZB_BACK | PSWIZB_NEXT);
+
+  	PostMessage(WM_SETPAGEFOCUS, 0, 0L);
+
+	return CPropertyPage::OnSetActive();
+}
+
+BEGIN_MESSAGE_MAP(CLicenseAgreement, CPropertyPage)
+	//{{AFX_MSG_MAP(CLicenseAgreement)
+	//}}AFX_MSG_MAP
+	ON_MESSAGE(WM_SETPAGEFOCUS, OnSetPageFocus)
+END_MESSAGE_MAP()
+
+LRESULT CLicenseAgreement::OnSetPageFocus(WPARAM wParam, LPARAM lParam)
+{
+	CWnd* pwndParent = GetParent();
+	ASSERT(pwndParent);
+  	CWnd* pwndCancel = pwndParent->GetDlgItem(IDCANCEL);
+	ASSERT(pwndCancel);
+	pwndCancel->SetFocus();
+
+  return 0;
+}
+
+PJ
+pj@exemplarsoftware.com
+
+----------
+From: 	Wen Lin[SMTP:wen.lin@autodesk.com]
+Sent: 	Monday, January 27, 1997 8:59 PM
+To: 	mfc-l@netcom.com
+Subject: 	SetFocus on CRichEditCtrl
+
+     Environment: NT 4.0, VC++ 4.2b
+
+
+     I have created a rich text editor control on one of the property
+     pages.  The way I created it is by adding a static control on the
+     dialog box resource, then obtain the rectangular area from it to
+     created CRichEditCtrl as below,
+     
+     BOOL CMyTextEditPage::OnInitDialog() 
+     {
+        CPropertyPage::OnInitDialog();
+        
+         // make the rich edit control
+         CWnd *pTempWnd = (CWnd*)GetDlgItem(IDC_TEXTEDITOR);
+         ASSERT(pTempWnd);
+         CRect rect;
+         pTempWnd->GetWindowRect(&rect);
+         pTempWnd->DestroyWindow();
+         ScreenToClient(&rect);
+         BOOL success =  myTextEdit.Create(WS_CHILD | WS_VISIBLE |
+                                 WS_TABSTOP | WS_BORDER | WS_VSCROLL | 
+                                 WS_HSCROLL | ES_AUTOHSCROLL |
+                                 S_AUTOVSCROLL | ES_MULTILINE |    
+                                 ES_WANTRETURN,
+                                    rect, this, IDC_TEXTEDITOR);
+         
+          .......
+     
+          myTextEdit.SetFocus();
+     
+          return FALSE;  
+     }
+     
+     I want cursor to stay on myTextEdit control whenever this property
+     page appears on top, so that user can key in characters right away.
+     But I can't seems be able to set focus to myTextEdit control by
+     SetFocus(), not even in CMyTextEditPage::OnShowWindow.
+     
+     Can someone point me if I miss any steps?
+     
+     
+     - Wen
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

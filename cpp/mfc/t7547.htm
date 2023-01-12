@@ -1,0 +1,881 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Problems with ActiveX Documents
+</B></FONT>
+<BR>
+<PRE>
+<B>
+David Thayer -- <A HREF="mailto:davon@is.netcom.com">davon@is.netcom.com</A>
+Saturday, November 02, 1996
+</B>
+Environment: VC++4.2b, Windows 95, IE 3.0 with patch
+
+I am trying to get a stand alone Application to integrate to the Internet
+Explorer.  In this regard I have moved the App to the Active X DocObject
+architecture.  I have some questions.
+
+1.  Where can I find comprehensive info on using the ActiveX DocObject
+features of VC++4.2b?
+I have searched the MSDN CD and found info on using VC++ 2.0 of VC++4.1 and
+tweaking the code but even the 4.2 Online Books seem to have a dearth of
+information. A search of the 4.2 Online Books using the keyword  'ActiveX
+Document' returns 22 hits of which the only coding samples are the
+BindScrib Example which was written using 4.1 and writing custom classes to
+extend the Classical Ole Document model to the new ActiveX Model.   
+
+By the way the Active X Model is the coolest thing since pop-corn as it
+finally moves COM objects into a position to have equivalent functionality
+and transparency to the user as the SOM Model proposed by the all those
+other Companies which shall remain nameless here although their initials
+are IBM.
+
+A search of the Microsoft Mailing List for Active Documents returns a few
+dozen articles mostly seeking information.  A search of the various News
+Groups using Alta Vista found many of the same people asking the same
+questions.  A search through the MFCL Archives found little if nothing
+about Active Documents.
+
+2. I installed the B Patch to my compiler a few weeks ago.  I was reluctant
+because I didn't want to have to redistribute the MFC42.dll and msvcrt.dll
+to my customers. but I finally took the plunge.  (I have an incremental
+distribution system where any change to the software automatically gets
+replicated to all my customers w/o them even being aware anything has
+happened this meant that the first change made to my applications after the
+patch I had to ship the new dlls. <Corporate User Base on Intranet>)  The
+problem I am seeing now is that when I step into the code for example in
+OLESRVER1.CPP there seems to be code in the libraries that is not reflected
+in my source listings making it very hard to figure out what is going on. 
+Is there any patch that I can get to Update the MFC source files on my
+machine?
+
+3. I can not get my toolbars (I have three) to display.  I also cannot get
+my status bar to display.  I have followed the example in the BndScrib
+CreateControlBars with the exception of using a TOOLBAR Resource instead of
+a bitmap.  I have also implemented the guidelines of Article Q148860 from
+the KB that suggests clearing the CBRS_HIDE_INPLACE flag of the toolbar but
+nothing is showing up when I run the App in IE 3.0.  I can find no
+information at all about Status Bars in Active Documents.
+
+4.  when I try to navigate away from the Page I get repeated GPFs in
+OLESRVR1.CPP.   When I run through the code in the debugger I am seeing a
+problem in the COleServerDoc::DestroyInPlaceFrame function.  This functions
+code is as follows my comments are set within angle brackets.
+
+void COleServerDoc::DestroyInPlaceFrame(COleIPFrameWnd* pFrameWnd)
+{
+	ASSERT_VALID(this);
+	ASSERT_VALID(pFrameWnd);
+
+	// connect view to original, if existing view was used
+	if (m_pOrigParent != NULL)
+	{
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+<The first time through this function this piece of code runs fine.  On
+each subsequent  			>
+<call the Function GetDescendentWindow  returns a NULL value which causes
+the 			> 
+<following ASSERT to Trigger.  If this is ignored then later in the
+function body when the NULL		>	 
+<window handle is used by the function in some other function call a new
+call to OnDeactivate is 		>
+<triggered which ends up calling DestroyInPlaceFrame.   The first time
+through the handle is not NULL	>
+<however when the Connect View function is called it fails and calls
+OnDeactivate which sets up the recursion > 
+<by calling DestroyInPlaceFrame.  									>
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+		CView* pView = (CView*)pFrameWnd->GetDescendantWindow(
+			AFX_IDW_PANE_FIRST, TRUE);
+		ASSERT_VALID(pView);
+
+		// leaving the focus on an MDI child or one of its child windows
+		// causes Windows to get confused when the child window is
+		// destroyed, not to mention the fact that the focus will be
+		// out of sync with activation.
+		if (::GetFocus() == pView->m_hWnd)
+		{
+			// move focus to somewhere safe
+			HWND hWnd = ::GetParent(pFrameWnd->m_hWnd);
+			if (hWnd != NULL)
+				::SetFocus(hWnd);
+
+			// check again
+			if (::GetFocus() == pView->m_hWnd)
+				SetFocus(NULL); // last ditch effort
+		}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+< The first time through we get here with no problem within the body of the
+function		>
+<A call is made to pFrameWnd->RecalcLayout() which somehow fails and
+recalls OnDeactivate	>
+<There seems to be additional code in the library I am stepping through
+than in the my version 	>
+<of the MFC Source Code.  I suspect that the B Patch while patching the
+Libraries did not 		>
+<change the Source Code Files.  When I go into Disassembly view there are
+comparisons		>
+< between pView and NULL  with subsequent calls to OnDeactivate
+interspersed all through the code>
+<which as you can see from the code snippets I have listed here do not 
+appear in the code	>
+<it seems that the code should read as the following in various places.			
+>
+< if (pView == NULL) 										>
+<	OnDeactivate();										>
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ConnectView(m_pOrigParent, pView);
+		m_pOrigParent = NULL;
+
+		// remove any scrollbars added because of in-place activation
+		if ((m_dwOrigStyle & (WS_HSCROLL|WS_VSCROLL)) == 0 &&
+			(pView->GetStyle() & (WS_HSCROLL|WS_VSCROLL)) != 0)
+		{
+			::SetScrollRange(pView->m_hWnd, SB_HORZ, 0, 0, TRUE);
+			::SetScrollRange(pView->m_hWnd, SB_VERT, 0, 0, TRUE);
+		}
+
+		// restore old 3D style
+		pView->ModifyStyleEx(0, m_dwOrigStyleEx & WS_EX_CLIENTEDGE,
+			SWP_DRAWFRAME);
+
+		// force recalc layout on splitter window
+		CSplitterWnd* pSplitter = CView::GetParentSplitter(pView, TRUE);
+		if (pSplitter != NULL)
+			pSplitter->RecalcLayout();
+	}
+
+	// no active view or document during destroy
+	pFrameWnd->SetActiveView(NULL);
+
+	// destroy in-place frame window
+	pFrameWnd->DestroyWindow();
+}
+
+void COleServerDoc::ConnectView(CWnd* pParentWnd, CView* pView)
+{
+	ASSERT_VALID(this);
+	ASSERT_VALID(pParentWnd);
+	ASSERT_VALID(pView);
+
+	// move the view to the new parent
+	pView->SetParent(pParentWnd);
+
+	// Note: The currently active view on the original frame window is
+	//  kept active, because some controls, especially Windows controls,
+	//  continue to send notification messages to the original parent
+	//  window of the control.  So, the original frame window is kept
+	//  alive with the original active view pointer intact, such that
+	//  these notification messages do not get lost.
+
+	// set the active view of the new frame to newly moved view
+	CFrameWnd* pFrameWnd = pParentWnd->IsFrameWnd() ?
+		(CFrameWnd*)pParentWnd : pParentWnd->GetParentFrame();
+	pFrameWnd->SetActiveView(pView, FALSE);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+<OnDeactivate gets recalled at this point setting up the infinite loop of
+ASSERTS>
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	pFrameWnd->RecalcLayout();
+}
+
+The result is that I get somewhere between five and ten ASSERTS before I
+finally get an unrecoverable error such as an Access Error or a divide by
+Zero Error and the Server Shuts down.  I do not know whether this is a Bug
+in the code or the result of something I am doing wrong in some other part
+of my Document Server.  I realize that some of the members of this list are
+fairly defensive about the MFC Code and rightly so as they have sweated
+blood over it so I will reserve judgment for now. I just need to get my
+application working.  I believe I have researched this problem as
+assiduously as the time and resources I have at my disposal allow.  I throw
+myself on the tender mercies of the MFC Professional community.  
+
+Any One that can explain this behavior or that knows where to find an
+updated copy of the MFC Source will have my undying gratitude.
+
+Here is some further information on my GPF problem when my Active Document
+Deactivates itself.
+The Problem was previously traced to somewhere in the RecalcLayout
+function.  Further investigation 
+reveals that the problem is in the very last call to RepositionBars in the
+function.
+Specifically in the call to EndDeferWindowPos which is throwing a Divide by
+Zero Exception and apparently messing up the stack as the function returns
+to a function call in OLE32 instead of RecalcLayout.  This may be because
+the first Exception Handler the code sees when it is unwinding the stack is
+in the OLE32 Library.  See commented Disassemblies of relevant code
+fragments below. 
+
+RepositionBars:
+2426: void CWnd::RepositionBars(UINT nIDFirst, UINT nIDLast, UINT
+nIDLeftOver,
+2427:     UINT nFlags, LPRECT lpRectParam, LPCRECT lpRectClient, BOOL
+bStretch)
+2428: {
+5f439c5c   push      ebp
+5f439c5d   mov       ebp,esp
+5f439c5f   sub       esp,00000038
+5f439c62   push      ebx
+5f439c63   push      esi
+5f439c64   push      edi
+5f439c65   mov       dword ptr [ebp-38],ecx
+2429:     ASSERT(nFlags == 0 || nFlags == reposQuery || nFlags ==
+reposExtra);
+
+		*   *   *   *   *   *   *   *   *   *   *   *   *	
+		*   *   *   *   Code Removed    *   *   *
+		*   *   *   *   *   *   *   *   *   *   *   *   *	
+
+2509:
+2510:     // move and resize all the windows at once!
+2511:     if (layout.hDWP == NULL || !::EndDeferWindowPos(layout.hDWP))
+5f439ebd   cmp       dword ptr [layout],00000000
+5f439ec1   je        CWnd::RepositionBars+0000027d (5f439ed9)
+5f439ec7   mov       eax,dword ptr [layout]
+5f439eca   push      eax
+5f439ecb   call      dword ptr [__imp__EndDeferWindowPos@4 (5f4d435c)]
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+<EndDeferWindowPos Throws a First Chance Exception Integer Divide by Zero		
+>
+< This causes the Following Trace Statement to be output						>
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+5f439ed1   test      eax,eax
+5f439ed3   jne       CWnd::RepositionBars+0000028f (5f439eeb)
+2512:         TRACE0("Warning: DeferWindowPos failed - low system
+resources.\n");
+5f439ed9   push      5f4b41c0
+5f439ede   push      5f4b20d8
+5f439ee3   call      AfxTrace (5f41a900)
+5f439ee8   add       esp,00000008
+2513: }
+5f439eeb   jmp       CWnd::RepositionBars+00000294 (5f439ef0)
+5f439ef0   pop       edi
+5f439ef1   pop       esi
+5f439ef2   pop       ebx
+5f439ef3   leave
+5f439ef4   ret       001c
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+<When the function returns it returns to OLE32! 65f8251f()  instead of
+RecalcLayout		>
+<This function then calls
+COleServerDoc::XOleInPlaceObject::InPlaceDeactivate()			>
+<It enters the function at a point beyond the Functions beginning however.	
+		>
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+2745: STDMETHODIMP COleServerDoc::XOleInPlaceObject::InPlaceDeactivate()
+5f582d84   push      5f59a9a0
+5f582d89   mov       ecx,dword ptr [pThis]
+5f582d8c   call      CCmdTarget::GetInterface (5f5646af)
+5f582d91   mov       dword ptr [lpActiveObject],eax
+2746: {
+5f582d94   mov       eax,dword ptr [fEnterMode]
+5f582d97   push      eax
+5f582d98   mov       eax,dword ptr [lpActiveObject]
+5f582d9b   push      eax
+5f582d9c   mov       eax,dword ptr [lpActiveObject]
+5f582d9f   mov       eax,dword ptr [eax]
+5f582da1   call      dword ptr [eax+10]
+5f582da4   jmp      
+COleServerDoc::XOleInPlaceObject::ContextSensitiveHelp+00000039 (5f582da9)
+2747:     METHOD_PROLOGUE_EX(COleServerDoc, OleInPlaceObject)
+5f582da9   pop       edi
+5f582daa   pop       esi
+5f582dab   pop       ebx
+5f582dac   leave
+5f582dad   ret       0008
+2748:     ASSERT_VALID(pThis);
+2749:
+2750:     pThis->InternalAddRef();    // protect this object	
+%%%%%%%%%%%%%%%%%%%	
+5f582db0   push      ebp						<New Entry Point Second Time Called>
+5f582db1   mov       ebp,esp					%%%%%%%%%%%%%%%%%%%
+5f582db3   push      ffffffff
+5f582db5   push      5f582edb
+5f582dba   mov       eax,dword ptr fs:[00000000]
+5f582dc0   push      eax
+5f582dc1   mov       dword ptr fs:[00000000],esp
+5f582dc8   sub       esp,00000004
+5f582dcb   sub       esp,00000014
+5f582dce   push      ebx
+5f582dcf   push      esi
+5f582dd0   push      edi
+5f582dd1   mov       dword ptr [ebp-10],esp
+
+This function eventually calls COleServerDoc::OnDeactivate()
+Which Calls COleServerDoc::DestroyInPlaceFrame(COleIPFrameWnd* pFrameWnd)
+Which Calls  CWnd::GetDescendentWindow
+Here is the Code fragment where the call to GetDescendentWindow is called
+
+1314:     {
+1315:         CView* pView = (CView*)pFrameWnd->GetDescendantWindow(
+1316:             AFX_IDW_PANE_FIRST, TRUE);
+5f57f096   push      00000001
+5f57f098   push      0000e900
+5f57f09d   mov       ecx,dword ptr [pFrameWnd]
+5f57f0a0   call      ?GetDescendantWindow@CWnd@@QBEPAV1@HH@Z (5f54b782)
+5f57f0a5   mov       dword ptr [pView],eax
+1317:         ASSERT_VALID(pView);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+<Program Asserts NULL Handle Here									>
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+5f57f0a8   push      00000525
+5f57f0ad   push      5f5adf20
+5f57f0b2   mov       eax,dword ptr [pView]
+5f57f0b5   push      eax
+5f57f0b6   call      ?AfxAssertValidObject@@YGXPBVCObject@@PBDH@Z
+(5f54b02c)
+1318:
+1319:         // leaving the focus on an MDI child or one of its child
+windows
+1320:         // causes Windows to get confused when the child window is
+1321:         // destroyed, not to mention the fact that the focus will be
+1322:         // out of sync with activation.
+1323:         if (::GetFocus() == pView->m_hWnd)
+5f57f0bb   call      dword ptr [__imp__GetFocus@0 (5f5b3138)]
+5f57f0c1   mov       ecx,dword ptr [pView]
+5f57f0c4   cmp       eax,dword ptr [ecx+20]
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+<Loops back to COleServerDoc::DestroyInPlaceFrame here						>
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+5f57f0c7   jne       COleServerDoc::DestroyInPlaceFrame+000000b7 (5f57f10b)
+
+David Thayer
+NCS Apps Development Team
+Internet: davon@ix.netcom.com
+ATTMail: attmail!dthayer
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Sunday, November 10, 1996
+</B>
+At 14:53 11/2/96 -0500, David Thayer wrote:
+>Environment: VC++4.2b, Windows 95, IE 3.0 with patch
+
+Which IE patch do you have?  IE 3.0a or IE 3.01?
+
+>1.  Where can I find comprehensive info on using the ActiveX DocObject
+>features of VC++4.2b?
+
+Try the Visual C++ 4.2 online documentation.  Topics with these
+titles:
+
+CDocObjectServer
+CDocObjectServerItem
+Internet Basics: ActiveX Documents
+Internet First Steps: ActiveX Documents
+ActiveX Documents
+
+specifically.
+
+>I have searched the MSDN CD and found info on using VC++ 2.0
+>of VC++4.1 and tweaking the code but even the 4.2 Online
+>Books seem to have a dearth of information.
+
+If you think about it, MSDN CD will always be out of date with
+respect to the Visual C++ documentation (or vice-versa) because the
+products don't have synchronized ship dates and development cycles.
+
+>A search of the 4.2 Online Books using the keyword  'ActiveX
+>Document' returns 22 hits of which the only coding samples are the
+>BindScrib Example which was written using 4.1 and writing custom classes to
+>extend the Classical Ole Document model to the new ActiveX Model.   
+
+Unfortunatey, when the Visual C++ 4.2 documentation was written,
+the technology was called "the OLE DocObject Architecture". It was
+changed to be "the ActiveX Document Architecture" just before it was
+possible to switch all the references in the MFC documentation.
+
+It turns out, though, that you're wrong: the VC++ 4.2 version of the
+BINDSCRB sample was updated from the version that shipped with VC++ 4.1
+and now uses the intrinsic MFC support rather than the hand-written
+classes.
+
+The BINDSCRB sample abstract even says that:
+
+-- BEGIN QUOTED DOCUMENTATION -- BEGIN QUOTED DOCUMENTATION --
+
+Note that a sample with this same name was provided in the MFC 4.1
+package. This sample has been significantly revised, and can only
+be built using MFC 4.2 because it relies on DocObject support now
+available MFC 4.2.
+
+-- END QUOTED DOCUMENTATION -- END QUOTED DOCUMENTATION --
+
+>2. I installed the B Patch to my compiler a few weeks ago. 
+
+The 4.2B patch doesn't patch the compiler.  It patches the MFC source
+and headers, the MFC libraries, the MFC DLLs, one of the Wizards,
+and most of the files in the main INCLUDE and LIB directories.  The
+documentation for the patch explains as much.
+
+>I was reluctant
+>because I didn't want to have to redistribute the MFC42.dll and msvcrt.dll
+>to my customers.
+
+You should be redistributing and correctly installing the files
+wether you've installed the patch or not.
+
+>The
+>problem I am seeing now is that when I step into the code for example in
+>OLESRVER1.CPP there seems to be code in the libraries that is not reflected
+>in my source listings making it very hard to figure out what is going on. 
+>Is there any patch that I can get to Update the MFC source files on my
+>machine?
+
+The only patch available is the 4.2B patch. It does update the source files
+on your machine, assuming you follow all the directions and install it
+correctly.
+
+>3. I can not get my toolbars (I have three) to display.  I also cannot get
+>my status bar to display. 
+
+I can't understand what you mean by "get to".
+
+>I can find no
+>information at all about Status Bars in Active Documents.
+
+The status bar is stil handled by the container, if I recall correctly,
+and you end up asking the server to update it for you via IOleCmdTarget.
+It's covered in the ActiveX Document Object Specification, which comes
+with the ActiveX SDK--you can find the correct answers there, even if
+I'm cloudy.
+
+>4.  when I try to navigate away from the Page I get repeated GPFs in
+>OLESRVR1.CPP.  
+
+Do you mean "Access violations" or "unahndled exceptions"?  Win32
+doesn't generate things called "GPF's"--only Win16 does.  The
+proper name  of the error message provides a world more information.
+
+>When I run through the code in the debugger I am seeing a
+>problem in the COleServerDoc::DestroyInPlaceFrame function.  This functions
+>code is as follows my comments are set within angle brackets.
+
+Are you changing frame windows?  Are you changing views?  Are you using
+splitter windows?
+
+>I realize that some of the members of this list are
+>fairly defensive about the MFC Code and rightly so as they have sweated
+>blood over it so I will reserve judgment for now.
+
+That's pretty kind of you--most people can't show quite so much
+professional courtesy and, instead, jump to conclusions and make
+offensive and ill-informed assertions.
+
+>Any One that can explain this behavior or that knows where to find an
+>updated copy of the MFC Source will have my undying gratitude.
+
+Again, the updated source si right inside the patch.  Read the INSTALL.TXT
+file that is included in the patch.
+
+>Here is some further information on my GPF problem when my Active Document
+>Deactivates itself.
+
+It would really help to know which server you're using your document in.
+Further, it would help to know exactly how you're activating the server 
+inside that document--it sounds like you're using Internet Explorer, and
+using IE you can activate a DocObject server in four or five different
+ways and deactivate it in a few different ways, too.
+
+You also mention that you've made lots of changes and done lots of different
+things in your application, but you don't say much about what those
+things are.  As such, it's impossible to decide if you're:
+
+ 1) Doing nothing and MFC is entirely at fault
+ 2) Doing something which is unreasonable and MFC isn't at fault
+ 3) Doing something which is reasonable and MFC should handle it
+ 4) Doing something which is reasonable and MFC isn't at fault, but
+    some other code (eg, the container) is at fault
+
+By the way, you might, in the future, want to only post one question
+per note.  I think most people find it easier to respond to questions
+which are sent that way.
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>      <-- trip report central!
+95 Honda VFR-750F / 88 Yamaha FZ-700 (damaged) / 94 Mazda RX-7
+Serial #00050!    /      AMA - HRC - VFROC     / Wang Dang Wankel
+  These words are my own - I do not speak on behalf of Microsoft.
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+David Thayer -- <A HREF="mailto:davon@is.netcom.com">davon@is.netcom.com</A>
+Tuesday, November 12, 1996
+</B>
+
+
+----------
+> From: Mike Blaszczak <mikeblas@nwlink.com>
+> To: mfc-l@netcom.com; MFC Mailing List <mfc-l@netcom.com>
+> Subject: Re: Problems with ActiveX Documents
+> Date: Sunday, November 10, 1996 10:03 PM
+> 
+> At 14:53 11/2/96 -0500, David Thayer wrote:
+> >Environment: VC++4.2b, Windows 95, IE 3.0 with patch
+> 
+> Which IE patch do you have?  IE 3.0a or IE 3.01?
+I believe it's 3.01 the version number didn't change to 3.01 but that was
+what I was supposed to have downloaded.
+> 
+> Unfortunatey, when the Visual C++ 4.2 documentation was written,
+> the technology was called "the OLE DocObject Architecture". It was
+> changed to be "the ActiveX Document Architecture" just before it was
+> possible to switch all the references in the MFC documentation.
+> 
+> It turns out, though, that you're wrong: the VC++ 4.2 version of the
+> BINDSCRB sample was updated from the version that shipped with VC++ 4.1
+> and now uses the intrinsic MFC support rather than the hand-written
+> classes.
+> 
+> The BINDSCRB sample abstract even says that:
+> 
+> -- BEGIN QUOTED DOCUMENTATION -- BEGIN QUOTED DOCUMENTATION --
+> 
+> Note that a sample with this same name was provided in the MFC 4.1
+> package. This sample has been significantly revised, and can only
+> be built using MFC 4.2 because it relies on DocObject support now
+> available MFC 4.2.
+> 
+> -- END QUOTED DOCUMENTATION -- END QUOTED DOCUMENTATION --
+> 
+Sorry My Mistake.  This was not very obvious when I first read through the
+project as the first place I usually go is to the source code.
+
+> >2. I installed the B Patch to my compiler a few weeks ago. 
+> 
+> The 4.2B patch doesn't patch the compiler.  It patches the MFC source
+> and headers, the MFC libraries, the MFC DLLs, one of the Wizards,
+> and most of the files in the main INCLUDE and LIB directories.  The
+> documentation for the patch explains as much.
+> 
+I view the entire package as one integrated tool that has many various
+facets.  So to me all the things that you mentioned are part of a whole
+that I refer to in my mind as the "compiler" this is just my own peculiar
+view of things however so we have here a semantical point  of little
+bearing on the main problem. 
+> >I was reluctant
+> >because I didn't want to have to redistribute the MFC42.dll and
+msvcrt.dll
+> >to my customers.
+> 
+> You should be redistributing and correctly installing the files
+> wether you've installed the patch or not.
+> 
+With thousands of customers and a narrow bandwidth for our distribution
+channel this is a distinct problem even if we only have to do it every
+three months.  It does help though that the names of the files are the same
+as we can use RTPatch to create difference files.  This issue was
+significant enough that we almost decided to go to a different development
+language.  
+
+> 
+> The only patch available is the 4.2B patch. It does update the source
+files
+> on your machine, assuming you follow all the directions and install it
+> correctly.
+> 
+I believe I followed the directions correctly they were fairly simple.  
+QUOTE INSTALL.TXT
+To patch the files in the \msdev tree:
+
+ - Close all applications using MFC, and close Developer Studio
+ - Copy patch-nt.exe, patchw32.dll and vc42b.rtp to your \msdev directory.
+ - Run the command "patch-nt vc42b" at a command prompt in that directory.
+END QUOTE
+The file says that the src files are updated  and the patch ran to
+completion with the only error messages being files for options I had not
+installed.  However I maintain that when I trace through OLESRVR1.CPP The
+library code does not match that in the source files.
+This is the header for the file.  There is nothing here to indicate that
+the file has been revised from its initial content.
+
+// This is a part of the Microsoft Foundation Classes C++ library.
+// Copyright (C) 1992-1995 Microsoft Corporation
+//
+// This source code is only intended as a supplement to the
+// Microsoft Foundation Classes Reference and related
+// electronic documentation provided with the library.
+// See these sources for detailed information regarding the
+// Microsoft Foundation Classes product.
+
+> >3. I can not get my toolbars (I have three) to display.  I also cannot
+get
+> >my status bar to display. 
+> 
+
+> I can't understand what you mean by "get to".
+> 
+When I run my app as a standalone executable I have three toolbars that
+appear neatly lined up along the top of the document frame.  When I run the
+App as a DocObject the toolbars do not appear.  The menu appears but no
+tool bars.
+
+> >I can find no
+> >information at all about Status Bars in Active Documents.
+> 
+> The status bar is stil handled by the container, if I recall correctly,
+> and you end up asking the server to update it for you via IOleCmdTarget.
+> It's covered in the ActiveX Document Object Specification, which comes
+> with the ActiveX SDK--you can find the correct answers there, even if
+> I'm cloudy.
+> 
+
+How can you get a control to display on the containers status bar; ie a
+progress indicator? How can you set up additional individual panes unique
+to your own app? ie to show lattitude and longitude on a real time basis in
+a map or gps system.
+
+> >4.  when I try to navigate away from the Page I get repeated GPFs in
+> >OLESRVR1.CPP.  
+> 
+> Do you mean "Access violations" or "unahndled exceptions"?  Win32
+> doesn't generate things called "GPF's"--only Win16 does.  The
+> proper name  of the error message provides a world more information.
+> 
+Sorry  too many years working with win16.  I am getting an Access error
+which is the same thing as a General Protection Fault just the name has
+been changed.
+
+> >When I run through the code in the debugger I am seeing a
+> >problem in the COleServerDoc::DestroyInPlaceFrame function.  This
+functions
+> >code is as follows my comments are set within angle brackets.
+> 
+> Are you changing frame windows?  Are you changing views?  Are you using
+> splitter windows?
+>
+This happens when with my document in the Frame I try to move to a
+different   URL it can be either a web-site or a different file such as a
+word document or an Excel Spreadsheet.  Yes I am using splitter windows or
+I was; I removed the splitter window support thinking that that might be
+the problem but it did not help.
+ 
+> >I realize that some of the members of this list are
+> >fairly defensive about the MFC Code and rightly so as they have sweated
+> >blood over it so I will reserve judgment for now.
+> 
+> That's pretty kind of you--most people can't show quite so much
+> professional courtesy and, instead, jump to conclusions and make
+> offensive and ill-informed assertions.
+> 
+I have been in this business a long time and know how difficult it can be
+just to get something to work much less make it work perfectly under all
+conceivable and inconceivable conditions.
+
+> >Any One that can explain this behavior or that knows where to find an
+> >updated copy of the MFC Source will have my undying gratitude.
+> 
+> Again, the updated source si right inside the patch.  Read the
+INSTALL.TXT
+> file that is included in the patch.
+I did.
+> 
+> >Here is some further information on my GPF problem when my Active
+Document
+> >Deactivates itself.
+> 
+> It would really help to know which server you're using your document in.
+> Further, it would help to know exactly how you're activating the server 
+> inside that document--it sounds like you're using Internet Explorer, and
+> using IE you can activate a DocObject server in four or five different
+> ways and deactivate it in a few different ways, too.
+> 
+I am activating the server by opening a file with the file extension I have
+registered for my server  *.gis  This is really a dummy file just to kick
+the server into gear  It is a geographical database of TIGER/Line street
+level data  for the US.  The data for a view is retrieved based on the
+coordinates of the corners of the  view window and changes each time the
+user zooms in or out or pans the map.
+since the different views in each pane of the splitter window of my
+original app could each contain unique sets of data and the entire database
+is potentially over a hundred Gigabytes and is incapable of being contained
+within a single document object I use the document object as a dummy class
+that simply acts to make a connection from the frame to the view.
+
+> You also mention that you've made lots of changes and done lots of
+different
+> things in your application, but you don't say much about what those
+> things are.  As such, it's impossible to decide if you're:
+> 
+I am using the DAO SDK to connect to my data.  I have separate table files
+for each county in the USA. plus I have a table of boundary info for each
+state and each county.  I have also a table of corporate information to be
+displayed at geographical locations at our sites throughout the USA.  I
+have at any one time only three files open but the file representing the
+county file can change many times in the course of drawing a single view if
+the view encompasses more than a single county.  The only other thing a
+little different is that I have a drop-down list box added to the file tool
+bar so that they can select a county as their primary area of view.  The
+other toolbars are a Drawing Tool bar that allows zoom-in, zoom-out, pan,
+and goto features.  And a editing toolbar that allows the technician to
+view lists of features on the screen select features to change their
+attributes or add new features that represent new sites of particular
+corporate interest.  These edits get collected on a regular basis attached
+to an e-mail message and sent to a central location.
+
+>  1) Doing nothing and MFC is entirely at fault
+>  2) Doing something which is unreasonable and MFC isn't at fault
+>  3) Doing something which is reasonable and MFC should handle it
+>  4) Doing something which is reasonable and MFC isn't at fault, but
+>     some other code (eg, the container) is at fault
+> 
+> By the way, you might, in the future, want to only post one question
+> per note.  I think most people find it easier to respond to questions
+> which are sent that way.
+> 
+I will do that.. I did not know which aspect of the problem I was asking
+about would provide the one essential bit of information as to what was
+going wrong.
+T.Dave
+
+> .B ekiM
+> <A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>      <-- trip report central!
+> 95 Honda VFR-750F / 88 Yamaha FZ-700 (damaged) / 94 Mazda RX-7
+> Serial #00050!    /      AMA - HRC - VFROC     / Wang Dang Wankel
+>   These words are my own - I do not speak on behalf of Microsoft.
+> 
+> 
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Erik Funkenbusch -- <A HREF="mailto:chucks@isd.net">chucks@isd.net</A>
+Wednesday, November 13, 1996
+</B>
+
+
+----------
+> From: David Thayer <davon@is.netcom.com>
+> I believe I followed the directions correctly they were fairly simple.  
+> QUOTE INSTALL.TXT
+> To patch the files in the \msdev tree:
+> 
+>  - Close all applications using MFC, and close Developer Studio
+>  - Copy patch-nt.exe, patchw32.dll and vc42b.rtp to your \msdev
+directory.
+>  - Run the command "patch-nt vc42b" at a command prompt in that
+directory.
+> END QUOTE
+> The file says that the src files are updated  and the patch ran to
+> completion with the only error messages being files for options I had not
+> installed.  However I maintain that when I trace through OLESRVR1.CPP The
+> library code does not match that in the source files.
+> This is the header for the file.  There is nothing here to indicate that
+> the file has been revised from its initial content.
+
+Did you install both patches that are in the archive you downloaded?  One
+patches the MSDEV tree the other Windows\system tree.
+
+Did you download the correct patch?  There is one version for people that
+have installed 4.2a (beta) and one version for those going from 4.2
+clean...
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+David Thayer -- <A HREF="mailto:davon@is.netcom.com">davon@is.netcom.com</A>
+Friday, November 15, 1996
+</B>
+Yes  and Yes. The patch that patched the windows/system directory would not
+have touched the source files under the msdev tree. I used the patch from
+4.2 clean to 4.2b as I had not installed the 4.2a patch.
+
+----------
+> From: Erik Funkenbusch <chucks@isd.net>
+> To: mfc-l@netcom.com
+> Subject: Re: Problems with ActiveX Documents
+> Date: Wednesday, November 13, 1996 9:35 PM
+> 
+> 
+> 
+> ----------
+> > From: David Thayer <davon@is.netcom.com>
+> > I believe I followed the directions correctly they were fairly simple. 
+
+> > QUOTE INSTALL.TXT
+> > To patch the files in the \msdev tree:
+> > 
+> >  - Close all applications using MFC, and close Developer Studio
+> >  - Copy patch-nt.exe, patchw32.dll and vc42b.rtp to your \msdev
+> directory.
+> >  - Run the command "patch-nt vc42b" at a command prompt in that
+> directory.
+> > END QUOTE
+> > The file says that the src files are updated  and the patch ran to
+> > completion with the only error messages being files for options I had
+not
+> > installed.  However I maintain that when I trace through OLESRVR1.CPP
+The
+> > library code does not match that in the source files.
+> > This is the header for the file.  There is nothing here to indicate
+that
+> > the file has been revised from its initial content.
+> 
+> Did you install both patches that are in the archive you downloaded?  One
+> patches the MSDEV tree the other Windows\system tree.
+> 
+> Did you download the correct patch?  There is one version for people that
+> have installed 4.2a (beta) and one version for those going from 4.2
+> clean...
+> 
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

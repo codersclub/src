@@ -1,0 +1,359 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+DLLs Again
+</B></FONT>
+<BR>
+<PRE>
+<B>
+<A HREF="mailto:tcatchick@aesprodata.com.au">tcatchick@aesprodata.com.au</A>
+Friday, December 06, 1996
+</B>
+
+     Environment: VC++ 1.52, Win3.1, Win95.
+     
+     Looks like I didn't conform to a standard the first time I sent the 
+     message, so apologies for those offended.
+     
+     I you didn't read my previous question here it comes again!
+     
+     If any can help me, I would like to know how to place C++ code into a 
+     DLL. 
+         
+     Hopefully its a simple solution.
+     
+     Thanks in advance.
+     
+     Theron. C.
+     
+     Email tcatchick@aesprodata.com.au
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Sunday, December 08, 1996
+</B>
+[Mini-digest: 4 responses]
+
+At 10:36 12/6/96, tcatchick@aesprodata.com.au wrote:
+
+>     Environment: VC++ 1.52, Win3.1, Win95.
+>     If any can help me, I would like to know how to place C++ code into a 
+>     DLL. 
+
+Compile it.  Take the OBJs and link it into a DLL.
+
+There are lots of books which show how; even right within the product, there's
+a sample called DLLHUSK which shows how to do it.
+         
+>     Hopefully its a simple solution.
+
+Your question is very vague.
+     
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+I'm afraid I've become some sort of speed freak.
+These words are my own. I do not speak on behalf of Microsoft.
+
+-----From: "Jorge Monteiro" <softcontrol@mail.telepac.pt>
+
+Theron,
+
+Is your problem putting C++ code inside a Dll or accessing it from a client
+application?
+I suppose your problem is accessing it outside the dll (or getting the dll
+compiled and linked without errors).
+
+Here are two possibilities:
+- simply use _export between the class declarator and the class name
+ ex: class _export MyClass { ... };
+This works fine if but forces you to also _export all the superclasses (and
+sometimes that's impossible)
+- use the C++ name mangling in the EXPORTS statement of your *.DEF file.
+The name mangling is almost impossible to understand so I suggest you to
+start by your compiler generated map file and copy the operations of your
+classes one at a time to your def file.
+
+NOTE: If you want I have a small app that do this for you. You must only
+state the name of the class to export.
+If you what the app please request it directly to my e-mail.
+
+
+Regards,
+
+Jorge Monteiro
+===========================================
+|     SoftControl - Sist. Inf., Lda    Tel (351) 33 31469    |
+|     Zona Industrial da Gala        Fax (351) 33 31101    |
+|     3081 Figueira da Foz            PORTUGAL              |
+|     softcontrol@mail.telepac.pt                                    |
+===========================================
+
+
+----------
+> From: tcatchick@aesprodata.com.au
+> To: mfc-l@netcom.com
+> Subject: DLLs Again
+> Date: Sexta-feira, 6 de Dezembro de 1996 10:36
+> 
+> 
+>      Environment: VC++ 1.52, Win3.1, Win95.
+>      
+>      Looks like I didn't conform to a standard the first time I sent the 
+>      message, so apologies for those offended.
+>      
+>      I you didn't read my previous question here it comes again!
+>      
+>      If any can help me, I would like to know how to place C++ code into
+a 
+>      DLL. 
+>          
+>      Hopefully its a simple solution.
+>      
+>      Thanks in advance.
+>      
+>      Theron. C.
+>      
+>      Email tcatchick@aesprodata.com.au
+-----From: Bill Berry <berry@cs.umass.edu>
+
+
+Export a c funtion. Here's an example. 
+
+Note: You need to pass back a safe array in the argument if you want this to work with Visual Basic.
+          e.g. TCHAR** ppszFileList would be FPSAFEARRAY* fppsaFileList.
+
+#ifdef CFILELIST_EXPORT
+    
+    // The following is a sample interface for C programs using C++ classes; the function GetFileList is
+    // an exported c call.
+    //
+    // The C++ classes used are CString and CFileList ( a non-MFC class ).
+    //
+    extern "C" {
+
+        #include <string.h>
+
+        _declspec(dllexport) BOOL GetFileList( const TCHAR* pszSearchString, UINT uStyle, TCHAR** ppszFileList )
+        {
+
+            CString csz = (CString)pszSearchString;           
+
+            _ASSERT( !csz.IsEmpty() );
+            if ( csz.IsEmpty() ) 
+                 return FALSE;
+
+            if ( 0 == uStyle ) 
+                 uStyle = DEFAULT_SEARCH;
+
+            CFileList FileList;
+            LONG lItems = FileList.Create( csz, uStyle );
+	        
+            if ( !lItems ) 
+                 return FALSE;
+
+            ppszFileList = (TCHAR**)malloc( (lItems+1)*sizeof(TCHAR**) );
+        
+            if ( NULL == ppszFileList ) {
+                 MessageBox( NULL, OUT_OF_MEMORY, "Error", MB_ICONERROR | MB_OK );
+                 return FALSE; 
+            }
+
+            INT n = 0; // counter for actual items added to ppszFileList
+
+            for ( INT i = 0; i < lItems; i++) {
+                  csz = FileList.GetPathName(i);
+                  ppszFileList[n++] = (TCHAR*)_strdup( (const char*)csz );
+            }
+	        ppszFileList[n] = NULL;
+
+            return TRUE;
+        }
+
+        #pragma auto_inline(on)
+            _declspec(dllexport) void FreeFileList( TCHAR* pszFileList ) { free( pszFileList ); }
+        #pragma auto_inline(off)
+
+    } // if defined extern "C" 
+
+#endif // if defined CFILELIST_EXPORT
+
+----------
+From: 	tcatchick@aesprodata.com.au
+Sent: 	Friday, December 06, 1996 5:36 AM
+To: 	mfc-l@netcom.com
+Subject: 	DLLs Again
+
+
+     Environment: VC++ 1.52, Win3.1, Win95.
+     
+     Looks like I didn't conform to a standard the first time I sent the 
+     message, so apologies for those offended.
+     
+     I you didn't read my previous question here it comes again!
+     
+     If any can help me, I would like to know how to place C++ code into a 
+     DLL. 
+         
+     Hopefully its a simple solution.
+     
+     Thanks in advance.
+     
+     Theron. C.
+     
+     Email tcatchick@aesprodata.com.au
+-----From: Ash Williams <ash@digitalworkshop.co.uk>
+
+There's a wealth of info on this list about what you want (which is a 
+microsoft extention dll). Here's a summary:
+
+1) [setup]
+You need to create a new 'MFC AppWizard(dll)' project and select the 
+MFC Extention Dll radio button.
+
+2) [setup]
+Make a file called modeMyDll.h, say, coded thus:
+
+#ifndef modeMyDllFile
+#define modeMyDllFile
+
+#ifdef exportMyDll
+	#define modeMyDll _declspec( dllexport )
+#else
+	#define modeMyDll _declspec( dllimport )
+#endif
+
+#endif
+
+3) [setup]
+In your compiler options, add 'exportMyDll' to the preprocessor 
+definitions.
+
+4) [including your code]
+Create classes as you would in any other project, but declare your 
+classes like so:
+
+#include "modeMyDllFile.h"
+
+class modeMyDllFile SomeClass { .. };
+
+Do not use AFX_EXT_CLASS whatever you do, pretend you've never heard of 
+it!
+
+5) REBUILD ALL
+
+6) [using your dll]
+In an exe project, simply insert the generated lib into your project 
+and make sure the generated dll can be found (eg in win95/system or 
+along side your exe). In a dll project just include the lib.
+
+Search the list to see reasons why and also tips on changing the 
+generated names for the lib and dll.
+
+Good luck, Ash
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Shaju Mathew -- <A HREF="mailto:shajum@hpptc51.rose.hp.com">shajum@hpptc51.rose.hp.com</A>
+Tuesday, December 10, 1996
+</B>
+#define DllExport _declspec(dllexport)
+
+
+class DllExport CMyMailSlot
+{
+protected:
+	CHAR	mailslot_name[MAX_MAILSLOT_NAMESIZ + 1];
+	HANDLE	hMailSlot;
+
+public:
+	CMyMailSlot(LPCSTR lpMailSlotName,DWORD maxMsgSiz);
+	~CMyMailSlot();
+
+	INT		NumMsgs(VOID);
+	INT		GetNextMsg(LPSTR lpMsg,UINT maxChars); 		//destructive get
+	INT		SendMsg(LPCSTR lpDestMailSlot,LPCSTR lpMsg);
+};
+
+		Hope this helps you...
+> 
+> 
+>      Environment: VC++ 1.52, Win3.1, Win95.
+>      
+>      Looks like I didn't conform to a standard the first time I sent the 
+>      message, so apologies for those offended.
+>      
+>      I you didn't read my previous question here it comes again!
+>      
+>      If any can help me, I would like to know how to place C++ code into a 
+>      DLL. 
+>          
+>      Hopefully its a simple solution.
+>      
+>      Thanks in advance.
+>      
+>      Theron. C.
+>      
+>      Email tcatchick@aesprodata.com.au
+> 
+
+
+--
+***********************************************************************
+                              .---.         .---.
+Shaju Mathew                 /" "  \  WWW  /  " "\    Off:(916)785-9018 
+Performance Technology  Lab / / ""  \(*|*)/  "" \ \ 
+Hewlett-Packard Company    //////   '. V .`   \\\\\\ Home:(916)722-4576
+8000, Foothills Blvd      //// / // : """ : \\ \ \\\\
+MS 5723, Roseville       // /   /  /`.""" '\  \   \ \\Fax:(916)785-1264
+CA 95747-5723           //          //.".\\          \\
+                     ------------- -UU---UU---------------
+Shaju_Mathew@hp.com                '//|||\\`
+                                     '' ``     
+***********************************************************************
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

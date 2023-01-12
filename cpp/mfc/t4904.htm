@@ -1,0 +1,210 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Main Menu and context Menu differences.
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Reza Razavipour -- <A HREF="mailto:biles.com!reza_r@jabberwock.biles.com">biles.com!reza_r@jabberwock.biles.com</A>
+Wednesday, April 24, 1996
+</B>
+NT 3.5.1 Patch 3 and VC 4.1
+
+I have an SDI app with obviously a menu bar. All is well so far, menu entries 
+become enabled and disabled correctly. Then I started adding context menu 
+popups, these menus do a subset of the main menu commands. I was thinking, I 
+dont have to code any more if I use the main menu IDs for the corresponding 
+context menu entries. But, the context menu entries are always enabled.
+
+Am I missing something. Do I have to duplicate the code for the new menu 
+entries?
+
+Any hint is appreciated.
+
+Reza
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Klaus Guetter -- <A HREF="mailto:100031.1400@CompuServe.COM">100031.1400@CompuServe.COM</A>
+Friday, April 26, 1996
+</B>
+[Mini-digest: 3 responses]
+
+Reza,
+
+The problem is that TrackPopupMenu does not send a WM_INITPOPUPMENU, so the
+UPDATE_COMMAND_UI handlers are not invoked.
+The simplest solutions would be to explicitly send the message befor calling
+TrackPopupMenu. One caveat: MFC's WM_INITMENUPOUPMENU handler implicitly frees
+the temporary handle maps (can be prevented by AfxLockTempMaps).
+
+Code example:
+
+	CMenu* pPopupMenu = ...;
+
+	AfxLockTempMaps();
+
+	AfxGetMainWnd()->SendMessage(WM_INITMENUPOPUP,
+(WPARAM)pPopupMenu->m_hMenu, 0);
+
+	pPopupMenu->TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTBUTTON, point.x,
+point.y, AfxGetMainWnd());
+
+	AfxUnlockTempMaps();
+
+
+- Klaus
+
+-----From: vpalani@harbinger.net (Venkat Palani)
+
+Hi Reza,
+
+You said that conext menu items are always enabled, but are these menu =
+commands handled when selected from context menu?. Enabling or disabling =
+menu items depends on which CWnd object handles these commands. Did you =
+pass the correct CWnd object in TrackPopupMenu(...) something like this
+
+void CMainFrame::OnContextMenu(CWnd* pWnd, CPoint point)=20
+{
+	if ( m_pContextMenu ) {
+		CMenu *pSubMenu =3D m_pContextMenu->GetSubMenu(0);
+		if ( pSubMenu ) {
+pSubMenu->TrackPopupMenu(TPM_LEFTALIGN|TPM_RIGHTBUTTON,point.x, =
+point.y,this);
+		}
+	}
+}
+
+It also depends on where you have put the handler for WM_CONTEXTMENU.
+May be you can get some hint from this.
+
+Venkat Palani
+Software Engineer
+Harbinger Net Services
+Atlanta.
+-----From: Ken Freeman <kfreeman@pobox.com>
+
+Make sure the parent of the popup menu is the frame and not the view.
+
+Ken
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Niels Ull Jacobsen -- <A HREF="mailto:nuj@kruger.dk">nuj@kruger.dk</A>
+Wednesday, May 01, 1996
+</B>
+[Mini-digest: 3 responses]
+
+I think you should be able to just send a WM_INITMENUPOPUP to your view=20
+with the appropriate parameters. This should take care of enabling/disabling
+items.
+
+Haven't tried it myself, though.=20
+
+Otherwise, you may consider duplicating the code from
+CFrameWnd::OnInitMenuPopup.
+
+Niels Ull Jacobsen, Kr=FCger A/S (nuj@kruger.dk)
+Everything stated herein is THE OFFICIAL POLICY of the entire Kruger group
+and should be taken as legally binding in every respect. Pigs will grow
+wings and fly.
+
+-----From: Simon Wilson <simon@techsoft.demon.co.uk>
+
+Ensure that your TrackPopuopMenu call uses the AfxGetMainWnd call to
+obtain the receiving window for commands from the popup menu. I
+discovered this initially by accident, but after considering the facts
+it makes sense. If you study the MFC message loop it originates in the
+main frame window (be it SDI or MDI) and these class pass the messages
+through the correct command handler classes for the application. (I've
+had cause to modify this in order to include custom messages that need
+to be passed to the document, normally only WM_COMMAND messages are
+sent to the document).
+
+Hope this helps
+Simon Wilson
+===========================================================
+Technisoft Ltd.            Solutions for tommorrow, today!
+Macclesfield	           Windows, OLE, OOA, OOD, OOP
+England                    simon@techsoft.demon.co.uk
++44 1625 434533
+===========================================================
+-----From: pmoss@bbn.com (Peter Moss)
+
+I'll add this tidbit to the issue of enabling/graying context menu items.  I 
+had the luxury of knowing when I load the menu in response to the 
+WM_CONTEXT_MENU msg which items should be enabled/grayed.  So this was my 
+solution:
+
+void CVarListBar::OnContextMenu(CWnd* pWnd, CPoint point) 
+{
+ // TODO: Add your message handler code here
+
+ TRACE0("CVarListBar::OnContextMenu Pop up Var context menu now\n");
+
+ CMenu menu;
+ if (!menu.LoadMenu(IDR_VARPOPUP_MENU))
+  return;
+  
+ CMenu* pPopup = menu.GetSubMenu(0);
+ ASSERT(pPopup);
+
+ // Determine what state to put the item "Add To Variable List"
+ UINT nMenuState = (m_pVarPropSheet == NULL) ? MF_GRAYED : MF_ENABLED;
+ pPopup->EnableMenuItem(ID_VARIABLEPOPUP_ADDTOVARIABLELIST, nMenuState);
+ 
+ // Pop up the menu and process msgs
+ // NB: this Cwnd will handle the message processing for the popup
+ BOOL bStatus = pPopup->TrackPopupMenu(TPM_LEFTALIGN | TPM_LEFTBUTTON | 
+TPM_RIGHTBUTTON, 
+  point.x, point.y, this);  
+ ASSERT(bStatus);
+
+ return;
+}
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

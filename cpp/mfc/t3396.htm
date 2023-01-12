@@ -1,0 +1,228 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Opening multiple instances of a 32bit app
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Roger Lamb RAS+ 95 -- <A HREF="mailto:rasplus@lambsoftware.com">rasplus@lambsoftware.com</A>
+Thursday, January 11, 1996
+</B>
+I found a great KB article on the topic:
+
+Title: SAMPLE: Limiting 32-bit Applications to a Single Instance 
+Document Number: Q141752           Publ Date: 09-JAN-1996 
+Product Name: Microsoft C Compiler 
+Product Version: 4.00 
+Operating System: WINDOWS NT
+
+It works fine MOST of the time, but I found that if I fire off the app at
+the same time, it seems that it consistentely possible to not detect the
+Window Class that this method talks about and it will create more than one
+instance.
+
+I have very little control over starting up the apps so fast as it is being
+called by Win95 from a dll (I think)... anyway.. it will fire off two
+requests so fast that the both will fire up.
+
+If one is aready running it works as expected.
+
+Q: Is there another method (Memory file or shared memory) under the 32 bit
+world that can be used to tell if more than one instance is running under
+this fluke.  Or is there a workaround to this?
+
+Looking for any leads!
+
+Sincerely,
+Roger C. Lamb Jr.
+
+Lamb Software, Inc.
+Email: rasplus@lambsoftware.com
+Upates: http://www.lambsoftware.com
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Doug Boone -- <A HREF="mailto:dboone@zeus.clr.com">dboone@zeus.clr.com</A>
+Friday, January 12, 1996
+</B>
+[Mini-digest: 4 responses]
+
+[Moderator's note: Gee, wouldn't it be nice if this were just part
+of the system, or at least part of MFC?]
+
+>Q: Is there another method (Memory file or shared memory) under the 32 bit
+>world that can be used to tell if more than one instance is running under
+>this fluke.  Or is there a workaround to this?
+  
+Thats what I do, have each InitApplication() create a semaphore. If
+GetLastError() returns ERROR_ALREADY_EXISTS then I know that some other
+application is already running and has gotten that far so I bail.
+
+-----From: Mario Contestabile <Mario_Contestabile.UOS__MTL@UOSMTL2.universal.com>
+
+Yourapp::InitInstance()
+{
+hMutexOneInstance = CreateMutex(NULL,TRUE,_T("PreventSecondInstance"));
+
+if(GetLastError() == ERROR_ALREADY_EXISTS)
+ bFound = TRUE;
+
+if(hMutexOneInstance) ReleaseMutex(hMutexOneInstance);
+
+return (bFound == TRUE) ? FALSE : TRUE;
+}
+
+mcontest@universal.com
+
+-----From: "Aravind Balakrishnan(abalakri@us.oracle.com)" <ABALAKRI@us.oracle.com>
+
+There is a nice section in Jeffrey Richter's book Advanced Windows NT about 
+this.  Essentially, it uses shared data segments between processes. 
+ 
+Step1: 
+===== 
+In your main file, have: 
+#pragma data_seg(".SharedData") 
+ 
+LONG nUsageCount = -1; 
+ 
+#pragma data_seg() 
+ 
+Step 2 : 
+======= 
+In your Application's InitInstance(), call: 
+InterlockedIncrement ( &nUsageCount ); 
+ 
+This function returns the incremented value of the variable.  If it is 
+non-zero, you know that you are not the first App. 
+ 
+In your Application's ExitInstance() call: 
+InterlockedDecrement( &nUsageCount ); 
+ 
+Step3: 
+==== 
+In your DEF file, have the following lines:  Note that the segment name you 
+give here should match the one in the application's main file. 
+ 
+SEGMENTS 
+	.SharedData shared 
+ 
+I am using this in our application on NT.  I have not checked it on Win95, 
+although I believe it should work there also. 
+ 
+Hope this helps! 
+ 
+ 
+ 
+Cheers,   
+Aravind.   
+===   
+ 
+Aravind Balakrishnan  
+Systems Management Products, Oracle Corp. 
+(415)506-0432 
+ 
+-----From: Niels Ull Jacobsen <nuj@kruger.dk>
+
+You'd better use one of the built-in synchronisation methods.
+See Q124134 : Allowing Only One Application Instance on Win32s for a sample
+of using a memory mapped file for synchronisation.
+
+It doesn't include starting the previous instance, but if you detect
+that you're not the only one running, it should be pretty simple:
+
+if CreateFileMapping fails, try to find the previous instance from the
+window class name. If it's not found, sleep for a while and start over
+(with CreateFileMapping).
+
+In this way, either you will find the other instance when it gets
+around to creating it's window or CreateFileMapping will eventually succeed.
+
+The advantage of using CreateFileMapping instead of CreateObject is
+that it also works on Win32s.
+
+--
+Niels Ull Jacobsen, Kruger A/S
+
+Everything stated herein is THE OFFICIAL POLICY of the entire Kruger
+group and should be taken as legally binding in every respect. Pigs
+will grow wings and fly.
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Doug Boone -- <A HREF="mailto:dboone@zeus.clr.com">dboone@zeus.clr.com</A>
+Saturday, January 13, 1996
+</B>
+At 10:33 AM 1/12/96 -0600, you wrote:
+>[Mini-digest: 4 responses]
+>
+>[Moderator's note: Gee, wouldn't it be nice if this were just part
+>of the system, or at least part of MFC?]
+  
+I guess the next question is, which is more efficient/fastest/uses least
+resources: Using a mutex, a semaphore, a memory-mapped file or a variable in
+a named data segment.
+ 
+My understanding is that Semaphores are real cheap as long as no one is
+waiting on them. The second user that has to wait causes a Ring transition
+but otherwise they're just set and released. 
+
+In "Fundamentals of Great Server Applications" by Mark Lukovsky one of the
+slides said "Used internally by Windows NT in critical section objects (when
+contention occurs), and in some queuing cases to track the number of items
+in a list."  (Windows NT Server PDC 1995) I guess that's where I got that
+impression but I don't find any real documentation about the relative
+overhead of each signaling system except that CriticalSections are cheapest
+because they only exist within a single process.
+ 
+I guess this isn't really MFC related, except that writing a class that
+would provide a standard method of solving the problem would be trivial as
+long as you know what the relative advantages of each method are.
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

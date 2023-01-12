@@ -1,0 +1,241 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Q: How to Use PostAppMessage( ) to Control Another App?
+</B></FONT>
+<BR>
+<PRE>
+<B>
+<A HREF="mailto:WnDBSoft@aol.com">WnDBSoft@aol.com</A>
+Friday, October 18, 1996
+</B>
+Environment: Visual C++ 1.52c, Windows 3.1
+Reply-To: mfc-l@netcom.com, WnDBSoft@gnn.com
+
+I would like to send Windows messages to another application using
+PostAppMessage( ). The documentation states that PostAppMessage( ),"posts
+(places) a message in the message queue of the given application (task)." 
+
+Here's the scoop. I know the path of the application I want to send messages
+to.
+
+What I need is its task handle.  Using the path, could anyone please tell me
+how to get the application's HTASK so I can send it messages using
+PostAppMessage( )?  This other application which I want to control is an MFC
+application written with version 2.5x of the library.
+
+Thank you very much for your help!!!
+
+Sincerely,
+Brian Hart
+WnDBSoft Software International
+<A HREF="http://members.aol.com/wndbsoft/wndbsoft.htm">http://members.aol.com/wndbsoft/wndbsoft.htm</A>
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Jerry Coffin -- <A HREF="mailto:jcoffin@taeus.com">jcoffin@taeus.com</A>
+Monday, October 21, 1996
+</B>
+[Mini-digest: 7 responses]
+
+At 07:25 PM 10/18/96 -0400, you wrote:
+>Environment: Visual C++ 1.52c, Windows 3.1
+>Reply-To: mfc-l@netcom.com, WnDBSoft@gnn.com
+>
+>I would like to send Windows messages to another application using
+>PostAppMessage( ). The documentation states that PostAppMessage( ),"posts
+>(places) a message in the message queue of the given application (task)." 
+>
+>Here's the scoop. I know the path of the application I want to send messages
+>to.
+>
+>What I need is its task handle.  Using the path, could anyone please tell me
+>how to get the application's HTASK so I can send it messages using
+>PostAppMessage( )?  This other application which I want to control is an MFC
+>application written with version 2.5x of the library.
+
+Generally if you want to post to another app, you don't want to use
+PostAppMessage; generally you still want to post to the message queue of the
+other app's main window, in which case you still use PostMessage.  
+
+To use PostMessage, you want to find the handle of its main window.  The
+path to the executable won't help you much; instead you need to know the
+class and title of its main window.  From the sound of things, you've
+written the program being controlled, and you may want to recompile it,
+specifying your own name for the window class; by default MFC specifies one
+itself, but it may be easier for you to find if you specify your own.
+
+-----From: CHOPINET Ludovic <lchopinet@normand-info.fr>
+
+With the window's name or window's class, you can retreive the HWND with
+::FindWindow(LPCSTR, LPCSTR)
+and the call ::GetWindowTask(HWND) to retreive the HTASK associated with
+this window.
+
+These functions are obsoletes or deleted under WIN32 !!
+
+Ludovic CHOPINET
+E-mail : lchopinet@normand-info.fr
+WEB : <A HREF="http://www.normand-info.fr/">http://www.normand-info.fr/</A>
+
+
+-----From: David.Lowndes@bj.co.uk
+
+Brian,
+
+I don't believe that knowing the path of the application's EXE file is the right
+starting point, unless your application is starting that application, as there is no
+HTASK unless the other application is running.
+
+You need to identify a window handle of a running instance of the application
+using FindWindow, then from there you can get a HTASK using GetWindowTask.
+However once you've got the HWND, you may be better off using PostMessage
+rather than PostAppMessage anyway.
+
+Dave Lowndes
+-----From: Mario Contestabile
+
+In one of your 16-bit CWnd objects, you could do
+CWnd *a = FindWindow("class", "window");
+if(a)
+  HTASK b = ::GetWindowTask(a.GetSafeHwnd());
+if(b)
+  PostAppM....
+
+mcontest@universal.com
+
+
+-----From: "Brian V. Zaino (516) 434-6278" <brian.zaino@reuters.com>
+
+To get the task handle, you will need to use toolhelp.dll's 
+TaskFirst and TaskNext functions.  To find the task handle,
+you must know the module name, not the path.  The code 
+would look something like this:
+
+#include <toolhelp.h>
+
+HTASK GetTask(CString csModuleName)
+{
+   TASKENTRY te;
+   te.dwSize = sizeof(te);
+
+   /* search the module list */
+   if (TaskFirst(&te))
+   {
+      do
+      {
+         /* Module found? */
+         if (csModuleName == te.szModule) 
+            return te.hTask;
+      }
+      while (TaskNext(&te));
+   }
+   return NULL;
+}
+
+I hope this helps,
+Brian
+
+-----From: rwagner <rwagner@genre.com>
+
+Environment: Visual C++ 1.52c, Windows 3.1
+
+Brian wrote:
+
+> I would like to send Windows messages to another > application using 
+PostAppMessage( ). 
+
+In each app to which you wish to send messages, make a call to _getPID() just 
+before you register the window class.  This works in MFC just fine, here's the 
+override:
+
+BOOL IFSDIFrame::PreCreateWindow(CREATESTRUCT& cs)
+{
+    sprintf( pid, "%X", _getpid() ); 
+    CString windowClass = (LPCTSTR)pid; 
+    if( ! CFrameWnd::PreCreateWindow(cs) )
+        return FALSE;
+    WNDCLASS wndClass;
+    memset( &wndClass, 0x0, sizeof(WNDCLASS) );
+    ASSERT( ::GetClassInfo(AfxGetInstanceHandle(), cs.lpszClass, &wndClass) );
+    cs.lpszClass = (LPCTSTR)pid;
+    wndClass.lpszClassName = (LPCTSTR)pid;
+    ASSERT( AfxRegisterClass(&wndClass) ); // stub if class already registered.
+    return CFrameWnd::PreCreateWindow( cs );
+...
+}
+
+I then make a call to ::FindWindow( windowClass, NULL) from any app and get back
+a handle to the target window, and then I can access it in any manner that 
+requires
+a handle.
+
+This may not be exactly what you want.  It works for me because I can juggle 
+any number of instances of the same app this way.  You may want to register the 
+window class with some unique identifier instead.
+
+I do this routinely in win32, this should still work in Ancient Windows.
+
+Cheers
+Rob
+-----From: "elie (e.e.) bensaci" <ebensaci@nortel.ca>
+
+
+Hi there,
+
+What you need, is to call the 
+
+static CWnd* PASCAL FindWindow( LPCTSTR lpszClassName, LPCTSTR lpszWindowName );
+  
+This will give you a handle to the application that you're looking for, then use this 
+handle to post your message. something like this: pHandle->PostMessage( ...), and you 
+should process the message in the application that receives your message.
+
+Hope this help.
+
+Elie.
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

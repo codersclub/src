@@ -1,0 +1,249 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+single line updates with CScrollView
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Joshua -- <A HREF="mailto:CAUBLE@KTICORP.MHS.CompuServe.COM">CAUBLE@KTICORP.MHS.CompuServe.COM</A>
+Monday, July 29, 1996
+</B>
+Environment:  VC++ 1.52, VC++ 2.0, Win95
+
+
+
+I am currently having trouble with screen updates using the default 
+CScrollView and CDocument implementations created by app wizard.  Is 
+there a way to update the screen while keeping the original text, without 
+having to redraw the whole screen.
+
+
+
+I am using an SDI application framework.  With CScrollView as my view 
+class.  I am trying to emulate a command prompt per say, for a client 
+application i am building.  
+
+
+
+The problem stems from using the CDC to draw to the screen and having to 
+write to it all at once, i.e. previous text, prompt, new text, etc. .  If 
+there is a way to write to the screen without having to write all saved 
+data, command prompt and the chars the users is typing I could use some 
+help.
+
+
+
+I am using the OnChar function in CScrollView to process the keystrokes, 
+and CString objects in the CDocument class for global text.
+
+
+
+Thank you for any help.
+
+
+
+i can be reached at either of the below email addresses:
+
+
+
+cauble@kticorp.mhs.compuserve.com
+
+al_thor@juno.com  
+
+althor@kincyb.com
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Saturday, August 03, 1996
+</B>
+At 01:08 PM 7/29/96 EDT, you wrote:
+>Environment:  VC++ 1.52, VC++ 2.0, Win95
+>I am currently having trouble with screen updates using the default 
+>CScrollView and CDocument implementations created by app wizard. 
+
+I don't understand the background of your question.  You _must_ have changed
+the CScrollView and CDocument implemnetations in your application because,
+if you didn't, there would be nothing to update.
+
+>Is there a way to update the screen while keeping the original text,
+>without having to redraw the whole screen.
+
+This, too, I don't understand: Windows application's can't update "the
+screen". They, instead, paint their output to a device. That device might
+be a printer or a window on the screen, or it might be a fancy recording
+mechanism that isn't a device at all but instead just plays back the
+drawing commands to a device some time later.
+
+Since Windows is a multitasking operating system, it must govern access
+to shared resources like the screen and the printer.
+
+What does your application do to update the screen directly?  Or did 
+you really mean to ask about how to update one of the windows your
+application owns?
+
+>I am using an SDI application framework.  With CScrollView as my view 
+>class. 
+
+You're using something _derived_ from CScrollView for your view class,
+right?
+
+>I am trying to emulate a command prompt per say, for a client 
+>application i am building.  
+
+Since you're targeting Win95, why don't you use a console window?  That
+lets your program pop up a window that is suspiciously similar to a command
+prompt window that you'd use in the operatnig system by itself.  Maybe
+you don't like this approach because the console window has to be a top-level
+window and can't have decorations like custom toolbars and status bars.
+
+>The problem stems from using the CDC to draw to the screen and having to 
+>write to it all at once, i.e. previous text, prompt, new text, etc.
+
+If you're really drawing to the screen, you shouldn't be. This is bad
+behaviour for an application.
+
+If you really mean that you're drawing to a window, 
+using the CDC class doesn't cause the need to paint everything on the
+window. Windows show information. You're asked to show information
+when Windows decides it is ready and necessary for you to show information:
+when some part of your window has become invlaid. When your window is
+first created, it is completely invalid. You paint it, and that means
+that it isn't invalid anymore: it is now valid.
+
+Now that it is painted, it might become invalid because Windows says
+so: maybe the user popped up another window that overwrote the content
+of your window and then moved it away. You need to repaint what you
+used to have there: that _part_ of your window that was previously
+obscured is now invalid.
+
+It might also become invalid because _you_ say so: if the user presses
+that causes your program to decide to change what it is showing on
+the screen, you call CWnd::InvalidateRect() to tell Windows that you
+think you'd like to repaint some part fo the screen.
+
+InvalidateRect() takes two parameters: a rectangle and a flag. The
+rectangle dictates what area of the window needs to be updated. You
+can pass NULL for the rectangle and Windows will assume that you mean
+to update _everything_ in the window.  The second flag is TRUE if you
+want to erase the area in the rectangle before painitng,
+and FALSE if you don't want to erase the area first.
+
+After you call InvalidateRect(), nothing immediately happens. Windows
+tries to coalesce invalid rectangles so you only have to paint as few
+times as possible.  Windows, when it's ready for you to paint, sends
+you a WM_ERASEBKGND message so you can reset the area of the window
+to whatever background colour or pattern you want to see.  If you have
+some special bitmap, that's the time to paint it. If you don't handle
+WM_ERASEBKGND, the default behaviour uses the colour that the user has
+set for windows backgrounds in the Control Panel.
+
+After the background is taken care of, Windows sends a WM_PAINT message.
+MFC handles this by initializing some data structures for you: most
+importantly, it sets up a CDC object you can paint with. Then, it
+calls your view's OnDraw() function--where you can paint whatever
+it is you'd like. What you paint, though, is clipped to the area of
+your window that you said was invalid. 
+
+If the client area of your window goes from (0,0) to (100,100), for
+instance, you might call InvalidateRect() with a rectangle from (50,50)
+to (70,70). Then, you might call it again with a rectangle from
+(50,0) to (70, 50).
+
+Windows realizes that those areas overlap and can be most easily expressed
+by the rectangle from (50, 0) to (70, 70).  So, it sends only one WM_PAINT
+set up to use that region. When you paint, if you try to paint something
+at (0,0), you won't really paint it: windows ignores your request because
+it knows what's there isn't invalid. This can _very_ significantly
+improve your application's performance: as Dean McCrory (my hero) sometimes
+says: "Your program will be faster if you don't do work you don't need to do."
+
+If you invalidate too much, you'll see flashing and your users will
+notice sluggish response. You'll also cause flashing, flickering display
+if you're not careful. If you invalidate too little, ugly little pieces
+of unupdated stuff might lie around in your window.  Or, worse yet,
+you might show the user data that doesn't reflect the current state
+of your application. Some people call these "redraw turds"; I, myself,
+would never stoop to such a level.
+
+>If there is a way to write to the screen without having to write all saved 
+>data, command prompt and the chars the users is typing I could use some 
+>help.
+
+There is no way to ask Windows to save window image data in a way that would
+actually help you. You need to write your program so that you can redraw
+everything on demand.  Windows asks you to paint because it doesn't have
+the information it wants to display: it needs you to recreate it.
+
+>I am using the OnChar function in CScrollView to process the keystrokes, 
+>and CString objects in the CDocument class for global text.
+
+You should look at the TTY sample that comes with the Windows SDK.
+It shows a pretty efficient way to hold stuff in memory and let it
+scroll off the screen while invalidating only what's necessary. 
+
+>Thank you for any help.
+
+Painting is not MFC-specifc, and it is certainly something that the
+introductory books on Windows programming cover in great length. You
+might consider buying a copy of Petzold's book--it explains how to paint
+in pretty good detail. It also has some text that explains the difference
+between a window and the screen, and it sounds like you could
+really benefit from this information.
+
+(If you really _are_ painting directly on the screen from your
+CScrollView-derived class, you should explain why.  The full-screen
+sample I wrote for my web site shows an alternative approach that
+probably could be tailored to your needs.)
+
+.B ekiM
+http://www.nwlink.com/~mikeblas/
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

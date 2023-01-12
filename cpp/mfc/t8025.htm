@@ -1,0 +1,282 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Problems with emmbedded CArrays
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Peter -- <A HREF="mailto:peter@arrowweb.com">peter@arrowweb.com</A>
+Wednesday, November 27, 1996
+</B>
+Environment: MSVC 4.2b, Windows NT 3.51 SP5
+
+Hi, everyone.  I'm go crazy over this problem... Please help!!
+
+I'm trying to make a variable of type CArray with a CArray as a member in
+the variable.  Let me show you what I do:
+
+// definition of the first class (Firstnames)
+class Firstnames
+{
+public:
+  Firstnames& operator=(Firstnames& src);
+  CString Firstname;
+  int age;
+};
+
+// 'operator =' definition for Firstnames class
+Firstnames& Firstnames::operator=(Firstnames& src)
+{
+  this->Firstname = src.Firstname;
+  this->age = src.age
+  return *this;
+}
+
+// the second class definition with a CArray of the other 
+// class (Firstnames) embedded as a member.
+class Surnames
+{
+public:
+  Surnames& operator=(Surnames& src);
+  CString theSurname;
+  CArray<Firstname, Firstname&> theFirstnames;	
+};
+
+// the copy operator of Surnames
+Surnames& Surnames::operator=(Surnames& src)
+{
+  this->theSurname = src.theSurname;
+  this->theFirstnames = src.theFirstnames; // crashes here!!
+}
+
+// And finally, the variable with the embedded CArray
+CArray<Surnames, Surnames&> Families;
+
+the exact error is:  error C2582: 'CArray<class Surnames,class Surnames &>'
+: 'operator =' function is unavailable.  This is occuring, I assume, during
+the copy operator of the Surnames class.  But why? the copy operator of
+Firstnames is *already* defined!
+
+Below is an example of what I did to cause this:
+
+void MyDocumentClass::FillArray() 
+{ 
+  Surnames   CurrLast;
+  Firstnames CurrFirst; 
+
+  CurrLast.theSurname = "Doe";
+  CurrFirst.Firstname = "John";
+  CurrFirst.age = 35;
+  CurrLast.theFirstnames.Add(theFirstnames);
+  
+  Families.Add(theSurnames);
+}
+
+Any help would be greatly appreciated. 
+
+Peter (peter@arrowweb.com)
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Fernando Morgan -- <A HREF="mailto:morgan@minisoftpt.com">morgan@minisoftpt.com</A>
+Saturday, November 30, 1996
+</B>
+> // definition of the first class (Firstnames)
+> class Firstnames
+> {
+> public:
+>   Firstnames& operator=(Firstnames& src);
+>   CString Firstname;
+>   int age;
+> };
+> 
+change the definition to:
+>   const Firstnames& operator=(const Firstnames& src);
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Michael Potter -- <A HREF="mailto:mpotter@ns.ezl.com">mpotter@ns.ezl.com</A>
+Saturday, November 30, 1996
+</B>
+There is no defined operator= for CArray. 
+
+	this->theFirstnames = src.theFristnames; //no definition
+
+You will have to redefine the CArray for your purpose. The best way to
+accomplish this is to create a new class and inherit the aspects of CArray
+
+class MyFirstNames : public CArray<Firstname,Firstname&>
+{
+public:
+	MyFirstNames() : CArray<Firstname,Firstname&>() {}
+	MyFirstNames& operator=(MyFirstNames& fn); 
+};
+
+Now just write the implementation for the operator= method and you are on
+your way.
+
+MyFirstNames& MyFirstNames::operator=(MyFirstNames& fn)
+{
+	//Make sure fn is empty first
+	ASSERT(fn.GetSize() == 0);
+	Firstname tmp;
+	for (int i = 0; i < GetSize();i++)
+ 	{
+		tmp = GetAt(i);
+		fn.Add(tmp);
+	}
+}
+
+Mike
+
+----------
+> From: Peter <peter@arrowweb.com>
+> To: mfc-l@netcom.com
+> Subject: Problems with emmbedded CArrays
+> Date: Wednesday, November 27, 1996 3:42 PM
+> 
+> Environment: MSVC 4.2b, Windows NT 3.51 SP5
+> 
+> Hi, everyone.  I'm go crazy over this problem... Please help!!
+> 
+> I'm trying to make a variable of type CArray with a CArray as a member in
+> the variable.  Let me show you what I do:
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Alexander Sasha Grinshpun -- <A HREF="mailto:alexgr@mercury.co.il">alexgr@mercury.co.il</A>
+Sunday, December 01, 1996
+</B>
+It seems to me that this question was answered here already.
+The reason is that CArray is subclassed from CObject that declares
+assignment operator (operator = (const CObject&)) and copy constructor
+(CObject(const CObject&)) as private. This prevents from the compiler to
+generate default implementation for them. On the other hand, CArray
+doesn' implement this functions too. So, you don't have assignment for
+CArray. Instead, you can youse  CArray<...>::Copy() method for doing the
+same job.
+
+Peter wrote:
+> 
+> Environment: MSVC 4.2b, Windows NT 3.51 SP5
+> 
+> Hi, everyone.  I'm go crazy over this problem... Please help!!
+> 
+> I'm trying to make a variable of type CArray with a CArray as a member in
+> the variable.  Let me show you what I do:
+> 
+> // definition of the first class (Firstnames)
+> class Firstnames
+> {
+> public:
+>   Firstnames& operator=(Firstnames& src);
+>   CString Firstname;
+>   int age;
+> };
+> 
+> // 'operator =' definition for Firstnames class
+> Firstnames& Firstnames::operator=(Firstnames& src)
+> {
+>   this->Firstname = src.Firstname;
+>   this->age = src.age
+>   return *this;
+> }
+> 
+> // the second class definition with a CArray of the other
+> // class (Firstnames) embedded as a member.
+> class Surnames
+> {
+> public:
+>   Surnames& operator=(Surnames& src);
+>   CString theSurname;
+>   CArray<Firstname, Firstname&> theFirstnames;
+> };
+> 
+> // the copy operator of Surnames
+> Surnames& Surnames::operator=(Surnames& src)
+> {
+>   this->theSurname = src.theSurname;
+>   this->theFirstnames = src.theFirstnames; // crashes here!!
+> }
+> 
+> // And finally, the variable with the embedded CArray
+> CArray<Surnames, Surnames&> Families;
+> 
+> the exact error is:  error C2582: 'CArray<class Surnames,class Surnames &>'
+> : 'operator =' function is unavailable.  This is occuring, I assume, during
+> the copy operator of the Surnames class.  But why? the copy operator of
+> Firstnames is *already* defined!
+> 
+> Below is an example of what I did to cause this:
+> 
+> void MyDocumentClass::FillArray()
+> {
+>   Surnames   CurrLast;
+>   Firstnames CurrFirst;
+> 
+>   CurrLast.theSurname = "Doe";
+>   CurrFirst.Firstname = "John";
+>   CurrFirst.age = 35;
+>   CurrLast.theFirstnames.Add(theFirstnames);
+> 
+>   Families.Add(theSurnames);
+> }
+> 
+> Any help would be greatly appreciated.
+> 
+> Peter (peter@arrowweb.com)
+
+-- 
+----
+Thanks,
+Sasha.
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

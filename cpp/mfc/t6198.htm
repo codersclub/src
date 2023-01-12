@@ -1,0 +1,392 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+exception within constructor results in memory leak
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Wolfgang Loch -- <A HREF="mailto:Wolfgang.Loch@RZ.TU-Ilmenau.DE">Wolfgang.Loch@RZ.TU-Ilmenau.DE</A>
+Friday, August 09, 1996
+</B>
+Environment: VC 2.0, Windows 95
+
+I ran into a subtle problem using a exception thrown
+by an object's constructor.
+ 
+What I wanted to do is:
+
+class CMyObject: public CObject
+{
+        CMyObject();
+        virtual ~CMyObject();
+        ...
+};
+CMyObject::CMyObject()
+{
+        if( !DoCriticalThing() )
+                throw new CMyException;
+        ...
+}
+void SomeFunction()
+{
+        CMyObject* pObject = NULL;
+        try
+        {
+                CMyObject* pObject = new CMyObject;
+        }
+        catch( CMyException* e )
+        {
+                if( pObject != NULL )
+                        delete pObject;
+                e->Delete();
+                MessageBox( ... );
+        }
+        ...
+}
+
+And what happens is:
+1. NULL is assigned to pObject
+2. memory is allocated for CMyObject member variables
+3. CMyObject constructor is called
+4. if the CriticalThing() fails an exception is thrown
+5. CMyObject destructor is called
+6. the Object *is not* assigned to pObject
+7. exception is catched
+
+And now there is no way to deallocate the memory, because
+pObject is still NULL.
+A possible way would be do do the CriticalThing() in an
+extra Create() function. But I don't like this, because
+I want to have a valid Object to be constructed.
+
+Any Idea?
+
+Wolfgang
+-- 
+/-------------------------------------------------\
+| Wolgang Loch  (Technical University of Ilmenau) |
+|   e-mail: Wolfgang.Loch@rz.TU-Ilmenenau.DE      |
+|   www   : http://www.rz.tu-ilmenau.de/~wolo     |
+\-------------------------------------------------/
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Monday, August 12, 1996
+</B>
+[Mini-digest: 3 responses]
+
+At 08:21 AM 8/9/96 +0200, you wrote:
+>Environment: VC 2.0, Windows 95
+
+You really need to upgrade.
+
+>And what happens is:
+> [...]
+>And now there is no way to deallocate the memory, because
+>pObject is still NULL.
+
+Right.  Back when VC++ 2.0 came out, it was Microsoft's first crack at
+making a compiler that supports exceptions. There's nothing in the 
+compiler to handle this situation, and that's why you see this behaviour.
+I'd bet a dollar, too, that the C++ draft language standard _AT THE TIME_
+didn't even discuss what to do.
+
+>A possible way would be do do the CriticalThing() in an
+>extra Create() function. But I don't like this, because
+>I want to have a valid Object to be constructed.
+>
+>Any Idea?
+
+The only thing I've ever seen people do here is write an override for
+new() for each type that can throw an exception. This is necessary because
+the language dictates that only completely cosntructed objects are
+destroyed in this situation.  So, if you have:
+
+class CInner;
+class CMiddle; // inherits from CInner
+class COuter; // inherits from CMiddle
+
+and it turns out the COuter constructor throws an exception, you end
+up calling the destructor on the excepted object's CMiddle and
+CInner parts, but not on its COuter part... because it wasn't
+_fully_ constructed.  If you think about a new implementation that
+can handle this without inherent support from the compiler, you'll
+realize that the only way to get it done is with explicit code that
+calls malloc() and calls the in-place constructor explicitly.  Maybe
+you could do that in-line in your code:
+
+        CMyObject* pObject = (CMyObject*) malloc(sizeof(CMyObject));
+        try
+        {
+                pObject->CMyObject::CMyObject();
+        }
+        catch( CMyException* e )
+        {
+                pObject->CMyObjectParentClass::~CMyObjectParentClass();
+                free(pObject);
+                e->Delete();
+                MessageBox( ... );
+        }
+
+pretty sick, huh?
+
+The current compilers -- certainly, VC++ 4.1 and VC++ 4.2 -- implement
+what the current UnStandard suggest. I don't know if VC++ 4.0 does,
+and I don't know if VC++ 2.1 or 2.2 do.  If you upgraded to VC++ 4.2,
+though, you'd certainly get a compiler that generates code to free and
+destroy on exceptions in constructors, as you'd like.
+
+It's funny that more people don't know about problems like this
+in the language specification and the compiler. MFC is often (and
+its designers more often) flamed for not being "properly object-oriented".
+One of the things that people just love to cite is the fact that most
+MFC classes have Create() or other initialization functions which are
+separate from the constructors.  Well, it turns out that this design
+is there for a very real reason: 16-bit compilers didn't support exceptions
+at all. For the 32-bit compilers, the language standard was late to dictate
+and/or Microsoft was late to describe and implemnet subtleties like
+this one.
+
+So, imagine how much easier your job would be if you had a separate
+Create() function:
+
+        CMyObject* pObject = new CMyObject();  // nothing interesting!
+        try
+        {
+                pObject->Create();
+        }
+        catch( CMyException* e )
+        {
+                delete pObject;
+                e->Delete();
+                MessageBox( ... );
+        }
+
+and that's just fine: it works. You can get your knickers in a twist
+about what's "true OOP", or you can get some work done.  MFC has address
+the latter goal.
+
+
+.B ekiM
+http://www.nwlink.com/~mikeblas/
+These words are my own. I do not speak on behalf of Microsoft.
+
+-----From: Gabriel Parlea-Visalon <Gabriel@derivs.demon.co.uk>
+
+See "The try, catch and throw Statements" in the "C++ language reference". Once 
+in a catch handler the "unwinding of the stack" is performed which will delete 
+all automatic variables created in the try statement.
+To check for memory leaks search for help on CMemoryState.
+By the way even if the new is successful your pointer goes out of scope at the 
+end of the try statement, but then thats probably why you declared one before 
+try, so get rid of the second declaration.
+
+Gabriel
+
+-- 
+                             Gabriel Parlea-Visalon
+                               Software Engineer
+                           Derivative Trading Systems
+                           gabriel@derivs.demon.co.uk
+-----From: Pradeep Tapadiya <pradeep@nuview.com>
+
+
+First things first. When a constructor throws an error:
+
+1. The destructor is NEVER called; the object could have been
+   partially constructed.
+2. The memory allocated by new is released automatically. You
+   do not (and should not) explictly release memory.
+3. In your code, it is good that you were initializing pObject
+   to NULL. Otherwise, if CMyObject throws an exception in the
+   constructor, the return value is not specified and most
+   likely will not be equal to NULL. 
+
+For obvious reasons, one should never look at the return value
+from a new if the constructor throws an exception.
+
+Now, more important problem: There is a leak in the way exceptions
+are handled by our beloved Microsoft Software engineers. The
+problem is as follows:
+
+One can redefine operator new to take in additional parameters.
+One typical use is for logging file/line information of all
+the allocations made in the program. That is, one can redefine
+operator new such that it can be used as
+
+  CMyObject* pObject = new (__FILE__, __LINE__) CMyObject;
+
+As a matter of fact, if you look at crtdbg.h, Microsoft does
+provide an overloaded operator new which takes in three
+paramters, two of which are __FILE__ and __LINE__. If you
+are using MFC, macro DEBUG_NEW replaces your "new" by
+this overloaded "new" operator.
+
+Now, the problem with Microsoft's implementation is, if
+CMyObject throws an exception, the memory is not freed
+at all. I have talked to Microsoft's technical support
+people about this. They acknowledge the problem. However,
+they have no intentions to fix it even in upcoming
+version (5.0) of the compiler.
+
+Note that the problem appears only when new is overloaded
+to take in extra parameters. It doesn't happen for
+  CMyObject* pObject = new CMyObject;
+However, beware of the fact that class wizard generated code
+may replace all "new" keyword by "DEBUG_NEW" which gets replaced by
+new(NORMAL_BLOCK, __FILE__, __LINE__).
+
+So, if you are using Microsoft's compiler, I suggest either
+ (i) do not let the construct throw an exception in the
+     constructor. Instead, define a method init().
+
+        CMyObject* pObject = new CMyObject;
+        if (NULL == pObject) {
+           blah ....
+           return;
+        }
+        try
+        {
+           pObject->Init();
+        }
+        catch( CMyException* e )
+        {
+                delete pObject;
+                ...
+         }
+
+   (ii) or make sure that your "new" doesn't get replaced by "DEBUG_NEW."
+
+Also, I see in your code that you try to check if a pointer is NULL
+before deleting it. You need not check if a variable is NULL to
+delete it; in the current specifications, it is legal to pass a
+NULL pointer to delete.
+
+Best,
+
+Pradeep
+pradeep@nuview.com
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Ash Williams -- <A HREF="mailto:ash@digitalworkshop.co.uk">ash@digitalworkshop.co.uk</A>
+Thursday, August 15, 1996
+</B>
+If a constructor hasn't been properly called, then its destructor won't 
+get called at all - true for stack or heap objects, so don't worry 
+about deleting pObject if new failed.
+
+Word of warning: if CMyObject happens to successfully new up some of 
+its own members, then these _must_ be deleted.
+
+**
+
+class Resource {...}; // pretend class
+
+CMyObject::CMyObject()
+:
+m_pResource( new Resource )
+
+{
+        if( !DoCriticalThing() )
+        // ~CMyObject won't get called, so if it does anything
+        // important such as freeing stuff, better do it here
+                delete m_pResource;
+                throw new CMyException;
+        ...
+}
+void SomeFunction()
+{
+        CMyObject* pObject = NULL;
+        try
+        {
+                CMyObject* pObject = new CMyObject;
+        }
+        catch( CMyException* e )
+        { // no worries, nothing got constructed so don't destruct
+                e->Delete();
+                MessageBox( ... );
+        }
+        ...
+}
+
+**
+
+A better solution would to have a management object to manage deleting:
+
+template< class T > // T is your class which you new up
+class Mangager
+{
+public:
+    Manager( T* pT ) { m_pT = pT; }
+    T* GetPtr() { return m_pT; }
+    ~Manager() { delete m_pT; }
+    
+    ...
+    
+private:
+    T* m_pT;
+};
+
+void Eg()
+{
+    Manager< Resource > man = new Resource;
+    throw( int );
+}
+
+
+As you can see you don't ever have to remember to use delete and since 
+Manager is stack based, its d'tor will get called even when an 
+exception is thrown halfway down the stack frame it happens to be on.
+
+Hope these are good tactics for you.
+
+Ash
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

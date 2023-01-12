@@ -1,0 +1,723 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Context menu support in CTreeView
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Irvin Waldman -- <A HREF="mailto:Irvin_Waldman@crow.bmc.com">Irvin_Waldman@crow.bmc.com</A>
+Thursday, October 17, 1996
+</B>
+     Environment: VC++ 4.2, Win 95
+     
+     Q: Context menu support in CTreeView
+          
+     I have wired context menu support in a CTreeView derived class.  I 
+     then provided an override for NM_RCLICK in order to display the pop-up 
+     menu.  How do I obtain the right-clicked item since it seems that an 
+     item is only selected if a left-click is performed?  Also, how do I 
+     obtain the coordinates e.g. CPoint, of the right-clicked item in order 
+     to positioned the pop menu appropriately?
+       
+     Thanks in advanced.
+     
+     Irvin M. Waldman
+     BMC Software, Inc.
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+SachinX Keskar -- <A HREF="mailto:SachinX_Keskar@ccm.jf.intel.com">SachinX_Keskar@ccm.jf.intel.com</A>
+Friday, October 18, 1996
+</B>
+
+Text item: 
+
+     Probably you might try the HitTest member function of the CTreeCtrl class. 
+     
+     Sachin 
+     
+     Environment: VC++ 4.2, Win 95
+     
+     Q: Context menu support in CTreeView
+     
+     I have wired context menu support in a CTreeView derived class.  I 
+     then provided an override for NM_RCLICK in order to display the pop-up 
+     menu.  How do I obtain the right-clicked item since it seems that an 
+     item is only selected if a left-click is performed?  Also, how do I 
+     obtain the coordinates e.g. CPoint, of the right-clicked item in order 
+     to positioned the pop menu appropriately?
+     
+     Thanks in advanced.
+     
+     Irvin M. Waldman
+     BMC Software, Inc.
+
+Text item: External Message Header
+
+The following mail header is for administrative use
+and may be ignored unless there are problems.
+
+***IF THERE ARE PROBLEMS SAVE THESE HEADERS***.
+
+Reply-To: mfc-l@netcom.com
+Precedence: bulk
+Errors-To: owner-mfc-l@majordomo.netcom.com
+Sender: owner-mfc-l@majordomo.netcom.com
+Content-Description: cc:Mail note part
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Randy Taylor -- <A HREF="mailto:randy_taylor@ebt.com">randy_taylor@ebt.com</A>
+Friday, October 18, 1996
+</B>
+[Mini-digest: 9 responses]
+
+Get the HTREEITEM of the item that was right clicked on
+by calling HitTest()
+
+Select an item by calling SelectItem().
+
+randy_taylor@ebt.com
+
+----------
+> From: Irvin Waldman <Irvin_Waldman@crow.bmc.com>
+> To: mfc-l@netcom.com
+> Subject: Context menu support in CTreeView
+> Date: Thursday, October 17, 1996 9:29 AM
+> 
+>      Environment: VC++ 4.2, Win 95
+>      
+>      Q: Context menu support in CTreeView
+>           
+>      I have wired context menu support in a CTreeView derived class.  I 
+>      then provided an override for NM_RCLICK in order to display the
+pop-up 
+>      menu.  How do I obtain the right-clicked item since it seems that an
+
+>      item is only selected if a left-click is performed?  Also, how do I 
+>      obtain the coordinates e.g. CPoint, of the right-clicked item in
+order 
+>      to positioned the pop menu appropriately?
+>        
+>      Thanks in advanced.
+>      
+>      Irvin M. Waldman
+>      BMC Software, Inc.
+-----From: "GoroKhM1" <gorokhm1@SMTP.ATG-NET.COM>
+
+Hi Irvin,
+
+You wrote:
+
+>How do I obtain the right-clicked item ...
+
+The following code works fine in a Tree View:
+
+class MyTree : public CTreeView
+{  
+  ... 
+  CTreeCtrl* m_pTree;
+  HTREEITEM m_hHitItem;
+  ...
+}
+
+int MyTree::OnCreate(...)
+{
+  ...
+  m_pTree = &GetTreeCtrl();
+}
+
+
+void MyTree::OnRightClick(...)
+{
+  ...
+  CPoint cpClick(::GetMessagePos());
+  ScreenToClient(&cpClick);
+  UINT nFlags;
+  m_hHitItem = m_pTree->HitTest(cpClick, &nFlags);
+  ...
+}
+
+If your are working with a Tree Control in a dialog box change 
+  ScreenToClient(&cpClick);
+to 
+  m_pTree->ScreenToClient(&cpClick);
+
+MarkG
+
+
+-----From: Jim Barry <Jim.Barry@ilp.com>
+
+Here's how I do it:
+
+void CMyDialog::OnRclickType(NMHDR* pNMHDR, LRESULT* pResult)
+{
+ CTreeCtrl& tree = m_wndTree;
+ CPoint pt;
+ GetCursorPos(&pt);
+ tree.ScreenToClient(&pt);
+ UINT flags;
+ HTREEITEM hItem = tree.HitTest(pt, &flags);
+ if ((NULL == hItem) || !(TVHT_ONITEM & flags))
+  return;
+
+ // Select the item now, because the tree control doesn't
+ tree.SelectItem(hItem);
+
+ // Show the context menu
+ CMenu menu;
+ VERIFY(menu.LoadMenu(IDM_TREE));
+ GetCursorPos(&pt);
+ menu.GetSubMenu(0)->TrackPopupMenu(TPM_RIGHTBUTTON, pt.x, pt.y, this);
+
+ *pResult = 0;
+}
+
+Note that the SelectItem() call allows you to get the correct tree item   
+by calling CTreeCtrl::GetSelectedItem() in the handlers for the context   
+menu commands.
+
+Hope this helps.
+
+Jim Barry
+Interactive Learning Productions
+Newcastle upon Tyne, UK
+<A HREF="http://www.ilp.com">http://www.ilp.com</A>
+-----From: Uma Shankar <Uma_Shankar@countrywide.com>
+
+Provide the override for WM_RBUTTONDOWN and you can obtain the item handle like 
+this
+
+void CNavigationTreeView::OnRButtonDown(UINT nFlags, CPoint point) 
+{
+ // CNavigationTreeView is derived from CTreeView
+ // TODO: Add your message handler code here and/or call default
+  CTreeCtrl& pTree = GetTreeCtrl();
+   HITEM hItem = pTree.HitTest(point,NULL);
+ 
+ CTreeView::OnRButtonDown(nFlags,point);
+
+}
+-----From: David Little <dlittle@equinoxcorp.com>
+
+Here is how I did it:
+
+void CCourtCostTree::OnContextMenu(CWnd* pWnd, CPoint point) 
+{
+    CMenu hmenu;            
+    CMenu* hmenuTrackPopup; 
+ 
+    if ((hmenu.LoadMenu(IDR_POPUPMENU)) == NULL) 
+        return; 
+ 
+    hmenuTrackPopup = hmenu.GetSubMenu(0); 
+ 
+    hmenuTrackPopup->TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTBUTTON,
+		point.x, point.y, pWnd, NULL);
+	
+    hmenu.DestroyMenu(); 
+}
+
+Hope this helps....
+
+-----From: "Quang Ngo" <quang@psnw.com>
+
+You should respond to WM_CONTEXTMENU rather than NM_RLICK.  Under MFC,
+when the user clicks Shift-F10 the message WM_CONTEXTMENU is sent to
+the parent window of the focused control.
+
+In your case, what you might want to do is intercept WM_CONTEXTMENU then
+post it to the focused control.
+
+ON_WM_CONTEXTMENU()
+
+void CParentWnd::OnContextMenu(CWnd* pWnd, CPoint point)
+	{
+	pWnd->PostMessage(WM_CONTEXTMENU, (WPARAM)pWnd->m_hWnd,
+MAKELPARAM(point.x, point.y));
+	}
+
+Then, in your code for the tree view, do:
+
+void CMyTree::OnContextMenu(CWnd* pWnd, CPoint ptScreen)
+	{
+	UINT flags;
+	HTREEITEM hHitItem;
+
+	/*---------------------------------------------------------------------
+	 * Convert point
+	 *-------------------------------------------------------------------*/
+	CPoint ptClient = ptScreen;
+	ScreenToClient(&ptClient);
+
+	/*---------------------------------------------------------------------
+	 * Check if cursor hits any item
+	 *-------------------------------------------------------------------*/
+	hHitItem = HitTest(ptClient, &flags);
+	if (hHitItem == NULL)
+		{
+		return;
+		}
+
+	/*---------------------------------------------------------------------
+	 * Build the context menu based on the hit item
+	 *-------------------------------------------------------------------*/
+	CMenu menu;
+	if (!BuildMyContextMenu(menu, hHitItem))
+		return;
+
+	/*---------------------------------------------------------------------
+	 * Hilight the hit item
+	 *-------------------------------------------------------------------*/
+	SetItemState(hHitItem, TVIS_DROPHILITED, TVIS_DROPHILITED);
+
+	/*---------------------------------------------------------------------
+	 * Show context menu
+	 * Note: Pass AfxGetMainWnd() to get the fly-by messages in the status
+	 *       bar.
+	 *-------------------------------------------------------------------*/
+	menu.TrackPopupMenu(
+		TPM_LEFTALIGN | TPM_LEFTBUTTON | TPM_RIGHTBUTTON,
+		ptScreen.x,
+		ptScreen.y,
+		m_bOwnPopupMenus ? this : AfxGetMainWnd(),
+		NULL);
+
+	/*---------------------------------------------------------------------
+	 * Unhilight the hit item
+	 *-------------------------------------------------------------------*/
+	SetItemState(hHitItem, ~TVIS_DROPHILITED, TVIS_DROPHILITED);
+
+	/*---------------------------------------------------------------------
+	 * Destroy the menu
+	 *-------------------------------------------------------------------*/
+	menu.DestroyMenu();
+	}
+
+NOTE: Under Windows NT 4.0 you don't need to PostMessage WM_CONTEXTMENU
+from the parent
+	window and the focused control will still get it.  However, under Windows
+95 and
+	Windows NT 3.5x you need to PostMessage it.  If you double-click the right
+button
+	you'll get WM_CONTEXTMENU and won't with a single click.  Moreover, a
+CTreeCtrl
+	control won't get WM_RBUTTONUP when user single right-click.
+
+-Quang
+
+-----From: IT GmbH <100031.1400@CompuServe.COM>
+
+>> How do I obtain the right-clicked item since it seems that an item is only
+selected if a left-click is performed?
+
+You can use GetTreeCtrl().GetDropHighlightItem to determine the right-clicked
+item.
+
+>> Also, how do I obtain the coordinates e.g. CPoint, of the right-clicked item
+in order    to positioned the pop menu appropriately?
+
+Use ::GetCursorPos()
+
+[Moderator's note: Actually, this is a bad idea because the cursor may have
+already moved.  As discussed previously in this list, you should use
+GetMessagePos() instead.]
+
+-----From: "Ferguson, Jeff" <JEFFF@twgi.com>
+
+
+Hello Irvin,
+
+First, call CTreeView::GetTreeCtrl() to get a reference to the view's   
+underlying tree control. You can then call CTreeCtrl::HitTest(), which   
+will return an HTREEITEM found at the supplied CPoint. In your case, this   
+will be the point at which the right mouse button was clicked.
+
+You should be able to use GetMessagePos() to find out what the mouse   
+coordinates of the message were.
+
+There are two forms of CTreeCtrl::HitTest(). See Books Online for more   
+information.
+
+Regards,
+ -- Jeff Ferguson [JeffF@twgi.com]
+   The Weidt Group, Inc. [<A HREF="http://www.twgi.com]">http://www.twgi.com]</A>
+-----From: "Peter Friis" <peterf@wallchart.com>
+
+Here is the NM_RCLICK handler from my CTreeCtrl-derived class:
+
+	void TreeCtrl::OnRclick(NMHDR*,LRESULT*){
+		CPoint p(GetMessagePos()); ScreenToClient(&p);
+		UINT flags;
+		HTREEITEM h=HitTest(p,&flags);
+		if(h) VERIFY(SelectItem(h));	// do this to select the right-clicked item
+		doPopup(h,p,flags);	// creates & tracks the context menu
+	}
+
+I think this answers both your questions. Hope it works for you.
+_______________________________________________________________
+
+Peter Friis, Software Engineer         peterf@wallchart.com
+Wallchart International Ltd            <A HREF="http://www.wallchart.com">http://www.wallchart.com</A>
++44 (1403) 275321                      Fax: +44 (1403) 275322
+_______________________________________________________________
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dominique Letrйsor -- <A HREF="mailto:isambert@mail.telepac.pt">isambert@mail.telepac.pt</A>
+Saturday, October 19, 1996
+</B>
+[Mini-digest: 2 responses]
+
+Irvin Waldman wrote:
+> 
+>      Environment: VC++ 4.2, Win 95
+> 
+>      Q: Context menu support in CTreeView
+> 
+>      I have wired context menu support in a CTreeView derived class.  I
+>      then provided an override for NM_RCLICK in order to display the pop-up
+>      menu.  How do I obtain the right-clicked item since it seems that an
+>      item is only selected if a left-click is performed?  Also, how do I
+>      obtain the coordinates e.g. CPoint, of the right-clicked item in order
+>      to positioned the pop menu appropriately?
+> 
+>      Thanks in advanced.
+> 
+>      Irvin M. Waldman
+>      BMC Software, Inc.
+
+In your OnRclick derivation, you can use the TreeCtrl HitTest member
+function. As to get the coordinate of the mouse click, the API function
+::GetCurPos () will do it. Here is an example:
+	
+	UINT		flags = TVHT_ONITEM;
+	CPoint		point;
+	HTREEITEM	hItem;
+
+	GetCursorPos (&point);
+	
+	ScreenToClient (&point);
+
+	if ((hItem = GetTreeCtrl ().HitTest(point, &flags)) != NULL)
+	{
+		
+	}
+-----From: "Michael A. Harris" <Michael.Harris@rossnutrition.com>
+
+I believe that I have done what you are asking in an app that I am
+currently working on.  I have included the code that I used to do the
+job.  Hope it helps.
+
+
+The following code stores the CPoint of the right click position in a
+private member variable of the view. 
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////
+void CSummaryView::OnRButtonDown(UINT nFlags, CPoint point) 
+{
+	// Store the current CPoint for which the user right clicked in a
+private
+	// member variable (MousePos) for future use. 
+	MousePos = point;
+	CTreeView::OnRButtonDown(nFlags, point);
+}
+//////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+The following code demonstates how I obtain the right clicked item in a
+CTreeCtrl irregardless of which item is currently selected:
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////
+void CSummaryView::OnRclick(NMHDR* pNMHDR, LRESULT* pResult) 
+{
+CMenu m_Menu;
+HTREEITEM m_TreeItem;
+UINT pInt = UINT(TVHT_ONITEM);
+int m_Image,m_SelectedImage; 
+	
+// Test if the point at which the user right clicked is on a valid tree
+item.
+m_TreeItem = GetTreeCtrl().HitTest(MousePos,&pInt);
+
+// If m_TreeItem is NULL then the click was not on a valid tree item so
+ignore.
+if ((m_TreeItem != NULL))
+{	
+	// Get the image(s) associated with the right clicked tree item.
+	if (GetTreeCtrl().GetItemImage(m_TreeItem, m_Image, m_SelectedImage));
+	{
+		// Store the right clicked tree item in a private member variable for 
+		// future use.
+		m_RClickedNode = m_TreeItem;
+		ClientToScreen(&MousePos);
+			
+		// Determine which type of node the user right clicked on and load the
+		// appropriate popup menu.
+		if (m_Image <= NODE1_IMG)
+		{
+			VERIFY(m_Menu.LoadMenu(IDR_NODE1MENU));
+			CMenu* pPopup = m_Menu.GetSubMenu(0);
+			ASSERT(pPopup != NULL);
+			pPopup->TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTBUTTON,
+					       MousePos.x, MousePos.y, this);
+		}
+		else if (m_Image <= NODE2_IMG)
+			{
+				VERIFY(m_Menu.LoadMenu(IDR_NODE2MENU));
+				CMenu* pPopup = m_Menu.GetSubMenu(0);
+				ASSERT(pPopup != NULL);
+				pPopup->TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTBUTTON,
+						       MousePos.x, MousePos.y, this);
+			}
+			else 
+			{
+				// Item selected is not one which we are interested in so
+				// do something else.		  
+			}
+					 
+	}
+			
+}
+*pResult = 0;
+}
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+Have a good day,
+Michael A. Harris
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Jim Barry -- <A HREF="mailto:Jim.Barry@ilp.com">Jim.Barry@ilp.com</A>
+Tuesday, October 22, 1996
+</B>
+[Mini-digest: 3 responses]
+
+[Moderator's note: Two of the responses use GetCursorPos(), which
+I'm pretty sure is a bad idea because the cursor can change position
+after the message has been put into the queue.  You should use
+GetMessagePos() whenever you need to know where the cursor was when
+the message came through.  This has been discussed here several
+times in the past and should probably be mentioned in the FAQ.]
+
+>Environment: VC++ 4.2, Win 95
+>
+>Q: Context menu support in CTreeView
+>
+>I have wired context menu support in a CTreeView derived class.  I
+>then provided an override for NM_RCLICK in order to display the pop-up
+>menu.  How do I obtain the right-clicked item since it seems that an
+>item is only selected if a left-click is performed?  Also, how do I
+>obtain the coordinates e.g. CPoint, of the right-clicked item in order
+>to positioned the pop menu appropriately?
+
+In my previous posting, I had not considered the WM_CONTEXTMENU message,   
+which a child window's DefWindowProc sends to the parent window following   
+a right button up-click. If the menu key on a Microsoft Natural Keyboard   
+is pressed, a WM_CONTEXTMENU message is sent with lParam set to -1. Here   
+is how my code now looks, if anyone's interested.
+
+void CMyDialog::OnRclickTree(NMHDR* pNMHDR, LRESULT* pResult)
+{
+ // Do a hit test
+ CTreeCtrl& tree = m_wndTree;
+ CPoint pt;
+ GetCursorPos(&pt);
+ tree.ScreenToClient(&pt);
+ UINT flags;
+ HTREEITEM hItem = tree.HitTest(pt, &flags);
+ if ((NULL == hItem) || !(TVHT_ONITEM & flags))
+  return;
+
+ // Select the item now, coz the tree control won't do it
+ tree.SelectItem(hItem);
+
+ *pResult = 0;
+}
+
+void CMyDialog::OnContextMenu(CWnd* pWnd, CPoint point)
+{
+ CTreeCtrl& tree = m_wndTree;
+ if (pWnd == &tree)
+ {
+  HTREEITEM hItem;
+
+  // Is click inside tree control?
+  CPoint pt(point); tree.ScreenToClient(&pt);
+  CRect rect; tree.GetClientRect(rect);
+  if (rect.PtInRect(pt))
+  {
+   // Inside control - hit test for item
+   UINT flags;
+   hItem = tree.HitTest(pt, &flags);
+   if ((NULL == hItem) || !(TVHT_ONITEM & flags))
+    return;
+  }
+  else
+  {
+   // Outside control - choose selected item
+   hItem = tree.GetSelectedItem();
+   if (NULL == hItem)
+    return;
+
+   // Set menu coords to be at centre of selected item
+   tree.GetItemRect(hItem, rect, TRUE);
+   point = rect.CenterPoint();
+   tree.ClientToScreen(&point);
+  }
+  ASSERT(hItem);
+
+  // Show the context menu
+  CMenu menu;
+  VERIFY(menu.LoadMenu(IDM_TREE));
+  menu.GetSubMenu(0)->TrackPopupMenu(TPM_RIGHTBUTTON,
+   point.x, point.y, this);
+ }
+}
+
+Works OK on Win32s too.
+
+Jim Barry
+Interactive Learning Productions
+Newcastle upon Tyne, UK
+<A HREF="http://www.ilp.com">http://www.ilp.com</A>
+
+-----From: "Dan Maher" <dmaher@apdi.net>
+
+A better way to do this might be to use the GetMessagePos() function since
+it retrieves the mouse position at the time the message was sent, which is
+not necessarily the same as when you process the message.
+
+void CMyTreeView::OnRClick( NMHDR* pNMHDR, LRESULT* pResult) {
+  *pResult = 0;
+
+  UINT dwPos = GetMessagePos();
+  CPoint pointScreen;  
+  // GetMessagePos returns mouse position in SCREEN coordinates
+
+  pointScreen.x = LOWORD (dwPos);
+  pointScreen.y = HIWORD (dwPos);
+}
+
+dM
+
+-----From: "Thomas Schall" <schall@csv.ica.uni-stuttgart.de>
+
+Hi Irvin,
+
+I just had the same problem. There is no great deal about solving the
+problem.
+My class CRSYDBBrowserView is derived from CTreeView. Just follow the code
+provided.
+My comment at the beginning of OnRClick() is only estimated! and not
+prooved.
+Hope thid helps.
+
+void CRSYDBBrowserView::OnContextMenu(CWnd* pWnd, CPoint point) 
+{
+	// Context menu has been avtivated
+	HTREEITEM hItem;
+	CMenu DBContextMenu;
+	CPoint localPoint = point;
+	CTreeCtrl& tree = GetTreeCtrl();
+	ScreenToClient(&localPoint);
+
+	if((hItem = tree.HitTest(localPoint)) == NULL)
+		return;
+
+	//pFrame = (CRSYMainWnd *)AfxGetApp()->m_pMainWnd;
+	// Further version will provide user defined commands
+	static char *szDBItemCmds[6] = {
+		"leaves only", "nodes only", "depth", "reverse", "DLI", "STR" };
+
+	DBContextMenu.CreatePopupMenu();
+	// Add menu items
+	for(int i=0; i<6; i++)
+	{
+		DBContextMenu.AppendMenu(MF_STRING, 0, szDBItemCmds[i]);
+	}
+	// Show popup menu
+	DBContextMenu.TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTBUTTON, point.x,
+point.y,
+		this);
+
+	TRACE("*** popup DB menu over item %s\n", tree.GetItemText(hItem));
+}
+
+void CRSYDBBrowserView::OnRClick(NMHDR* pNMHDR, LRESULT* pResult) 
+{
+	CPoint point;
+
+	// We need this explicit redirection, because otherwise the popup menu
+only
+	// will be drawn clicking twice the right mouse. Maybe this is due to the
+	// reflection of the NM_RCLICK message.
+
+	// Get current cursor position
+	GetCursorPos(LPPOINT(&point));
+	// Redirect right click to member function OnContextMenu()
+	OnContextMenu(this, point);
+	*pResult = 0;
+}
+
+Feel free to remail, if any problems occur.
+
+Thomas
+ 
+------------------------
+Dipl.-Ing. Thomas Schall
+ICA-CSV                         EMail: schall@csv.ica.uni-stuttgart.de
+Universitaet Stuttgart
+Pfaffenwaldring 27              Tel. : +49 (0) 711 / 685 3756
+70569 Stuttgart, Germany        Fax  : +49 (0) 711 / 685 3758
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

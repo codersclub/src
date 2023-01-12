@@ -1,0 +1,258 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Drag & Drop support with CTreeCtrl
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Pete Silvestre -- <A HREF="mailto:psilvest@village.ios.com">psilvest@village.ios.com</A>
+Thursday, January 25, 1996
+</B>
+I'm trying to add support for drag and drop between a Ctreectrl and
+a Clistctrl on the same window.  Just to get my feet wet I took
+a look around on the both the MSDN & VC++ 4.0 CD's to see what samples
+were available.  I only found one that used MFC,  mfctree.  It doesnt
+seem to operate correctly - I can drag a tree item but no image 
+appears while it is being dragged and the code to do this seems to
+be present (it also required a minor change to compile under 4.0).  
+
+I'm having the same problem when I try similar code in my app (ie: 
+there is no drag image).  Does anybody have or know where I can find
+a simple example of code like this.  It could be for either the 95 tree
+or list control.  FYI, this MFC 4.0, VC++ 4.0 under NT 3.51.  TIA...
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mickey Williams -- <A HREF="mailto:75460.2102@compuserve.com">75460.2102@compuserve.com</A>
+Sunday, January 28, 1996
+</B>
+Pete Silvestre wrote:
+> I'm trying to add support for drag and drop between a Ctreectrl and
+> a Clistctrl on the same window.  
+> ...
+>   Does anybody have or know where I can find
+> a simple example of code like this.  It could be for either the 95 tree
+> or list control.  FYI, this MFC 4.0, VC++ 4.0 under NT 3.51.  TIA...
+
+The code for either is similar, but not identical, so I'll give you both -
+you would think that functions like GetImageRect would have the
+same signatures, but that's not the case. Anyway, merging the two
+is left as an excersize to the reader - hope this helps.
+---
+Mickey
+
+---------CTreeCtrl drag and drop -----------
+// Handlers for TVN_BEGINDRAG, WM_MOUSEMOVE, and
+// WM_LBUTTONUP
+
+//The image list is 32 pixels wide, and image 3 is used for all the dragable
+items.
+// There are three member variables to handle dnd:
+// HTREEITEM m_hDragItem - the item being dragged
+// HTREEITEM m_hDragTarget - the item being dropped on
+// BOOL m_fIsDragging - TRUE if a drag is in progress
+
+void CTreeDispDlg::OnBegindragTree(NMHDR* pNMHDR, LRESULT* pResult) 
+{
+    NM_TREEVIEW* pNMTreeView = (NM_TREEVIEW*)pNMHDR;
+    // In this tree, root nodes aren't allowed to move.
+    if(m_tree.GetParentItem(pNMTreeView->itemNew.hItem) != NULL)
+    {
+        m_hDragItem = pNMTreeView->itemNew.hItem;
+        CImageList* pDragImage;
+        pDragImage = m_tree.CreateDragImage( m_hDragItem );
+        ASSERT( pDragImage );
+        // The next few lines calculate the position of the cursor rel to
+        // the image. A crude bu simpler approach is to use CPoint(0,0)
+        // as the cursor point in BeginDrag. 
+        CRect   rcDrag;
+        CPoint  ptCursor;
+        m_tree.GetItemRect( m_hDragItem, rcDrag, TRUE );
+        rcDrag.left -= 32;  // Adjust by width of image
+        GetCursorPos( &ptCursor );
+        m_tree.ScreenToClient( &ptCursor );
+        CPoint ptDrag( ptCursor - rcDrag.TopLeft() );
+        pDragImage->BeginDrag( 0, ptDrag );
+        pDragImage->DragEnter( &m_tree, pNMTreeView->ptDrag );
+        SetCapture();
+        m_fIsDragging = TRUE;
+    }
+    *pResult = 0;
+}
+
+void CTreeDispDlg::OnMouseMove(UINT nFlags, CPoint point) 
+{
+    if( m_fIsDragging == TRUE )
+    {
+        CPoint ptTree(point);
+        MapWindowPoints( &m_tree, &ptTree, 1 );
+        CImageList::DragMove( ptTree );
+
+        UINT    uHitTest = TVHT_ONITEM;
+        m_hDragTarget = m_tree.HitTest( ptTree, &uHitTest );
+    }
+    CDialog::OnMouseMove(nFlags, point);
+}
+
+void CTreeDispDlg::OnLButtonUp(UINT nFlags, CPoint point) 
+{
+    if( m_fIsDragging == TRUE )
+    {
+        CImageList::DragLeave( &m_tree );
+        CImageList::EndDrag();
+        ReleaseCapture();
+        m_fIsDragging = FALSE;
+        // Test for valid drop target.
+        if((m_hDragTarget != NULL)&&(m_hDragTarget != m_hDragItem))
+        {
+            // Create a copy of the drag item.
+            HTREEITEM   hParent;
+            hParent = m_tree.GetParentItem( m_hDragTarget );
+            CString szLabel = m_tree.GetItemText( m_hDragItem );
+            if( hParent != NULL )
+                m_tree.InsertItem( szLabel, 3, 3, hParent,
+                                   m_hDragTarget );
+            else
+                m_tree.InsertItem( szLabel, 3, 3, m_hDragTarget,
+                                   TVI_FIRST );
+            // Remove the existing copy of the drag item.
+            m_tree.DeleteItem( m_hDragItem );
+        }
+    }
+    else
+        CDialog::OnLButtonUp(nFlags, point);
+}
+
+---- A list view drag and drop -----------
+
+// This list view uses image and text callbacks, so it isn't completely
+// interchangable with the tree-view. On the other hand, it does show
+// how the basic dnd works.
+// There are three member variables here also:
+// int m_nDragItem, m_nDragTarget; - the draggee and drop target
+// BOOL m_fIsDragging; - True if a drag is in progress
+
+void CTravelDlg::OnBegindragList(NMHDR* pNMHDR, LRESULT* pResult) 
+{
+    NM_LISTVIEW* pNMListView = (NM_LISTVIEW*)pNMHDR;
+
+    m_nDragItem = pNMListView->iItem;
+    CImageList* pDragImage;
+    pDragImage = m_listCtrl.CreateDragImage( m_nDragItem, &pNMListView->ptAction
+);
+    ASSERT( pDragImage );
+
+    CRect   rcDrag;
+    CPoint  ptCursor;
+    m_listCtrl.GetItemRect( m_nDragItem, rcDrag, LVIR_ICON );
+    GetCursorPos( &ptCursor );
+    m_listCtrl.ScreenToClient( &ptCursor );
+    CPoint ptDrag( ptCursor - rcDrag.TopLeft() );
+
+    pDragImage->BeginDrag( 0, ptDrag );
+    pDragImage->DragEnter( &m_listCtrl, pNMListView->ptAction );
+    SetCapture();
+    m_fIsDragging = TRUE;
+
+    *pResult = 0;
+}
+
+void CTravelDlg::OnMouseMove(UINT nFlags, CPoint point) 
+{
+    if( m_fIsDragging == TRUE )
+    {
+        CPoint ptList(point);
+        MapWindowPoints( &m_listCtrl, &ptList, 1 );
+        CImageList::DragMove( ptList );
+        UINT    uHitTest = LVHT_ONITEM;
+        m_nDragTarget = m_listCtrl.HitTest( ptList, &uHitTest );
+    }
+    CDialog::OnMouseMove(nFlags, point);
+}
+
+void CTravelDlg::OnLButtonUp(UINT nFlags, CPoint point) 
+{
+    if( m_fIsDragging == TRUE )
+    {
+        CImageList::DragLeave( &m_listCtrl );
+        CImageList::EndDrag();
+        ReleaseCapture();
+        m_fIsDragging = FALSE;
+        if((m_nDragTarget != -1)&&(m_nDragTarget != m_nDragItem))
+        {
+            LV_ITEM theItem;
+            theItem.iItem = m_nDragItem;
+            theItem.iSubItem = 0;
+            theItem.mask = LVIF_PARAM;
+            VERIFY( m_listCtrl.GetItem( &theItem ) );
+
+             // Obviously, this section is different for other applications....
+            CHotel* pOldHotel = (CHotel*)theItem.lParam;
+            ASSERT(pOldHotel);
+            CHotel* pNewHotel = new CHotel(*pOldHotel);
+            ASSERT(pNewHotel);
+            theItem.iItem = m_nDragTarget;
+            theItem.iImage = pNewHotel->m_nRank;
+            theItem.mask |= (LVIF_TEXT | LVIF_IMAGE);
+            theItem.pszText = LPSTR_TEXTCALLBACK;
+            theItem.cchTextMax = 40;
+            theItem.lParam = (LPARAM)pNewHotel;
+            VERIFY( m_listCtrl.InsertItem(&theItem) != -1 );
+            m_listCtrl.SetItemText( m_nDragTarget, 1, LPSTR_TEXTCALLBACK );
+            m_listCtrl.SetItemText( m_nDragTarget, 2, LPSTR_TEXTCALLBACK );
+
+            if( m_nDragTarget < m_nDragItem )
+                m_nDragItem++;
+
+            VERIFY( m_listCtrl.DeleteItem( m_nDragItem ));
+        }
+    }
+    else
+        CDialog::OnLButtonUp(nFlags, point);
+}
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

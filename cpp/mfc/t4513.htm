@@ -1,0 +1,207 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Problem with Print Preview...
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Anil Madhav Bhagwat -- <A HREF="mailto:abhagwat@cvimail.CV.COM">abhagwat@cvimail.CV.COM</A>
+Monday, April 01, 1996
+</B>
+Environment : WIN95, MSVC++ 4.0,MFC 4.0
+
+Hi,
+
+I am having some problem with Print preview in my MDI application. I show the
+user a view with a huge amount of data. I use OnDraw function to display the
+data. When I do "Print Preview" 2 things happen
+
+1) The data displayed does not look proper. I have left enough space between
+2 successive lines in the output. But in Preview the lines get merged with
+each other.
+
+2) The Preview gives button for next page. But on clicking it, it keeps on
+displaying the first page only with some annoying flicker in between. Is
+there a way to specify page break in the data itself?
+
+Any solution for this...
+
+anil
+------------------------------------------------------------------------------
+Anil M. Bhagwat
+
+Residence : 4/Bhalchandra,       Office : ComputerVision(India) R&D Pvt.Ltd.
+            Karve Road,                   16 Pune-Mumbai Road, 
+            Erandawane,                   Opp. Bajaj Auto Show Room,
+            Pune 4                        Pune 3
+
+Telephone : 330130               Telephone : 318816 / 17 / 18 / 19 / 20
+------------------------------------------------------------------------------
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Darius Thabit -- <A HREF="mailto:darius@world.std.com">darius@world.std.com</A>
+Wednesday, April 03, 1996
+</B>
+[Mini-digest: 3 responses]
+
+> 2) The Preview gives button for next page. But on clicking it, it keeps o
+> displaying the first page only with some annoying flicker in between. Is
+> there a way to specify page break in the data itself?
+
+   When your OnPrint routine gets called, the m_nCurPage member of the 
+CPrintInfo structure that gets passed to you has the page number you are 
+supposed to be rendering.  It's up to you to decide exactly what is meant by 
+Page N and render that in your OnPrint - generally this will be a subset of 
+the data shown in the view.  I know that because I didn't use this parameter 
+correctly at first, my "previous page" button was not working properly. 
+Perhaps you have a similar problem.
+
+-----From: "Sanu M.P" <sanump@hcla.com>
+
+   What is the DC output function you're using ? It should be used with
+   proper co-ordinate values to go to a next line.Otherwise lines will look
+   merged.
+
+> 
+> 2) The Preview gives button for next page. But on clicking it, it keeps on
+> displaying the first page only with some annoying flicker in between. Is
+> there a way to specify page break in the data itself?
+  
+  Though the CScrollView class shows the previous and next buttons , you're
+  responsible for displaying the correct page information when the user
+  hits it.You need to override OnDraw or OnPrint to display different page
+  information.It is called (OnDraw/OnPrint) each time a page gets printed.
+
+  I think you need something like this :
+  
+  void CMyView::OnPrint(CDC* pDC,CPrintInfo* pInfo)
+  {
+      PrintMyPage(m_nCurPage);
+  }
+> 
+> Any solution for this...
+> 
+-----From: "Rondal C. Ellifritt" <rondal@mvision.com>
+
+>I am having some problem with Print preview in my MDI application.
+>I show the user a view with a huge amount of data. I use OnDraw
+>function to display the data. When I do "Print Preview" 2 things
+>happen
+
+You can't print (or print preview) a multi-page document using only 
+OnDraw(). You have to use OnPrint() You probably also need to use 
+OnPreparePrinting(), OnBeginPrinting(), and OnEndPrinting().
+
+>1) The data displayed does not look proper. I have left enough
+>space between 2 successive lines in the output. But in Preview the
+>lines get merged with each other.
+
+You need to set the mapping mode for printing. CDC::SetMapMode() 
+takes an argument which determines how the units of measure are 
+interpreted for drawing commands such as CDC::TextOut() and 
+CDC::Rectangle(). I use the following:
+
+void CMyView::OnPrint(CDC* pDC, CPrintInfo* pInfo)
+{
+    // set mapping mode to 1000 units per inch
+    pDC->SetMapMode(MM_HIENGLISH);
+    ...
+}
+
+>2) The Preview gives button for next page. But on clicking it, it
+>keeps on displaying the first page only with some annoying flicker
+>in between. Is there a way to specify page break in the data
+>itself?
+
+You need to set the maximum page correctly. The framework depends 
+upon OnPreparePrinting() to tell it how many pages your document has 
+via the CPrintInfo argument. It then calls OnPrint() for each page, 
+passing it a CPrintInfo argument which contains the current page 
+number. This means OnPrint() must figure out for itself which set of 
+data should appear on the current page. It cannot assume it has been 
+called to print the previous pages, because the user may not be 
+printing the entire document. I use the following:
+
+BOOL CMyView::OnPreparePrinting(CPrintInfo* pInfo)
+{
+    int nMaxPage;
+    // use some algorithm to determine the number of pages
+
+    ...
+
+    pInfo->SetMaxPage(nMaxPage);
+    return DoPreparePrinting(pInfo);
+}
+
+void CMyView::OnPrint(CDC* pDC, CPrintInfo* pInfo)
+{
+    ...
+    // determine which set of data to print
+    for (int nPage = 1; nPage < pInfo->m_nCurPage; nPage++) {
+        // skip past one page of data
+    }
+    // print this page of data
+    ...
+}
+
+Note that this method for find which set of data to print is the 
+worst case scenario, when one has nothing more to go on than how the 
+data fits on the page. There is usually a faster method available 
+which depends on the particular data you're printing.
+
+Hope this gives you a start,
+Rondal
+
+==================================================================
+| Rondal C. Ellifritt   Market Vision Corp.   rondal@mvision.com |
+| Voice: 212.306.0374                          Fax: 212.587.3976 |
++----------------------------------------------------------------+
+| Opinions expressed herein belong solely to the author and to a |
+| team of underpaid monkeys working feverishly at typewriters.   |
+==================================================================
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

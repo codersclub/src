@@ -1,0 +1,176 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Bad ASSERT in Wincore.cpp!?
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Michel Robert -- <A HREF="mailto:michero@login.net">michero@login.net</A>
+Wednesday, May 22, 1996
+</B>
+VC 4.0, Win95, MFC
+
+At line 1938 of Wincore.cpp the ASSERT is causing me grief.  I'm using int,
+as I'm supposed to be allowed (and I need the whole range).
+
+	::GetScrollInfo(hWndBar, nBar, &info);
+	// Next line is causing intermittent problems
+        ASSERT(nPos == (short)info.nTrackPos);
+	nPos = info.nTrackPos;
+
+Does anybody know if this is an MFC bug?  Has it been fixed?
+
+TIA
+
+These are the lines that precede the  ASSERT:
+
+
+	case AfxSig_vwwW:
+	case AfxSig_vwwx:
+		{
+			// special case for WM_VSCROLL and WM_HSCROLL for
+			// getting 32-bit scroll position
+			ASSERT(message == WM_VSCROLL || message == WM_HSCROLL ||
+				message == WM_VSCROLL+WM_REFLECT_BASE || message ==
+WM_HSCROLL+WM_REFLECT_BASE);
+			int nScrollCode = (short)LOWORD(wParam);
+			int nPos = (short)HIWORD(wParam);
+			if (afxData.nWinVer >= 0x333 &&
+				(nScrollCode == SB_THUMBTRACK ||
+				 nScrollCode == SB_THUMBPOSITION))
+			{
+				HWND hWndBar = (HWND)lParam;
+				int nBar = SB_CTL;
+				if (hWndBar == NULL)
+				{
+					hWndBar = m_hWnd;
+					nBar = (message == WM_VSCROLL ? SB_VERT : SB_HORZ);
+				}
+				static const TCHAR szScrollBar[] = _T("scrollbar");
+				if (nBar != SB_CTL ||
+					_AfxCompareClassName(hWndBar, szScrollBar))
+				{
+					SCROLLINFO info;
+					info.cbSize = sizeof(SCROLLINFO);
+					info.fMask = SIF_TRACKPOS;
+					::GetScrollInfo(hWndBar, nBar, &info);
+					ASSERT(nPos == (short)info.nTrackPos);
+					nPos = info.nTrackPos;
+				}
+			}
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dan Liliedahl -- <A HREF="mailto:lilied@adra.com">lilied@adra.com</A>
+Tuesday, May 28, 1996
+</B>
+[Mini-digest: 3 responses]
+
+Check out the docs for SetScrollRange.  Even though the variable range is
+an int (32-bits) you are limited to a
+short (16-bits) because of a limitation of the WM_HSCROLL/WM_VSCROLL
+position range.
+
+-----From: "David W. Gillett" <DGILLETT@expertedge.com>
+
+On 22 May 96 at 12:36, Michel Robert wrote:
+
+> VC 4.0, Win95, MFC
+
+  Thanks -- this is important.  The underlying problem is a 
+difference between 95 and NT.
+ 
+  Although you'd like the range in 32 bits, and a comment in the code 
+(snipped) suggests that that range is supposed to be available, in 
+fact Win95's GDI only works in 16 bits.  [This has been discussed 
+here, with particular reference to scroll bars, not very long ago.]
+
+  [Few users' screens offer more than about 10 bits of resolution in 
+horizontal or vertical, so 16 bits is more precision than the 
+position of the scrolling thumb can display.  I would suggest that a 
+scrollbar alone is not sufficient for finer resolution; perhaps 
+something analogous to the "fine tuning" knob on many old radios is 
+called for.]
+
+Dave
+
+-----From: "David W. Gillett" <DGILLETT@expertedge.com>
+
+  Michel Robert and I have been discussing/exploring the problem he 
+has encountered, and conclude that it doesn't appear to have anything 
+to do with the 16-bit GDI in Windows 95.
+
+  The WM_*SCROLL message contains only a 16-bit scroll position.  The 
+MFC code handling this message is calling ::GetScrollInfo(), with a 
+flag parameter not documented as of the April MSDN version of the SDK 
+docs, to retrieve the 32-bit "tracking" position of the scroll thumb. 
+This much looks reasonable enough.
+  An assertion in that code checks that the bottom 16 bits of the 
+retrieved tracking position match the 16-bit position reported in the 
+message -- and it is this assertion which is sometimes failing.  
+[Sorry, I don't have Michel's original message in front of me.  I 
+know that he's using 95 and MSVC/MFC 4.x.  In 4.1, the relevant 
+assertion is at line 1948 in wincore.cpp, inside an #ifdef _AFXDLL 
+block.]
+
+  The only situation we have been able to imagine where this should 
+be able to fail is where the thumb has moved since the scroll message 
+was queued, perhaps because repainting the window to reflect a 
+previous scroll message took too long.  Questions which suggest 
+themselves:
+
+1.  Is this a plausible situation?  Are there other situations where 
+this condition might arise?
+
+2.  Is this a reasonable way for MFC to cope with the situation?  If 
+not, can it be avoided without doing a private rebuild of the debug 
+MFC versions?
+
+Dave
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

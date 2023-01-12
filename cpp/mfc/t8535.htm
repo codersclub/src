@@ -1,0 +1,305 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+MFC Exceptions.
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Paul Martinsen -- <A HREF="mailto:pmartinsen@hort.cri.nz">pmartinsen@hort.cri.nz</A>
+Tuesday, December 17, 1996
+</B>
+Environment: VC++ 4.0, Win 95
+
+Hello,
+  I was testing my error handling code last night & discovered what I 
+would call an error in the documentation. In many cases the MFC help 
+notes that a function could throw an exception, for example 
+CArray::InsertAt throws exceptions when there is insufficient memory 
+to insert the element. However, I discovered that it is actually a 
+POINTER that is thrown, not a CMemoryException (for example) object, 
+in otherwords the following code doesn't catch the error:
+
+try
+{ myArray.InsertAt(10,pNewObject);
+} catch (CMemoryException)
+{ AfxMessageBox(IDS_NO_MORE_MEMORY);
+}
+
+The catch line must read:
+catch (CMemoryException *)
+to catch the exception thrown by InsertAt. I looked at the code that
+seems to be used for throwing these, eg AfxThrowMemoryException(),
+and it seems to use a pointer to a static object which, of course,
+doesn't need to be deleted. Does anybody know if this is always
+true, ie do I every have to delete the pointer that I get in the
+catch? Also, what is all this business with THROW and CATCH etc, 
+instead of the C++ throw & catch? Is this just MFC shouting so we 
+notice what is going on :), or should I be using them for my exception 
+handling too?
+
+Paul. 
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+John Addis -- <A HREF="mailto:jaddis@erols.com">jaddis@erols.com</A>
+Wednesday, December 18, 1996
+</B>
+[Mini-digest: 7 responses]
+
+> From: Paul Martinsen <pmartinsen@hort.cri.nz>
+> To: mfc-l@netcom.com
+> Subject: MFC Exceptions.
+> Date: Monday, December 16, 1996 7:37 PM
+> 
+> Environment: VC++ 4.0, Win 95
+> 
+> Hello,
+>   I was testing my error handling code last night & discovered what I 
+> would call an error in the documentation. In many cases the MFC help 
+> notes that a function could throw an exception, for example 
+> CArray::InsertAt throws exceptions when there is insufficient memory 
+> to insert the element. However, I discovered that it is actually a 
+> POINTER that is thrown, not a CMemoryException (for example) object, 
+> in otherwords the following code doesn't catch the error:
+
+All of the ::AfxThrowXxxxException() functions throw pointers rather than
+actual objects.
+
+> I looked at the code that
+> seems to be used for throwing these, eg AfxThrowMemoryException(),
+> and it seems to use a pointer to a static object which, of course,
+> doesn't need to be deleted. Does anybody know if this is always
+> true, ie do I every have to delete the pointer that I get in the
+> catch? 
+
+For CException derived classes you should call the object's Delete()
+method. 
+
+Ex: 
+  catch(CMemoryException* pME)
+  {
+    ...
+    pME->Delete();
+  }
+
+
+> Also, what is all this business with THROW and CATCH etc, 
+> instead of the C++ throw & catch? Is this just MFC shouting so we 
+> notice what is going on :), or should I be using them for my exception 
+> handling too?
+
+THROW and CATCH were maintained for backwards compatibility with previous
+versions of MFC. If you are not concerned with this then you should be okay
+using the normal c++ throw/catch keywords.
+ 
+--
+John Addis                   <A HREF="http://www.xorbit.com">http://www.xorbit.com</A>
+"Power failure; please turn your computer on."
+-----From: Mike Blaszczak <mikeblas@nwlink.com>
+
+At 12:37 12/17/96 +1200, Paul Martinsen wrote:
+
+>I looked at the code that seems to be used for throwing these,
+>eg AfxThrowMemoryException(), and it seems to use a pointer to
+>a static object which, of course, doesn't need to be deleted.
+
+Obviously.  If MFC needed throw a memory exception, where would it
+get the memory to create it before throwing it?
+
+>Does anybody know if this is always true, ie do I every have
+>to delete the pointer that I get in the catch?
+
+Yes.  Please read the documentation.  It explains that you must
+call the Delete() member of CException-derived objects that you
+catch.  Like this:
+
+
+   try
+   {
+      m_array.InsertAt(11, "Kevin Dineen");
+      m_array.InsertAt(35, "Peter Siedorkiewicz");
+      m_array.InsertAt(5, "Ulf Samuelsson");
+   } 
+   catch (CMemoryException* pEx)
+   {
+      pEx->ReportError();
+      pEx->Delete();
+   }
+
+>Also, what is all this business with THROW and CATCH etc, 
+>instead of the C++ throw & catch? Is this just MFC shouting so we 
+>notice what is going on :), or should I be using them for my exception 
+>handling too?
+
+Please read the documentation.  It explains that the THROW and CATCH
+macros are there just for backward compatibiltiy. MFC had exception
+handling before the C++ Committee was even a twinkle in ANSI's eye.
+In current versions of MFC (like MFC 4.0, which you're using), the
+macros translate _almost_ directly to the C++ keywords.  The
+documentation explains how to convert the macros to C++ keywords,
+if you'd like to do that.  'Course, you have to _read_ it, first.
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+I'm afraid I've become some sort of speed freak.
+These words are my own. I do not speak on behalf of Microsoft.
+
+-----From: Amir Shoval <torin@netvision.net.il>
+
+Paul Martinsen wrote:
+> 
+> Environment: VC++ 4.0, Win 95
+> 
+> Hello,
+>   I was testing my error handling code last night & discovered what I
+> would call an error in the documentation. In many cases the MFC help
+> notes that a function could throw an exception, for example
+> CArray::InsertAt throws exceptions when there is insufficient memory
+> to insert the element. However, I discovered that it is actually a
+> POINTER that is thrown, not a CMemoryException (for example) object,
+> in otherwords the following code doesn't catch the error:
+> 
+> try
+> { myArray.InsertAt(10,pNewObject);
+> } catch (CMemoryException)
+> { AfxMessageBox(IDS_NO_MORE_MEMORY);
+> }
+> 
+> The catch line must read:
+> catch (CMemoryException *)
+Yes, This is *exactly* how it should read according to C++ language
+rules (*not* MFC's). In fact, even a better one is:
+
+	catch (CMemoryException *e)
+
+so you can use the exception pointer in the catch block to gain 
+information about the exception.
+
+> to catch the exception thrown by InsertAt. I looked at the code that
+> seems to be used for throwing these, eg AfxThrowMemoryException(),
+> and it seems to use a pointer to a static object which, of course,
+> doesn't need to be deleted. Does anybody know if this is always
+> true, ie do I every have to delete the pointer that I get in the
+> catch? Also, what is all this business with THROW and CATCH etc,
+> instead of the C++ throw & catch? Is this just MFC shouting so we
+> notice what is going on :), or should I be using them for my exception
+> handling too?
+> 
+> Paul.
+
+MFC once did not support c++ try & catch mechanism and the exception
+handling was done using MFC's macros TRY, CATCH & THROW. MFC docs says
+you better use the new supported c++ mechanism for compatability
+reasons. You can read about it in any c++ language reference.
+
+	Amir
+
+--------------------------
+Amir Shoval N.C.C. Israel
+torin@netvision.net.il
+--------------------------
+-----From: SCS.007@mch.scn.de
+
+>> Environment: VC++ 4.0, Win 95
+
+>> to insert the element. However, I discovered that it is actually a 
+>> POINTER that is thrown, not a CMemoryException (for example) object, 
+>> in otherwords the following code doesn't catch the error:
+
+>> try
+>> { myArray.InsertAt(10,pNewObject);
+>> } catch (CMemoryException)
+>> { AfxMessageBox(IDS_NO_MORE_MEMORY);
+>> }
+
+>> The catch line must read:
+>> catch (CMemoryException *)
+>> to catch the exception thrown by InsertAt. I looked at the code that
+
+Use TRY, CATCH, AND_CATCH, END_CATCH - It gives you an exception object.
+
+>> catch? Also, what is all this business with THROW and CATCH etc, 
+>> instead of the C++ throw & catch? Is this just MFC shouting so we 
+>> notice what is going on :), or should I be using them for my exception 
+>> handling too?
+During the days of VC++ 1.5, 1.52, the C++ team of Microsoft had not 
+supported exception handling machanism. Smart that the MFC team is, came up 
+with the TRY-CATCH  mechanism - basically macros which provide that 
+functionality to you. MSVC 4.0 completely supports the C++ specification. You 
+should be thankful to them(MFC team). It does have some bugs though - for eg, 
+in VC++ 1.52, CFile doesnt throw exceptions in some cases, even thoough it is 
+documented. You can pardon them for such mistakes... .. sometimes.
+
+Chandru.
+
+Paul. 
+-----From: jmitchell@cc-mail.derwent.co.uk
+
+--IMA.Boundary.447099058
+Content-Type: text/plain; charset=ISO-8859-1
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Ash Williams -- <A HREF="mailto:ash@digitalworkshop.co.uk">ash@digitalworkshop.co.uk</A>
+Friday, December 20, 1996
+</B>
+I'm suprised you haven't found anything in the help.
+
+Yes you must delete the caught exception, but use the 'Delete' member 
+rather than the 'delete' operator.
+
+Also TRY, THROW and CATCH are macros and were introduced before 
+try, throw and catch were a part of the language. Unfortunately they're 
+brain-dead as they rely on goto's, which of course means anything on 
+the stack doesn't get cleaned up. Actually they probably evaluate to 
+the language equivalent by now, but don't bother with them anyway just 
+in case.
+
+Ash
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

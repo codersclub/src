@@ -1,0 +1,230 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+asynchronous downloads
+</B></FONT>
+<BR>
+<PRE>
+<B>
+John Drum -- <A HREF="mailto:drum@best.com">drum@best.com</A>
+Wednesday, October 30, 1996
+</B>
+Environment:  VC++ 4.2b, NT 4.0
+
+I'm having trouble getting asynchronous downloads from
+the net to work.
+
+The first approach I tried was to derive a class from
+CInternetSession with the following constructor:
+
+	CDownloader::CDownloader()
+		: CInternetSession(
+			_T("Downloader"),
+			1,
+			PRE_CONFIG_INTERNET_ACCESS,
+			NULL,
+			NULL,
+			INTERNET_FLAG_ASYNC)
+	{
+		try
+		{
+			EnableStatusCallback();
+		}
+		catch (CInternetException* pEx)
+		{
+			// snip
+			pEx->Delete();
+		}
+	
+		m_dwCurrentContext = 2; // incremented for each new request
+	}
+
+
+Then for each download request I did the following in a CDownloader
+member function:
+
+	AfxParseURL(url, dwServiceType, strServerName, strObject, nPort))
+	// snip
+	pHttpConnection = GetHttpConnection(strServerName, nPort);
+	// snip
+	pHttpFile = pHttpConnection->OpenRequest(
+			CHttpConnection::HTTP_VERB_GET,
+			strObject,
+			NULL,
+			fContext,
+			NULL,
+			NULL,
+			INTERNET_FLAG_EXISTING_CONNECT);
+	//snip
+	pHttpFile->SendRequest();
+
+
+Now when my overloaded OnStatusCallback() function is finally
+called with a INTERNET_STATUS_REQUEST_COMPLETE status, I try
+to Read() from the above pHttpFile.  The problem is that
+every Read() results in a CInternetException of type
+ERROR_IO_PENDING being thrown.
+
+
+
+Yesterday afternoon I tried using a CAsyncMonikerFile derivative
+(again called CDownloader)
+with the OnDataAvailable() member function overidden to detect
+completion.  However, I didn't get far with this since my
+call to Open() failed every time.
+
+	CString strUrl;
+
+	CDownloader* pDown = new CDownloader();
+	CFileException ex;
+	if (!pDown->Open(strUrl, &ex))
+	{
+		CString string;
+		string.Format("URL could not be opened, error %d", ex.m_cause);
+		AfxMessageBox(string, MB_OK);
+		// ex.m_cause was always 1 here
+	}
+
+
+So I would welcome any suggestions for fixing these approaches or
+any new and better ideas for asynchronously downloading arbitrary urls.
+
+Thanks,
+John
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Sunday, November 03, 1996
+</B>
+At 15:25 10/30/96 -0800, John Drum <drum@best.com> wrote:
+>Environment:  VC++ 4.2b, NT 4.0
+
+>I'm having trouble getting asynchronous downloads from
+>the net to work.
+
+Doesn't the README for the 4.2b patch explain that INTERNET_FLAG_ASYNC
+isn't supported by MFC?  I thought it did, but I don't have a copy
+handy.
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+I'm afraid I've become some sort of speed freak.
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mario Contestabile -- <A HREF="mailto:Mario_Contestabile.UOS__MTL@UOSMTL2.universal.com">Mario_Contestabile.UOS__MTL@UOSMTL2.universal.com</A>
+Tuesday, November 05, 1996
+</B>
+>Doesn't the README for the 4.2b patch explain that INTERNET_FLAG_ASYNC
+>isn't supported by MFC?  I thought it did, but I don't have a copy
+>handy.
+>
+>.B ekiM
+
+Why would inet.cpp have a AfxInternetStatusCallbackDebug() function which 
+requires
+the flag then? I don't have a copy of the readme either...
+
+mcontest@universal.com
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:Slh1995@aol.com">Slh1995@aol.com</A>
+Wednesday, November 06, 1996
+</B>
+In a message dated 96-11-06 22:10:03 EST, you write:
+
+<< >Doesn't the README for the 4.2b patch explain that INTERNET_FLAG_ASYNC
+ >isn't supported by MFC?  I thought it did, but I don't have a copy
+ >handy.
+ >
+ >.B ekiM
+ 
+ Why would inet.cpp have a AfxInternetStatusCallbackDebug() function which 
+ requires
+ the flag then? I don't have a copy of the readme either... >>
+
+I do have a copy of the readme.txt file for 4.2b and it does not have any
+reference to INTERNET_FLAG_ASYNC at all...
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Saturday, November 09, 1996
+</B>
+At 22:28 11/6/96 -0500, Slh1995@aol.com wrote:
+>In a message dated 96-11-06 22:10:03 EST, you write:
+
+><< >Doesn't the README for the 4.2b patch explain that INTERNET_FLAG_ASYNC
+> >isn't supported by MFC?  I thought it did, but I don't have a copy
+> >handy.
+
+> >.B ekiM
+ 
+> Why would inet.cpp have a AfxInternetStatusCallbackDebug() function which 
+> requires
+> the flag then? I don't have a copy of the readme either... >>
+
+Neither status callbacks in general nor the specific implementation of
+AfxInternetStatusCallbackDebug() require INTERNET_FLAG_ASYNC.
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+I'm afraid I've become some sort of speed freak.
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

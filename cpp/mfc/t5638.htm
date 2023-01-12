@@ -1,0 +1,235 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Error executing a CPropertySheet object in Win 95
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Mats Månhav -- <A HREF="mailto:manhav@connectum.skurup.se">manhav@connectum.skurup.se</A>
+Tuesday, June 25, 1996
+</B>
+-- [ From: Mats Manhav * EMC.Ver #2.5.02 ] --
+
+ENV: MSVC 4.1 Windows NT 4.0 beta 1 and Windows 95
+
+Hi,
+
+I am developing an application where I use several Propertysheets.
+These are a class derived from CPropertySheet and the pages are
+CPropertyPage derived.
+
+
+Everything about the property sheets work fine under NT, 
+however under Windows 95 one of the sheets does not work.
+
+Under Windows 95 of the property sheets I could at first not get to work at
+all.
+I always got an assert on the line ASSERT(ContinueModal); in WINCORE.CPP
+line 3525.
+It turned out that the failing statement is
+	SendMessage(PSM_GETCURRENTPAGEHWND);
+in DLGPROP.CPP at line 724.
+
+BOOL CPropertySheet::ContinueModal()
+{
+	// allow CWnd::EndModalLoop to be used
+	if (!CWnd::ContinueModal())
+		return FALSE;
+
+	// when active page is NULL, the modal loop should end
+	ASSERT(::IsWindow(m_hWnd));
+	BOOL bResult = SendMessage(PSM_GETCURRENTPAGEHWND);
+	return bResult;
+}
+
+I rearranged the pages so that the first page instead was number 2 and then
+number 4 (the last). In both these cases I got a tab saying "General" (which
+is the title for the failing page), but when I clicked on it it just
+disappeared. OnInitDialog() for the failing page is never called.
+With NO error message what so ever.
+
+The page has quite a lot of controls on it (87 edit controls, 12 static and
+one custom control). The custom control is not the reason because I use that
+on another page and that works fine. Could the large number of controls be
+the reason ?. Is there any limit (documented?) for how many controls to put
+on a page?
+
+Note the page works fine under NT.
+None of the pages have a extended style.
+I have checked the dialog resources to make sure that they 
+have the correct style for property pages.
+The pages are created using new in the constructor of the sheet.
+
+I tested replacing 7 of the edit boxes with buttons and after that the page
+works. 
+I am glad that I got it to work, but I'm still a bit worried. What if it
+stops working at a customer installation. I really would like to know why it
+did not work, before I send it out to customers.
+
+Could anyone give me an idea what is happening here.
+
+
+Mats
+--
+==========================================================================
+Mats Månhav (Mats Manhav for 7-bit people)
+email:manhav@connectum.skurup.se   WWW: http://connectum.skurup.se/~manhav
+FAX:  (int) 46 (0) 414 243 05      Phone: (int) 46 (0) 414 243 05         
+==========================================================================
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Robertson David -- <A HREF="mailto:davidr@devmail.sps.mot.com">davidr@devmail.sps.mot.com</A>
+Friday, June 28, 1996
+</B>
+[Mini-digest: 3 responses]
+
+     We have seen the same problem on both Window 3.11 and Windows 95.
+     In both cases, the problem we had occurred when Windows ran out of
+     resources. The behaviour was exactly as you see. It just doesn't
+     show everything you think it should. You might be able to verify
+     this by looking at your resource level when this occurs. You might
+     also try closing some other applications and see if page starts
+     working.
+     If this is in fact what the problem is, you may consider our final
+     solution. What we did was actually destroy each page when it was
+     losing the focus. This gives more resources back and is gracefully
+     handled by the CpropertySheet in that it will regenerate each page
+     as needed.
+     Good Luck...
+//==================================================//
+//  David Robertson     davidr@devmail.sps.mot.com  //
+//                      davidr@inetport.com         //
+//==================================================//
+
+-----From: Roger Onslow/Newcastle/Computer Systems Australia/AU <Roger_Onslow@compsys.com.au>
+
+Mats Manhav wrote:
+>I always got an assert on the line ASSERT(ContinueModal); in WINCORE.CPP
+>line 3525.
+>It turned out that the failing statement is
+> SendMessage(PSM_GETCURRENTPAGEHWND);
+>in DLGPROP.CPP at line 724.
+>
+>BOOL CPropertySheet::ContinueModal()
+>{
+> // allow CWnd::EndModalLoop to be used
+> if (!CWnd::ContinueModal())
+>  return FALSE;
+>
+> // when active page is NULL, the modal loop should end
+> ASSERT(::IsWindow(m_hWnd));
+> BOOL bResult = SendMessage(PSM_GETCURRENTPAGEHWND);
+> return bResult;
+>}
+
+Just a note here -- the line that faild would *NOT* be the line:
+ BOOL bResult = SendMessage(PSM_GETCURRENTPAGEHWND);
+but the line *before*:
+ ASSERT(::IsWindow(m_hWnd));
+ie there is no (valid) window for the property sheet.
+
+You probably got confused because of the location of the current line pointer 
+which usually seems to point to the line AFTER the one where the error occurs.
+
+Unfortunately I cannot offer an explanation at this stage -- unless you are out 
+of resources (win95 is still 16bit/64K in some places where winNT is 32bit -- 
+so you can run out)
+
+           /|\        Roger Onslow
+      ____|_|.\       ============
+    _/.........\Senior Software Engineer
+   /CCC.SSS..A..\
+  /CC..SS...A.A..\   Computer
+ /.CC...SS..AAA...\       Systems
+/\.CC....SSAA.AA../            Australia
+\ \.CCCSSS.AA.AA_/
+ \ \...........//      Ph: +61 49 577155
+  \ \...._____//      Fax: +61 49 675554
+   \ \__|_/\_//    RogerO@compsys.com.au
+    \/_/  \//
+
+
+-----From: Mats Manhav <manhav@connectum.skurup.se>
+
+Roger,
+
+> Just a note here -- the line that faild would *NOT* be the line:
+>  BOOL bResult = SendMessage(PSM_GETCURRENTPAGEHWND);
+> but the line *before*:
+>  ASSERT(::IsWindow(m_hWnd));
+> ie there is no (valid) window for the property sheet.
+> 
+> You probably got confused because of the location of the current line
+pointer 
+> which usually seems to point to the line AFTER the one where the error
+occurs.
+
+Well, maybe it is more my language that makes the confusion here.
+I never got an assert on ASSERT(::IsWindow(m_hWnd));
+The function call that failed was indeed the one I pointed out, namely the 
+   BOOL bResult = SendMessage(PSM_GETCURRENTPAGEHWND);
+
+This happens IN the function ContinueModal(). The bResult beeing zero is
+what makes the 
+ASSERT(ContinueModal()); to be activated.
+
+> Unfortunately I cannot offer an explanation at this stage -- unless you
+are out
+> of resources (win95 is still 16bit/64K in some places where winNT is 32bit
+-- 
+> so you can run out)
+
+Well maybe so, but it seems odd that everything else in the machine runs
+smooth if I am in such a lack of resources, don't you think, especially when
+thinking of the fact that after replacing 7 edit boxes with 7 buttons it
+works fine, and then there are still resources to create 3 more pages with
+there controls too.
+
+Mats
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Âåðíóòüñÿ â êîðåíü Àðõèâà</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

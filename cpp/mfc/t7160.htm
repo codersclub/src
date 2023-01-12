@@ -1,0 +1,627 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+saving/restoring toolbars
+</B></FONT>
+<BR>
+<PRE>
+<B>
+PP mail system -- <A HREF="mailto:LAWSONW@sydney.ccur.com">LAWSONW@sydney.ccur.com</A>
+Friday, October 11, 1996
+</B>
+G'day!
+Unless you can make use of CDockState View-to-View I reckon
+you've got trouble.  See previous threads for mention of
+CMiniDockFrameWnd and CDockBar.  As Microsoft has not documented
+these Classes, presumably sometime in the future the whole basis
+for toolbar-handling could change.  If, however, you're content to risk
+that,
+
+      if  (m_pToolBar->GetParentOwner()  == this)
+
+in CMainFrame, then the CDockBar parent is docked, else floating in a
+CMiniDockFrameWnd.  You could fight your way back through the hierarchy
+to find out where everything is.
+
+It should be no great trick to SW_SHOW/HIDE a particular toolbar.  If
+you're docked, m_pToolBar->ShowWindow(...), else use the ParentOwner.
+
+However, given that you are 2 levels removed from the floating-frame
+CLOSE message, offhand I can't think of any way of preventing the User
+from closing a bar other than by peeking at the message-queue, and
+ripping up CLOSEs addressed to the floating frame.
+
+Regards,
+Jim LW
+
+                          Forwarded Mail Item.
+========================================================================
+Subject:dynamically saving/restoring too   Created by: /Gateway ocpt
+Message:Message-Id: <9610081900.AA24569@cra11.noname>
+        To: mfc-l@netcom.com
+        Subject: dynamically saving/restoring toolbar state
+        Errors-To: owner-mfc-l@majordomo.netcom.com
+        Precedence: bulk
+        Reply-To: mfc-l@netcom.com
+        Sender: owner-mfc-l@majordomo.netcom.com
+        From: pburbano@cra11.cambridge.com (Patricio Burbano)
+========================================================================
+Send to:  LAWSONW
+
+
+Dated at:  15:00    on  8 October 96
+
+Environment: VC++ 4.2, NT 4.0
+
+Hi all,
+
+I have an SDI application that has more than one view for a document.
+The frame window creates a set of toolbars that are going to be
+shared by all the views.
+At any time, the user should be able to dock/undock, hide/show the
+toolbars.
+I would like to be able to save the state of the toolbars for each
+view dynamically.  This means for example, that with view1,
+toolbar1 is docked, and with view2 toolbar1 is floating.  I would
+like the toolbars to return to the state the user left them for
+each view, when views change.
+
+I am able to find out most of the information I need from the toolbars
+before I change from one view to the next.  However, I can not seem
+to find out on which side of the frame window a particular toolbar
+was docked to.
+
+I would like not to have to destroy and create the toolbars every
+time the user changes views.
+
+Any ideas on how to do this?
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Greg Lee ID -- <A HREF="mailto:GLee@kollmorgen.com">GLee@kollmorgen.com</A>
+Tuesday, November 05, 1996
+</B>
+Environment: VC 4.0, Win95
+
+I am attempting to maintain the state of the toolbars in one of my
+programs from run to run.  I have attempted to do this by adding a
+handler to OnDestroy through the class wizard:
+
+void CMainFrame::OnDestroy() 
+{
+	m_wndToolBar.GetToolBarCtrl().SaveState( HKEY_CURRENT_USER,
+"KMTGeditor", "MainToolbar");
+	m_wndWizardToolBar.GetToolBarCtrl().SaveState( HKEY_CURRENT_USER,
+"KMTGeditor", "WizardToolbar");
+	m_wndDebugToolBar.GetToolBarCtrl().SaveState( HKEY_CURRENT_USER,
+"KMTGeditor", "DebugToolbar");
+	m_wndModeToolBar.GetToolBarCtrl().SaveState( HKEY_CURRENT_USER,
+"KMTGeditor", "ModeToolbar");
+	
+	CMDIFrameWnd::OnDestroy();
+}
+
+My CMainFrame::OnCreate() has the following code repeated for each of
+the toolbar mentioned above:
+
+	if (!m_wndWizardToolBar.Create(this,
+			WS_CHILD | WS_VISIBLE | CBRS_TOP, ID_VIEW_WIZARD_TOOLBAR) ||
+		!m_wndWizardToolBar.LoadToolBar(IDR_WIZARD_TOOLBAR))
+	{
+		TRACE0("Failed to create wizard toolbar\n");
+		return -1;      // fail to create
+	}
+
+	m_wndWizardToolBar.SetBarStyle(m_wndWizardToolBar.GetBarStyle() |
+		CBRS_TOOLTIPS | CBRS_FLYBY | CBRS_SIZE_DYNAMIC);
+	m_wndWizardToolBar.EnableDocking(CBRS_ALIGN_ANY);
+// **** here is the call to restore the toolbar state ... probably not
+good idea to use "KMTGeditor" as the key, pick a new one ****
+	m_wndWizardToolBar.GetToolBarCtrl().RestoreState( HKEY_CURRENT_USER,
+"KMTGeditor", "WizardToolbar");
+	DockControlBar(&m_wndWizardToolBar);
+
+
+
+Problem: My toolbars are micro-scopic.  Obviously my RestoreState call
+is not working properly.  Is OnDestroy the proper place to save the
+toolbars?  Or do I have something else wrong?  I have experimented with
+the CCS_ADJUSTABLE style ORing it in with the rest of the style flags
+(in both the Create and the SetBarStyle calls).  I have not been able to
+find a place in the documentation that explicitly says you need to use
+this style if you want to Save/Restore, although most of the mentions of
+RestoreState and SaveState are in toolbar customization sections (to
+support TBN_RESET).
+
+Greg Lee
+glee@kollmorgen.com
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Roger Onslow/Newcastle/Computer Systems Australia/
+Thursday, November 07, 1996
+</B>
+[Mini-digest: 5 responses]
+
+>I am attempting to maintain the state of the toolbars in one of my
+>programs from run to run.  I have attempted to do this by adding a
+>handler to OnDestroy through the class wizard:
+>
+>void CMainFrame::OnDestroy() 
+>{
+> m_wndToolBar.GetToolBarCtrl().SaveState( HKEY_CURRENT_USER,
+>"KMTGeditor", "MainToolbar");
+> m_wndWizardToolBar.GetToolBarCtrl().SaveState( HKEY_CURRENT_USER,
+>"KMTGeditor", "WizardToolbar");
+> m_wndDebugToolBar.GetToolBarCtrl().SaveState( HKEY_CURRENT_USER,
+>"KMTGeditor", "DebugToolbar");
+> m_wndModeToolBar.GetToolBarCtrl().SaveState( HKEY_CURRENT_USER,
+>"KMTGeditor", "ModeToolbar");
+> CMDIFrameWnd::OnDestroy();
+>}
+>
+>My CMainFrame::OnCreate() has the following code repeated for each of
+>the toolbar mentioned above:
+>
+> if (!m_wndWizardToolBar.Create(this,
+>   WS_CHILD | WS_VISIBLE | CBRS_TOP, ID_VIEW_WIZARD_TOOLBAR) ||
+>  !m_wndWizardToolBar.LoadToolBar(IDR_WIZARD_TOOLBAR))
+> {
+>  TRACE0("Failed to create wizard toolbar\n");
+>  return -1;      // fail to create
+> }
+>
+> m_wndWizardToolBar.SetBarStyle(m_wndWizardToolBar.GetBarStyle() |
+>  CBRS_TOOLTIPS | CBRS_FLYBY | CBRS_SIZE_DYNAMIC);
+> m_wndWizardToolBar.EnableDocking(CBRS_ALIGN_ANY);
+>// **** here is the call to restore the toolbar state ... probably not
+>good idea to use "KMTGeditor" as the key, pick a new one ****
+> m_wndWizardToolBar.GetToolBarCtrl().RestoreState( HKEY_CURRENT_USER,
+>"KMTGeditor", "WizardToolbar");
+> DockControlBar(&m_wndWizardToolBar);
+>
+>Problem: My toolbars are micro-scopic.  Obviously my RestoreState call
+>is not working properly.  Is OnDestroy the proper place to save the
+>toolbars?  Or do I have something else wrong?  I have experimented with
+>the CCS_ADJUSTABLE style ORing it in with the rest of the style flags
+>(in both the Create and the SetBarStyle calls).  I have not been able to
+>find a place in the documentation that explicitly says you need to use
+>this style if you want to Save/Restore, although most of the mentions of
+>RestoreState and SaveState are in toolbar customization sections (to
+>support TBN_RESET).
+>
+>Greg Lee
+>glee@kollmorgen.com
+========================================
+Here's what I do in my main frame class (and I use SetRegistryKey() in my 
+Application to make sure that the registry is used rather than .INI files)...  
+NOTE: This is hacked from my own classes with irrelevant stuff removed - 
+hopefully I haven't also removed any relevant stuff as well :-)
+
+// NOTE: I declare the following routines as virtual
+// and override for each application I build.  That way
+// I can have a lot of common functionality in my base
+// mainframe class and then derive for each app
+//
+// the code for each one is pretty much taken from
+// the standard app-wizard code for OnCreate
+
+BOOL CMyMainFrame::CreateToolbars() {
+ // create toolbars here here
+}
+
+BOOL CMyMainFrame::CreateStatusbar() {
+ // create status bar here
+}
+
+void CMyMainFrame::DockToolbars() {
+ // do all the initial docking of toolbars here
+}
+
+BOOL CMyMainFrame::LoadBarState(LPCTSTR name) {
+ CDockState state;
+ state.LoadState(name);
+ // note: without this if number of toolbars changes
+ // the application will assert and die.
+ // this way, if something goes wrong
+ // it reverts back to default settings
+ if (EnsureValidDockState(state)) { // checks for valid so won't ASSERT
+  SetDockState(state);
+ } else {
+  DockToolbars();
+ }
+ // note: here I check that all toolbars are correctly restored
+ // if not, then I return FALSE
+ // but I won't include that code here
+ return TRUE;
+}
+
+BOOL CMyMainFrame::EnsureValidDockState(CDockState& state) {
+ for (int i = 0; i < state.m_arrBarInfo.GetSize(); i++) {
+  CControlBarInfo* pInfo = (CControlBarInfo*)state.m_arrBarInfo[i];
+  if (! pInfo) return FALSE;
+  if (! pInfo->m_bFloating) {
+   pInfo->m_pBar = GetControlBar(pInfo->m_nBarID);
+   if (!pInfo->m_pBar) return FALSE; //toolbar id's probably changed
+  }
+ }
+ return TRUE;
+}
+
+// bug fix for control bar state (is it fixed in 4.2 yet???)
+// without the the registry fills up
+#if _MFC_VER == 0x0400 || _MFC_VER == 0x0410
+static void CleanUpControlBarState(CDockState& state) {
+    for (int i = 0; i < state.m_arrBarInfo.GetSize(); i++) {
+        CControlBarInfo* pInfo1 = (CControlBarInfo*)state.m_arrBarInfo[i];
+        for (int j = 0; j < state.m_arrBarInfo.GetSize(); j++) {
+            if (i == j) continue;
+            CControlBarInfo* pInfo2 = (CControlBarInfo*)state.m_arrBarInfo[j];
+            if (pInfo1->m_uMRUDockID == pInfo2->m_nBarID) continue;
+            int nSize = pInfo2->m_arrBarID.GetSize();
+            for (int k = 0; k < nSize - 1; k++) {
+                if ((LONG)pInfo2->m_arrBarID[k] == (LONG)pInfo1->m_nBarID + 
+0x10000) {
+                    pInfo2->m_arrBarID[k] = NULL;
+                }
+            }
+        }
+    }
+    for (i = 0; i < state.m_arrBarInfo.GetSize(); i++) {
+        CControlBarInfo* pInfo = (CControlBarInfo*)state.m_arrBarInfo[i];
+        int nSize = pInfo->m_arrBarID.GetSize();
+        for (int j = 0; j < nSize - 1; j++) {
+            if (pInfo->m_arrBarID[j]==NULL) continue;
+            for (int k = j + 1; k < nSize; k++) {
+                if (pInfo->m_arrBarID[k]==NULL) continue;
+                if (pInfo->m_arrBarID[k]==pInfo->m_arrBarID[j]) {
+                    pInfo->m_arrBarID[k] = NULL;
+                }
+            }
+        }
+  
+        while ((nSize!=0) && (pInfo->m_arrBarID[nSize-1]==NULL)) {
+            nSize--;
+            pInfo->m_arrBarID.RemoveAt(nSize);
+        }
+        if (nSize) pInfo->m_arrBarID.InsertAt(nSize, (void*)NULL);
+    }
+}
+#endif
+
+void ::SaveBarStateForFrame(const CFrameWnd* pFrame, LPCTSTR lpszProfileName) {
+ CDockState state;
+ pFrame->GetDockState(state);
+// not sureabout 4.2 yet !!!, but requied for 4.0,4.1
+#if _MFC_VER == 0x0400 || _MFC_VER == 0x0410
+ CleanUpControlBarState(state);
+#endif
+ state.SaveState(lpszProfileName);
+}
+
+void CMyMainFrame::OnDestroy() {
+ ::SaveBarStateForFrame(this,"Toolbars");
+ CFrameWnd::OnDestroy();
+}
+
+int CMyMainFrame::OnCreate(LPCREATESTRUCT lpCreateStruct) {
+ if (CFrameWnd::OnCreate(lpCreateStruct) == -1) return -1;
+ if (! CreateStatusbar()) return -1; // create statusbar
+ if (! CreateToolbars()) return -1; // create the toolbars
+ EnableDocking(CBRS_ALIGN_ANY);
+ DockToolbars();
+ if (! LoadBarState("Toolbars",TRUE,NumToolbars())) return -1;
+ return 0;
+}
+
+
+Hope this helps
+
+Roger
+-----From: Manolis Papadopoulos <papadop@metal.ntua.gr>
+
+Hello,
+
+have you seen the example DOCKTOOL on the VC4.0 CD in =
+"\msdev\samples\mfc\general"? I had similar problems and it helped a =
+lot. You should know however that, as stated in previous messages to =
+this list, LoadBarStyle does NOT work properly if the toolbar is a =
+resource toolbar, that is, it is not created by the program, as is the =
+case in DOCKTOOL. I pretty sure there are other older messages about =
+this subject, which you can get if you visit advn.com/pub/mfc/. There is =
+an archive of ALL the messages to this list.
+
+Best Regards,
+
+Manolis Papadopoulos
+
+-----From: Carl Gunther <cgunther@ix.netcom.com>
+
+Greg,
+
+A good place to save things like window placements is
+the OnClose() function of your CFrameWnd-derived class.
+
+Carl
+
+-----From: "Robert H. Mowery III" <rmowery@csci.csc.com>
+
+Greg, 
+
+If I understand your question correctly you are simply trying to save the
+settings of the toolbars when a user exits your program and then next time
+through you want to restore those same settings of the toolbar.  There is a
+very good exple of this presented in the VC++ samples.  You should look at
+the DockTool sample and the code can be found in Mainframe.cpp. I think you
+are going through more trouble then you need to with the code you are
+trying to implement.
+
+-Robert
+
+-----From: browkl@inel.gov (Kenneth L Brown)
+
+Here's a couple things you can try.
+
+After setting your toolbar positions call AutoSize().  This is a member
+of CToolBarCtrl.  You can get to the CToolBarCtrl for your toolbar by
+calling GetToolBarCtrl, something like
+m_wndToolBar.GetToolBarCtrl().AutoSize();
+
+If this does not solve your problem you may need to override the
+RecalcLayout member function of your frame window.  I used the
+undocumented function GetBarInfo to have more control of the toolbar
+positioning.  It takes a reference to CControlBarInfo as the only
+argument.  These definitions are found in \msdev\mfc\src\dockstat.cpp
+and \msdev\mfc\include\Afxpriv.h respectively.  My guess is they are
+undocumented because they are used by the docking serialization but I
+had problems getting that to work in my case.
+
+CControlBarInfo has member variables m_rectMRUDockPos that gives you the
+most recently used docking positon and m_ptMRUFloatPos that gives you
+the most recently used floating position.  These are valid only after
+the bar has been positioned obviously.
+
+GetBarStyle will give you the current docking state.  These functions
+should allow you to roll your own docking procedure.
+
+You could save the positioning to the registry in your RecalcLayout
+function which will happen anytime the user moves a toolbar or makes a
+change to the frame window, or you could save the data to member
+variables and commit those variables to the registry in the frame
+destructor which is what I did.  Seemed to work fine.
+
+You will still need to call AutoSize() after positioning your toolbars.  
+
+Hope this wasn't too long winded but it took me a while to figure this
+stuff out.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+alan ismail -- <A HREF="mailto:alan.ismail@imagin1.com">alan.ismail@imagin1.com</A>
+Tuesday, November 12, 1996
+</B>
+
+
+Greg,
+
+I had similar problems. I wasted a call to MS only to have the guy build a 
+sample (CTRLBARS?) and see that it was indeed broken. MS confirmed that there 
+was a hairy bug in the MFC code: "Yep, it's not working."  A little while later,
+VC++ 4.1 came out and guess what?  It just so happened to have a new class 
+called CDockState that takes care of the problems. 8^}  
+
+BTW: there is no mention of this problem in any 4.0 documentation that I can 
+find.  The closest thing is for VC 2.x (Q138722).  
+
+So, if you can get the latest VC you should be set. Or you can always roll your 
+own.
+
+Later,
+Alan
+alan.ismail@imagin1.com
+<A HREF="http://www.inngames.com">http://www.inngames.com</A>
+
+
+
+______________________________ Reply Separator _________________________________
+Subject: Saving/Restoring ToolBars
+Author:  mfc-l@netcom.netcom.com at Internet
+Date:    11/6/96 8:00 PM
+
+
+Environment: VC 4.0, Win95
+
+I am attempting to maintain the state of the toolbars in one of my 
+programs from run to run.  I have attempted to do this by adding a 
+handler to OnDestroy through the class wizard:
+
+void CMainFrame::OnDestroy() 
+{
+ m_wndToolBar.GetToolBarCtrl().SaveState( HKEY_CURRENT_USER,
+"KMTGeditor", "MainToolbar");
+ m_wndWizardToolBar.GetToolBarCtrl().SaveState( HKEY_CURRENT_USER,
+"KMTGeditor", "WizardToolbar");
+ m_wndDebugToolBar.GetToolBarCtrl().SaveState( HKEY_CURRENT_USER,
+"KMTGeditor", "DebugToolbar");
+ m_wndModeToolBar.GetToolBarCtrl().SaveState( HKEY_CURRENT_USER,
+"KMTGeditor", "ModeToolbar");
+
+ CMDIFrameWnd::OnDestroy();
+}
+
+My CMainFrame::OnCreate() has the following code repeated for each of 
+the toolbar mentioned above:
+
+ if (!m_wndWizardToolBar.Create(this,
+   WS_CHILD | WS_VISIBLE | CBRS_TOP, ID_VIEW_WIZARD_TOOLBAR) ||
+  !m_wndWizardToolBar.LoadToolBar(IDR_WIZARD_TOOLBAR))
+ {
+  TRACE0("Failed to create wizard toolbar\n"); 
+  return -1;      // fail to create
+ }
+
+ m_wndWizardToolBar.SetBarStyle(m_wndWizardToolBar.GetBarStyle() |
+  CBRS_TOOLTIPS | CBRS_FLYBY | CBRS_SIZE_DYNAMIC);
+ m_wndWizardToolBar.EnableDocking(CBRS_ALIGN_ANY);
+// **** here is the call to restore the toolbar state ... probably not 
+good idea to use "KMTGeditor" as the key, pick a new one ****
+ m_wndWizardToolBar.GetToolBarCtrl().RestoreState( HKEY_CURRENT_USER,
+"KMTGeditor", "WizardToolbar");
+ DockControlBar(&m_wndWizardToolBar);
+
+
+
+Problem: My toolbars are micro-scopic.  Obviously my RestoreState call 
+is not working properly.  Is OnDestroy the proper place to save the 
+toolbars?  Or do I have something else wrong?  I have experimented with 
+the CCS_ADJUSTABLE style ORing it in with the rest of the style flags 
+(in both the Create and the SetBarStyle calls).  I have not been able to 
+find a place in the documentation that explicitly says you need to use 
+this style if you want to Save/Restore, although most of the mentions of 
+RestoreState and SaveState are in toolbar customization sections (to 
+support TBN_RESET).
+
+Greg Lee
+glee@kollmorgen.com
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Roger Onslow/Newcastle/Computer Systems Australia/
+Thursday, November 14, 1996
+</B>
+>I had similar problems. I wasted a call to MS only to have the guy build a 
+>sample (CTRLBARS?) and see that it was indeed broken. MS confirmed that there 
+>was a hairy bug in the MFC code: "Yep, it's not working."  A little while 
+later,
+>VC++ 4.1 came out and guess what?  It just so happened to have a new class 
+>called CDockState that takes care of the problems. 8^}  
+>
+>BTW: there is no mention of this problem in any 4.0 documentation that I can 
+>find.  The closest thing is for VC 2.x (Q138722).  
+>
+>So, if you can get the latest VC you should be set. Or you can always roll 
+your 
+>own.
+
+BTW: CBockState was waround earlier, but was not a documented MFC class
+
+I found this in KB, along with a solution which I have included below (massaged 
+from the original by me and cut from my working code).
+
+(Also see my earlier response to this topic -- assuming it made it thru to the 
+list)
+
+// bug fix for control bar state (is it fixed in 4.2 yet???)
+// without the the registry fills up
+#if _MFC_VER == 0x0400 || _MFC_VER == 0x0410
+static void CleanUpControlBarState(CDockState& state) {
+    for (int i = 0; i < state.m_arrBarInfo.GetSize(); i++) {
+        CControlBarInfo* pInfo1 = (CControlBarInfo*)state.m_arrBarInfo[i];
+        for (int j = 0; j < state.m_arrBarInfo.GetSize(); j++) {
+            if (i == j) continue;
+            CControlBarInfo* pInfo2 = (CControlBarInfo*)state.m_arrBarInfo[j];
+            if (pInfo1->m_uMRUDockID == pInfo2->m_nBarID) continue;
+            int nSize = pInfo2->m_arrBarID.GetSize();
+            for (int k = 0; k < nSize - 1; k++) {
+                if ((LONG)pInfo2->m_arrBarID[k] == (LONG)pInfo1->m_nBarID + 
+0x10000) {
+                    pInfo2->m_arrBarID[k] = NULL;
+                }
+            }
+        }
+    }
+    for (i = 0; i < state.m_arrBarInfo.GetSize(); i++) {
+        CControlBarInfo* pInfo = (CControlBarInfo*)state.m_arrBarInfo[i];
+        int nSize = pInfo->m_arrBarID.GetSize();
+        for (int j = 0; j < nSize - 1; j++) {
+            if (pInfo->m_arrBarID[j]==NULL) continue;
+            for (int k = j + 1; k < nSize; k++) {
+                if (pInfo->m_arrBarID[k]==NULL) continue;
+                if (pInfo->m_arrBarID[k]==pInfo->m_arrBarID[j]) {
+                    pInfo->m_arrBarID[k] = NULL;
+                }
+            }
+        }
+  
+        while ((nSize!=0) && (pInfo->m_arrBarID[nSize-1]==NULL)) {
+            nSize--;
+            pInfo->m_arrBarID.RemoveAt(nSize);
+        }
+        if (nSize) pInfo->m_arrBarID.InsertAt(nSize, (void*)NULL);
+    }
+}
+#endif
+
+static void SaveBarStateForFrame(const CFrameWnd* pFrame, LPCTSTR 
+lpszProfileName) {
+ CDockState state;
+ pFrame->GetDockState(state);
+// not sureabout 4.2 yet !!!, but requied for 4.0,4.1
+#if _MFC_VER == 0x0400 || _MFC_VER == 0x0410
+ CleanUpControlBarState(state);
+#endif
+ state.SaveState(lpszProfileName);
+}
+
+NOTE1: call SaveBarStateForFrame (make it external if required) to save you bar 
+state.
+
+NOTE2: the bug this fixes was that the registry/ini file section for toolbars 
+would grow every time you saved toolbar state.
+
+NOTE3: as noted in comments, I don't know if this patch is rquired under 4.2 -- 
+hopefully they have fixed it.
+
+Roger
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

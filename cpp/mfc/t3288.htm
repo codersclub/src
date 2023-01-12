@@ -1,0 +1,226 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CToolBar without any tools...
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Alex McLeod -- <A HREF="mailto:amcleod@imagesw2.mv.com">amcleod@imagesw2.mv.com</A>
+Wednesday, January 03, 1996
+</B>
+Thanks for the reply regarding CToolBar without any tools which I posted =
+before Christmas (i.e., Use a CDialogBar-derived class).=20
+
+In my (minimal) experience with DialogBars I do not think that a dialog =
+bar automatically relays out its controls when it is undocked and its =
+orientation is changed from its default (horizontal) to vertical.
+
+Am I wrong about this? It seems natural to me that given that the dialog =
+bar's layout is defined by a dialog box template that a Dialog Bar does =
+not support this, am I wrong?=20
+
+The few samples that use a dialog bar that I have found and the sample =
+that I built did not support this requirement (i.e., MY requirement for =
+the toolbar that I need in my app!)
+
+The reason that I am using a CToolBar type of object is that I do want =
+the bar to change from:
+(please excuse the crude text-graphics, but its supposed to be a toolbar =
+w/3 combo boxes, the attached files graphically show 2, what seem to be =
+toolbars, which have the behavior that I am looking for (these are =
+custom toolbars from MSWord))
+
++-------------------------------------------------+
+|  +-------+    +---------+    +---------+        |
+|  |      | v|     |      | v  |     |      | v  |         |
+|  +-------+    +---------+    +---------+        |
++-------------------------------------------------+
+
+(3 horizontally placed combo boxes) when horizontal, to=20
+
++---------------+
+|   +---------+  |
+|    |      | v |   |
+|   +---------+  |
+|                   |
+|   +---------+  |
+|    |      | v |   |
+|   +---------+  |
+|                   |
+|   +---------+  |
+|    |      | v |   |
+|   +---------+  |
+|                   |
++---------------+
+ (3 vertically stacked combo boxes)  when vertical...
+
+The toolbars in MSWord (which seem to be some type of toolbar, and not =
+dialog bars) which have multiple combo boxes (PLUS additional buttons) =
+support this (i.e., vertical stacking of combo boxes).
+
+The toolbars in MFC support what I need with the exception that if NO =
+toolbar buttons are left on the toolbar the toolbar, when docked, =
+shrinks up to 10 pixels tall!=20
+
+By the way if the Ctoolbar (and/or CToolBarCtrl) methods are used to GET =
+the rectangle occupied by the controls that SHOULD be visible the =
+correct rectangle is returned.=20
+
+Also if the bar is undocked and stretched vertically the control DOES =
+show up as it should. (These 2 behaviors would seem to be =
+inconsistencies in the CToolBar implementation(?))=20
+
+Thanks again!
+
+Alex
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Ghislain Lachapelle -- <A HREF="mailto:Ghislain.Lachapelle@Matrox.COM">Ghislain.Lachapelle@Matrox.COM</A>
+Wednesday, January 10, 1996
+</B>
+At 13:57 95-12-21 -0500, you wrote:
+>I am trying to create a toolbar-like object for use in my application. My
+toolbar needs to have ONLY comboboxes, etc. and NO 'normal' toolbar buttons.
+>
+>
+
+I have done a similar toolbar. I derived from CToolBar and overwrote some
+functions like HitTest, CalcFixedLayout and DoPaint. I don't have combo
+boxes but some push buttons. I didn't created them with the ID_SEPARATOR
+stuff because I do not call LoadBitmap or SetButtons. Those buttons are
+directly child windows of the tool bar (created in OnCreate).
+
+
+int CToolBarDerivedClass::OnCreate(LPCREATESTRUCT lpCreateStruct)
+{
+        if (CToolBar::OnCreate(lpCreateStruct) == -1)
+	        return -1;
+	
+    // create two buttons 
+    CRect rect1(x1, y1, x2, y2); // initialize here the button rect.
+    CRect rect2(x1, y1, x2, y2); // initialize here the button rect.
+
+    m_Button1.Create("Button 1", WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON, rect,
+this, IDC_BUTTON1);
+    m_Button2.Create("Button 2", WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON, rect2,
+this, IDC_BUTTON2);                                                         
+
+	return 0;
+}
+
+
+int CToolBarDerivedClass::HitTest(CPoint)  // in window relative coords
+{
+	ASSERT(m_nCount==0);
+	
+	 return -1;	  // no button 
+}
+
+
+In addition, You must calculate yourself the size of your
+toolbar when horizontal or vertical. This is the main advantage to my
+technique instead of using a CDialogBar. 
+
+For this, you must overwrite CalcFixedLayout. Also, in the DoPaint, I move
+my buttons to fit my horizontal or vertical rectangle.
+
+Start with this, you probably have a few more functions to overwrite.
+Hope this helps you...
+
+
+Ghislain Lachapelle(Ghislain.Lachapelle@matrox.com)
+Matrox Electronic Systems Ltd.
+ 
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Alex McLeod -- <A HREF="mailto:amcleod@imagesw2.mv.com">amcleod@imagesw2.mv.com</A>
+Monday, January 15, 1996
+</B>
+Thanks for the reply regarding using a CToolBar without any tools but =
+the problem that I have found seems to be within CToolBar itself!
+
+After playing some more I found that in the CTRLBARS sample if the 4 =
+toolbar buttons after the combobox are hidden or removed the toolbar =
+'shrinks up'. This is the problem that I am trying to circumvent.
+
+I.e., add the following to the sample's CMainFrame::CreateStyleBar() =
+after the combobox has been created and populated:
+
+	CToolBarCtrl& Ctl =3D m_wndStyleBar.GetToolBarCtrl();
+	Ctl.DeleteButton(5);
+	Ctl.DeleteButton(4);
+	Ctl.DeleteButton(3);
+	Ctl.DeleteButton(2);
+
+Presto, NO TOOLBAR, or at least not a useful one (its about 8 pixels =
+tall and shows no combo box)! (I tried hiding them with the same =
+results!)
+
+By the way... If one inquires the rectangle of the first separator =
+(i.e., the combo box) after removing or hiding the buttons the correct =
+rectangle is returned although the toolbar seems to ignore it! ALSO if =
+the toolbar is undocked and stretched vertically the combobox magically =
+reappears!
+
+I've subsequently given up on the CToolBar approach because of this =
+seeming limitation!
+
+Thanks
+
+Alex
+
+
+
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

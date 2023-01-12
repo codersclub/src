@@ -1,0 +1,217 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Initialization dialog
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Syed -- <A HREF="mailto:sxs296@psu.edu">sxs296@psu.edu</A>
+Saturday, December 21, 1996
+</B>
+Environment: Visual C++ 4.0, Win95      
+
+Hi there,
+        I want to display a dialog box after the application is all
+initialized (the application window is visible, splash screen is vanished)
+much like MS-PowerPoint - where there is a dialog asking what kind of New
+Presentation etc etc each time PowerPoint is launched. This problem has been
+bugging me for months and it's now the time to get rid of it.:)
+        I have tried to do it, but it does not fulfill exactly what I want
+to do. What I did was:-
+        In View's OnCreate, I call up the initialization dialog. If the user
+select something (other than cancel), the program will send a message to the
+parent frame to open or create a new file. The problem is if I want to open
+a file,there will be assertion error saying that IsWindow(framewindow) is NULL.
+Therefore, obviously I put the code in the wrong place. Therefore, I tried
+placing it at View's OnInitialUpdate; the result I don't remember exactly
+but it's worse than in OnCreate. No luck either with OnCreateClient. Placing
+the initialization dialog in OnCreate is by far, the best I could think of
+to get desired result (unsatisfactory one though). I don't want to place
+the code in WM_PAINT or WM_SIZE because it would generate unnecessary
+CPU-overhead. The sample code might look like below:-
+{
+static BOOL bOnce = FALSE;
+if (bOnce == FALSE) // The overhead is here..
+{
+// perform initialization here...
+bOnce = TRUE;
+return;
+}
+}
+
+However, I see that it (placing the dialog initialization at
+WM_PAINT/WM_SIZE) might be the better way as the overhead is minimal but
+certainly it doesn't look very efficient.
+Thanks for responses.
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+P. Senthil -- <A HREF="mailto:senthilp@geocities.com">senthilp@geocities.com</A>
+Monday, December 23, 1996
+</B>
+[Mini-digest: 2 responses]
+
+Syed wrote:
+> Environment: Visual C++ 4.0, Win95
+> 
+> Hi there,
+>         I want to display a dialog box after the application is all
+> initialized (the application window is visible, splash screen is vanished)
+> much like MS-PowerPoint - where there is a dialog asking what kind of New
+> Presentation etc etc each time PowerPoint is launched. This problem has been
+> bugging me for months and it's now the time to get rid of it.:)
+>         I have tried to do it, but it does not fulfill exactly what I want
+> to do. What I did was:-
+>         In View's OnCreate, I call up the initialization dialog. If the user
+> select something (other than cancel), the program will send a message to the
+> parent frame to open or create a new file. The problem is if I want to open
+> a file,there will be assertion error saying that IsWindow(framewindow) is NULL.
+> Therefore, obviously I put the code in the wrong place. Therefore, I tried
+> placing it at View's OnInitialUpdate; the result I don't remember exactly
+> but it's worse than in OnCreate. No luck either with OnCreateClient. Placing
+> the initialization dialog in OnCreate is by far, the best I could think of
+> to get desired result (unsatisfactory one though). I don't want to place
+> the code in WM_PAINT or WM_SIZE because it would generate unnecessary
+> CPU-overhead. The sample code might look like below:-
+> {
+> static BOOL bOnce = FALSE;
+> if (bOnce == FALSE) // The overhead is here..
+> {
+> // perform initialization here...
+> bOnce = TRUE;
+> return;
+> }
+> }
+> 
+> However, I see that it (placing the dialog initialization at
+> WM_PAINT/WM_SIZE) might be the better way as the overhead is minimal but
+> certainly it doesn't look very efficient.
+> Thanks for responses.
+
+In your CWinApp derived class, override the OnFileNew member and create
+your dialog like the following code:
+C???App::OnFileNew()
+{
+	if (m_templateList.IsEmpty())
+	{
+		TRACE0("Error : no document templates registered with CWinApp\n");
+		AfxMessageBox(AFX_IDP_FAILED_TO_CREATE_DOC);
+		return;
+	}
+
+	CmYourDlg dlg(m_pMainWnd);
+	
+	if (IDOK != dlg.DoModal())
+		return;     		// none - cancel operation
+	
+	// This is for only one document type in an MDI, modify suitably for
+SDI and
+	// multiple documents.
+	CMultiDocTemplate* pTemplate = (CMultiDocTemplate
+*)m_templateList.GetAt(0);
+
+	if (NULL != pTemplate)
+		pTemplate->OpenDocumentFile(NULL);
+}
+-----From: Colin Angus Mackay <colin.angus.mackay@dial.pipex.com>
+
+> Environment: Visual C++ 4.0, Win95      
+> 
+> Hi there,
+>         I want to display a dialog box after the application is all
+> initialized (the application window is visible, splash screen is vanished)
+> much like MS-PowerPoint - where there is a dialog asking what kind of New
+> Presentation etc etc each time PowerPoint is launched. This problem has been
+> bugging me for months and it's now the time to get rid of it.:)
+[bit skipped]
+> Thanks for responses.
+
+Hi,
+I had a similar problem but my solution all works with in the
+InitInstance of my application class. This is some of the code I use...
+
+
+
+BOOL CMy_App::InitInstance()
+{
+
+	CCommandLineInfo cmdInfo;
+	ParseCommandLine(cmdInfo);
+
+	// CSplashWnd is created by the Component Gallery
+	CSplashWnd::EnableSplashScreen(cmdInfo.m_bShowSplash);
+
+//[code skipped - put all your other inits here]
+
+
+	// If the splash screen is enabled wait a further 2.5 seconds
+	if (cmdInfo.m_bShowSplash)
+		Sleep(2500);
+
+	// The main window has been initialized, so show and update it.
+	pMainFrame->ShowWindow(m_nCmdShow);
+	pMainFrame->UpdateWindow();
+
+	return StartupMessage();
+}
+
+BOOL CMy_App::StartupMessage()
+{
+	// This function handles the startup dialog that askes for
+	// a new project, last project or open existing project. If the
+	// quit button is pressed then FALSE is returned, otherwize TRUE
+	// is returned.
+
+//[code skipped - handle your dialog here]
+
+	return TRUE;
+}
+
+I hope all this helps,
+Colin.
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

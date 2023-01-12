@@ -1,0 +1,227 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+SetActivePage doesn't work
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Maurits Rijk 7 84941 -- <A HREF="mailto:rijkm@ehv.tass.philips.com">rijkm@ehv.tass.philips.com</A>
+Friday, January 12, 1996
+</B>
+Hi Folks,
+
+Does anybody know why the function SetActivePage on a PropertySheet
+does not work? I defined a PropertySheet with 5 pages (4 on row1 and 1
+on row2). I call the function SetActivePage(i), with i being a value between
+0-4, but nothing seems to happen. At least no page change occurs. What
+happens, is that after a few tries, the page contents are not correct.
+But it can be corrected by selecting a few tabs on the PropertySheet.
+
+I'm using MSVC version 1.52c.
+
+Thanks,
+
+Maurits Rijk
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Rick Esterling -- <A HREF="mailto:rick@eco.twg.com">rick@eco.twg.com</A>
+Monday, January 15, 1996
+</B>
+On 12 Jan 96 at 14:57, Maurits Rijk (7 wrote:
+
+> Does anybody know why the function SetActivePage on a PropertySheet
+> does not work? 
+
+If you look in DLGPROP.CPP, you'll see that whenever MFC calls this member 
+method, it also makes some other calls to actually get the page active, in 
+the proper Z-Order, etc.  To the best of my knowledge, SetActivePage() 
+was not a documented call until MFC 4.0, so trying to use that function 
+with an earlier version of MFC can obviously cause unpredicatable results.
+
+There is, however, another undocumented method you can use that does work 
+for the version of MFC you're using:
+
+   CYourDerivedPropSheet::SomeMemberMethod() {
+      m_tabRow->SetCurSel( nPage );
+   }
+
+m_tabRow is a protected member so you'll have to use it from a
+CPropertySheet-derived class, not just a CPropertySheet-derived object. 
+Give that a try and I think you'll be good to go.
+
+> I'm using MSVC version 1.52c.
+
+Thanks for including this info.  Makes is easier to offer assistance.
+
+Good luck,
+Rick
+
+-------------------------------------------------------------
+
+Rick Esterling                     The Wollongong Group, Inc.
+Senior Software Engineer           McLean, VA
+http://widget.eco.twg.com:1080     http://www.twg.com
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+David Goldfarb -- <A HREF="mailto:deg@degel.com">deg@degel.com</A>
+Wednesday, January 17, 1996
+</B>
+
+    Date: Mon, 15 Jan 1996 12:18:06 -0005
+    From: Rick Esterling <rick@eco.twg.com>
+    Subject: Re: SetActivePage doesn't work
+
+    ...
+
+    m_tabRow is a protected member so you'll have to use it from a
+    CPropertySheet-derived class, not just a CPropertySheet-derived object. 
+    Give that a try and I think you'll be good to go.
+
+There is actually a way, condoned by C++, to access protected members
+from anywhere.  The following is gross, so stop reading here if you
+have a weak stomach!
+
+Basically, C++ has a designed-in security hole, at least compared to
+some other OO languages (I'm personally a CommonLisp/Flavors/CLOS
+bigot, and my biases may be showing here).  The protected/private style
+protection applies to the entire class, and not to individual objects.
+Therefore, an object of any type that is based on CWnd is able to
+access protected CWnd members of any other object that is a CWnd or of
+a class based on CWnd.
+
+This technique, though evil, is occasionally incredibly useful when
+working with MFC, which relies a bit too heavily on protected members
+(and way too heavily on non-virtual functions, but that's a subject for
+another thread).
+
+In any event, I've enclosed a code fragment below that does this.  The
+actual problem that I was solving there is irrelevant; it was a subtle
+problem with our use of CTL3D in a particular application.  The
+technique, though, is generally applicable whenever you need to access
+a protected member of CWnd and can't use cleaner mechanisms.
+
+Notes:
+- I still don't understand why the downward cast is needed in
+  GetHisSuperWndProcAddr.  Any C++ language lawyers care to enlighten
+  me?  (Or is this just a Microsoft bug?)
+- Looking at this code now, it seems pretty clear to me that
+  GetHisSuperWndProcAddr should be defined as a static method, thus
+  obviating the need to create the global oBarfoliousSnarfer.  Not
+  tested, so I'm leaving the code as is here.
+- Sorry, I will not explain the silly names used below to this whole
+  forum. 
+
+Anyway, here's the code.
+
+// This class, with it euphonious name, exists to enable us to access a
+// protected member of CWnd, the function, GetSuperWndProcAddr, from
+// outside of CWnd-derived class.  This is needed by the function
+// Ctl3dSubclassCtlForMFC below.
+// We are relying on the fact that C++ protection works at the class
+// level, rather than the object level -- a member function is able to
+// access the private data of any object of it's class, and not just of
+// the object pointed to by the "this" pointer.  Similarly, it is able
+// to access proteced data of ancestor classes for any object of its
+// type, not just the "this".
+// We take advantage of this fact to write a public accessor that can
+// retrieve the ostensibly protected data guarded by the function
+// CWnd::GetSuperWndProc.
+// Actually, GetSuperWndProc is a virtual function and what we are
+// going to get is the appropriate function for the runtime type of
+// pWnd, but that all just works in the usual way, since the virtual
+// function mechanism happens at runtime and is completely unrelated to
+// the compile-time public/protected/private mechanism.
+class CWoundedHorseBarfoSnarfoWnd : CWnd
+{
+public:
+  WNDPROC *GetHisSuperWndProcAddr(CWnd *pWnd) {
+    // It is not at all clear to me why the downward pointer cast is
+    // needed in the next line.  It seems it should be equally
+    // permissible to access the protected state of a CWnd.  But, this
+    // works only with the cast.
+    return ((CWoundedHorseBarfoSnarfoWnd *)pWnd)->GetSuperWndProcAddr();
+  }
+};
+
+// This is just a global object used to trampoline into GetSuperWndProcAddr.
+static CWoundedHorseBarfoSnarfoWnd oBarfoliousSnarfer;
+
+// ... [Many lines of comment elided here]
+// To get around the problem, we've defined the following function that
+// splices the CTL3D subclassing into the proper place in the chain.
+// This has to be a global function, rather than a member of some
+// CWnd-derived class, since we have to support controls of classes
+// that are defined by MFC, as well as those of our own classes.
+// Technically, we could make this be a method of CWnd, but we don't
+// want to modify the MFC sources.  Furthermore, because we have to use
+// a protected member of CWnd, we have to use the BarfoSnarfo hack
+// described above.
+VOID Ctl3dSubclassCtlForMFC(CWnd *pWnd)
+{
+  // Get the old super procedure.
+  WNDPROC *lplpfn = oBarfoliousSnarfer.GetHisSuperWndProcAddr(pWnd);
+
+  ...
+}
+
+
+David
+
+
+===================================================
+		   David Goldfarb
+		Editor, The GUI Bits
+Degel Software Tools Ltd.    Email:   deg@degel.com
+7 Ha'Iris St.                Tel: +972 (2) 991-7033
+Beit Shemesh, Israel         Fax: +972 (2) 991-6718
+ (Ask about our new "advisory consulting" service)
+===================================================
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

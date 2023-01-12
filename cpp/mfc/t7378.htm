@@ -1,0 +1,915 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Memory leak in CWinThread!
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Kalyan -- <A HREF="mailto:chakri@sunserv.cmc.stph.net">chakri@sunserv.cmc.stph.net</A>
+Wednesday, October 23, 1996
+</B>
+Environment : Win95, VC++ 4.1
+
+Hi all,
+   I have created a worker thread and waiting for an event to occur. when
+   I exit out of the application, the debug window shows the following
+   memory leak. I was not able to fingure out what went wrong, any help
+   would be appreciated.
+Thank u,
+Kalyan.V
+/* memmory leak message */
+
+Detected memory leaks!
+Dumping objects ->
+thrdcore.cpp(156) : {78} client block at 0x006516A4, subtype 0, 104 bytes long.
+a CWinThread object at $006516A4, 104 bytes long
+{69} normal block at 0x00651248, 512 bytes long.
+ Data: <                > CD CD CD CD CD CD CD CD CD CD CD CD CD CD CD CD 
+Object dump complete.
+The program 'C:\User Directories\Kalyan\multi\Debug\multi.exe' has exited with code 0 (0x0).
+
+/* Sample Code below */
+
+// multiView.h : interface of the CMultiView class
+//
+////////////////////////////////////////////////////////////////////////////
+#include "afxmt.h"
+
+extern CEvent g_imageIsInvalid;
+
+class CRestrictedAcess 
+{
+private :
+	CString m_data;
+	BOOL	m_flag;
+	CRITICAL_SECTION cs;
+		
+public:
+	CRestrictedAcess()
+	{
+		::InitializeCriticalSection(&cs);
+		m_data =   "Default";
+		m_flag  = FALSE;
+	}
+
+	CRestrictedAcess(const CRestrictedAcess& right)
+	{
+		::InitializeCriticalSection(&cs);
+		::EnterCriticalSection(&cs);
+		m_data = right.m_data;
+		m_flag =  right.m_flag;
+		::LeaveCriticalSection(&cs);
+ 	}
+
+	CString getData() { 
+		CString data;
+		::EnterCriticalSection(&cs);
+		data =  m_data;
+		::LeaveCriticalSection(&cs);
+		return data;
+	}
+	void setData(CString s) { 
+		::EnterCriticalSection(&cs);
+		m_data = s;	
+		::LeaveCriticalSection(&cs);
+	}
+
+	BOOL getFlag() {
+		BOOL flag;
+		::EnterCriticalSection(&cs);
+		flag = m_flag; 	
+		::LeaveCriticalSection(&cs);
+		return flag; 	
+	}
+
+	void setFlag(BOOL flag) {
+		::EnterCriticalSection(&cs);
+		m_flag = flag;
+		::LeaveCriticalSection(&cs);
+	}
+
+};
+
+class CThreadSafe
+{
+public :
+	static CRestrictedAcess m_rAcess[10];
+	static CWinThread *theThread;
+	static BOOL m_waiting;
+		
+
+	static CRestrictedAcess getObject(int index)
+	{
+		CRestrictedAcess rAcess;
+		CRITICAL_SECTION cs;
+		::InitializeCriticalSection(&cs);
+		::EnterCriticalSection(&cs);
+		rAcess = m_rAcess[index];
+		::LeaveCriticalSection(&cs);
+		return rAcess;
+	}
+
+
+	static int findUnprocessed() 
+	{	
+		TRACE("in to find unprocessed ");
+		for (int i = 0; i<10; i++)
+			if (!m_rAcess[i].getFlag()) { 
+			return i;
+			}
+		return -1;
+	}
+
+	static UINT startProcess(LPVOID lpVoid)
+	{
+		while (TRUE) {
+		int i = findUnprocessed();
+		Sleep(1000);
+		if (i+1)
+		{
+		  CRestrictedAcess temp = m_rAcess[i];
+		  CString s; s.Format(" %d ",i);
+		  TRACE("Processing + " + temp.getData() + s + "\n"); 
+		  m_rAcess[i].setFlag(TRUE);
+		} 
+		else {
+			AfxMessageBox("in to waiting");
+			TRACE("into waiting\n");
+			m_waiting = TRUE;
+			::WaitForSingleObject(g_imageIsInvalid,INFINITE);
+			m_waiting = FALSE;
+			TRACE("outof waiting\n");
+		}  // end of if-else
+			
+		} // end of while
+	return 0;
+	}
+
+	static void start();
+
+};
+
+class CMultiView : public CView
+{
+protected: // create from serialization only
+	CMultiView();
+	DECLARE_DYNCREATE(CMultiView)
+
+// Attributes
+public:
+	CMultiDoc* GetDocument();
+
+// Operations
+public:
+
+// Overrides
+	// ClassWizard generated virtual function overrides
+	//{{AFX_VIRTUAL(CMultiView)
+	public:
+	virtual void OnDraw(CDC* pDC);  // overridden to draw this view
+	virtual BOOL PreCreateWindow(CREATESTRUCT& cs);
+	protected:
+	//}}AFX_VIRTUAL
+
+// Implementation
+public:
+	virtual ~CMultiView();
+#ifdef _DEBUG
+	virtual void AssertValid() const;
+	virtual void Dump(CDumpContext& dc) const;
+#endif
+
+protected:
+
+// Generated message map functions
+protected:
+	//{{AFX_MSG(CMultiView)
+	afx_msg void OnHelpChangeavalue();
+	afx_msg void OnHelpDisplayvalues();
+	afx_msg void OnHelpStartthread();
+	//}}AFX_MSG
+	DECLARE_MESSAGE_MAP()
+};
+
+#ifndef _DEBUG  // debug version in multiView.cpp
+inline CMultiDoc* CMultiView::GetDocument()
+   { return (CMultiDoc*)m_pDocument; }
+#endif
+
+/////////////////////////////////////////////////////////////////////////////
+// multiView.cpp : implementation of the CMultiView class
+//
+
+#include "stdafx.h"
+#include "multi.h"
+
+#include "multiDoc.h"
+#include "multiView.h"
+
+#ifdef _DEBUG
+#define new DEBUG_NEW
+#undef THIS_FILE
+static char THIS_FILE[] = __FILE__;
+#endif
+
+
+CEvent g_imageIsInvalid;
+
+
+CWinThread *CThreadSafe::theThread = NULL;
+BOOL CThreadSafe::m_waiting = FALSE;
+
+CRestrictedAcess CThreadSafe::m_rAcess[10] = {  CRestrictedAcess(),
+											CRestrictedAcess(),
+											CRestrictedAcess(),
+											CRestrictedAcess(),
+											CRestrictedAcess(),
+											CRestrictedAcess(),
+											CRestrictedAcess(),
+											CRestrictedAcess(),
+											CRestrictedAcess(),
+											CRestrictedAcess() };
+
+
+void CThreadSafe::start()
+{
+		TRACE("Thread started\n");
+		theThread = AfxBeginThread((AFX_THREADPROC)CThreadSafe::startProcess,(LPVOID)0);
+
+}
+	
+/////////////////////////////////////////////////////////////////////////////
+// CMultiView
+
+IMPLEMENT_DYNCREATE(CMultiView, CView)
+
+BEGIN_MESSAGE_MAP(CMultiView, CView)
+	//{{AFX_MSG_MAP(CMultiView)
+	ON_COMMAND(ID_HELP_CHANGEAVALUE, OnHelpChangeavalue)
+	ON_COMMAND(ID_HELP_DISPLAYVALUES, OnHelpDisplayvalues)
+	ON_COMMAND(ID_HELP_STARTTHREAD, OnHelpStartthread)
+	ON_COMMAND(ID_HELP_SUSPENDTHREAD, OnHelpSuspendthread)
+	ON_COMMAND(ID_HELP_RESUMETHREAD, OnHelpResumethread)
+	ON_COMMAND(ID_HELP_KILLTHREAD, OnHelpKillthread)
+	//}}AFX_MSG_MAP
+END_MESSAGE_MAP()
+
+/////////////////////////////////////////////////////////////////////////////
+// CMultiView construction/destruction
+
+CMultiView::CMultiView()
+{
+	// TODO: add construction code here
+
+}
+
+CMultiView::~CMultiView()
+{
+}
+
+BOOL CMultiView::PreCreateWindow(CREATESTRUCT& cs)
+{
+	// TODO: Modify the Window class or styles here by modifying
+	//  the CREATESTRUCT cs
+
+	return CView::PreCreateWindow(cs);
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// CMultiView drawing
+
+void CMultiView::OnDraw(CDC* pDC)
+{
+	CMultiDoc* pDoc = GetDocument();
+	ASSERT_VALID(pDoc);
+
+	// TODO: add draw code for native data here
+}
+
+////////////////////////////////////////////////////////////////////////////
+// CMultiView diagnostics
+
+#ifdef _DEBUG
+void CMultiView::AssertValid() const
+{
+	CView::AssertValid();
+}
+
+void CMultiView::Dump(CDumpContext& dc) const
+{
+	CView::Dump(dc);
+}
+
+CMultiDoc* CMultiView::GetDocument() // non-debug version is inline
+{
+	ASSERT(m_pDocument->IsKindOf(RUNTIME_CLASS(CMultiDoc)));
+	return (CMultiDoc*)m_pDocument;
+}
+#endif //_DEBUG
+
+/////////////////////////////////////////////////////////////////////////////
+// CMultiView message handlers
+
+void CMultiView::OnHelpChangeavalue() 
+{
+	CThreadSafe::m_rAcess[0].setData("New");
+	CThreadSafe::m_rAcess[0].setFlag(FALSE);
+	if (CThreadSafe::m_waiting) 
+	{
+		AfxMessageBox("Waiting");
+		g_imageIsInvalid.SetEvent();
+	}
+}
+
+void CMultiView::OnHelpDisplayvalues() 
+{
+	CString s;
+	for (int i=0; i<10; i++)
+	{
+		s += CThreadSafe::getObject(i).getData(); 
+		if (CThreadSafe::getObject(i).getFlag()) s += CString("TRUE") +"\n";
+		else s += CString("FALSE") +"\n";
+	}
+	TRACE(s);
+}
+
+void CMultiView::OnHelpStartthread() 
+{
+	CThreadSafe::start();
+	
+}
+
+void CMultiView::OnHelpKillthread() 
+{
+	// TODO: Add your command handler code here
+	//g_killThread.SetEvent();
+//	if(TerminateThread(CThreadSafe::theThread,0)) AfxMessageBox("sucessful kill");
+}
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Ian Pepper -- <A HREF="mailto:Ian@flexicom.ie">Ian@flexicom.ie</A>
+Friday, October 25, 1996
+</B>
+[Mini-digest: 4 responses]
+
+Hi Kaylan,
+
+The memory leak is your worker thread being forcibly terminated.=20
+Instead of WaitForSingleObject try using WaitForMultipleObjects with an
+array of two HANDLEs.  The first would be as you currently have and the
+second, an event that signals that the app is about to terminate.  If
+the second event is signalled then you may exit the thread procedure.
+
+Ian
+ian@flexicom.ie
+
+>----------
+>From: 	Kalyan[SMTP:chakri@sunserv.cmc.stph.net]
+>Sent: 	23 October 1996 3:58 PM
+>To: 	mfc-l@netcom.com
+>Subject: 	Memory leak in CWinThread!
+>
+>Environment : Win95, VC++ 4.1
+>
+>Hi all,
+>   I have created a worker thread and waiting for an event to occur.
+>when
+>   I exit out of the application, the debug window shows the =
+following=08
+>   memory leak. I was not able to fingure out what went wrong, any help
+>   would be appreciated.
+>Thank u,
+>Kalyan.V
+>/* memmory leak message */
+>
+>Detected memory leaks!
+>Dumping objects ->
+>thrdcore.cpp(156) : {78} client block at 0x006516A4, subtype 0, 104
+>bytes long.
+>a CWinThread object at $006516A4, 104 bytes long
+>{69} normal block at 0x00651248, 512 bytes long.
+> Data: <                > CD CD CD CD CD CD CD CD CD CD CD CD CD CD CD
+>CD=20
+>Object dump complete.
+>The program 'C:\User Directories\Kalyan\multi\Debug\multi.exe' has
+>exited with code 0 (0x0).
+>
+>/* Sample Code below */
+>
+>// multiView.h : interface of the CMultiView class
+>//
+>////////////////////////////////////////////////////////////////////////=
+
+>////
+>#include "afxmt.h"
+>
+>extern CEvent g_imageIsInvalid;
+>
+>class CRestrictedAcess=20
+>{
+>private :
+>	CString m_data;
+>	BOOL	m_flag;
+>	CRITICAL_SECTION cs;
+>	=09
+>public:
+>	CRestrictedAcess()
+>	{
+>		::InitializeCriticalSection(&cs);
+>		m_data =3D   "Default";
+>		m_flag  =3D FALSE;
+>	}
+>
+>	CRestrictedAcess(const CRestrictedAcess& right)
+>	{
+>		::InitializeCriticalSection(&cs);
+>		::EnterCriticalSection(&cs);
+>		m_data =3D right.m_data;
+>		m_flag =3D  right.m_flag;
+>		::LeaveCriticalSection(&cs);
+> 	}
+>
+>	CString getData() {=20
+>		CString data;
+>		::EnterCriticalSection(&cs);
+>		data =3D  m_data;
+>		::LeaveCriticalSection(&cs);
+>		return data;
+>	}
+>	void setData(CString s) {=20
+>		::EnterCriticalSection(&cs);
+>		m_data =3D s;=09
+>		::LeaveCriticalSection(&cs);
+>	}
+>
+>	BOOL getFlag() {
+>		BOOL flag;
+>		::EnterCriticalSection(&cs);
+>		flag =3D m_flag; =09
+>		::LeaveCriticalSection(&cs);
+>		return flag; =09
+>	}
+>
+>	void setFlag(BOOL flag) {
+>		::EnterCriticalSection(&cs);
+>		m_flag =3D flag;
+>		::LeaveCriticalSection(&cs);
+>	}
+>
+>};
+>
+>class CThreadSafe
+>{
+>public :
+>	static CRestrictedAcess m_rAcess[10];
+>	static CWinThread *theThread;
+>	static BOOL m_waiting;
+>	=09
+>
+>	static CRestrictedAcess getObject(int index)
+>	{
+>		CRestrictedAcess rAcess;
+>		CRITICAL_SECTION cs;
+>		::InitializeCriticalSection(&cs);
+>		::EnterCriticalSection(&cs);
+>		rAcess =3D m_rAcess[index];
+>		::LeaveCriticalSection(&cs);
+>		return rAcess;
+>	}
+>
+>
+>	static int findUnprocessed()=20
+>	{=09
+>		TRACE("in to find unprocessed ");
+>		for (int i =3D 0; i<10; i++)
+>			if (!m_rAcess[i].getFlag()) {=20
+>			return i;
+>			}
+>		return -1;
+>	}
+>
+>	static UINT startProcess(LPVOID lpVoid)
+>	{
+>		while (TRUE) {
+>		int i =3D findUnprocessed();
+>		Sleep(1000);
+>		if (i+1)
+>		{
+>		  CRestrictedAcess temp =3D m_rAcess[i];
+>		  CString s; s.Format(" %d ",i);
+>		  TRACE("Processing + " + temp.getData() + s + "\n");=20
+>		  m_rAcess[i].setFlag(TRUE);
+>		}=20
+>		else {
+>			AfxMessageBox("in to waiting");
+>			TRACE("into waiting\n");
+>			m_waiting =3D TRUE;
+>			::WaitForSingleObject(g_imageIsInvalid,INFINITE);
+>			m_waiting =3D FALSE;
+>			TRACE("outof waiting\n");
+>		}  // end of if-else
+>		=09
+>		} // end of while
+>	return 0;
+>	}
+>
+>	static void start();
+>
+>};
+>
+>class CMultiView : public CView
+>{
+>protected: // create from serialization only
+>	CMultiView();
+>	DECLARE_DYNCREATE(CMultiView)
+>
+>// Attributes
+>public:
+>	CMultiDoc* GetDocument();
+>
+>// Operations
+>public:
+>
+>// Overrides
+>	// ClassWizard generated virtual function overrides
+>	//{{AFX_VIRTUAL(CMultiView)
+>	public:
+>	virtual void OnDraw(CDC* pDC);  // overridden to draw this view
+>	virtual BOOL PreCreateWindow(CREATESTRUCT& cs);
+>	protected:
+>	//}}AFX_VIRTUAL
+>
+>// Implementation
+>public:
+>	virtual ~CMultiView();
+>#ifdef _DEBUG
+>	virtual void AssertValid() const;
+>	virtual void Dump(CDumpContext& dc) const;
+>#endif
+>
+>protected:
+>
+>// Generated message map functions
+>protected:
+>	//{{AFX_MSG(CMultiView)
+>	afx_msg void OnHelpChangeavalue();
+>	afx_msg void OnHelpDisplayvalues();
+>	afx_msg void OnHelpStartthread();
+>	//}}AFX_MSG
+>	DECLARE_MESSAGE_MAP()
+>};
+>
+>#ifndef _DEBUG  // debug version in multiView.cpp
+>inline CMultiDoc* CMultiView::GetDocument()
+>   { return (CMultiDoc*)m_pDocument; }
+>#endif
+>
+>////////////////////////////////////////////////////////////////////////=
+
+>/////
+>// multiView.cpp : implementation of the CMultiView class
+>//
+>
+>#include "stdafx.h"
+>#include "multi.h"
+>
+>#include "multiDoc.h"
+>#include "multiView.h"
+>
+>#ifdef _DEBUG
+>#define new DEBUG_NEW
+>#undef THIS_FILE
+>static char THIS_FILE[] =3D __FILE__;
+>#endif
+>
+>
+>CEvent g_imageIsInvalid;
+>
+>
+>CWinThread *CThreadSafe::theThread =3D NULL;
+>BOOL CThreadSafe::m_waiting =3D FALSE;
+>
+>CRestrictedAcess CThreadSafe::m_rAcess[10] =3D {  CRestrictedAcess(),
+>											CRestrictedAcess(),
+>											CRestrictedAcess(),
+>											CRestrictedAcess(),
+>											CRestrictedAcess(),
+>											CRestrictedAcess(),
+>											CRestrictedAcess(),
+>											CRestrictedAcess(),
+>											CRestrictedAcess(),
+>											CRestrictedAcess() };
+>
+>
+>void CThreadSafe::start()
+>{
+>		TRACE("Thread started\n");
+>		theThread =3D
+>AfxBeginThread((AFX_THREADPROC)CThreadSafe::startProcess,(LPVOID)0);
+>
+>}
+>=09
+>////////////////////////////////////////////////////////////////////////=
+
+>/////
+>// CMultiView
+>
+>IMPLEMENT_DYNCREATE(CMultiView, CView)
+>
+>BEGIN_MESSAGE_MAP(CMultiView, CView)
+>	//{{AFX_MSG_MAP(CMultiView)
+>	ON_COMMAND(ID_HELP_CHANGEAVALUE, OnHelpChangeavalue)
+>	ON_COMMAND(ID_HELP_DISPLAYVALUES, OnHelpDisplayvalues)
+>	ON_COMMAND(ID_HELP_STARTTHREAD, OnHelpStartthread)
+>	ON_COMMAND(ID_HELP_SUSPENDTHREAD, OnHelpSuspendthread)
+>	ON_COMMAND(ID_HELP_RESUMETHREAD, OnHelpResumethread)
+>	ON_COMMAND(ID_HELP_KILLTHREAD, OnHelpKillthread)
+>	//}}AFX_MSG_MAP
+>END_MESSAGE_MAP()
+>
+>////////////////////////////////////////////////////////////////////////=
+
+>/////
+>// CMultiView construction/destruction
+>
+>CMultiView::CMultiView()
+>{
+>	// TODO: add construction code here
+>
+>}
+>
+>CMultiView::~CMultiView()
+>{
+>}
+>
+>BOOL CMultiView::PreCreateWindow(CREATESTRUCT& cs)
+>{
+>	// TODO: Modify the Window class or styles here by modifying
+>	//  the CREATESTRUCT cs
+>
+>	return CView::PreCreateWindow(cs);
+>}
+>
+>////////////////////////////////////////////////////////////////////////=
+
+>/////
+>// CMultiView drawing
+>
+>void CMultiView::OnDraw(CDC* pDC)
+>{
+>	CMultiDoc* pDoc =3D GetDocument();
+>	ASSERT_VALID(pDoc);
+>
+>	// TODO: add draw code for native data here
+>}
+>
+>////////////////////////////////////////////////////////////////////////=
+
+>////
+>// CMultiView diagnostics
+>
+>#ifdef _DEBUG
+>void CMultiView::AssertValid() const
+>{
+>	CView::AssertValid();
+>}
+>
+>void CMultiView::Dump(CDumpContext& dc) const
+>{
+>	CView::Dump(dc);
+>}
+>
+>CMultiDoc* CMultiView::GetDocument() // non-debug version is inline
+>{
+>	ASSERT(m_pDocument->IsKindOf(RUNTIME_CLASS(CMultiDoc)));
+>	return (CMultiDoc*)m_pDocument;
+>}
+>#endif //_DEBUG
+>
+>////////////////////////////////////////////////////////////////////////=
+
+>/////
+>// CMultiView message handlers
+>
+>void CMultiView::OnHelpChangeavalue()=20
+>{
+>	CThreadSafe::m_rAcess[0].setData("New");
+>	CThreadSafe::m_rAcess[0].setFlag(FALSE);
+>	if (CThreadSafe::m_waiting)=20
+>	{
+>		AfxMessageBox("Waiting");
+>		g_imageIsInvalid.SetEvent();
+>	}
+>}
+>
+>void CMultiView::OnHelpDisplayvalues()=20
+>{
+>	CString s;
+>	for (int i=3D0; i<10; i++)
+>	{
+>		s +=3D CThreadSafe::getObject(i).getData();=20
+>		if (CThreadSafe::getObject(i).getFlag()) s +=3D CString("TRUE") =
++"\n";
+>		else s +=3D CString("FALSE") +"\n";
+>	}
+>	TRACE(s);
+>}
+>
+>void CMultiView::OnHelpStartthread()=20
+>{
+>	CThreadSafe::start();
+>=09
+>}
+>
+>void CMultiView::OnHelpKillthread()=20
+>{
+>	// TODO: Add your command handler code here
+>	//g_killThread.SetEvent();
+>//	if(TerminateThread(CThreadSafe::theThread,0))
+>AfxMessageBox("sucessful kill");
+>}
+>
+>
+>
+-----From: Ted <Ted@www.Ibex.com>
+
+Is it just me, or do you never destroy the critical section you
+initialized in your constructor? Perhaps that's the source of your leak?
+(Off-the-cuff first guess.)
+
+-----From: Mike Blaszczak <mikeblas@nwlink.com>
+
+The message you get says you're leaking a CWinThread object, and it means
+exactly
+what it says.  When you call AfxBeginThread(), a new object is created for you.
+The object isn't deleted until the thread terminates, and is only deleted
+automatically by MFC if the thread's m_bAutoDelete member is TRUE.
+
+You've not provided the code which shows how you shut down the thread, other
+than this disgusting and unacceptable hack:
+
+>//	if(TerminateThread(CThreadSafe::theThread,0)) AfxMessageBox("sucessful
+kill");
+
+Do not ever, ever, ever, under any circumstances, call the TerminateThread()
+API.  It will break your application and cause you heartache.  This API is
+wrong to use in any circumstance.
+
+You've also bogusly cast a pointer to a function in your call to AfxBeginThread:
+
+> theThread =
+AfxBeginThread((AFX_THREADPROC)CThreadSafe::startProcess,(LPVOID)0);
+
+This makes your thread sick and wrong from the get go.  Your startProcess()
+function isn't shown to us, so it's impossible to tell what it's really doing.
+In addition, you don't show the code you use to synchronize the shutdown
+of the thread, so it's impossible to pinpoint your problem--but the improper
+management of the thread's death is the most likely cause of the problem you're
+experiencing.
+
+The code you've shown, though, is largely bogus and, in my estimation, the
+appearance of a memory leak is the least of your worries.
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+I'm afraid I've become some sort of speed freak.
+These words are my own. I do not speak on behalf of Microsoft.
+
+-----From: erik.heuer@ks-t.no (Erik Heuer)
+
+You do not call ::DeleteCriticalSection in the CRestrictedAcess
+destructor.
+
+-- 
+Erik Heuer, Kongsberg Simulation & Training, 3600 Kongsberg, Norway
+E-mail: erik.heuer@ks-t.no  Phone:(+47) 32735766 Fax:(+47) 32736965
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Sunday, October 27, 1996
+</B>
+>-----From: Ted <Ted@www.Ibex.com>
+
+>Is it just me, or do you never destroy the critical section you
+>initialized in your constructor? Perhaps that's the source of your leak?
+>(Off-the-cuff first guess.)
+
+>-----From: erik.heuer@ks-t.no (Erik Heuer)
+
+>You do not call ::DeleteCriticalSection in the CRestrictedAcess
+>destructor.
+
+
+These are bad conclusions.  The original poster said that this diagnostic was
+generated by the runtime library when the application terminated:
+
+>Detected memory leaks!
+>Dumping objects ->
+>thrdcore.cpp(156) : {78} client block at 0x006516A4, subtype 0, 104
+>bytes long.
+>a CWinThread object at $006516A4, 104 bytes long
+>{69} normal block at 0x00651248, 512 bytes long.
+> Data: <                > CD CD CD CD CD CD CD CD CD CD CD CD CD CD CD
+>CD 
+>Object dump complete.
+
+The message _clearly_ indicates the object which wasn't deleted
+is actually a CWinThread. Further, the CRITICAL_SECTION object in question
+is a member of the CRestrictedAcess class, not the CThreadSafe class.
+When a data structure (like CRITICAL_SECTION) is a member of a class, it
+is automatically allocated and dstroyed with the owner class.
+
+The second leak, which is 512 bytes of data of an unknown type, is allocated
+_before_ AfxBeginThread() is called.  You can tell that because the
+counter for that object (69) is less than the counter for the thread
+object (78).
+
+If the member was a _pointer to_ a CRITICAL_SECTION, it would be possible
+to leak a CRITICAL_SECTION object, but that's not the case here.  Even
+if it was happening, you'd see that the resulting dump wasn't identified
+as belonging to a particular object type by the runtimes.  The output
+might look something more like:
+
+Detected memory leaks!
+Dumping objects ->
+C:\Double\Double.cpp(95) : {111} normal block at 0x00762AC0, 24 bytes long.
+ Data: <                > CD CD CD CD CD CD CD CD CD CD CD CD CD CD CD CD 
+Object dump complete.
+
+Since the object isn't a CObject-derived object, the runtimes can't figure
+out what name its data type really has. (If you allocate a CObject-derived
+object, you're using MFC's CObject-specific implementation of operator new
+and that's what puts the class name in the preamble for the allocated
+memory block... in debug builds only.)
+
+The InitCriticalSection() and DeleteCriticalSection() APIs do not allocate
+any memory directly on behalf of your application. They let Windows know
+that you have a critical section, and this information is needed by the
+scheduler.  Forgetting to delete the critical section will make the tiniest
+dent in Windwos performance, and you certainly shouldn't do it in a loop.
+But Windows cleans up everything when your process terminates and will forget
+your mistake at that time.  This rule doesn't always apply to other
+synchronization objects because they can have scopes larger than the process--
+that is, they can outlive a process.
+
+Forgetting to call DeleteCriticalSection() could be completely avoided by
+using CCriticalSection instead of using the critical section APIs directly.
+(Why not accept the help that MFC can offer you?)  But forgetting to
+call DeleteCriticalSection() certainly isn't the cause of a traced memory
+leak in the termination of an application.
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+I'm afraid I've become some sort of speed freak.
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

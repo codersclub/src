@@ -1,0 +1,207 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Cross-Version Object Serialization
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Michael C. Hamilton -- <A HREF="mailto:mch@tiac.net">mch@tiac.net</A>
+Wednesday, October 09, 1996
+</B>
+Environment: (1) VC++ 1.52 (MFC 2.52), WfW 3.11
+             (2) VC++ 4.2 (MFC 4.2), Win NT 4.0
+
+Greetings all,
+
+An application that was developed in environment one above is being
+ported to environment two.  One criterion for this porting process is
+that files serialized from MFC 2.52 should be readable by MFC 4.2...
+For the most part this was all done behind-the-scenes by MFC, but I'm
+running into a peculiar problem.
+
+Most of the objects I serialize contain CObLists, which I serialize
+by simply calling CObList::Serialize.  For example, one of my
+overridden Serializes:
+
+void CSeriesInfo::Serialize(CArchive& ar)
+{
+        CStampedInfo::Serialize(ar);    // base class
+        
+        // Internal simple variables (use inline helper func)
+        SFX_CString(ar, m_ImgParam_ID);
+        
+        // Lists
+        m_lstSlices.Serialize(ar);
+        m_lstParams.Serialize(ar);
+}
+
+This works on every occasion except when the list I'm serializing is
+is empty.  If the list I'm serializing out is in fact empty, MFC 4.2
+throws an endOfFile exception at the following location:
+
+// FILE: ARCCORE.CPP
+DWORD CArchive::ReadCount()     // Line 739
+{
+        WORD wCount;
+        *this >> wCount;        <--- Chokes here
+        if (wCount != 0xFFFF)
+                return wCount;
+
+        DWORD dwCount;
+        *this >> dwCount;
+        return dwCount;
+}
+
+I don't understand why there is an end-of-file exception only when
+the list is empty.  If there is at least one item in the list, it
+serializes everything fine.
+
+Incidentally, the schema numbers for both versions of the program are
+identical, since no new information was added in the Win32 port...
+
+Anyone run into this?  I'm at a loss to explain it, and so far the
+only way around it has been to serialize another byte out to keep
+track if the list is empty or not, and not try to serialize it if
+it is empty...  A solution that seems a bit -- yucky.
+
+Thanks,
+-Michael C. Hamilton
+ mch@tiac.net
+ Millennium Information Technology Inc.
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Gerry Sweeney -- <A HREF="mailto:gerry@hornbill.com">gerry@hornbill.com</A>
+Friday, October 11, 1996
+</B>
+
+Environment: (1) VC++ 1.52 (MFC 2.52), WfW 3.11
+             (2) VC++ 4.2 (MFC 4.2), Win NT 4.0
+
+Michael,
+
+Our application depended on the serialization stuff in MFC. When we moved to 
+Win32 we had all sorts of problems with cross compatibility. I can't 
+remember exact details but for example, one of the MFC list classes was 
+using an 'int' variable to maintain a count of the number of items in the 
+list. This was true for both the 16bit and the 32bit versions. When this 
+list would serialize the first thing it would write to the archive apart 
+from the class id was this count value. When loading the reverse was true. 
+This caused problems because of the size of an int under 16&32bit code. As I 
+can remember there where about half a dozen or so cases in our app. What we 
+decided to do was handle the lists our self. We override the 'Serialize' 
+member of the list and write each contained object to the archive. Because 
+of the types of data objects we were storing we knew exactly what was going 
+into/out of the archive but the collection classes where a bit of a mystery. 
+We decided to take this approach so our application would not break when MS 
+decided to change things.
+
+If you want to see what's going on in your instance try stepping through the 
+serialize code of your collection class. Its very enlightening
+
+
+I hope this helps
+
+Gerry
+ ----------------------------------------------------
+Greetings all,
+
+An application that was developed in environment one above is being
+ported to environment two.  One criterion for this porting process is
+that files serialized from MFC 2.52 should be readable by MFC 4.2...
+For the most part this was all done behind-the-scenes by MFC, but I'm
+running into a peculiar problem.
+
+Most of the objects I serialize contain CObLists, which I serialize
+by simply calling CObList::Serialize.  For example, one of my
+overridden Serializes:
+
+void CSeriesInfo::Serialize(CArchive& ar)
+{
+        CStampedInfo::Serialize(ar);    // base class
+
+        // Internal simple variables (use inline helper func)
+        SFX_CString(ar, m_ImgParam_ID);
+
+        // Lists
+        m_lstSlices.Serialize(ar);
+        m_lstParams.Serialize(ar);
+}
+
+This works on every occasion except when the list I'm serializing is
+is empty.  If the list I'm serializing out is in fact empty, MFC 4.2
+throws an endOfFile exception at the following location:
+
+// FILE: ARCCORE.CPP
+DWORD CArchive::ReadCount()     // Line 739
+{
+        WORD wCount;
+        *this >> wCount;        <--- Chokes here
+        if (wCount != 0xFFFF)
+                return wCount;
+
+        DWORD dwCount;
+        *this >> dwCount;
+        return dwCount;
+}
+
+I don't understand why there is an end-of-file exception only when
+the list is empty.  If there is at least one item in the list, it
+serializes everything fine.
+
+Incidentally, the schema numbers for both versions of the program are
+identical, since no new information was added in the Win32 port...
+
+Anyone run into this?  I'm at a loss to explain it, and so far the
+only way around it has been to serialize another byte out to keep
+track if the list is empty or not, and not try to serialize it if
+it is empty...  A solution that seems a bit -- yucky.
+
+Thanks,
+ -Michael C. Hamilton
+ mch@tiac.net
+ Millennium Information Technology Inc.
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

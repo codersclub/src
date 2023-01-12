@@ -1,0 +1,230 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CRichEditView & the cursor
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Kevin Bentley -- <A HREF="mailto:kevinb@globaltrav.com">kevinb@globaltrav.com</A>
+Saturday, March 15, 1997
+</B>
+Environment: Win95, MSVC 4.2b
+I have been searching the web, and Deja news (which is a great 
+resource for programmers BTW) and found a few people asking this, but 
+no answers yet.....
+I have an app that uses a CRichEditView, and I need to change the 
+cursor when it is over a URL. I currently have it working, but the 
+cursor flickers when being moved over the URL.
+The problem as I see it is that windows is trying to restore the 
+default cursor for the class when the mouse is moved. I know that I 
+should be able to change it, but if I set the cursor to NULL in 
+PreCreateWindow, the RichEditCtrl no longer works, because MFC gets 
+all upset that the class name has changed (since I created a new class 
+with the cursor of NULL).
+I also tried using SetClassLong to set the cursor, and I can even see 
+in Spy that it is being set, but still, windows changes it back to the 
+I-Beam on mouse movements.  I also removed any instance of SetSel from 
+my code, thinking that it was making the cursor flicker, but it still 
+flickers.
+I think that something in MFC, or in windows is also trying to restore 
+the cursor, but I can't figure out what.
+Any help would be greatly appreciated.
+Kevin Bentley
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Roma -- <A HREF="mailto:roma@neonet.lv">roma@neonet.lv</A>
+Wednesday, March 19, 1997
+</B>
+[Mini-digest: 4 responses]
+
+Hello!
+
+Kevin Bentley wrote:
+> 
+> Environment: Win95, MSVC 4.2b
+> I have been searching the web, and Deja news (which is a great
+> resource for programmers BTW) and found a few people asking this, but
+> no answers yet.....
+> I have an app that uses a CRichEditView, and I need to change the
+> cursor when it is over a URL. I currently have it working, but the
+> cursor flickers when being moved over the URL.
+[snip]
+
+The following code works fine (i.e. without flickering) on my NT
+3.51/VC++4.0.
+Although CSomeView is not RichEditView, I guess the problem is common to
+the
+windows, not to the specific class.
+
+CRect rc(100, 100, 200, 200);
+
+void CSomeView::OnMouseMove(UINT nFlags, CPoint point) 
+{
+    if(rc.PtInRect(point))
+    {
+        SetClassLong(m_hWnd, GCL_HCURSOR,
+(DWORD)::LoadCursor(NULL,IDC_CROSS));
+    }
+    else
+    {
+        SetClassLong(m_hWnd, GCL_HCURSOR,
+(DWORD)::LoadCursor(NULL,IDC_ARROW));
+    }
+	
+    CView::OnMouseMove(nFlags, point);
+}
+
+HTH, 
+Roma.
+roma@neonet.lv
+-----From: "Manos D. Anastasiadis" <manos@ced.tuc.gr>
+
+----------
+> I think that something in MFC, or in windows is also trying to restore 
+> the cursor, but I can't figure out what.
+> Any help would be greatly appreciated.
+> Kevin Bentley
+> 
+
+Whenever the mouse is moved, Windows (and MFC) try to set the cursor.
+The answer why is quite be simple: to let the cursor change when
+the pointer is over the window's edge (sizing).
+
+Of course, windows *does* let you alter this behaviour:
+with MFC, you just need to overload
+	CWnd::OnSetCursor()
+to return TRUE for the cases (window area, as indicated
+by the nHitTest parameter) when *you* want *your* cursor
+to remain unchanged.
+
+>From the MFC docs:
+> The framework calls this member function if mouse input is not captured
+> and the mouse causes cursor movement within the CWnd object. 
+> The default implementation calls the parent windows OnSetCursor 
+> before processing. If the parent window returns TRUE, further processing 
+> is halted. Calling the parent window gives the parent window control over 
+> the cursors setting in a child window. 
+> The default implementation sets the cursor to an arrow if it is not in the 
+> client area or to the registered-class cursor if it is.
+> If nHitTest is HTERROR and message is a mouse button-down 
+> message, the MessageBeep member function is called. 
+> The message parameter is 0 when CWnd enters menu mode.
+
+So, a typical implementation might be:
+
+BOOL CMyWnd::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
+{
+	return (nHitTest == HTCLIENT)
+		? TRUE
+		: CMyWndBase::OnSetCursor(pWnd, nHitTest, message);
+}
+
+... where CMyWnd is either a CRichEditView-derived class you could use,
+or the window that has a CRichEditView object as a child window (your
+CFrameWnd).
+
+-
+
+Manos D. Anastasiadis
+Computer Engineer
+Mu.S.I.C. / Technical University of Crete
+manos@ced.tuc.gr
+
+-----From: DFPav@aol.com
+
+In terms of setting the cursor, maybe you need to investigate overriding
+OnHitTest.
+
+Hope that helps,
+Dan
+-----From: Jerzy Piejko <jpiejko@icverify.com>
+
+[Moderator's note: Use ::SetCursor() to be safe.  If you don't know
+why - LOOK IT UP!]
+
+     Did you try to handle WM_SETCURSOR message yourself ?
+     This message is send every time the cursor moves inside the window.
+     You can use 
+                 SetCursor(hYourCursor) 
+     inside this message handler if cursor is over your URL.
+     To avoid reseting the cursor by CRichEdit control inside your view 
+     you would have to return TRUE from message handler.
+     
+     Maybe it help and Good Luck anyway,
+		                                   Jerzy PIejko.
+     
+
+----------
+From: 	Kevin Bentley[SMTP:kevinb@globaltrav.com]
+Sent: 	Saturday, March 15, 1997 4:41 PM
+To: 	'mfc-l@netcom.com'
+Subject: 	CRichEditView & the cursor
+
+Environment: Win95, MSVC 4.2b
+I have been searching the web, and Deja news (which is a great 
+resource for programmers BTW) and found a few people asking this, but 
+no answers yet.....
+I have an app that uses a CRichEditView, and I need to change the 
+cursor when it is over a URL. I currently have it working, but the 
+cursor flickers when being moved over the URL.
+The problem as I see it is that windows is trying to restore the 
+default cursor for the class when the mouse is moved. I know that I 
+should be able to change it, but if I set the cursor to NULL in 
+PreCreateWindow, the RichEditCtrl no longer works, because MFC gets 
+all upset that the class name has changed (since I created a new class 
+with the cursor of NULL).
+I also tried using SetClassLong to set the cursor, and I can even see 
+in Spy that it is being set, but still, windows changes it back to the 
+I-Beam on mouse movements.  I also removed any instance of SetSel from 
+my code, thinking that it was making the cursor flicker, but it still 
+flickers.
+I think that something in MFC, or in windows is also trying to restore 
+the cursor, but I can't figure out what.
+Any help would be greatly appreciated.
+Kevin Bentley
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+    <A HREF="http://www.digiday.com/mfcpro/joinmfcl.htm">Become an MFC-L member</A>
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

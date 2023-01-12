@@ -1,0 +1,356 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Dynamic CStatusBar message text
+</B></FONT>
+<BR>
+<PRE>
+<B>
+<A HREF="mailto:peter.hodgman@autodesk.com">peter.hodgman@autodesk.com</A>
+Sunday, March 16, 1997
+</B>
+     Environment : VC++ 4.2 flat, NT 4.0
+     
+     I would like to allow various parts of my application to set the text 
+     for pane 0 of the status bar. For example, when a particular command 
+     for specific view of a particular document (in MDI) is running it 
+     wants to place dynamically various strings in the pane. When the user 
+     switches to another view on a different document I want the pane to 
+     reflect whatever is the current context of that document (maybe a 
+     different command). The problem being is that there needs to be some 
+     cooperation here so that as one client places text in the pane that 
+     another clients text does not get destroyed and as the user switches 
+     between different views on a document the pane 0 text is correct. 
+     Additionally, I want to preserve the behavior of the tooltip / 
+     toolhelp that the default toolbar provides. For example, when the user 
+     is over a tool that text appears in pane 0 and when the cursor comes 
+     back to the view it returns to the appropriate text for the context of 
+     the active view and document. What would be the best way to achive 
+     this?
+     
+     Thanks in advance,
+     
+     Pete Hodgman
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Jeff S. Shanholtz -- <A HREF="mailto:jeffshan@flash.net">jeffshan@flash.net</A>
+Tuesday, March 18, 1997
+</B>
+[Mini-digest: 5 responses]
+
+>      I would like to allow various parts of my application to set the
+text 
+>      for pane 0 of the status bar.
+
+You can override the CFrameWnd::OnSetMessageString as follows:
+
+LRESULT CMainFrame::OnSetMessageString(WPARAM wParam, LPARAM lParam)
+{
+    if(AFX_IDS_IDLEMESSAGE == wParam)
+    {
+        lParam = (LONG)(const char*)m_wndStatusBar.GetIdleText();    //
+custom method
+        wParam = 0;
+    }
+    return CMDIFrameWnd::OnSetMessageString(wParam, lParam);
+}
+
+>      For example, when a particular command 
+>      for specific view of a particular document (in MDI) is running it 
+>      wants to place dynamically various strings in the pane. When the
+user 
+>      switches to another view on a different document I want the pane to 
+>      reflect whatever is the current context of that document (maybe a 
+>      different command).
+
+I overrode CStatusBar and added the method GetIdleText. You could call
+GetActiveView and a method like GetIdleText within the view in order to
+make it view specific.
+
+>      The problem being is that there needs to be some 
+>      cooperation here so that as one client places text in the pane that 
+>      another clients text does not get destroyed and as the user switches
+
+>      between different views on a document the pane 0 text is correct. 
+
+The method I described should handle this problem; OnSetMessageString is
+called thru OnIdle, so if you get the string from the active view, the pane
+should always display the right string.
+
+>      Additionally, I want to preserve the behavior of the tooltip / 
+>      toolhelp that the default toolbar provides. For example, when the
+user 
+>      is over a tool that text appears in pane 0 and when the cursor comes
+
+>      back to the view it returns to the appropriate text for the context
+of 
+>      the active view and document.
+
+Because of the "if(AFX_IDS_IDLEMESSAGE == wParam)" check, toolbars and
+menus will still be able to set the pane text.
+
+Good luck!
+
+Jeff Shanholtz
+Enertech Consultants
+-----From: Mario Contestabile
+
+>The problem being is that there needs to be some 
+>     cooperation here so that as one client places text in the pane that 
+>     another clients text does not get destroyed and as the user switches 
+>     between different views on a document the pane 0 text is correct. 
+
+Well I'm not sure I understand this. If you're setting the text for pane 0,
+you obviously don't want the previous text that was there. If you're
+into displaying various information, use 2 panes of text.
+
+>     Additionally, I want to preserve the behavior of the tooltip / 
+>     toolhelp that the default toolbar provides. For example, when the user 
+>     is over a tool that text appears in pane 0 and when the cursor comes 
+>     back to the view it returns to the appropriate text for the context of 
+>     the active view and document. What would be the best way to achive 
+>     this?
+
+Perhaps you're looking for something like:
+
+pStat = (CStatusBar*)AfxGetMainWnd()->GetDescendantWindow(AFX_IDW_STATUS_BAR);
+yourview::OnActivateView(){
+ if(bActive)
+  pStat->SetPaneText(...)
+}
+
+Then when the cursor is over a toolbar icon, the pane text will change 
+(presuming you added
+one). If you still want something else use the resource string 
+AFX_IDS_IDLEMESSAGE.
+
+Mario
+mcontest@universal.com
+
+-----From: "John Moulder" <jm@wg.icl.co.uk>
+
+>	 The problem being is that there needs to be some 
+>      cooperation here so that as one client places text in the pane that 
+>      another clients text does not get destroyed and as the user switches
+
+>      between different views on a document the pane 0 text is correct.
+
+I think that you are getting a little confused between objects setting the
+status bar text when they need to show something on the status bar, and the
+status bar object asking for some text when it needs to display the text.
+
+Anyway, here is a method to set the text on the status bar:
+
+Firstly, see the Visual C++ Books Online help article entitled "FAQ:
+Updating the Text of a Status-Bar Pane". This explains how to use the
+CCmdUi mechanism to update the status bar.
+
+Secondly, (this is the subtle trick), take advantage of MFC's
+command/message routing, and implement the CCmdUi OnUpdateXXX handler in
+each of your view classes or MDI document classes, rather than handling the
+OnUpdateXXX in the mainframe window class.
+
+Your view or document class will then update the status bar, and tooltips,
+menu tracking text etc. will still appear on the status bar as well.
+
+----------
+> From: peter.hodgman@autodesk.com
+> To: mfc-l@netcom.com
+> Subject: Dynamic CStatusBar message text
+> Date: 16 March 1997 10:57
+> 
+>      Environment : VC++ 4.2 flat, NT 4.0
+>      
+>      I would like to allow various parts of my application to set the
+text 
+>      for pane 0 of the status bar. For example, when a particular command
+
+>      for specific view of a particular document (in MDI) is running it 
+>      wants to place dynamically various strings in the pane. When the
+user 
+>      switches to another view on a different document I want the pane to 
+>      reflect whatever is the current context of that document (maybe a 
+>      different command). The problem being is that there needs to be some
+
+>      cooperation here so that as one client places text in the pane that 
+>      another clients text does not get destroyed and as the user switches
+
+>      between different views on a document the pane 0 text is correct. 
+>      Additionally, I want to preserve the behavior of the tooltip / 
+>      toolhelp that the default toolbar provides. For example, when the
+user 
+>      is over a tool that text appears in pane 0 and when the cursor comes
+
+>      back to the view it returns to the appropriate text for the context
+of 
+>      the active view and document. What would be the best way to achive 
+>      this?
+>      
+>      Thanks in advance,
+>      
+>      Pete Hodgman
+> 
+-----From: "petter.hesselberg" <petter.hesselberg@ac.com>
+
+For various reasons I don't have access to my development environment right 
+now, so this is pretty much off the top of my head. I did find some relevant 
+source code; this is from an MDI app which appears to do pretty much what you 
+want. It overrides a function called OnSetMessageString in the main frame; I 
+seem to recall that this function is not documented, but I'm not staking my rep 
+on that. The GetCurrentPrompt() is up to you -- get it from the active view, 
+perhaps.
+
+Final advice: Trace through CMDIFrameWnd::OnSetMessageString and chec out what 
+it does. Here's the code:
+
+afx_msg LRESULT MainFrame::OnSetMessageString( WPARAM wParam, LPARAM lParam )
+{
+   // Override this to control default message string on status bar.
+   // MFC handles menu prompt and tooltips.
+
+   const LRESULT lResult = CMDIFrameWnd::OnSetMessageString( wParam, lParam );
+   if ( AFX_IDS_IDLEMESSAGE == wParam ) {
+      CWnd *pMessageBar = GetMessageBar();
+      if ( pMessageBar ) {
+         CString strMsg;
+         if ( MDIGetActive() ) {
+            //TODO: Try overriding GetMessageString instead of
+            //this function. Equivalent to LoadString, pretty much.
+            GetMessageString( GetCurrentPrompt(), strMsg );
+         } else {
+            strMsg.LoadString( IDS_NO_VIEW_PROMPT );
+         }
+         pMessageBar->SetWindowText( strMsg );
+      }
+   }
+   return lResult;
+}
+
+Regards,
+Petter Hesselberg
+_____________________________
+To: mfc-l @ netcom.com  @ internet
+cc:  (bcc: Petter Hesselberg)
+From: peter.hodgman @ autodesk.com @ internet
+Date: 16-03-97 08:57
+Subject: Dynamic CStatusBar message text
+_____________________________
+     Environment : VC++ 4.2 flat, NT 4.0
+     
+     I would like to allow various parts of my application to set the text 
+     for pane 0 of the status bar. For example, when a particular command 
+     for specific view of a particular document (in MDI) is running it 
+     wants to place dynamically various strings in the pane. When the user 
+     switches to another view on a different document I want the pane to 
+     reflect whatever is the current context of that document (maybe a 
+     different command). The problem being is that there needs to be some 
+     cooperation here so that as one client places text in the pane that 
+     another clients text does not get destroyed and as the user switches 
+     between different views on a document the pane 0 text is correct. 
+     Additionally, I want to preserve the behavior of the tooltip / 
+     toolhelp that the default toolbar provides. For example, when the user 
+     is over a tool that text appears in pane 0 and when the cursor comes 
+     back to the view it returns to the appropriate text for the context of 
+     the active view and document. What would be the best way to achive 
+     this?
+     
+     Thanks in advance,
+     
+     Pete Hodgman
+
+-----From: "petter.hesselberg" <petter.hesselberg@ac.com>
+
+Here's an update on my previus reply to this posting. It turns out that there's 
+a message map entry for the OnSetMessageString, as follows:
+
+BEGIN_MESSAGE_MAP(MainFrame, CMDIFrameWnd)
+   ...
+    ON_MESSAGE( WM_SETMESSAGESTRING, OnSetMessageString )
+   ...
+   //{{AFX_MSG_MAP(MainFrame)
+   ON_WM_CREATE()
+   ...
+   //}}AFX_MSG_MAP
+END_MESSAGE_MAP()
+
+This entry is NOT maintained by ClassWizard.
+
+Hope this helps.
+
+Regards,
+Petter
+_____________________________
+To: mfc-l @ netcom.com  @ internet
+cc:  (bcc: Petter Hesselberg)
+From: peter.hodgman @ autodesk.com @ internet
+Date: 16-03-97 08:57
+Subject: Dynamic CStatusBar message text
+_____________________________
+     Environment : VC++ 4.2 flat, NT 4.0
+     
+     I would like to allow various parts of my application to set the text 
+     for pane 0 of the status bar. For example, when a particular command 
+     for specific view of a particular document (in MDI) is running it 
+     wants to place dynamically various strings in the pane. When the user 
+     switches to another view on a different document I want the pane to 
+     reflect whatever is the current context of that document (maybe a 
+     different command). The problem being is that there needs to be some 
+     cooperation here so that as one client places text in the pane that 
+     another clients text does not get destroyed and as the user switches 
+     between different views on a document the pane 0 text is correct. 
+     Additionally, I want to preserve the behavior of the tooltip / 
+     toolhelp that the default toolbar provides. For example, when the user 
+     is over a tool that text appears in pane 0 and when the cursor comes 
+     back to the view it returns to the appropriate text for the context of 
+     the active view and document. What would be the best way to achive 
+     this?
+     
+     Thanks in advance,
+     
+     Pete Hodgman
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+    <A HREF="http://www.digiday.com/mfcpro/joinmfcl.htm">Become an MFC-L member</A>
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

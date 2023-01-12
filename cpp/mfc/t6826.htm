@@ -1,0 +1,281 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Preventing more than one doc. from opening in MDI
+</B></FONT>
+<BR>
+<PRE>
+<B>
+BLR CSG -- <A HREF="mailto:T_SAMAL_C1@blrv1.verifone.com">T_SAMAL_C1@blrv1.verifone.com</A>
+Wednesday, September 18, 1996
+</B>
+Environment : VC4.0 , Win95
+Hi,
+ I have an app that uses multiple document templates. One of these 
+templates shouldn't have more than one document open.
+ My question is if i can prevent a document from being opened if a document 
+of that type is already open.
+ I've currently done it by having a class member variable
+static int XDoc::IsOpen, and incrementing this var in XDoc::OnOpenDocument() 
+and decrementing it in XDoc::OnCloseDocument().
+If the member is 0 I return FALSE in OnOpenDocument(). I can't use a simple 
+BOOL type because OnCloseDocument() gets called even if i return FALSE in 
+OnOpenDocument().
+ I feel there must be a better (hopefully more standard) way of doing 
+this.
+Any suggestions??
+Thanks/Samal.
+Verifone, Bangalore.
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Chet Murphy -- <A HREF="mailto:cmurphy@modelworks.com">cmurphy@modelworks.com</A>
+Friday, September 20, 1996
+</B>
+[Mini-digest: 2 responses]
+
+> Environment : VC4.0 , Win95
+> Hi,
+>  I have an app that uses multiple document templates. One of these 
+> templates shouldn't have more than one document open.
+>  My question is if i can prevent a document from being opened if a document 
+> of that type is already open.
+>  I've currently done it by having a class member variable
+> static int XDoc::IsOpen, and incrementing this var in XDoc::OnOpenDocument() 
+> and decrementing it in XDoc::OnCloseDocument().
+> If the member is 0 I return FALSE in OnOpenDocument(). I can't use a simple 
+> BOOL type because OnCloseDocument() gets called even if i return FALSE in 
+> OnOpenDocument().
+>  I feel there must be a better (hopefully more standard) way of doing 
+> this.
+
+I solved this problem by creating a new CDocTemplate using code like the
+following:
+
+CDocument* CWorkspaceTemplate::OpenDocumentFile(LPCTSTR lpszPathName, BOOL
+bMakeVisible)
+{
+	...
+	if (m_WorkspaceDoc != NULL)
+	{
+		// already have a document - close it
+		CString path = m_WorkspaceDoc->GetPathName();
+		ASSERT(path.IsEmpty() == FALSE);
+		m_WorkspaceDoc->OnSaveDocument(path);
+		theApp.CloseAllUserDocuments();
+		CloseAllDocuments(FALSE);
+		gProjectPanel->CloseAllViews();
+	}
+	...
+}
+
+to prevent more than one document to being opened at a time.  Then I just
+create the template in my InitInstance() along with all my other templates:
+
+		// add workspace template 
+		pWorkspaceTemplate = new CWorkspaceTemplate(IDR_WORKSPACETYPE,
+			RUNTIME_CLASS(CWorkspaceDoc),
+			NULL,
+			NULL);
+		AddDocTemplate(pWorkspaceTemplate);
+
+
+Chet Murphy
+ModelWorks Software - Editors for Java, JavaScript, VBScript, HTML and VRML
+cmurphy@modelworks.com
+<A HREF="http://www.modelworks.com/express">http://www.modelworks.com/express</A>
+-----From: "David Holliday" <holliday@Empire.Net>
+
+I have no idea if this is the best way to do this, but it's how I do it.
+
+Keep a varriable m_pYourWnd in CYourApp.  In the constructor for CYourWnd
+set m_pYourWnd to this (GetCYourApp()->SetpYourWnd(this);).  In the
+destructor set m_pYourWnd to NULL (GetCYourApp()->SetpYourWnd(NULL);).  Now
+you can test to see if a window for your Doc is open.
+
+//**************************
+class CYourApp : public CWinApp
+{
+...
+
+  CYourWnd* m_ pYourWnd ;   // points Your window 
+... 
+  void SetpYourWnd(CYourWnd* pYourWnd) {m_ pYourWnd = pYourWnd;}
+...
+private: 
+	// member pointers to document templates
+	CMultiDocTemplate *m_pMDITemplateYour; 
+public:
+	// access functions to member pointers to document templates
+	CMultiDocTemplate* GetMDITemplateYour()const {return m_pMDITemplateYour;}
+...
+};
+
+
+
+
+//************************
+CYourApp::CYourApp() 
+{
+	// TODO: add construction code here,
+	// Place all significant initialization in InitInstance 
+...
+	m_pYourDocWnd = NULL; // no window (or Doc) is open
+...
+}
+
+
+//******************************
+BOOL CYourApp::InitInstance()
+{
+...
+  AddDocTemplate(m_pMDITemplateYour = new CMultiDocTemplate(IDR_MAINFRAME,
+		RUNTIME_CLASS(CYourDoc),
+		RUNTIME_CLASS(CYourWnd
+		RUNTIME_CLASS(CYourView)));
+...
+	return TRUE;
+}
+
+
+//************************************
+void CYourApp::OnOpenYourDoc()
+{
+	// TODO: Add your command handler code here  
+	if(!m_pYourWnd)  // the window is not open
+	{
+	  	GetMDITemplateYour()->OpenDocumentFile(NULL);
+	}
+	else  // the Button window is open
+	{
+		 m_pYourWnd->BringWindowToTop();
+	}
+}
+
+
+
+
+//********************
+CYourWnd:: CYourWnd()
+{
+	GetCYourApp()->SetpYourWnd(this);
+}
+
+//*********************
+CYourWnd::~ CYourWnd()
+{ 
+	GetCYourApp()->SetpYourWnd(NULL);
+}
+
+Hope this helps,
+--David
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:rkumar@mail.cswl.com">rkumar@mail.cswl.com</A>
+Tuesday, September 24, 1996
+</B>
+     
+     Every doc template maintains a list of documents opened by it.u can 
+     traverse the list by using GetFirstDocPosition and GetNextDoc 
+     functions. Do GetFirstDocPosition if it returns NULL open the document 
+     otherwise don't. 
+     For this u may have to maintain a pointer to the doc template in the 
+     app class.
+                                                                Ratan.
+                                                                rkumar@cswl.com
+
+______________________________ Reply Separator _________________________________
+Subject: Preventing more than one doc. from opening in MDI
+Author:  mfc-l@netcom.com at internet
+Date:    20/09/96 11:57 PM
+
+
+Environment : VC4.0 , Win95
+Hi,
+ I have an app that uses multiple document templates. One of these 
+templates shouldn't have more than one document open.
+ My question is if i can prevent a document from being opened if a document 
+of that type is already open.
+ I've currently done it by having a class member variable
+static int XDoc::IsOpen, and incrementing this var in XDoc::OnOpenDocument() 
+and decrementing it in XDoc::OnCloseDocument().
+If the member is 0 I return FALSE in OnOpenDocument(). I can't use a simple 
+BOOL type because OnCloseDocument() gets called even if i return FALSE in 
+OnOpenDocument().
+ I feel there must be a better (hopefully more standard) way of doing 
+this.
+Any suggestions??
+Thanks/Samal.
+Verifone, Bangalore.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+John Bundgaard -- <A HREF="mailto:johnb@image.dk">johnb@image.dk</A>
+Tuesday, September 24, 1996
+</B>
+When you register the documenttype in your app-object, the store the
+CDocTemplate handle returned, in say m_pDocTemplate.
+
+You can the determine if a document is open by calling
+m_pDocTemplate->GetFirstDocPosition().
+If the returned value is NULL, the there is no document open.
+
+John Bundgaard
+johnb@image.dk
+
+----------
+>  I have an app that uses multiple document templates. One of these 
+> templates shouldn't have more than one document open.
+>  My question is if i can prevent a document from being opened if a
+document 
+> of that type is already open.
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,382 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+A thread, a custom object...
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Michel Robert -- <A HREF="mailto:michero@login.net">michero@login.net</A>
+Friday, May 03, 1996
+</B>
+Win95, VC4.0, MFC
+
+Problem:  a custom object of mine (non mfc) has a function that does a very 
+long computation and writes to disk.  I placed this call in a thread (using 
+globals mostly).  If the user closes the window, the main thread uses another 
+of the object's function to set a member flag which the long computation 
+polls on each iteration. About 1 time out of 3, the program hangs and I must 
+give it the 3 finger salute.  I don't have a clue why this is happening.  
+There are no AfxMessageBox calls.  Suggestions will be appreciated.  Some 
+code follows:
+
+
+void CMainFrame::OnClose() 
+{
+        /* if the object's long computation function is in progress */
+        if(bInProgress) 
+                {
+                //sets a member flag which is polled during long computations
+                mpeObject.AbortBuild(); 
+                }
+         /* even if not bInProgress, the thread could still be running */
+        if(pthread)
+                {
+                g_eventKill.SetEvent();
+                 /* wait for the thread to acquiesce */
+                while(!bCancel);
+                }
+        CFrameWnd::OnClose();
+}
+
+
+
+UINT MyThread(LPVOID pParam)
+{
+HWND hw = (HWND)pParam;
+CStatic* wndStatic;
+wndStatic = (CStatic*)CWnd::FromHandle(hw);
+wndStatic->SetWindowText("banzaiiiiiiiiiiii");
+ // the object's function will also grab the static and use it to blabber
+wndStatic->Detach();
+MPermutation::Error mpeError;
+NTYPE j;
+for(j = 9; j < 10; j++)
+        {
+        bInProgress = TRUE;
+        mpeError = mpeObject.OpenSet("h:\\temp\\",j,hw,FALSE);
+        bInProgress = FALSE;
+        if(mpeError) /* object has polled the abort member flag and exited
+                {
+                // ALWAYS - this is the path I'm having trouble with
+                break;
+                }
+        // a loop starts here, but this is of no concern (for now...)
+        if(::WaitForSingleObject(g_eventKill.m_hObject,0) == WAIT_OBJECT_0)
+                        break;  
+                else
+                        {
+                        // some more processing
+                        }
+pthread = NULL;
+bCancel = TRUE; // inform this thread is done
+return TRUE;
+}
+
+
+
+TIA
+Michel Robert
+Montreal
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Marty Fried -- <A HREF="mailto:mfried@linex.com">mfried@linex.com</A>
+Saturday, May 04, 1996
+</B>
+[Mini-digest: 4 responses]
+
+At 03:07 AM 5/3/96 -0400, Michel Robert wrote:
+>Win95, VC4.0, MFC
+>
+>Problem:  a custom object of mine (non mfc) has a function that does a very 
+>long computation and writes to disk.  I placed this call in a thread (using 
+>globals mostly).  If the user closes the window, the main thread uses another 
+>of the object's function to set a member flag which the long computation 
+>polls on each iteration. About 1 time out of 3, the program hangs and I must 
+>give it the 3 finger salute.  I don't have a clue why this is happening.  
+>There are no AfxMessageBox calls.  Suggestions will be appreciated.  Some 
+>code follows:
+> . . .
+>         /* even if not bInProgress, the thread could still be running */
+>        if(pthread)
+>                {
+>                g_eventKill.SetEvent();
+>                 /* wait for the thread to acquiesce */
+>                while(!bCancel);
+>                }
+>        CFrameWnd::OnClose();
+
+I haven't tried to fully analyze your code, but one thing I notice is the line
+"while(!bCancel)".  This is eating up unnecessary cpu time that is better used
+by the thread to finish what it's doing.  Better to use WaitForSingleObject with
+the thread handle as the object to wait for.  Also, if the thread needs any
+message processing, you aren't doing it while waiting, so if this is the case,
+you may need to have a fairly short timeout in the wait, and process messages
+in between waits.
+
+Hope this makes sense.
+________________________________
+ Marty Fried (mfried@linex.com)
+ Marin County, California
+
+
+-----From: mikeblas@interserv.com
+
+On Fri, 3 May 1996, michero@login.net (Michel Robert) wrote:
+
+>Win95, VC4.0, MFC
+
+Thanks.
+
+>        if(pthread)
+>                {
+>                g_eventKill.SetEvent();
+>                 /* wait for the thread to acquiesce */
+>                while(!bCancel);
+>                }
+
+This is a very poor way to check for the termination of the thread.  It is 
+poor because it sits and polls, sucking CPU time that the other thread could 
+be using--you could avoid that problem by using 
+
+  while (!bCancel)
+     sleep(100);
+
+But what you _really_ should do is use the mulitthreading features the 
+operating system gives you: wait for the handle of the thread.  The thread 
+handle is unsignalled while the thread is running, and signalled when the 
+thread has finished.
+
+.B ekiM
+--
+TCHAR szDisc[] = _T("These words are my own; I do not speak for Microsoft.");
+
+-----From: Frank McGeough <fm@synchrologic.com>
+
+Michel Robert wrote:
+> 
+> Win95, VC4.0, MFC
+> 
+> Problem:  a custom object of mine (non mfc) has a function that does a very
+> long computation and writes to disk.  I placed this call in a thread (using
+> globals mostly).  If the user closes the window, the main thread uses another
+> of the object's function to set a member flag which the long computation
+> polls on each iteration. About 1 time out of 3, the program hangs and I must
+> give it the 3 finger salute.  I don't have a clue why this is happening.
+> There are no AfxMessageBox calls.  Suggestions will be appreciated.  Some
+> code follows:
+> <snip>
+
+I have a similar program that is running a pool of worker threads. The worker
+threads are created by a Workbench object that is created by the Document
+class. The threads are derived from CWinThread. The Workbench object keeps 
+the CWinThread objects and it sets a flag in the worker threads to indicate
+that they should exit. The Workbench exposes a method that allows a caller to
+see if the threads are running and to request them to exit. The Workbench
+object checks to see if they have exited by :
+
+VERIFY(::GetExitCodeThread(pWorkerThread->m_hThread, &dwStatus));
+if (dwStatus == STILL_ACTIVE)
+    // we haven't exited yet
+
+When the user chooses to close the app, I call the Workbench and ask it to
+stop the threads, hide the app right away and then wait for the threads 
+to respond to the flag that I set (I return FALSE to the request to 
+close the frame & post another WM_CLOSE msg while my threads are still 
+running). This seems to work fine for this particular app. I haven't had 
+any problems with it hanging. I guess I would not have your MainFrame use 
+the same variable that you're using to signal the threads to stop. I would 
+suggest using the thread information itself and checking the exit code.
+__________________________________________________
+Frank McGeough      fm@synchrologic.com
+Synchrologic, Inc. (http://www.synchrologic.com/)
+Voice: 404.876.3209            Fax: 404.876.3809
+-----From: Niels Ull Jacobsen <nuj@kruger.dk>
+
+At 03:07 03-05-96 -0400, you wrote:
+>Win95, VC4.0, MFC
+>
+>Problem:  a custom object of mine (non mfc) has a function that does a very=
+=20
+>long computation and writes to disk.=20
+Just a note: If you're concerned about speed and the disk writes happens=
+ during=20
+the computation (and not just at the end), you should probably put the
+computation
+and the writing to disk in separate threads. That way the CPU won't be kept
+waiting for=20
+the disk.=20
+
+>I placed this call in a thread (using=20
+>globals mostly).  If the user closes the window, the main thread uses=
+ another=20
+>of the object's function to set a member flag which the long computation=20
+>polls on each iteration. About 1 time out of 3, the program hangs and I=
+ must=20
+>give it the 3 finger salute.  I don't have a clue why this is happening. =
+=20
+>There are no AfxMessageBox calls.  Suggestions will be appreciated.
+> Some code follows:
+
+Why are you using both an abort flag and a Kill event. Wouldn't=20
+a Kill event suffice? Just SetEvent() in mpeAbortBuild().=20
+
+>
+>void CMainFrame::OnClose()=20
+>{
+>        /* if the object's long computation function is in progress */
+>        if(bInProgress)=20
+>                {
+>                //sets a member flag which is polled during long=
+ computations
+>                mpeObject.AbortBuild();=20
+>                }
+>         /* even if not bInProgress, the thread could still be running */
+>        if(pthread)
+>                {
+>                g_eventKill.SetEvent();
+>                 /* wait for the thread to acquiesce */
+>                while(!bCancel);
+
+I think your problem is here. This is busy waiting - always a bad idea.=20
+If your worker thread has lower priority than the main thread, couldn't=20
+this prevent it from running at all? Or, if the compiler is smart,=20
+perhaps it puts bCancel in a register? Is bCancel declared volatile?=20
+
+I'd use a WaitForSingleObject on the thread's handle with some reasonable
+time-out.
+
+
+>                }
+>        CFrameWnd::OnClose();
+>}
+>
+>
+>
+>UINT MyThread(LPVOID pParam)
+>{
+>HWND hw =3D (HWND)pParam;
+>CStatic* wndStatic;
+>wndStatic =3D (CStatic*)CWnd::FromHandle(hw);
+>wndStatic->SetWindowText("banzaiiiiiiiiiiii");
+> // the object's function will also grab the static and use it to blabber
+>wndStatic->Detach();
+>MPermutation::Error mpeError;
+>NTYPE j;
+>for(j =3D 9; j < 10; j++)
+>        {
+>        bInProgress =3D TRUE;
+>        mpeError =3D mpeObject.OpenSet("h:\\temp\\",j,hw,FALSE);
+>        bInProgress =3D FALSE;
+>        if(mpeError) /* object has polled the abort member flag and exited
+>                {
+>                // ALWAYS - this is the path I'm having trouble with
+>                break;
+>                }
+>        // a loop starts here, but this is of no concern (for now...)
+>        if(::WaitForSingleObject(g_eventKill.m_hObject,0) =3D=3D=
+ WAIT_OBJECT_0)
+>                        break; =20
+>                else
+>                        {
+>                        // some more processing
+>                        }
+>pthread =3D NULL;
+>bCancel =3D TRUE; // inform this thread is done
+>return TRUE;
+>}
+>
+>
+>
+>TIA
+>Michel Robert
+>Montreal
+>
+>
+>
+>
+>
+>
+Niels Ull Jacobsen, Kr=FCger A/S (nuj@kruger.dk)
+Everything stated herein is THE OFFICIAL POLICY of the entire Kruger group
+and should be taken as legally binding in every respect. Pigs will grow
+wings and fly.
+
+
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+David Shoots -- <A HREF="mailto:dshoots@lmcorp.com">dshoots@lmcorp.com</A>
+Thursday, May 09, 1996
+</B>
+mfc-l@netcom.com,Internet writes:
+>Problem:  a custom object of mine (non mfc) has a function that does a very 
+>long computation and writes to disk.  I placed this call in a thread (using 
+>globals mostly).  If the user closes the window, the main thread uses
+another 
+>of the object's function to set a member flag which the long computation 
+>polls on each iteration. About 1 time out of 3, the program hangs and I must
+
+>give it the 3 finger salute.  I don't have a clue why this is happening.  
+>There are no AfxMessageBox calls.  Suggestions will be appreciated.  Some 
+>code follows:
+
+Are you using SendMessage() from your worker thread to convey information to
+your main thread?  This can cause the deadlock requiring an EndTask.  (If
+your main thread has signalled and is waiting for the thread to die, and the
+thread calls SendMessage(), the worker thread will hang)
+
+DWS
+"I don't know for whom I'm speaking..."
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

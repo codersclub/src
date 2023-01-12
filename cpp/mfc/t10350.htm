@@ -1,0 +1,213 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Using VB Ole Server methods from VC
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Shilpa Vyapari -- <A HREF="mailto:shini@highway.or.jp">shini@highway.or.jp</A>
+Sunday, March 30, 1997
+</B>
+Environment: VC++ 4.0, Windows 95
+
+I have a VB OLE Server object which is to be invoked both from VB as
+well as VC. With VB applization it works fine. But when I try to call a
+method of that object from VC, it fails. I can't get the dispid. I use
+following function to convert name to dispid.
+
+DISPID CLayoutView::NameToID( COleDispatchDriver &pDisp, TCHAR *pszName
+)
+{
+    DISPID      dispid = 0;
+    HRESULT     hr;
+    TCHAR       szMsg[80];
+
+    hr = pDisp.m_lpDispatch->GetIDsOfNames( IID_NULL, (OLECHAR FAR*
+FAR*)&pszName, 1, 
+		m_lcid, &dispid );
+
+    if ( FAILED( hr ) )
+    {
+        wsprintf( szMsg,TEXT( "GetIDsOfNames on '%s' failed with 0x%lX"
+), pszName, hr );
+        AfxMessageBox( szMsg );
+    }
+    return dispid;
+}
+
+and call it through COleDispatchDriver interface :
+
+	COleDispatchDriver dispDriver;
+
+	dispDriver.CreateDispatch( "OLEServer.Screen2" );
+
+	DISPID dispID = NameToID( dispDriver, "Display" ); // always falis and
+displays error box
+
+	if ( dispID != -1 )
+	{
+		int iret;
+		dispDriver.InvokeHelper( dispID, DISPATCH_METHOD, VT_BOOL, &iret,
+			NULL, NULL );
+	}
+
+
+Can anyone figure out what's going wrong? 
+
+- Shilpa
+
+---------------------------------
+Shilpa Vyapari
+Phone/Fax : 81 (0)3-3745-0040
+<A HREF="mailto:shini@highway.or.jp">mailto:shini@highway.or.jp</A>
+---------------------------------
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Alberto Massari -- <A HREF="mailto:alby@belva.infomus.dist.unige.it">alby@belva.infomus.dist.unige.it</A>
+Tuesday, April 01, 1997
+</B>
+At 07:06 PM 30/3/97 +0900, you wrote:
+>Environment: VC++ 4.0, Windows 95
+>
+>I have a VB OLE Server object which is to be invoked both from VB as
+>well as VC. With VB applization it works fine. But when I try to call a
+>method of that object from VC, it fails. I can't get the dispid. I use
+>following function to convert name to dispid.
+>
+>DISPID CLayoutView::NameToID( COleDispatchDriver &pDisp, TCHAR *pszName
+>)
+>{
+>    DISPID      dispid = 0;
+>    HRESULT     hr;
+>    TCHAR       szMsg[80];
+>
+>    hr = pDisp.m_lpDispatch->GetIDsOfNames( IID_NULL, (OLECHAR FAR*
+>FAR*)&pszName, 1, 
+>		m_lcid, &dispid );
+>
+>    if ( FAILED( hr ) )
+>    {
+>        wsprintf( szMsg,TEXT( "GetIDsOfNames on '%s' failed with 0x%lX"
+>), pszName, hr );
+>        AfxMessageBox( szMsg );
+>    }
+>    return dispid;
+>}
+>
+>and call it through COleDispatchDriver interface :
+>
+>	COleDispatchDriver dispDriver;
+>
+>	dispDriver.CreateDispatch( "OLEServer.Screen2" );
+>
+>	DISPID dispID = NameToID( dispDriver, "Display" ); // always falis and
+>displays error box
+>
+>	if ( dispID != -1 )
+>	{
+>		int iret;
+>		dispDriver.InvokeHelper( dispID, DISPATCH_METHOD, VT_BOOL, &iret,
+>			NULL, NULL );
+>	}
+>
+>
+>Can anyone figure out what's going wrong? 
+
+Last year I wrote a piece of code like your, and it worked.
+One week ago I recompiled it, and I found that GetIDsOfNames failed in
+looking for an exported method.
+
+I found out that GetIDsOfNames wants OLECHAR, and the only way to make it
+works is:
+
+#include <afxpriv.h>
+
+DISPID CLayoutView::NameToID( COleDispatchDriver &pDisp, const char*pszName)
+{
+>>>>>>>>>>>>>>>>>>>>>>>>>>>> begin modified
+	USES_CONVERSION;
+>>>>>>>>>>>>>>>>>>>>>>>>>>>> end modified
+
+	DISPID      dispid = 0;
+	HRESULT     hr;
+	TCHAR       szMsg[80];
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>> begin modified
+	OLECHAR* unicodeName=T2OLE(pszName);
+	hr = pDisp.m_lpDispatch->GetIDsOfNames( IID_NULL, &unnicodeName, 1,
+m_lcid, &dispid );
+>>>>>>>>>>>>>>>>>>>>>>>>>>>> end modified
+
+	if ( FAILED( hr ) )
+	{
+		wsprintf( szMsg,TEXT( "GetIDsOfNames on '%s' failed with 0x%lX"),
+pszName, hr );
+		AfxMessageBox( szMsg );
+	}
+	return dispid;
+}
+
+
+Ciao,
+
+Alberto
+
+			----------------------------
+			    |\      _,,,--,,_
+			    /,`.-'`'   ._  \-;;,_
+			   |,4-  ) )_   .;.(  `'-'
+			  '---''(_/._)-'(_\_)    
+------------------------------------------------------------------
+alby@musart.dist.unige.it is: 	Alberto Massari
+
+Universita' di Genova
+Facolta' di Ingegneria Elettronica
+Laboratorio di Informatica Musicale
+Viale F. Causa 13
+I-16100 Genova, Italia		<A HREF="http://musart.dist.unige.it/alby">http://musart.dist.unige.it/alby</A>
+------------------------------------------------------------------
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+    <A HREF="http://www.digiday.com/mfcpro/joinmfcl.htm">Become an MFC-L member</A>
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,267 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+One instance
+</B></FONT>
+<BR>
+<PRE>
+<B>
+SIT/CS -- <A HREF="mailto:tangst@nyp.ac.sg">tangst@nyp.ac.sg</A>
+Wednesday, April 03, 1996
+</B>
+
+I am working on MFC 2.5 on MS Windows 3.11
+
+I want to restrict my application to one instance only. If there is previous 
+instance exist, the previous window is activated.
+
+I read the FAQ, the answer is seem for MFC 4.0. It provides the following:
+const char * MyMainWndClassName = "MyScribble";
+BOOL CMyApp::InitApplication() {
+     ...
+     ::GetClassInfo(AfxGetInstanceHandle(), "AfxFrameOrView", &wndcls);
+     wndcls.lpszClassName = MyMainWndClassName
+     return ::RegisterClass(&wndcls);
+}
+
+I did the same thing in my application. However, the WinMain in MFC 2.5 
+ performed the following:
+int PASCAL WinMain(...)
+{
+     ...
+     // App global initializations (rare)
+     if (hPrevInstance == NULL && !AfxGetApp()->InitApplication())
+          goto InitFailure;
+     ...
+}
+
+Since hPrevInstance is not NULL, the AfxF=GetApp()->InitApplication() never 
+get executed. Therefore, the wndcls.lpszClassName does not get changed to 
+"MyScribble".
+
+In MyApp::InitInstance(), I am unable to find the window of the previous 
+instance using FindWindow(MyMainWndClassName, NULL) because 
+MyMainWndClassName is not initialized.
+
+Does anyone have a solution to restricting application to one instance in 
+MFC 2.5?
+
+Appreciate any help.
+
+Thanks
+Tang S. T.
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+David W. Gillett -- <A HREF="mailto:DGILLETT@expertedge.com">DGILLETT@expertedge.com</A>
+Thursday, April 04, 1996
+</B>
+[Mini-digest: 2 responses]
+
+> I am working on MFC 2.5 on MS Windows 3.11
+> 
+> I want to restrict my application to one instance only. If there
+> is previous instance exist, the previous window is activated. 
+
+  Absolutely the easiest way to do this is to build your app using 
+the "large" memory model and turn on the "extern and uninitialized 
+data 'far'" option.  You might, just possibly, still need to 
+specifically designate some global/static variable as 'far', but most 
+likely not.
+  What we're trying to do here is force the linker to create an 
+executable with two or more data segments.  16-bit Windows can't run 
+multiple instances of such an .EXE, and when the user tries to start 
+a second instance, Windows will instead activate the instance already 
+running and bring it to the front.  And that's what you want.
+
+  There might be some reason why you don't want to take the easy way. 
+If hPrevInstance is non-zero, you know that there's already an 
+instance running.  The problem is to activate that instance's window 
+and bring it to the foreground.
+  The documented/recommended approach is to use FindWindow().  It 
+has looked to me like it should also be possible to make it work with 
+GetInstanceData(), but I have never actually gotten that to work....
+
+  [Matt Pietrek has covered this question extensively in articles for 
+MSJ which are on the MSDN CD-ROM....]
+
+Dave
+
+-----From: "VARughese GEOrge" <vargeo@msn.com>
+
+hi,
+
+try to use this code in the beginig of InitInstace.
+
+BOOL CMyApp::InitInstance()
+{
+	
+   // Do not run the second Instance
+   HWND hFirsthWnd, hFirstChildhWnd; 
+   if (m_hPrevInstance != NULL)
+   { 
+      ::GetInstanceData(m_hPrevInstance, (unsigned char *)&FirsthWnd,2);  
+       if (hFirsthWnd )
+       {
+	hFirstChildhWnd = ::GetLastActivePopup(hFirsthWnd);
+     	::BringWindowToTop(hFirsthWnd);      // Bring main window to top.
+ 	if (hFirsthWnd != hFirstChildhWnd)
+	::BringWindowToTop(hFirstChildhWnd);//A pop-up is active so bring it to the 
+to top too.
+	return (FALSE);                // Do not run second instance.
+	}
+    }
+   // go with the first instance...
+  ......
+
+}
+
+hopw this helps
+thanx
+vargeo
+http://www.ramco.com/vargeo.htm
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Chong Zhang -- <A HREF="mailto:cz@dana.ucc.nau.edu">cz@dana.ucc.nau.edu</A>
+Friday, April 05, 1996
+</B>
+We used to have problem of making our MFC-based application multiple 
+instance one. In Win3.11, your application will be single instanced if it 
+has multiple data segment. So if you declare DATA MULTIPLE in your .DEF 
+file, it do the trick. Or you can declare some global objects, such as a 
+CString object
+  CString myGlobalText;
+then the linker will treat your application as one with multiple DATA 
+segments and your application will be single instanced.
+
+On Wed, 3 Apr 1996, Tang Siong Tiing, SIT/CS wrote:
+
+> 
+> I am working on MFC 2.5 on MS Windows 3.11
+> 
+> I want to restrict my application to one instance only. If there is previous 
+> instance exist, the previous window is activated.
+> 
+> I read the FAQ, the answer is seem for MFC 4.0. It provides the following:
+> const char * MyMainWndClassName = "MyScribble";
+> BOOL CMyApp::InitApplication() {
+>      ...
+>      ::GetClassInfo(AfxGetInstanceHandle(), "AfxFrameOrView", &wndcls);
+>      wndcls.lpszClassName = MyMainWndClassName
+>      return ::RegisterClass(&wndcls);
+> }
+> 
+> I did the same thing in my application. However, the WinMain in MFC 2.5 
+>  performed the following:
+> int PASCAL WinMain(...)
+> {
+>      ...
+>      // App global initializations (rare)
+>      if (hPrevInstance == NULL && !AfxGetApp()->InitApplication())
+>           goto InitFailure;
+>      ...
+> }
+> 
+> Since hPrevInstance is not NULL, the AfxF=GetApp()->InitApplication() never 
+> get executed. Therefore, the wndcls.lpszClassName does not get changed to 
+> "MyScribble".
+> 
+> In MyApp::InitInstance(), I am unable to find the window of the previous 
+> instance using FindWindow(MyMainWndClassName, NULL) because 
+> MyMainWndClassName is not initialized.
+> 
+> Does anyone have a solution to restricting application to one instance in 
+> MFC 2.5?
+> 
+> Appreciate any help.
+> 
+> Thanks
+> Tang S. T.
+> 
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Crucial Software -- <A HREF="mailto:crucial@ix.netcom.com">crucial@ix.netcom.com</A>
+Friday, April 05, 1996
+</B>
+
+------ =_NextPart_000_01BB23C0.F18C0900
+Content-Type: text/plain; charset="us-ascii"
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+David W. Gillett -- <A HREF="mailto:DGILLETT@expertedge.com">DGILLETT@expertedge.com</A>
+Monday, April 08, 1996
+</B>
+> >>  What we're trying to do here is force the linker to create an 
+> >> executable with two or more data segments.  16-bit Windows can't run 
+> >> multiple instances of such an .EXE, and when the user tries to start 
+> >> a second instance, Windows will instead activate the instance already 
+> >> running and bring it to the front.  And that's what you want.
+> 
+> Windows does _NOT_ do this.  If you try and run a 16-bit application with
+> multiple, writable data segments, WinExec() will fail with the appropriate
+> error code (there is one indicating this).  Program Manager displays an
+> error message box indicating the problem.
+
+  I do not get any such message from Program Manager -- I get the 
+running instance activated and brought to the front.  Same thing from 
+File Manager. 
+
+  According to MSJ's "Windows Q and A" column, 1994 - number 6, the 
+magic to activate the first instance in this case is in the 
+ShellExecute() function.  So it appears that perhaps the missing key 
+is simply to use ShellExecute() instead of calling WinExec() directly.
+
+Dave
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

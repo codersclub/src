@@ -1,0 +1,213 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+NT Service Technique
+</B></FONT>
+<BR>
+<PRE>
+<B>
+John Ferguson -- <A HREF="mailto:johnf@uvsg.com">johnf@uvsg.com</A>
+Thursday, September 05, 1996
+</B>
+Environment: VC++ 4.2 Enterprise Edition, NT 4.0
+
+Background:
+I am writing an NT service application that will run 24x7. I need some
+advice on "good practices".
+This service will connect to a SQL Server 6.x database via the MFC ODBC
+classes ( CDatabase, CRecordset, ... ). The service will run in cycles,
+with each cycle consisting of checking the DB for jobs/tasks to be done,
+doing the requested work, and going to sleep.
+
+Question:
+Is it "OK" to leave the CDatabase OPEN all the time, or should I open
+and close the connectivity in each cycle?
+If I leave it OPEN, how do I utilize the ODBC classes to ensure the
+database has not gone done between cycles?
+
+This process needs to be as efficient as possible when dealing with the
+database.
+
+for any help, I thank you in advance.
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Colin Angus Mackay -- <A HREF="mailto:colin.angus.mackay@dial.pipex.com">colin.angus.mackay@dial.pipex.com</A>
+Friday, September 06, 1996
+</B>
+[Mini-digest: 4 responses]
+
+
+> Environment: VC++ 4.2 Enterprise Edition, NT 4.0
+
+> Background:
+> This service will connect to a SQL Server 6.x database via the MFC ODBC
+> classes ( CDatabase, CRecordset, ... ). The service will run in cycles,
+> with each cycle consisting of checking the DB for jobs/tasks to be done,
+> doing the requested work, and going to sleep.
+
+> Question:
+> Is it "OK" to leave the CDatabase OPEN all the time, or should I open
+> and close the connectivity in each cycle?
+I would guess this depends on how long the sleep period is. If it is 
+relatively short then I would not close the database between cycles, 
+otherwise just close it. If the sleep period cannot be determined I would 
+set a time out in the sleep period to say that over a certain time period 
+the connection is closed.
+
+> If I leave it OPEN, how do I utilize the ODBC classes to ensure the
+> database has not gone done between cycles?
+You can call the CDatabase functions IsOpen() to determine if the data 
+source connection is open or not.
+
+> This process needs to be as efficient as possible when dealing with the
+> database.
+I think you'll have to tweek the above to see what is best for your 
+particular situation. Connecting to a data source can sometimes be time 
+consuming other times not, it really depends on your set up.
+
+> for any help, I thank you in advance.
+Just hope this helps.
+
+
+Colin Angus Mackay.
+
+-----From: Gerry Sweeney <gerry@hornbill.com>
+Environment: VC++ 4.2 Enterprise Edition, NT 4.0
+
+
+I would leave the database connected (SQLConnect) but issue a new SQL SELECT 
+statement each time you need to check for new events. I am sorry but I do 
+not know the semantics of the MFC implementation. I use intersolv libraries. 
+To make it more efficient I would have a column in the table that is set 
+FALSE for every record that needs attention. Index it, and then use this in 
+my SQL statement. For example:-
+
+"SELECT * FROM jobtable WHERE isjob = FALSE"
+
+This will return a record set that has all the new jobs. After each job you 
+can issue an SQL statement to set the flag for that job. For example:-
+
+"UPDATE jobtable SET isjob = TRUE WHERE jobnumber = 10".
+
+That's about the best I can come up with. I hope it helps.
+
+Gerry Sweeney
+Hornbill Systems Ltd.
+-----From: Mario Contestabile
+
+>I am writing an NT service application that will run 24x7. I need some
+>advice on "good practices".
+>This service will connect to a SQL Server 6.x database via the MFC ODBC
+
+Will the service be connecting to the SQL server on the _same_ machine
+(locally), or to another station?
+
+mcontest@universal.com
+
+-----From: John Ferguson <johnf@uvsg.com>
+
+it will be running on the same machine (locally).
+>
+>>I am writing an NT service application that will run 24x7. I need some
+>>advice on "good practices".
+>>This service will connect to a SQL Server 6.x database via the MFC ODBC
+>
+>Will the service be connecting to the SQL server on the _same_ machine
+>(locally), or to another station?
+>
+>mcontest@universal.com
+>
+>
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Sunday, September 08, 1996
+</B>
+At 03:52 PM 9/5/96 -0500, you wrote:
+
+>I am writing an NT service application that will run 24x7. I need some
+>advice on "good practices".
+
+Test, test, and test some more.  When you think you're done testing,
+you're not.
+
+>Is it "OK" to leave the CDatabase OPEN all the time, or should I open
+>and close the connectivity in each cycle?
+
+There's nothing wrong with that.  But you must remember that the database
+at the other end of the connection is a completely different process.
+It might start and stop, and you won't ever notice.  You should make
+sure that all of your code does tight error checking: one of the errors
+you might run into is that the database server went down
+and came back up completely.  Or, it might have decided to disconnect
+you even though it didn't go down.  You must be prepared to handle
+situations like this even if they happen right in the middle of one
+of your transactions.
+
+>If I leave it OPEN, how do I utilize the ODBC classes to ensure the
+>database has not gone done between cycles?
+
+Write a simple hartbeat query.  SELECT GETTIME() from it, or something.
+If you can do ExecuteSQL() and not get an error, you know things are
+still okay.  Or, you might just keep doign your transaction: if the
+first thing you do in your transaction returns an error, you know there's
+some problem.  You should have error checking and handling code
+on _every_ statement, not just on the first database statement in
+one of your cycles.
+
+
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

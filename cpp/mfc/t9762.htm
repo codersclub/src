@@ -1,0 +1,246 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Missing IsFirstRecord() & IsLastRecord()..
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Mihir Dalal -- <A HREF="mailto:m_dalal@ECE.concordia.CA">m_dalal@ECE.concordia.CA</A>
+Tuesday, February 25, 1997
+</B>
+
+                  Environment: MSVC 1.52, Windows 95
+
+Hi,
+
+I am developing an SDI based database enabled windows application on the 
+above mentioned platform.
+
+While writing my CMyRecordView class handlers, I need to use the 
+IsFirstRecord() & IsLastRecord() member functions frequently. It turns 
+out that these functions although documented in Visual C++ 1.52 are not 
+implemented in the source code. 
+
+Any suggestions to rectify this or any other alternate way around to 
+resolve this problem ??
+
+Mihir. 
+
+ _________________________________________________________________________
+     Mihir Dalal <m_dalal@ECE.Concordia.CA>, M.Engg. (Electrical) Student
+              Department of Electrical and Computer Engineering
+                   Concordia University, Montreal, Canada
+                <A HREF="http://www.ECE.Concordia.CA/~m_dalal/addr.html">http://www.ECE.Concordia.CA/~m_dalal/addr.html</A>
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Ray Barley -- <A HREF="mailto:barley@rdaconsultants.com">barley@rdaconsultants.com</A>
+Thursday, February 27, 1997
+</B>
+[Mini-digest: 3 responses]
+
+To find out if you're on the first or last record, call CRecordset
+GetStatus() like this:
+
+Assuming rs is a CRecordset,
+
+CRecordsetStatus s;
+rs.GetStatus(s);
+if(s.m_lCurrentRecord == 0)	// it's zero-based
+{
+  // you are on the first record
+}
+
+// To see if you're on the last record is a little more complicated
+if(s.m_bRecordCountFinal)        // mean's you hit EOF at some point
+{
+    long lCount = rs.GetRecordCount();    // how many records in
+recordset
+    if(lCount == (s.m_lCurrentRecord + 1))
+        // you are on the last record.
+}
+
+The last record test won't work if you call CRecordset MoveLast().  It
+says so in CRecordset GetRecordCount().  If it's really important to
+know whether you are on the last record, don't call CRecordset
+MoveLast(); do some sort of loop where you keep calling MoveNext() until
+you IsEOF() is TRUE.  Check the manual on GetStatus().  There are some
+other conditions you might need to be aware of.
+
+>----------
+>From: 	Mihir Dalal[SMTP:m_dalal@ECE.concordia.CA]
+>Sent: 	Tuesday, February 25, 1997 12:46 PM
+>To: 	mfc-l@netcom.com
+>Subject: 	Missing IsFirstRecord() & IsLastRecord().. 
+>
+>
+>                  Environment: MSVC 1.52, Windows 95
+>
+>Hi,
+>
+>I am developing an SDI based database enabled windows application on the 
+>above mentioned platform.
+>
+>While writing my CMyRecordView class handlers, I need to use the 
+>IsFirstRecord() & IsLastRecord() member functions frequently. It turns 
+>out that these functions although documented in Visual C++ 1.52 are not 
+>implemented in the source code. 
+>
+>Any suggestions to rectify this or any other alternate way around to 
+>resolve this problem ??
+>
+>Mihir. 
+>
+> _________________________________________________________________________
+>     Mihir Dalal <m_dalal@ECE.Concordia.CA>, M.Engg. (Electrical) Student
+>              Department of Electrical and Computer Engineering
+>                   Concordia University, Montreal, Canada
+>                <A HREF="http://www.ECE.Concordia.CA/~m_dalal/addr.html">http://www.ECE.Concordia.CA/~m_dalal/addr.html</A>
+>
+>
+>
+>
+-----From: jeremy@omsys.com (Jeremy H. Griffith)
+
+On Tue, 25 Feb 1997 12:46:44 -0500 (EST), Mihir Dalal <m_dalal@ECE.concordia.CA>
+wrote:
+>                  Environment: MSVC 1.52, Windows 95
+>
+>While writing my CMyRecordView class handlers, I need to use the 
+>IsFirstRecord() & IsLastRecord() member functions frequently. It turns 
+>out that these functions although documented in Visual C++ 1.52 are not 
+>implemented in the source code. 
+
+Try IsOnFirstRecord() and IsOnLastRecord(), which are present in DBVIEW.CPP
+in the MFC source for 1.52c, and are listed as public in AFXDB.H.
+
+This appears to be a doc error in MFC.HLP (and possibly the print docs).
+
+--Jeremy
+-----From: Shane Triem <shane@steptech.com>
+
+
+Write your own functions in a base class for your record view.
+
+BOOL CMyRecordViewBase::IsFirstRecord()
+{
+ BOOL bReturnValue = FALSE;
+ if (!IsBOF())
+ {
+  // Move back one record, check for BOF.
+  // If BOF, then you were on the first record.
+  // Make sure to move back to original record
+  // before returning.
+  MovePrev();
+  if (IsBOF())
+  {
+   bReturnValue = TRUE;
+  }
+  MoveNext();
+ }
+ return bReturnValue;
+}
+
+BOOL CMyRecordViewBase::IsLastRecord()
+{
+ BOOL bReturnValue = FALSE;
+ if (!IsEOF())
+ {
+  // Move forward one record, check for EOF.
+  // If EOF, then you were on the last record.
+  // Make sure to move back to original record
+  // before returning.
+  MoveNext();
+  if (IsEOF())
+  {
+   bReturnValue = TRUE;
+  }
+  MovePrev();
+ }
+ return bReturnValue;
+}
+
+ ----------
+From:  Mihir Dalal
+Sent:  Thursday, February 27, 1997 5:55 AM
+To:  SHANE; 'MFC-L@SMTP <mfc-l@netcom.com>'
+Subject:  Missing IsFirstRecord() & IsLastRecord()
+
+Original Subject:
+Missing IsFirstRecord() & IsLastRecord()..
+
+
+                  Environment: MSVC 1.52, Windows 95
+
+Hi,
+
+I am developing an SDI based database enabled windows application on the
+above mentioned platform.
+
+While writing my CMyRecordView class handlers, I need to use the
+IsFirstRecord() & IsLastRecord() member functions frequently. It turns
+out that these functions although documented in Visual C++ 1.52 are not
+implemented in the source code.
+
+Any suggestions to rectify this or any other alternate way around to
+resolve this problem ??
+
+Mihir.
+
+ _________________________________________________________________________  
+
+     Mihir Dalal <m_dalal@ECE.Concordia.CA>, M.Engg. (Electrical) Student
+              Department of Electrical and Computer Engineering
+                   Concordia University, Montreal, Canada
+                <A HREF="http://www.ECE.Concordia.CA/~m_dalal/addr.html">http://www.ECE.Concordia.CA/~m_dalal/addr.html</A>
+
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+    <A HREF="http://www.digiday.com/mfcpro/joinmfcl.htm">Become an MFC-L member</A>
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

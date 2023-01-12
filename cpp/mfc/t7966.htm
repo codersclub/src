@@ -1,0 +1,256 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Compound Files...
+</B></FONT>
+<BR>
+<PRE>
+<B>
+P. Senthil -- <A HREF="mailto:senthilp@geocities.com">senthilp@geocities.com</A>
+Tuesday, November 26, 1996
+</B>
+Environment: VC++ 1.52, Win 95
+
+1. I'm writing a program which uses compound files for storage. The file
+itself has only one stream and a root storage. Since the program is on a
+multiuser env. I have to open the storage in SHARE_DENY_WRITE mode. The
+other flags are READ_WRITE and DIRECT for the first time and if open
+fails READ and DIRECT. This is a valid combination according to the OLE
+2.0 documentation. But, StgOpenStorage is returning
+INVALID_FLAGCOMBINATION everytime.
+
+I've checked up Brockschmidt and Kruglinski but all samples they have
+open the root storage only as SHARE_EXCLUSIVE.
+
+2. This problem is with MFC. If I have a document class derived from
+COleDocument, the default behaviour for File|Open is: it opens the
+compound file in SHARE_EXCLUSIVE. How can I modify this behaviour
+without overriding the entire File|Open process...
+
+Thanks in advance for any help in this matter...
+
+-- 
+P. Senthil
+-----------------------------------------------------------------------
+1, 7th Avenue (West),
+7th Main Road,
+Dhandeeswaram Nagar,
+Velachery,
+MADRAS - 600 042.
+
+Mail:  senthilp@geocities.com
+
+Homepage: www.geocities.com/SiliconValley/Heights/6504
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:Slh1995@aol.com">Slh1995@aol.com</A>
+Tuesday, November 26, 1996
+</B>
+[Mini-digest: 2 responses]
+
+In a message dated 96-11-26 19:13:26 EST, P. Senthil writes:
+
+<< Environment: VC++ 1.52, Win 95
+ 
+ 1. I'm writing a program which uses compound files for storage. The file
+ itself has only one stream and a root storage. Since the program is on a
+ multiuser env. I have to open the storage in SHARE_DENY_WRITE mode. The
+ other flags are READ_WRITE and DIRECT for the first time and if open
+ fails READ and DIRECT. This is a valid combination according to the OLE
+ 2.0 documentation. But, StgOpenStorage is returning
+ INVALID_FLAGCOMBINATION everytime.
+ 
+ I've checked up Brockschmidt and Kruglinski but all samples they have
+ open the root storage only as SHARE_EXCLUSIVE.
+ 
+ 2. This problem is with MFC. If I have a document class derived from
+ COleDocument, the default behaviour for File|Open is: it opens the
+ compound file in SHARE_EXCLUSIVE. How can I modify this behaviour
+ without overriding the entire File|Open process...
+ 
+ Thanks in advance for any help in this matter... 
+ -- 
+ P. Senthil
+ Mail:  senthilp@geocities.com
+  >>
+
+For problem #1, I've used the following code:
+
+IO_RETURN_TYPE CMediamstDoc::DoOpenDocument( CString& sPathName )
+{
+    HRESULT hr;
+    const char* pszPathName = sPathName;
+    CString sErrorString  = sPathName;
+    CString sTemp;    sErrorString += " :  ";
+    ASSERT( pszPathName == NULL || AfxIsValidString( pszPathName ) );
+    BeginWaitCursor( );
+    DeleteContents( );
+    TRY
+    {
+        m_lpRootStg = NULL;               // always start new root storage
+        LPSTORAGE lpStorage;
+        DWORD flag = STGM_READ | STGM_TRANSACTED | STGM_SHARE_DENY_WRITE;
+#ifdef WIN32
+        USES_CONVERSION;
+        hr = ::StgOpenStorage( T2COLE(pszPathName), NULL, flag, 0, 0,
+&lpStorage );
+#else
+        hr = ::StgOpenStorage( pszPathName, NULL, flag, 0, 0, &lpStorage );
+#endif // WIN32
+        if ( hr != NOERROR )
+        {
+            AfxThrowOleException(hr);
+        }        
+        ASSERT(lpStorage != NULL);
+        m_lpRootStg = lpStorage;
+        LoadFromStorage( );
+        SetModifiedFlag( FALSE ); // start off with unmodified
+    }
+    CATCH( COleException, e )
+    {       
+        ...
+        return IO_OTHER_ERROR;
+    }
+    END_CATCH    
+    EndWaitCursor( );
+    return IO_NO_ERROR;
+}
+
+However, after some fairly extensive network testing, it turns out that the
+above code still causes hangups in a network environment.  If the file
+resides on a Novell server, everything is ok, but if you are running a
+Windows NT server, then only one client may access your document at a time.
+ This may because of the 2nd problem you mention (inside MFC), which I have
+not yet found a workaround to.
+-Steve Haber
+www.mindq.com
+
+-----From: Alexander Walsh <sandy@ANDYNE.COM>
+
+Ha ... what timing ... I just posted a similiar article. 
+
+Here's what we did. Basically we copied the code from
+COleDocument::OnOpenDocument() and did it ourselves ... with the
+following trick. When the first user opens the file, we grant read/write
+access to them, all subsequent users opening the file get read-only.
+
+We keep a flag around in the document to indicate this. The users are
+notified of the new state. They can still save their file, but need to
+rename it. 
+
+We are still testing it, but it seems to work on all platforms. What a
+stupid limitation and the MFC part of the stuff wasn't engineered to
+allow alterations. Oh well.
+
+Stay tuned,
+Sandy
+
+-- 
+----
+Alexander (Sandy) Walsh      | I hope I die peacefully in my sleep
+Project Lead - GQL Reports   | like my Dad ... and not screaming
+Andyne Computing Ltd         | hysterically like his passengers.
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+David Shillito -- <A HREF="mailto:David_Shillito@msn.com">David_Shillito@msn.com</A>
+Monday, December 02, 1996
+</B>
+In a message dated 96-11-26 19:13:26 EST, P. Senthil writes:
+
+<< Environment: VC++ 1.52, Win 95
+ 
+ 1. I'm writing a program which uses compound files for storage. The file
+ itself has only one stream and a root storage. Since the program is on a
+ multiuser env. I have to open the storage in SHARE_DENY_WRITE mode. The
+ other flags are READ_WRITE and DIRECT for the first time and if open
+ fails READ and DIRECT. This is a valid combination according to the OLE
+ 2.0 documentation. But, StgOpenStorage is returning
+ INVALID_FLAGCOMBINATION everytime.
+ 
+ I've checked up Brockschmidt and Kruglinski but all samples they have
+ open the root storage only as SHARE_EXCLUSIVE.
+ 
+ 2. This problem is with MFC. If I have a document class derived from
+ COleDocument, the default behaviour for File|Open is: it opens the
+ compound file in SHARE_EXCLUSIVE. How can I modify this behaviour
+ without overriding the entire File|Open process...
+ 
+ Thanks in advance for any help in this matter... 
+ -- 
+ P. Senthil
+ Mail:  senthilp@geocities.com
+  >>
+
+We found we did, indeed, need to modify the entire File|Open process.
+We needed to override both COleDocument::OnOpenDocument and 
+COleDocument::OnSaveDocument. Since these are 2 or 3 levels deep in the 
+inheritance hierarchy this meant cloning methods from their callers too such 
+as
+COleLinkingDoc::OnOpenDocument and COleServerDoc::OnOpenDocument.
+
+Our documents are partially read into memory but continue to be accessed
+as the user wanders through them. When the user saves the entire document
+is written out again.
+
+When a user opens a document we give him STGM_DIRECT |STGM_READ | 
+STGM_SHARE_DENY_WRITE access. This allows multiple users to have a
+document open simultaneously. When a users saves we write to a temporary 
+storage,
+copying, if necessary, from the storage of the still open document. When the 
+temp
+storage is completed we close it and close the original. We then attempt to 
+delete
+the original and rename the temp storage. This will fail if we were not the 
+only reader.
+The user can then choose to save under a different name or get the other 
+readers to
+close their copies of the document befirre retrying his save operation.
+
+David Shillito
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

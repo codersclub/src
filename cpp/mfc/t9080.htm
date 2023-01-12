@@ -1,0 +1,388 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+I need CSocket help please. (Questioin clarified)
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Scott Andrew -- <A HREF="mailto:sandrew@pacbell.net">sandrew@pacbell.net</A>
+Saturday, January 18, 1997
+</B>
+Environment: VC++ 4.2-flat, Win 95
+
+ 
+I have a few questions about using CSocket for syncronous usage.. 
+
+Question 1
+--------------
+I am creating an application that needs to FTP but not supply UI when
+connecting. I have overridden CSocket to give me to wrap fucntionality.
+
+I have a SendCommand function that sends a command to a server and reads
+from the socket until it's done. Then it returns TRUE or FALSE depending on
+what comes back from the server. In my SendCommand I have a Recieve and I
+need to keep reading until there is no more data to read. My current code
+looks something like this (It's just the part in question):
+
+bResult = Send(szCommand, szCommand.Length())
+
+if (bResult)
+{
+	do
+	{
+		Ioctl(FIONREAD, &dwBytes);
+
+		if (dwBytes != 0)
+		{
+			char szBuffer[1024] = "";
+			bytesRead = Recieve(szBuffer, 1024);
+
+			if (bytesRead != SOCKET_ERROR)
+				szReply += szBufer;
+			else
+				bResult = FALSE;
+		}
+	}while (bResult && dwBytes);
+}
+
+if (bResult)
+	bResult = ProcessReply(nCmd, szReply);
+
+return bResult;
+
+Becuase of the nature I really want this to be fully syncronous.. Is this
+the best way to keep reading until there is no more data if I am not using
+Asyncronous sockets?
+
+Question 2
+--------------
+What is the best way to time out on a CSocket??? Should I set up my own
+timer and then close the socket if nothing happends?? I have played with
+the WINSOCK API a little. I am being asked to do this in MFC.. I want to be
+able to time out on Recieve and Send if they are taking to long. And how do
+you detect (On a syncronous socket) when a connecion is lost?? Is it just
+when you try to do a Send or Recieve?
+
+Scott Andrew 
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Simon Coghlan -- <A HREF="mailto:coghlans@sharelink.com">coghlans@sharelink.com</A>
+Tuesday, January 21, 1997
+</B>
+Scot
+--=20
+Re Q2:
+I have written my own thin wrapper that  sits over the WinSock DLL (Ver =
+2 as well )..
+In this extension DLL I have a command that looks like :-
+CBOOL CCoreSock::SetSocketOption( CINT ciOptName, PCSTR cpszOptVal, CINT =
+ciOptLen )
+{
+;;;
+	// The Windows Sockets setsockopt function sets a socket option.
+	if ( setsockopt( m_Socket, SOL_SOCKET, ciOptName, cpszOptVal, ciOptLen =
+) =3D=3D SOCKET_ERROR )
+	{
+		Decode_Error( "SetSocketOption:setsockopt()" );
+	}
+	else=20
+;;;
+}		// End CCoreSock::SetSocketOption
+This is used to set the Timeouts like this ..
+	if ( !Get_Error_Status_Flag()
+		&& (connect( GetSocket(), (PSOCKADDR)&EndPoint_Address, sizeof( =
+EndPoint_Address ) ) =3D=3D SOCKET_ERROR)
+		)
+	{
+		Decode_Error( "Connect:connect()" );
+	}
+	else=20
+	{=09
+		if ( SetSocketOption( SO_SNDTIMEO, (char *)&iSend_TimeOut, sizeof( =
+iSend_TimeOut ) )=20
+			&& SetSocketOption( SO_RCVTIMEO, (char *)&iRecieve_TimeOut, sizeof( =
+iRecieve_TimeOut) )
+			)
+		{	// If it got his far then everything is okay
+			bReturn_Status =3D TRUE;
+			Decode_Error( "CTalkToGateway::Connect" );
+//			m_iLast_Error_Value =3D 0;
+		}
+	}
+
+connect and setsockopt are WinSock Api's that are documented.. There =
+should be an implementation that works with the classes that yoou are =
+using..
+The reason that I wrote my own wrapper, was to use the TCP stuff in a =
+console app and to get timeouts working under MFC 4.1x..
+---------
+Simon=20
+----------<- Smurf-IV ->-------------
+Tel : 0121 200 7713
+Fax : +44 (0)121 212 0379
+Email smurf-iv@sharelink.com
+Member of the 'Team of CIS' ;-)
+---------<- Fun To All ->------------
+We are what we repeatedly do, Excellence, then, is not an act, but a =
+habit.
+Aristotle
+The one who says it cannot be done, should never interrupt the one who =
+is doing it.
+The Roman Rule
+
+
+On 18 January 1997 22:12, Scott Andrew wrote:
+> Environment: VC++ 4.2-flat, Win 95
+>=20
+> =20
+> I have a few questions about using CSocket for synchronous usage..=20
+>=20
+> Question 1
+> --------------
+> I am creating an application that needs to FTP but not supply UI when
+> connecting. I have overridden CSocket to give me to wrap =
+functionality.
+>=20
+> I have a SendCommand function that sends a command to a server and =
+reads
+> from the socket until it's done. Then it returns TRUE or FALSE =
+depending on
+> what comes back from the server. In my SendCommand I have a Receive =
+and I
+> need to keep reading until there is no more data to read. My current =
+code
+> looks something like this (It's just the part in question):
+>=20
+> bResult =3D Send(szCommand, szCommand.Length())
+>=20
+> if (bResult)
+> {
+> 	do
+> 	{
+> 		Ioctl(FIONREAD, &dwBytes);
+>=20
+> 		if (dwBytes !=3D 0)
+> 		{
+> 			char szBuffer[1024] =3D "";
+> 			bytesRead =3D Recieve(szBuffer, 1024);
+>=20
+> 			if (bytesRead !=3D SOCKET_ERROR)
+> 				szReply +=3D szBufer;
+> 			else
+> 				bResult =3D FALSE;
+> 		}
+> 	}while (bResult && dwBytes);
+> }
+>=20
+> if (bResult)
+> 	bResult =3D ProcessReply(nCmd, szReply);
+>=20
+> return bResult;
+>=20
+> Becuase of the nature I really want this to be fully syncronous.. Is =
+this
+> the best way to keep reading until there is no more data if I am not =
+using
+> Asyncronous sockets?
+>=20
+> Question 2
+> --------------
+> What is the best way to time out on a CSocket??? Should I set up my =
+own
+> timer and then close the socket if nothing happends?? I have played =
+with
+> the WINSOCK API a little. I am being asked to do this in MFC.. I want =
+to be
+> able to time out on Recieve and Send if they are taking to long. And =
+how do
+> you detect (On a syncronous socket) when a connecion is lost?? Is it =
+just
+> when you try to do a Send or Recieve?
+>=20
+> Scott Andrew=20
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Simon Coghlan -- <A HREF="mailto:coghlans@sharelink.com">coghlans@sharelink.com</A>
+Tuesday, January 21, 1997
+</B>
+Scot
+--=20
+Re Q2:
+I have written my own thin wrapper that  sits over the WinSock DLL (Ver =
+2 as well )..
+In this extension DLL I have a command that looks like :-
+CBOOL CCoreSock::SetSocketOption( CINT ciOptName, PCSTR cpszOptVal, CINT =
+ciOptLen )
+{
+;;;
+	// The Windows Sockets setsockopt function sets a socket option.
+	if ( setsockopt( m_Socket, SOL_SOCKET, ciOptName, cpszOptVal, ciOptLen =
+) =3D=3D SOCKET_ERROR )
+	{
+		Decode_Error( "SetSocketOption:setsockopt()" );
+	}
+	else=20
+;;;
+}		// End CCoreSock::SetSocketOption
+This is used to set the Timeouts like this ..
+	if ( !Get_Error_Status_Flag()
+		&& (connect( GetSocket(), (PSOCKADDR)&EndPoint_Address, sizeof( =
+EndPoint_Address ) ) =3D=3D SOCKET_ERROR)
+		)
+	{
+		Decode_Error( "Connect:connect()" );
+	}
+	else=20
+	{=09
+		if ( SetSocketOption( SO_SNDTIMEO, (char *)&iSend_TimeOut, sizeof( =
+iSend_TimeOut ) )=20
+			&& SetSocketOption( SO_RCVTIMEO, (char *)&iRecieve_TimeOut, sizeof( =
+iRecieve_TimeOut) )
+			)
+		{	// If it got his far then everything is okay
+			bReturn_Status =3D TRUE;
+			Decode_Error( "CTalkToGateway::Connect" );
+//			m_iLast_Error_Value =3D 0;
+		}
+	}
+
+connect and setsockopt are WinSock Api's that are documented.. There =
+should be an implementation that works with the classes that yoou are =
+using..
+The reason that I wrote my own wrapper, was to use the TCP stuff in a =
+console app and to get timeouts working under MFC 4.1x..
+---------
+Simon=20
+----------<- Smurf-IV ->-------------
+Tel : 0121 200 7713
+Fax : +44 (0)121 212 0379
+Email smurf-iv@sharelink.com
+Member of the 'Team of CIS' ;-)
+---------<- Fun To All ->------------
+We are what we repeatedly do, Excellence, then, is not an act, but a =
+habit.
+Aristotle
+The one who says it cannot be done, should never interrupt the one who =
+is doing it.
+The Roman Rule
+
+
+On 18 January 1997 22:12, Scott Andrew wrote:
+> Environment: VC++ 4.2-flat, Win 95
+>=20
+> =20
+> I have a few questions about using CSocket for synchronous usage..=20
+>=20
+> Question 1
+> --------------
+> I am creating an application that needs to FTP but not supply UI when
+> connecting. I have overridden CSocket to give me to wrap =
+functionality.
+>=20
+> I have a SendCommand function that sends a command to a server and =
+reads
+> from the socket until it's done. Then it returns TRUE or FALSE =
+depending on
+> what comes back from the server. In my SendCommand I have a Receive =
+and I
+> need to keep reading until there is no more data to read. My current =
+code
+> looks something like this (It's just the part in question):
+>=20
+> bResult =3D Send(szCommand, szCommand.Length())
+>=20
+> if (bResult)
+> {
+> 	do
+> 	{
+> 		Ioctl(FIONREAD, &dwBytes);
+>=20
+> 		if (dwBytes !=3D 0)
+> 		{
+> 			char szBuffer[1024] =3D "";
+> 			bytesRead =3D Recieve(szBuffer, 1024);
+>=20
+> 			if (bytesRead !=3D SOCKET_ERROR)
+> 				szReply +=3D szBufer;
+> 			else
+> 				bResult =3D FALSE;
+> 		}
+> 	}while (bResult && dwBytes);
+> }
+>=20
+> if (bResult)
+> 	bResult =3D ProcessReply(nCmd, szReply);
+>=20
+> return bResult;
+>=20
+> Becuase of the nature I really want this to be fully syncronous.. Is =
+this
+> the best way to keep reading until there is no more data if I am not =
+using
+> Asyncronous sockets?
+>=20
+> Question 2
+> --------------
+> What is the best way to time out on a CSocket??? Should I set up my =
+own
+> timer and then close the socket if nothing happends?? I have played =
+with
+> the WINSOCK API a little. I am being asked to do this in MFC.. I want =
+to be
+> able to time out on Recieve and Send if they are taking to long. And =
+how do
+> you detect (On a syncronous socket) when a connecion is lost?? Is it =
+just
+> when you try to do a Send or Recieve?
+>=20
+> Scott Andrew=20
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

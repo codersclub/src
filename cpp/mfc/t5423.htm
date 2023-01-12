@@ -1,0 +1,728 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Dynamic Modeless Property Sheet
+</B></FONT>
+<BR>
+<PRE>
+<B>
+GoroKhM1 -- <A HREF="mailto:gorokhm1@SMTP.ATG-NET.COM">gorokhm1@SMTP.ATG-NET.COM</A>
+Thursday, June 06, 1996
+</B>
+     Subject: Dynamic Modeless Property Sheet
+     
+     Platform: VC++ 4.0 / Win 95
+     Keywords: Property Sheet, Modeless
+     
+     Problem: How to remove all pages and add new set of pages in modeless 
+     Property Sheet without passing focus to it?
+     
+     The model of the task is the following. I have two kinds of objects in 
+     the screen: Text and Shape. The user may select any object or not to 
+     have selection at all. Modeless Property Sheet should behave similar 
+     to Developer Studio's.
+     
+     Here is a scheme of my code based on PROPDLG sample.
+     
+     class CMyPropertySheet: public CPropertySheet {
+     // class CMyPropertySheet is similar to class // 
+     CModelessShapePropSheet in PROPDLG sample.
+     // Property Sheet is placed in mini frame window and // activated in 
+     CMyApp::InitInstance()
+     ...
+     enum { ObjUnknown, ObjText, ObjShape };
+     
+     void OnChangeObject(int iObType);
+     
+     CMyPage0 m_Page0; // "No selection"
+     CMyPage1 m_Page1; // Text: Edit Box
+     CMyPage2 m_Page2; // Text: Font Size & Color
+     CMyPage3 m_Page3; // Shape: Style (Rectangle, Ellipse, etc.) CMyPage4 
+     m_Page4; // Shape: Size & Color
+     ...
+     }
+     
+     // Called each time the user change selected object. void 
+     CMyPropertySheet:: OnChangeObject(int iObType) {
+     // Delete all pages
+     while ( GetPageCount() > 0 )
+     RemovePage(0);  // Problem #1. _Sometimes_ already removed
+     // page receives notification message from // its control (radio 
+     button). Immediate
+     // consequence is assertion from MFC because // hWnd == NULL. It 
+     occurs even if no changes // were made in the page.
+     
+     // Insert new pages
+     switch (iObType)
+     {
+     case ObjUnknown:
+     AddPage(&m_Page0);
+     // Nothing to load
+     break;
+     case ObjText:
+     AddPage(&m_Page1);   
+     m_Page1.LoadData(); // Load text string into page variable for 
+     // selected text object. Don't call
+     // UpdateData(FALSE) because page's 
+     // hWnd == NULL. Similar for all
+     // statements like m_PageN.LoadData(). 
+     AddPage(&m_Page2);   
+     m_Page2.LoadData(); // Load font size & color ... break;
+     case ObjShape:
+     AddPage(&m_Page3);   
+     m_Page3.LoadData(); // ...
+     AddPage(&m_Page4);   
+     m_Page4.LoadData(); // ...
+     break;
+     }
+     
+     // Problem #2. What to do next to actually create page window and // 
+     UpdateData(FALSE) in it without setting focus to that page?
+     //
+     // 1. return;
+     //    If exit from the function immediately, the page will remain //   
+      gray without any activated controls in it because the page //    
+     window isn't created.
+     // 
+     // 2. GetTabControl()->SetCurSel(0); //    The same.
+     //
+     // 3. SetActivePage(0);
+     //    This function send message PSM_SETCURSEL. The window for //    
+     activated page is created, framework calls 
+     //    CMyPageN::OnSetActive() and everything works fine. The only //   
+      problem is the focus set to the active page. If the user is //    
+     navigating through the objects, the Property Sheet should //    
+     reflect user's choice but not to grab focus. Switch focus 
+     //    back to the selected object is not the best solution because //  
+       of blinking.
+     }
+     
+     I investigated property sheets in PROPDLG sample and in Developer 
+     Studio with the SPY++.  Property Sheets looks similar but they are 
+     completely different.  There is the following windows hierarchy in the 
+     PROPDLG sample: Frame -> PropSheet -> TabControl -> PropPage -> 
+     Controls. Developer Studio's property sheet has the hierarchy: Frame 
+     -> PropPage -> Controls.  It looks as TabControl but in reality is 
+     not.  Initially there are three not visible and not active pages: 
+     "Multiple selection," "No selection," and "No properties available."  
+     These pages have no caption.  How to code this?  Dialog Editor, e.g., 
+     shows tabs "General," "Style," "More Styles," and "Extended Styles."  
+     Only "General" page from that list is loaded and active, but the rest 
+     part of tab pages are not included in the property sheet at all!  
+     After deactivation the page will remain in the property sheet until 
+     Developer Studio session exit (?).  If the next page is activated, it 
+     is included and becomes visible.  Thus, the list of tab captions and 
+     the list of pages in the property sheet are two separate lists.  How 
+     to code this? 
+     
+     I have no strong experience with OLE. Will it help with its 
+     COlePropertyPage?
+     
+     If you have any ideas, please help.
+     
+     Mark.
+     
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+GoroKhM1 -- <A HREF="mailto:gorokhm1@SMTP.ATG-NET.COM">gorokhm1@SMTP.ATG-NET.COM</A>
+Monday, June 10, 1996
+</B>
+     
+
+
+     Subject: Dynamic Modeless Property Sheet
+     
+     Platform: VC++ 4.0 / Win 95
+     Keywords: Property Sheet, Modeless
+     
+     Problem: How to remove all pages and add new set of pages in modeless 
+     Property Sheet without passing focus to it?
+     
+     The model of the task is the following. I have two kinds of objects in 
+     the screen: Text and Shape. The user may select any object or not to 
+     have selection at all. Modeless Property Sheet should behave similar 
+     to Developer Studio's.
+     
+     Here is a scheme of my code based on PROPDLG sample.
+     
+     class CMyPropertySheet: public CPropertySheet 
+     { 
+         // class CMyPropertySheet is similar to class 
+         // CModelessShapePropSheet in PROPDLG sample.
+         // Property Sheet is placed in mini frame window and 
+         // activated in CMyApp::InitInstance()
+         ...
+         enum { ObjUnknown, ObjText, ObjShape };
+     
+         void OnChangeObject(int iObType);
+     
+         CMyPage0 m_Page0; // "No selection"
+         CMyPage1 m_Page1; // Text: Edit Box
+         CMyPage2 m_Page2; // Text: Font Size & Color
+         CMyPage3 m_Page3; // Shape: Style (Rectangle, Ellipse, etc.) 
+         CMyPage4 m_Page4; // Shape: Size & Color
+         ...
+     }
+     
+     // Called each time the user change selected object. 
+     void CMyPropertySheet:: OnChangeObject(int iObType) 
+     {
+         // Delete all pages
+         while ( GetPageCount() > 0 )
+             RemovePage(0);  
+         // Problem #1. _Sometimes_ already removed 
+         // page receives notification message from 
+         // its control (radio button). Immediate
+         // consequence is assertion from MFC because 
+         // hWnd == NULL. It occurs even if no changes 
+         // were made in the page. Have I to 
+         // DestroyWindow() before RemovePage()?
+     
+         // Insert new pages
+         switch (iObType)
+         {
+             case ObjUnknown:
+                 AddPage(&m_Page0);
+                 // Nothing to load
+                 break;
+             case ObjText:
+                 AddPage(&m_Page1);   
+                 m_Page1.LoadData(); // Load text string into page variable
+                                     // for selected text object. Don't
+                                     // call UpdateData(FALSE) because
+                                     // page's hWnd == NULL. Similar for
+                                     // all statements like 
+                                     // m_PageN.LoadData().
+                 AddPage(&m_Page2);   
+                 m_Page2.LoadData(); // Load font size & color ... 
+                 break;
+             case ObjShape:
+                 AddPage(&m_Page3);   
+                 m_Page3.LoadData(); // ...
+                 AddPage(&m_Page4);   
+                 m_Page4.LoadData(); // ...
+                 break;
+         }
+     
+     // Problem #2. What to do next to actually create page window and 
+     // UpdateData(FALSE) in it without setting focus to that page?
+     //
+     // 1. return;
+     //    If exit from the function immediately, the page will remain 
+     //    gray without any activated controls in it because the page 
+     //    window isn't created.
+     // 
+     // 2. GetTabControl()->SetCurSel(0); 
+     //    The same. 
+     //
+     // 3. SetActivePage(0);
+     //    This function send message PSM_SETCURSEL. The window for 
+     //    activated page is created, framework calls 
+     //    CMyPageN::OnSetActive() and everything works fine. The only 
+     //    problem is the focus set to the active page. If the user is 
+     //    navigating through the objects, the Property Sheet should 
+     //    reflect user's choice but not to grab focus. Switch focus 
+     //    back to the selected object is not the best solution because 
+     //    of blinking.
+     //
+     // 4. May be GetPage(0)->Create(...) ?
+     }
+     
+     I investigated property sheets in PROPDLG sample and in Developer 
+     Studio with the SPY++.  Property Sheets looks similar but they are 
+     completely different.  There is the following windows hierarchy in the 
+     PROPDLG sample: Frame -> PropSheet -> TabControl -> PropPage -> 
+     Controls. Developer Studio's property sheet has the hierarchy: Frame 
+     -> PropPage -> Controls.  It looks as TabControl but in reality is 
+     not.  Initially there are three not visible and not active pages: 
+     "Multiple selection," "No selection," and "No properties available."  
+     These pages have no caption.  How to code this?  Dialog Editor, e.g., 
+     shows tabs "General," "Style," "More Styles," and "Extended Styles."  
+     Only "General" page from that list is loaded and active, but the rest 
+     part of tab pages are not included in the property sheet at all!  
+     After deactivation the page will remain in the property sheet until 
+     Developer Studio session exit (?).  If the next page is activated, it 
+     is included and becomes visible.  Thus, the list of tab captions and 
+     the list of pages in the property sheet are two separate lists.  How 
+     to code this? 
+     
+     If you have any ideas, please help.
+     
+     Mark.
+     
+     
+
+Received: from relay1.smtp.psi.net by SMTP.ATG-NET.COM (SMTPLINK V2.11 PreRelease 4)
+    ; Mon, 10 Jun 96 12:23:31 PST
+Return-Path: <gorokhm1@SMTP.ATG-NET.COM>
+Received: from SMTP.ATG-NET.COM by relay1.smtp.psi.net (8.6.12/SMI-5.4-PSI)
+    id MAA25279; Mon, 10 Jun 1996 12:23:26 -0400
+Received: from ccMail by SMTP.ATG-NET.COM (SMTPLINK V2.11 PreRelease 4)
+    id AA834434605; Mon, 10 Jun 96 12:19:41 PST
+Date: Mon, 10 Jun 96 12:19:41 PST
+From: "GoroKhM1" <gorokhm1@SMTP.ATG-NET.COM>
+Message-Id: <9605108344.AA834434605@SMTP.ATG-NET.COM>
+To: gorokhm1@atg-net.com
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Roger Onslow -- <A HREF="mailto:Roger_Onslow@compsys.com.au">Roger_Onslow@compsys.com.au</A>
+Tuesday, June 11, 1996
+</B>
+[Mini-digest: 2 responses]
+
+>     Subject: Dynamic Modeless Property Sheet
+>     
+>     Platform: VC++ 4.0 / Win 95
+>     Keywords: Property Sheet, Modeless
+>     
+>     Problem: How to remove all pages and add new set of pages in modeless 
+>     Property Sheet without passing focus to it?
+>     
+>     The model of the task is the following. I have two kinds of objects in 
+>     the screen: Text and Shape. The user may select any object or not to 
+>     have selection at all. Modeless Property Sheet should behave similar 
+>     to Developer Studio's.
+
+We do similar things in our app (with lots of different  object type).
+
+We have a modeless property sheet (or property inspector as Win32
+guidelines calls them).  We dynamically change the pages depending
+on what object is highlighted, and changes in the pages are reflected
+dynamically as they are mde (no OK or Apply button).
+
+We also have a "No Selection" page (but also don't know how to
+remove the tab when only one page there...)
+
+When type of object selected changes, we first Add the "No Selection"
+page (for want of something better) remove all other pages, add the
+new pages and then remove the "No Selection" page.  This stops
+the assert (CPropertySheet insists on having at least one page).
+
+Recently, I've made this smoother by passing a list of required
+pages, and then selectively adding/removing pages from the
+sheet as appropriate.  This way, if there are any common pages
+they remain on the sheet, and if active, they remain active.
+For example, several of our object types have a colour page.
+If we have the colour page visible, and change the selection from
+one type of object to another, the colour page remains visible
+and its contents change to reflect the new object.  This makes
+it easy to compare the properties of different types of objects
+that share the same pages.
+
+I don't think we have this "focus-shifting" problem (or if we do, the
+focus shift isn't a problem for us), s oI'm afraid I can't help too
+much here.
+
+If desired I can post some source for our PropertyPage and
+PropertySheet classes.
+
+Roger
+
+
+-----From: "GoroKhM1" <gorokhm1@SMTP.ATG-NET.COM>
+
+     Hi Roger,
+     
+     I fought without any success with tab for "No selection" page too. 
+     
+     If there are no property pages added to the property sheet while 
+     CPropertySheet constuctor works, you have MFC assertion.
+     There are no assertion if all of them are removed later.
+     
+     I tried your method to add "No selection" page, remove the rest pages, 
+     add new set of pages, and remove "No selection" page. The result 
+     wasn't
+     positive. _Sometimes_ I had message OnChange() from radio button in 
+     removed page even if no changes where made. Possibly I have a bug in
+     addition to PropertySheet/PropertyPage problems. Your experience is
+     important to me, it proves that page change should work.
+     
+     My first variant of code was close to your selective add/remove 
+     method. 
+     When selected object is changed, and new object has the same type as 
+     previous, I update only data and leave all set of pages unchanged. I 
+     have 
+     my own assertion in the program, so I notice, that new object receives
+     message OnChange() from radio button control with values associated
+     with previous object. I significantly simplified my program with 
+     add/remove
+     pages for each object, even if the type of new object is the same.
+     
+     How do you activate a page after new set of pages is added? Do you 
+     know
+     methods other then SetActivePage()?
+     
+     How do you prevent blinking while pages add/remove? I tried 
+     SetRedraw() 
+     and it works fine.
+     
+     Thank for you readiness to post your PropertySheet and PropertyPage 
+     classes.
+     I'd appreciate it.
+     
+     Mark.
+     
+     ===================================
+     Something wrong with my cc:Mail, so I'm not sure that your received 
+     correct version of e-mail with proper lines. Please find below my 
+     original
+     e-mail text.
+     ===================================
+     
+     Subject: Dynamic Modeless Property Sheet
+          
+     Platform: VC++ 4.0 / Win 95
+     Keywords: Property Sheet, Modeless
+     
+     Problem: How to remove all pages and add new set of pages in modeless 
+     Property Sheet without passing focus to it?
+          
+     The model of the task is the following. I have two kinds of objects in 
+     the screen: Text and Shape. The user may select any object or not to 
+     have selection at all. Modeless Property Sheet should behave similar 
+     to Developer Studio's.
+          
+     Here is a scheme of my code based on PROPDLG sample.
+          
+     class CMyPropertySheet: public CPropertySheet 
+     { 
+         // class CMyPropertySheet is similar to class 
+         // CModelessShapePropSheet in PROPDLG sample.
+         // Property Sheet is placed in mini frame window and 
+         // activated in CMyApp::InitInstance()
+         ...
+         enum { ObjUnknown, ObjText, ObjShape };
+     
+         void OnChangeObject(int iObType);
+     
+         CMyPage0 m_Page0; // "No selection"
+         CMyPage1 m_Page1; // Text: Edit Box
+         CMyPage2 m_Page2; // Text: Font Size & Color
+         CMyPage3 m_Page3; // Shape: Style (Rectangle, Ellipse, etc.) 
+         CMyPage4 m_Page4; // Shape: Size & Color
+         ...
+     }
+     
+     // Called each time the user change selected object. 
+     void CMyPropertySheet:: OnChangeObject(int iObType) 
+     {
+         // Delete all pages
+         while ( GetPageCount() > 0 )
+             RemovePage(0);  
+         // Problem #1. _Sometimes_ already removed 
+         // page receives notification message from 
+         // its control (radio button). Immediate
+         // consequence is assertion from MFC because 
+         // hWnd == NULL. It occurs even if no changes 
+         // were made in the page. Have I to 
+         // DestroyWindow() before RemovePage()?
+     
+         // Insert new pages
+         switch (iObType)
+         {
+             case ObjUnknown:
+                 AddPage(&m_Page0);
+                 // Nothing to load
+                 break;
+             case ObjText:
+                 AddPage(&m_Page1);   
+                 m_Page1.LoadData(); // Load text string into page variable
+                                     // for selected text object. Don't
+                                     // call UpdateData(FALSE) because
+                                     // page's hWnd == NULL. Similar for
+                                     // all statements like 
+                                     // m_PageN.LoadData().
+                 AddPage(&m_Page2);   
+                 m_Page2.LoadData(); // Load font size & color ... 
+                 break;
+             case ObjShape:
+                 AddPage(&m_Page3);   
+                 m_Page3.LoadData(); // ...
+                 AddPage(&m_Page4);   
+                 m_Page4.LoadData(); // ...
+                 break;
+         }
+     
+     // Problem #2. What to do next to actually create page window and 
+     // UpdateData(FALSE) in it without setting focus to that page?
+     //
+     // 1. return;
+     //    If exit from the function immediately, the page will remain 
+     //    gray without any activated controls in it because the page 
+     //    window isn't created.
+     // 
+     // 2. GetTabControl()->SetCurSel(0); 
+     //    The same. 
+     //
+     // 3. SetActivePage(0);
+     //    This function send message PSM_SETCURSEL. The window for 
+     //    activated page is created, framework calls 
+     //    CMyPageN::OnSetActive() and everything works fine. The only 
+     //    problem is the focus set to the active page. If the user is 
+     //    navigating through the objects, the Property Sheet should 
+     //    reflect user's choice but not to grab focus. Switch focus 
+     //    back to the selected object is not the best solution because 
+     //    of blinking.
+     //
+     // 4. May be GetPage(0)->Create(...) ? 
+     }
+     
+     I investigated property sheets in PROPDLG sample and in Developer 
+     Studio with the SPY++.  Property Sheets looks similar but they are 
+     completely different.  There is the following windows hierarchy in the 
+     PROPDLG sample: Frame -> PropSheet -> TabControl -> PropPage -> 
+     Controls. Developer Studio's property sheet has the hierarchy: Frame 
+     -> PropPage -> Controls.  It looks as TabControl but in reality is 
+     not.  Initially there are three not visible and not active pages: 
+     "Multiple selection," "No selection," and "No properties available."  
+     These pages have no caption.  How to code this?  Dialog Editor, e.g., 
+     shows tabs "General," "Style," "More Styles," and "Extended Styles."  
+     Only "General" page from that list is loaded and active, but the rest 
+     part of tab pages are not included in the property sheet at all!  
+     After deactivation the page will remain in the property sheet until 
+     Developer Studio session exit (?).  If the next page is activated, it 
+     is included and becomes visible.  Thus, the list of tab captions and 
+     the list of pages in the property sheet are two separate lists.  How 
+     to code this? 
+     
+     If you have any ideas, please help.
+     
+     Mark.
+      
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Roger Onslow -- <A HREF="mailto:Roger_Onslow@compsys.com.au">Roger_Onslow@compsys.com.au</A>
+Wednesday, June 12, 1996
+</B>
+[Mini-digest: 2 responses]
+
+Mark,
+
+> I fought without any success with tab for "No selection" page too. 
+
+Thanks for getting me to look at this area again...
+In a flash of inspiration I workd out how to do it
+I've now posted a solution to the 'No Selection" problem.
+     
+>If there are no property pages added to the property sheet while 
+>CPropertySheet constuctor works, you have MFC assertion.
+>There are no assertion if all of them are removed later.
+     
+Sorry, a bum steer here...
+
+The problem about needing to have at least one page
+once the property sheet window was created seems to
+have disappeared in MFC4 probably because MFC4
+uses the Win32 property sheet/page support rather
+than simulating it in code (like it still does for 16bit 1.52).
+
+I've now retried a simple example and can successfully
+remove all pages from a modeless property sheet just
+fine.
+
+The workaround I suggested (and had coded myselft
+some time ago) is now not required (ie adding a dummy
+property page while adding/removing real pages).
+
+...
+
+I'll try to respond to your other problems ASAP, but I'm
+afraid my boss insists that I actually do some work
+here every so often, so it might take a day or so for  me
+to get back to it.
+
+Hope the method for "No Selection" page keeps you
+smiling ....
+
+
+Roger
+
+
+-----From: "GoroKhM1" <gorokhm1@SMTP.ATG-NET.COM>
+
+     Possibly the solution to prevent Property Sheet flashing 
+     after default set focus to page in SetActivePage(..) and 
+     set focus back to selected object is in playing with 
+     OnSetFocus(). Although it promises additional headache. 
+     How to tell when SetFocus() is desirable and when isn't?
+     
+     It will be interesting to know why Property Dialog Box in 
+     Developer Studio VC++ 4.x doesn't use SysTabControl32? If 
+     Property Dialog Box was born before tab control, it's OK. 
+     Otherwise it means I cannot reproduce such a behavior with 
+     MFC CPropertySheet based on tab control.
+     
+     A discussion in a thread "Tabs Controls vs CPropertySheet" 
+     in April 96 was very useful. CPropertySheet is fine if you
+     may use it "as is." If you find yourself fighting with
+     defaults, it's better to write your own tabbed dialog and
+     have a control over everything.
+     
+     Mark
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Roger Onslow -- <A HREF="mailto:Roger_Onslow@compsys.com.au">Roger_Onslow@compsys.com.au</A>
+Friday, June 14, 1996
+</B>
+>Problem: How to remove all pages and add new set of pages in modeless 
+>Property Sheet without passing focus to it?
+
+Simply save/restore the focus before/after updating changes
+This is how I do it...
+  
+void CMyPropertySheet::EnsureHavePages() {
+ // only update if we need to
+ if (! m_bNeedsUpdate) return;
+ m_bNeedsUpdate = FALSE;
+ // remember focus and resotre when finished
+ CWnd* pOldFocus = NULL;
+ if (GetSafeHwnd()) pOldFocus = CWnd::GetFocus();
+ // make sure sheet and required list match up
+ EnsurePagesInListAreInSheet();
+ EnsurePagesInSheetAreInList();
+ // restore focus
+ if (GetSafeHwnd() && pOldFocus) pOldFocus->SetFocus();
+}
+
+NOTE: m_bNeedsUpdate
+  - is my "dirty" flag that indicates a change
+  to set of pages is required.
+ EnsurePagesInSheetAreInList() and
+ EnsurePagesInListAreInPage()
+  - do the removing and adding of pages
+
+Hope this helps
+
+Roger Onslow
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+GoroKhM1 -- <A HREF="mailto:gorokhm1@SMTP.ATG-NET.COM">gorokhm1@SMTP.ATG-NET.COM</A>
+Friday, June 14, 1996
+</B>
+     Problem: How to remove all pages and add new set of pages in modeless 
+     Property Sheet without passing focus to it?
+     
+     You wrote:
+     
+     >Simply save/restore the focus before/after updating changes
+     >This is how I do it...
+     
+     >void CMyPropertySheet::EnsureHavePages() {
+     > // only update if we need to
+     > if (! m_bNeedsUpdate) return;
+     > m_bNeedsUpdate = FALSE;
+     > // remember focus and resotre when finished
+     > CWnd* pOldFocus = NULL;
+     > if (GetSafeHwnd()) pOldFocus = CWnd::GetFocus();
+     > // make sure sheet and required list match up
+     > EnsurePagesInListAreInSheet();
+     > EnsurePagesInSheetAreInList();
+     > // restore focus
+     > if (GetSafeHwnd() && pOldFocus) pOldFocus->SetFocus();
+     >}
+     >
+     >NOTE: m_bNeedsUpdate
+     >  - is my "dirty" flag that indicates a change
+     >  to set of pages is required.
+     > EnsurePagesInSheetAreInList() and
+     > EnsurePagesInListAreInPage()
+     >  - do the removing and adding of pages
+     >
+     >Hope this helps
+     >
+     
+     It helps to return focus to previously focused object but 
+     doesn't prevent windows flashing. 
+     
+     I have two windows: CMyMainFrame with views with all objects 
+     and CMyMiniFrame with property sheet. It's close to the sample
+     PROPDLG. When user works in CMyMainFrame and changes object 
+     selection, the capture bars colors are: CMyMainFrame - blue, 
+     CMyMiniFrame - grey. Colors show that focus is somewhere in 
+     CMyMainFrame.
+     
+     1. Side effect after method CPropertySheet::RemovePage(..) is 
+     focus in CMyMiniFrame.
+     
+     2. CPropertySheet::AddPage(..) doesn't actually activate page and 
+     doesn't create its window with controls. Activation is produced 
+     by CPropertySheet::SetActivePage(..). And again the side effect 
+     is focus in CMyMiniFrame.
+     
+     If focus is in CMyMiniFrame its capture bar becomes blue, and 
+     CMyMainFrame becomes grey. No problem to return focus back, but
+     capture bars are flashing:
+     
+     CMyMainFrame: blue - grey - blue
+     CMyMiniFrame: grey - blue - grey
+     
+     How to prevent this? How to prevent passing focus to property 
+     sheet while RemovePage(..) and SetActivePage(..)? That was the
+     original question in the beginning of the thread.
+     
+     Mark
+     
+     
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,271 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Status bars.
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Colin Angus Mackay -- <A HREF="mailto:colin.angus.mackay@dial.pipex.com">colin.angus.mackay@dial.pipex.com</A>
+Wednesday, December 04, 1996
+</B>
+Environment: VC++ 4.1, Win 95, Win NT 3.51
+
+I have used the Component Gallery to create panes for the status bar, I
+now want to replace one of them (The date one) with a pane that contains
+a drawing (not a bitmap).
+
+How do I draw what I want into that particular pane?
+
+Thanks,
+Colin Angus Mackay
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dicky Singh -- <A HREF="mailto:Dicky@landmark.com">Dicky@landmark.com</A>
+Friday, December 06, 1996
+</B>
+[Mini-digest: 4 responses]
+
+You want to make the pane in question owner draw, use SetPaneInfo(...,SBPS_OWNERDRAW|..., ...)
+
+derive a class from CStatusBar and add virtual fn: DrawItem(LPDRAWITEMSTRUCT);
+
+Help does not list DrawItem(LPDRAWITEMSTRUCT); to be an overridable, see
+<msdevpath>\mfc\include\afxext.h
+
+----------
+From: 	Colin Angus Mackay[SMTP:colin.angus.mackay@dial.pipex.com]
+Sent: 	Wednesday, December 04, 1996 4:43 a
+To: 	Microsoft Foundation Class List
+Subject: 	Status bars.
+
+Environment: VC++ 4.1, Win 95, Win NT 3.51
+
+I have used the Component Gallery to create panes for the status bar, I
+now want to replace one of them (The date one) with a pane that contains
+a drawing (not a bitmap).
+
+How do I draw what I want into that particular pane?
+
+Thanks,
+Colin Angus Mackay
+
+
+
+--------------------
+Dicky Singh, Dicky@Landmark.COM
+Dragon Team. Landmark Systems Inc.
+8000 Towers Crescent, Vienna VA 22182
+-----From: Ian Pepper <Ian@flexicom.ie>
+
+There's and example on the MSDN CD that show's how to render a bitmap
+into a status bar pane.  Search for Q149407 in the KB. For completeness:
+
+Step-by-Step Example and Sample Code
+------------------------------------
+ 
+1. Derive a class from CStatusBar (for example, CMyStatusBar), and use
+this
+   class instead of CStatusBar in CMainFrame.
+ 
+2. Add the following member functions to the class definition in the .h
+   file:
+ 
+   class CMyStatusBar : public CStatusBar
+   {
+   ...
+   #if _MFC_VER < 0x400
+       virtual void DoPaint(CDC* pDC);
+   #endif
+ 
+   #if _MFC_VER >= 0x400
+       virtual void DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct);
+   #endif
+   ...
+   }
+ 
+3. Add the following code for the functions in the .cpp file:
+ 
+   #if _MFC_VER < 0x400
+   void CMyStatusBar::DoPaint(CDC* pDC)
+   {
+       CRect rect;
+       GetItemRect(1, &rect);  // get pane rect
+       pDC->ExcludeClipRect(&rect);  // exclude pane rect from paint
+       CStatusBar::DoPaint(pDC);  // paint remainder of status bar
+ 
+       CRgn paneRgn;
+       paneRgn.CreateRectRgnIndirect(rect);
+       pDC->SelectClipRgn(&paneRgn); // set clip region to pane rect
+ 
+       CBitmap* pBitmap = /* pointer to current CBitmap */;
+       CDC srcDC; // select current bitmap into a compatible CDC
+       srcDC.CreateCompatibleDC(NULL);
+       CBitmap* pOldBitmap = srcDC.SelectObject(pBitmap);
+       pDC->BitBlt(rect.left, rect.top, rect.Width(), rect.Height(),
+                 &srcDC, 0, 0, SRCCOPY); // BitBlt to pane rect
+       srcDC.SelectObject(pOldBitmap);
+   }
+   #endif
+ 
+   #if _MFC_VER >= 0x400
+   void CMyStatusBar::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
+   {
+       switch(lpDrawItemStruct->itemID)
+       {
+       case 1:
+           // Attach to a CDC object
+           CDC dc;
+           dc.Attach(lpDrawItemStruct->hDC);
+ 
+           // Get the pane rectangle and calculate text coordinates
+           CRect rect(&lpDrawItemStruct->rcItem);
+ 
+           CBitmap* pBitmap = /* pointer to current CBitmap */;
+           CDC srcDC; // select current bitmap into a compatible CDC
+           srcDC.CreateCompatibleDC(NULL);
+           CBitmap* pOldBitmap = srcDC.SelectObject(pBitmap);
+           dc.BitBlt(rect.left, rect.top, rect.Width(), rect.Height(),
+                     &srcDC, 0, 0, SRCCOPY); // BitBlt to pane rect
+           srcDC.SelectObject(pOldBitmap);
+ 
+           // Detach from the CDC object, otherwise the hDC will be
+           // destroyed when the CDC object goes out of scope
+           dc.Detach();
+ 
+           return;
+       }
+ 
+       CStatusBar::DrawItem(lpDrawItemStruct);
+   }
+   #endif
+ 
+4. Add the following code to CMainFrame::OnCreate().
+ 
+   int CMainFrame::OnCreate(LPCREATESTRUCT lpCreateStruct)
+   {
+   ...
+       if (!m_wndStatusBar.Create(this) ||
+           !m_wndStatusBar.SetIndicators(indicators,
+             sizeof(indicators)/sizeof(UINT)))
+ 
+           TRACE0("Failed to create status bar\n");
+           return -1;      // fail to create
+       }
+ 
+   // Add the following code
+   #if _MFC_VER >= 0x400
+       UINT nID, nStyle;
+       int cxWidth;
+ 
+       m_wndStatusBar.GetPaneInfo(1, nID, nStyle, cxWidth);
+       m_wndStatusBar.SetPaneInfo(1, nID, nStyle | SBT_OWNERDRAW,
+           cxWidth);
+   #endif
+   ...
+   }
+ 
+Cheers,
+
+Ian
+ian@flexicom.ie
+
+
+>
+-----From: Dean Grimm <dean@la.cortron.com>
+
+The following works for me:
+1) Subclass CStatusBar
+2) In your new class, override the DrawItem member function (this is where your drawing occurs)
+3) Change your mainframe class so it uses your status bar
+4) in mainframe->OnCreate, after you create the status bar, add 
+    myStatusBar.SetPaneInfo(...) with SBT_OWNERDRAW added
+
+Hope this helps,
+Dean Grimm                         Software Engineer / Cortron Corp.
+
+----------
+From: 	Colin Angus Mackay
+Sent: 	Wednesday, December 04, 1996 1:43 AM
+To: 	Microsoft Foundation Class List
+Subject: 	Status bars.
+
+Environment: VC++ 4.1, Win 95, Win NT 3.51
+
+I have used the Component Gallery to create panes for the status bar, I
+now want to replace one of them (The date one) with a pane that contains
+a drawing (not a bitmap).
+
+How do I draw what I want into that particular pane?
+
+Thanks,
+Colin Angus Mackay
+-----From: Joe willmann <joew@mdhost.cse.tek.com>
+
+1. Make your own CMyStatusBar class derived from CStatusBar
+2. In OnCreate() call GetStatusBarCtrl() to get the underling control rhen
+call ctrl->SetText(,,SBT_OWNERDRAWM) to make the pane an ownwe drawn control.
+3.  In DrawItem() check the pDS->itemId to see if it is yours.  If so draw!
+
+
+At 09:43 AM 12/4/96 +0000, you wrote:
+>Environment: VC++ 4.1, Win 95, Win NT 3.51
+>
+>I have used the Component Gallery to create panes for the status bar, I
+>now want to replace one of them (The date one) with a pane that contains
+>a drawing (not a bitmap).
+>
+>How do I draw what I want into that particular pane?
+>
+>Thanks,
+>Colin Angus Mackay
+>
+>
+
+Joe Willmann
+My opinions are my own, not Tektronix, or anyone elses for that matter!
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,359 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+TrackPopup and CmdUI
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Timothy D. A. Cox -- <A HREF="mailto:tcox@io.org">tcox@io.org</A>
+Friday, January 05, 1996
+</B>
+Hi,
+
+I would like my popup menu to use the same 'update UI' handlers
+that the corresponding my CView menu uses. How does one trap the
+'update UI' messages when using a popup menu? Can I use my existing
+handlers somehow?
+
+TIA 
+
+Timothy D. A. Cox
+TDAC Software Inc.                  Good, Cheap, Fast.
+e-mail: tcox@io.org                    
+URL: http://www.io.org/~tcox            pick two!
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mathias Olausson -- <A HREF="mailto:mo@tripnet.se">mo@tripnet.se</A>
+Sunday, January 07, 1996
+</B>
+>I would like my popup menu to use the same 'update UI' handlers
+>that the corresponding my CView menu uses. How does one trap the
+>'update UI' messages when using a popup menu? Can I use my existing
+>handlers somehow?
+
+If you have the same values (id's) on both the view and the popup menu items
+then the updating can be mapped to and handled by the same UI-handler=
+ function.
+
+// Mathias Olausson
+/////////////////////////////////////////////////////
+// Mathias Olausson        Internet: mo@tripnet.se //
+// Sankt Pauligatan 11                             //
+// S-416 60  G=F6teborg                              //
+// SWEDEN                                          //
+/////////////////////////////////////////////////////
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Josef Haslinger -- <A HREF="mailto:jhasling@gascad.co.at">jhasling@gascad.co.at</A>
+Tuesday, January 09, 1996
+</B>
+Hi tcox,
+
+> I would like my popup menu to use the same 'update UI' handlers
+> that the corresponding my CView menu uses. How does one trap the
+> 'update UI' messages when using a popup menu? Can I use my existing
+> handlers somehow?
+>
+
+
+I had the same problem when e created a context menu.
+The entries in my context menu have the same menu ids
+as other entries in the mainframes menu.
+
+First i tried CWnd::OnInitMenuPopup(...) but that did
+not work.
+
+So I implemented my own InitMenuPoput which gets called
+before TrackPopupMenu.
+
+And here's the source code:
+
+void MyView::InitMenuPopup(CMenu* pMenu )
+{
+  if( pMenu == NULL)
+      return;
+
+  CmdUI state;
+  state.m_pMenu     = pMenu;
+  state.m_pSubMenu  = NULL;
+  state.m_nIndexMax = pMenu->GetMenuItemCount();
+  for( state.m_nIndex = 0;
+       state.m_nIndex < state.m_nIndexMax;
+       state.m_nIndex++) {
+    state.m_nID = pMenu->GetMenuItemID(state.m_nIndex);
+    // menu separator or invalid cmd - ignore it
+    if( state.m_nID == 0 )
+      continue;
+
+    // if it's a popup menu, do a recursve InitMenuPopup call
+    if( state.m_nID == (UINT)-1) {
+      InitMenuPopup( pMenu->GetSubMenu(state.m_nIndex));
+    }
+    else {
+      // normal menu item
+      state.DoUpdate(this, state.m_nID < 0xF000);
+    }
+  }
+}
+
+If there is a better way, than writing my own InitMenuPopup
+function, please let me know.
+
+Joe Haslinger
+jhasling@gascad.co.at
+
+## CrossPoint v3.02 ##
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Joseph Koral -- <A HREF="mailto:jkoral@ftp.com">jkoral@ftp.com</A>
+Tuesday, January 16, 1996
+</B>
+[Mini-digest: 2 responses]
+
+> I would like my popup menu to use the same 'update UI' handlers
+> that the corresponding my CView menu uses. How does one trap the
+> 'update UI' messages when using a popup menu? Can I use my existing
+> handlers somehow?
+
+>> If there is a better way, than writing my own InitMenuPopup
+>> function, please let me know.
+
+Why don't you just make the parent of your popup menu the frame window?
+
+The frame window will route both the UI update handlers and the eventual =
+command message to the active view before trying your CMainFrame and =
+application object.  (Refer to CFrameWnd::OnCmdMsg in winfrm.cpp).
+
+Besides, don't you get the added benefit of menu hint text in the status =
+bar if the parent of the menu is the frame?  A quick glance at the =
+source reveals no WM_MENUSELECT handler in CView (there is one however =
+in CFrameWnd).
+
+If you really need to make the parent of the popup menu the view, you =
+could duplicate some of this work in your view to get the same effect =
+(like implementing an CMyView::OnInitPopupMenu).  But you should be able =
+to get all this for free.  I implement multiple popup menus originating =
+from multiple views, and the UI update handlers and command messages all =
+get routed correctly, not to mention they display hint text.
+
+Joe
+
+-----From: Ken Freeman <kfreeman@viewlogic.com>
+
+> If there is a better way, than writing my own InitMenuPopup
+> function, please let me know.
+
+There sure is.  Just make sure that you pass the frame window
+to TrackPopupWindow as its pWnd parameter and not the view.
+
+As a side benefit, you'll also get the status bar correctly updated
+as well.
+
+Ken
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Albert Szilvasy -- <A HREF="mailto:szilvasy@almos.vein.hu">szilvasy@almos.vein.hu</A>
+Wednesday, January 17, 1996
+</B>
+On  9 Jan 96 at 9:34, Josef Haslinger wrote:
+
+> Hi tcox,
+> 
+> > I would like my popup menu to use the same 'update UI' handlers
+> > that the corresponding my CView menu uses. How does one trap the
+> > 'update UI' messages when using a popup menu? Can I use my existing
+> > handlers somehow?
+> >
+> 
+> 
+> I had the same problem when e created a context menu.
+> The entries in my context menu have the same menu ids
+> as other entries in the mainframes menu.
+> 
+> First i tried CWnd::OnInitMenuPopup(...) but that did
+> not work.
+> 
+> So I implemented my own InitMenuPoput which gets called
+> before TrackPopupMenu.
+> 
+> And here's the source code:
+> 
+> void MyView::InitMenuPopup(CMenu* pMenu )
+> {
+>   if( pMenu == NULL)
+>       return;
+> 
+>   CmdUI state;
+>   state.m_pMenu     = pMenu;
+>   state.m_pSubMenu  = NULL;
+>   state.m_nIndexMax = pMenu->GetMenuItemCount();
+>   for( state.m_nIndex = 0;
+>        state.m_nIndex < state.m_nIndexMax;
+>        state.m_nIndex++) {
+>     state.m_nID = pMenu->GetMenuItemID(state.m_nIndex);
+>     // menu separator or invalid cmd - ignore it
+>     if( state.m_nID == 0 )
+>       continue;
+> 
+>     // if it's a popup menu, do a recursve InitMenuPopup call
+>     if( state.m_nID == (UINT)-1) {
+>       InitMenuPopup( pMenu->GetSubMenu(state.m_nIndex));
+>     }
+>     else {
+>       // normal menu item
+>       state.DoUpdate(this, state.m_nID < 0xF000);
+>     }
+>   }
+> }
+> 
+> If there is a better way, than writing my own InitMenuPopup
+> function, please let me know.
+> 
+> Joe Haslinger
+> jhasling@gascad.co.at
+> 
+I guess the problem is that you contextmenu is displayed by the view. 
+It should be popped up by the CFrameWnd derived class owning the view 
+and then your CmdUI and command handlers would work fine.
+
+Cheers,
+Albert
+--
+UofV,Hungary
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Veeraraghavan -- <A HREF="mailto:veera@hiso.honeywell.soft.net">veera@hiso.honeywell.soft.net</A>
+Tuesday, January 23, 1996
+</B>
+Hi
+
+	In TrackPopup API use AfxGetMainWnd() to pass the mainframe 
+window pointer instead of this pointer(view pointer) thereby mainframe 
+window will own the popup instead of the view.
+
+On Wed, 17 Jan 1996, Albert Szilvasy wrote:
+
+> On  9 Jan 96 at 9:34, Josef Haslinger wrote:
+> 
+> > Hi tcox,
+> > 
+> > > I would like my popup menu to use the same 'update UI' handlers
+> > > that the corresponding my CView menu uses. How does one trap the
+> > > 'update UI' messages when using a popup menu? Can I use my existing
+> > > handlers somehow?
+> > >
+> > 
+> > 
+> > I had the same problem when e created a context menu.
+> > The entries in my context menu have the same menu ids
+> > as other entries in the mainframes menu.
+> > 
+> > First i tried CWnd::OnInitMenuPopup(...) but that did
+> > not work.
+> > 
+> > So I implemented my own InitMenuPoput which gets called
+> > before TrackPopupMenu.
+> > 
+> > And here's the source code:
+> > 
+> > void MyView::InitMenuPopup(CMenu* pMenu )
+> > {
+> >   if( pMenu == NULL)
+> >       return;
+> > 
+> >   CmdUI state;
+> >   state.m_pMenu     = pMenu;
+> >   state.m_pSubMenu  = NULL;
+> >   state.m_nIndexMax = pMenu->GetMenuItemCount();
+> >   for( state.m_nIndex = 0;
+> >        state.m_nIndex < state.m_nIndexMax;
+> >        state.m_nIndex++) {
+> >     state.m_nID = pMenu->GetMenuItemID(state.m_nIndex);
+> >     // menu separator or invalid cmd - ignore it
+> >     if( state.m_nID == 0 )
+> >       continue;
+> > 
+> >     // if it's a popup menu, do a recursve InitMenuPopup call
+> >     if( state.m_nID == (UINT)-1) {
+> >       InitMenuPopup( pMenu->GetSubMenu(state.m_nIndex));
+> >     }
+> >     else {
+> >       // normal menu item
+> >       state.DoUpdate(this, state.m_nID < 0xF000);
+> >     }
+> >   }
+> > }
+> > 
+> > If there is a better way, than writing my own InitMenuPopup
+> > function, please let me know.
+> > 
+> > Joe Haslinger
+> > jhasling@gascad.co.at
+> > 
+> I guess the problem is that you contextmenu is displayed by the view. 
+> It should be popped up by the CFrameWnd derived class owning the view 
+> and then your CmdUI and command handlers would work fine.
+> 
+> Cheers,
+> Albert
+> --
+> UofV,Hungary
+> 
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

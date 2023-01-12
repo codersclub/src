@@ -1,0 +1,383 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+PreCreateWindow problems.
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Derek F. Groft - UTL -- <A HREF="mailto:derek.groft@utiligent.com">derek.groft@utiligent.com</A>
+Thursday, January 02, 1997
+</B>
+Environment:  VC++4.2b, NT4.0
+
+I have a CEdit derived class, CMyEdit, which in order to work properly,
+should always have certain styles set.  I want these styles to work even if
+the users create the edit control in the resource editor without these
+styles.  My first thought was to override PreCreateWindow as such:
+
+BOOL CMyEdit::PreCreateWindow(CREATESTRUCT& cs) 
+{
+	cs.style | = ES_MULTILINE | ES_RIGHT;
+	return CEdit::PreCreateWindow(cs);
+}
+
+Whether or not I have actually coded the PreCreateWindow correctly is
+irrelevant at this point.  My real problem is that this function does not
+seem to get called at all.  When I place a breakpoint in this function, it
+never stops there.  I have several other functions in CMyEdit which do get
+called, (e.g. OnChar), so I feel that the basic setup of the class is OK.
+
+I have seen several examples for using PreCreateWindow and they all were
+either for SDI or MDI applications.  My application is CDialog based. 
+Could this the problem?  Is there something else I need to do to get
+PreCreateWindow called?  
+
+Is there a better way to guarantee the appropriate style flags are always
+set for a CMyEdit object?
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Thursday, January 02, 1997
+</B>
+[Mini-digest: 2 responses]
+
+At 13:56 1/2/97 -0600, Derek F. Groft - UTL wrote:
+
+>Is there something else I need to do to get
+>PreCreateWindow called?  
+
+PreCreateWindow() is only called for windows which are created by MFC.
+If your control exists on a dialog template, MFC doesn't create it--it
+only creates the dialog template.  Windows takes care of implicitly creating
+the control and all of the other controls on the template.  Windows doesn't
+call PreCreateWindow() in MFC while doing this.
+
+>Is there a better way to guarantee the appropriate style flags are always
+>set for a CMyEdit object?
+
+You could set up your class to check the style bits on the window it
+was being attached to by using GetWindowStyle().  If the style bits you
+need are there, you could just keep going.  If they're not, I guess
+you have two choices: you could ASSERT(FALSE) so that the application
+stops and the developer knows there's a problem.
+
+Or, you could have your code memorize the state of the window,
+destroy the window, recreate it with the proper style bits, and then
+recreate the state of the window.
+
+While the second method sounds slicker, the first method is really
+preferred since the second method is very slow and could cause glitchy
+painting.  The ASSERT draws the developer's attention to the mistake
+they made and they fix it and everything's right again.
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+I'm afraid I've become some sort of speed freak.
+These words are my own. I do not speak on behalf of Microsoft.
+
+-----From: Ian Pepper <Ian@flexicom.ie>
+
+Derek,
+
+I don't believe PreCreateWindow is called for contols.  Instead you must
+use the API function SetWindowLong to alter the style bits, after the
+control is created e.g. in OnInitDialog.  Try
+
+	SetWindowLong(pMyEditInstance->m_hWnd, 
+			GWL_STYLE, 
+			GetWindowLong(pMyEditInstance->m_hWnd, 
+					GWL_STYLE) | ES_MULTILINE | ES_RIGHT);
+
+This should point you in the right direction.
+
+Ian
+ian@flexicom.ie
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Claus Michelsen -- <A HREF="mailto:cmi@cri.dk">cmi@cri.dk</A>
+Friday, January 03, 1997
+</B>
+[Mini-digest: 3 responses]
+
+Hi Derek,
+
+I assume that you use DDX_Control to attach a CMyEdit object to your edit
+control in the dialog. If you do that you should override the
+PreSubclassWindow function and alter the style there. This is the
+appropirate place since you are not creating the control but rather
+subclassing it. PreCreateWindow is only called if you create the control by
+e.g. calling Create.
+
+Best Regards,
+Claus Michelsen
+Software Engineer
+Computer Resources Internation A/S, Denmark
+
+-----From: Stuart Downing <sdowning@fame.com>
+
+PreCreateWindow is only called for windows that are created by
+MFC (or your calls to Create(Ex)).  The controls in a dialog 
+are created by code within Windows, not MFC.
+Override PreSubclassWindow.  The HNWD will have already been 
+attached to your CWnd derived window (but not yet subclassed).
+In your override, you can call ModifyStyle to change the
+window styles.
+-----
+Stuart Downing						David, thanks for the squishy wallpaper! 
+sdowning@fame.com
+FAME Information Services, Inc.
+
+----------
+From:  Derek F. Groft - UTL[SMTP:derek.groft@utiligent.com]
+Sent:  Thursday, January 02, 1997 2:57 PM
+To:  mfc-l@netcom.com
+Subject:  PreCreateWindow problems.
+
+Environment:  VC++4.2b, NT4.0
+
+I have a CEdit derived class, CMyEdit, which in order to work properly,
+should always have certain styles set.  I want these styles to work even if
+the users create the edit control in the resource editor without these
+styles.  My first thought was to override PreCreateWindow as such:
+
+BOOL CMyEdit::PreCreateWindow(CREATESTRUCT& cs) 
+{
+	cs.style | = ES_MULTILINE | ES_RIGHT;
+	return CEdit::PreCreateWindow(cs);
+}
+
+Whether or not I have actually coded the PreCreateWindow correctly is
+irrelevant at this point.  My real problem is that this function does not
+seem to get called at all.  When I place a breakpoint in this function, it
+never stops there.  I have several other functions in CMyEdit which do get
+called, (e.g. OnChar), so I feel that the basic setup of the class is OK.
+
+I have seen several examples for using PreCreateWindow and they all were
+either for SDI or MDI applications.  My application is CDialog based. 
+Could this the problem?  Is there something else I need to do to get
+PreCreateWindow called?  
+
+Is there a better way to guarantee the appropriate style flags are always
+set for a CMyEdit object?
+
+
+-----From: hou@tfn.com (Bing Hou)
+
+     The PreCreateWindow method is NOT a virtual member of the CEdit class, 
+     therefore your overide is never called.
+     
+     Provide a Crate method for your CMyEdit class, in which you force to create
+     an edit control with the style you desire.
+
+     -Bing
+
+______________________________ Reply Separator _________________________________
+Subject: PreCreateWindow problems.
+Author:  derek.groft@utiligent.com (Derek F. Groft - UTL) at Internet
+Date:    1/2/97 1:56 PM
+
+
+Environment:  VC++4.2b, NT4.0
+     
+I have a CEdit derived class, CMyEdit, which in order to work properly, 
+should always have certain styles set.  I want these styles to work even if 
+the users create the edit control in the resource editor without these 
+styles.  My first thought was to override PreCreateWindow as such:
+     
+BOOL CMyEdit::PreCreateWindow(CREATESTRUCT& cs) 
+{
+        cs.style | = ES_MULTILINE | ES_RIGHT; 
+        return CEdit::PreCreateWindow(cs);
+}
+     
+Whether or not I have actually coded the PreCreateWindow correctly is 
+irrelevant at this point.  My real problem is that this function does not 
+seem to get called at all.  When I place a breakpoint in this function, it 
+never stops there.  I have several other functions in CMyEdit which do get 
+called, (e.g. OnChar), so I feel that the basic setup of the class is OK.
+     
+I have seen several examples for using PreCreateWindow and they all were 
+either for SDI or MDI applications.  My application is CDialog based. 
+Could this the problem?  Is there something else I need to do to get 
+PreCreateWindow called?  
+     
+Is there a better way to guarantee the appropriate style flags are always 
+set for a CMyEdit object?
+     
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Derek F. Groft - UTL -- <A HREF="mailto:derek.groft@utiligent.com">derek.groft@utiligent.com</A>
+Wednesday, January 08, 1997
+</B>
+This is great information, thanks to all who answered this posting. 
+However, it forces me to ask another question.  Perhaps my confusion is a
+result of never having programmed Windows applications prior to becoming an
+MFC programmer, so I'm not sure if this is an MFC question or really just a
+generic Windows question.
+
+In the response below Mike says, basically, that MFC does not call
+PreCreateWindow() on a control that exists on a dialog template.  What
+other functions (generally) do not get called or do not work?
+
+For example, I have tried to use SetWindowPos() on a control that exists on
+a dialog template and it doesn't seem to do anything.  Is this a function
+that will not work on a control created like this?  
+
+In general, what class of functions can I call and how will I know?  I
+suppose the reason PreCreateWindow() documentation does not say "This
+function will not be called for a control created in the resource editor."
+is because it is fundamental knowledge that everyone should just know. 
+Where is the best place for me to get an understanding of this?
+
+Thanks again,
+
+Derek
+
+
+----------
+> From: Mike Blaszczak <mikeblas@nwlink.com>
+> To: mfc-l@netcom.com
+> Subject: Re: PreCreateWindow problems.
+> Date: Friday, January 03, 1997 12:57 AM
+> 
+> [Mini-digest: 2 responses]
+> 
+> At 13:56 1/2/97 -0600, Derek F. Groft - UTL wrote:
+> 
+> >Is there something else I need to do to get
+> >PreCreateWindow called?  
+> 
+> PreCreateWindow() is only called for windows which are created by MFC.
+> If your control exists on a dialog template, MFC doesn't create it--it
+> only creates the dialog template.  Windows takes care of implicitly
+creating
+> the control and all of the other controls on the template.  Windows
+doesn't
+> call PreCreateWindow() in MFC while doing this.
+> 
+> >Is there a better way to guarantee the appropriate style flags are
+always
+> >set for a CMyEdit object?
+> 
+> You could set up your class to check the style bits on the window it
+> was being attached to by using GetWindowStyle().  If the style bits you
+> need are there, you could just keep going.  If they're not, I guess
+> you have two choices: you could ASSERT(FALSE) so that the application
+> stops and the developer knows there's a problem.
+> 
+> Or, you could have your code memorize the state of the window,
+> destroy the window, recreate it with the proper style bits, and then
+> recreate the state of the window.
+> 
+> While the second method sounds slicker, the first method is really
+> preferred since the second method is very slow and could cause glitchy
+> painting.  The ASSERT draws the developer's attention to the mistake
+> they made and they fix it and everything's right again.
+> 
+> .B ekiM
+> <A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+> I'm afraid I've become some sort of speed freak.
+> These words are my own. I do not speak on behalf of Microsoft.
+> 
+> -----From: Ian Pepper <Ian@flexicom.ie>
+> 
+> Derek,
+> 
+> I don't believe PreCreateWindow is called for contols.  Instead you must
+> use the API function SetWindowLong to alter the style bits, after the
+> control is created e.g. in OnInitDialog.  Try
+> 
+> 	SetWindowLong(pMyEditInstance->m_hWnd, 
+> 			GWL_STYLE, 
+> 			GetWindowLong(pMyEditInstance->m_hWnd, 
+> 					GWL_STYLE) | ES_MULTILINE | ES_RIGHT);
+> 
+> This should point you in the right direction.
+> 
+> Ian
+> ian@flexicom.ie
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Stuart Downing -- <A HREF="mailto:sdowning@fame.com">sdowning@fame.com</A>
+Friday, January 10, 1997
+</B>
+There's no simple answer to your questions.  Windows and MFC are
+rich environments that don't have a shallow learning curve.  The
+same kind of questions you have about MFC's interaction with 
+child controls in a dialog will come up in MANY other areas.
+Some things you can do are...
+* Read the MFC encyclopedia articles for background instruction
+on MFC architecture and functionality
+* Read the Tech Notes for in-depth descriptions of implementation
+details
+* MFC provides a cushion, but doesn't completely shield you from
+knowing API-level details.  When exploring new territory, try to 
+learn at least a little about what's happening at the API level,
+and what MFC is doing for you, which leads to...
+* Read the MFC source code.  For me this typically means tracing into
+MFC functions under the debugger and seeing how they work.
+* Monitor relevant newsgroups and mailing lists like this one to
+learn from those who know more than you (and I) do.
+-----
+Stuart Downing
+sdowning@fame.com
+FAME Information Services, Inc.
+
+----------
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,332 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Thread Message Map error
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Ed Rapoport -- <A HREF="mailto:ehud@advn.com">ehud@advn.com</A>
+Thursday, December 21, 1995
+</B>
+Hi,
+
+I'm trying to use PostThreadMessage(.) in MFC environment, but cannot insert
+the message in the message map. I get compile error "error C2642: cast to
+pointer to member must be from related pointer to member". Any ideas ?
+
+I'm using VC++ 4.0.  My application has many threads. The thread class is
+derived from CWinThread. I added new sub and put messages in the maps as
+shown in the following segments:
+
+=====> .h file
+(note:  I also tried LRESULT and LPARAM instead of LONG and WPARAM for UINT)
+. . . . 
+// Implementation
+public:
+	// Generated message map functions
+	//{{AFX_MSG(CSocketThread)
+	//}}AFX_MSG
+	afx_msg LONG PrepareToSend(UINT wParam, LONG lParam); <====== the error
+
+	DECLARE_MESSAGE_MAP()
+
+====> .cpp file
+(note:  the message number is temporary for testing)
+
+IMPLEMENT_DYNAMIC(CSocketThread, CWinThread)
+
+BEGIN_MESSAGE_MAP(CSocketThread, CWinThread)
+	//{{AFX_MSG_MAP(CSocketThread)
+	//}}AFX_MSG_MAP
+	ON_MESSAGE(WM_USER+1995,  PrepareToSend)
+END_MESSAGE_MAP()
+
+. . . . . . .
+LONG CSocketThread::PrepareToSend(UINT wParam, LONG lParam)
+{
+	::MessageBeep(MB_OK);	//ER122095
+	return 0;
+}
+. . . . .
+
+Thanks,
+Ed
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@msn.com">mikeblas@msn.com</A>
+Saturday, December 23, 1995
+</B>
+You can't use message maps in non CWnd-derived objects. I've fixed this for a 
+future version of MFC, but until that's released I think you'll need to rely 
+on overriding PreTranslateMessage() for your CWinThread.
+
+.B ekiM
+----------
+From: 	owner-mfc-l@netcom.com on behalf of Ed Rapoport
+Sent: 	Thursday, December 21, 1995 13:49
+To: 	mfc-l@netcom.com
+Subject: 	Thread Message Map error
+
+Hi,
+
+I'm trying to use PostThreadMessage(.) in MFC environment, but cannot insert
+the message in the message map. I get compile error "error C2642: cast to
+pointer to member must be from related pointer to member". Any ideas ?
+
+I'm using VC++ 4.0.  My application has many threads. The thread class is
+derived from CWinThread. I added new sub and put messages in the maps as
+shown in the following segments:
+
+=====> .h file
+(note:  I also tried LRESULT and LPARAM instead of LONG and WPARAM for UINT)
+. . . . 
+// Implementation
+public:
+	// Generated message map functions
+	//{{AFX_MSG(CSocketThread)
+	//}}AFX_MSG
+	afx_msg LONG PrepareToSend(UINT wParam, LONG lParam); <====== the error
+
+	DECLARE_MESSAGE_MAP()
+
+====> .cpp file
+(note:  the message number is temporary for testing)
+
+IMPLEMENT_DYNAMIC(CSocketThread, CWinThread)
+
+BEGIN_MESSAGE_MAP(CSocketThread, CWinThread)
+	//{{AFX_MSG_MAP(CSocketThread)
+	//}}AFX_MSG_MAP
+	ON_MESSAGE(WM_USER+1995,  PrepareToSend)
+END_MESSAGE_MAP()
+
+. . . . . . .
+LONG CSocketThread::PrepareToSend(UINT wParam, LONG lParam)
+{
+	::MessageBeep(MB_OK);	//ER122095
+	return 0;
+}
+. . . . .
+
+Thanks,
+Ed
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Ken Freeman -- <A HREF="mailto:kfreeman@viewlogic.com">kfreeman@viewlogic.com</A>
+Tuesday, December 26, 1995
+</B>
+Mike Blaszczak wrote:
+> 
+> You can't use message maps in non CWnd-derived objects. I've fixed this for a
+> future version of MFC, but until that's released I think you'll need to rely
+> on overriding PreTranslateMessage() for your CWinThread.
+> 
+
+Mike, what about other classes derived from CCmdTarget, such as CDocument?
+
+Ken
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@msn.com">mikeblas@msn.com</A>
+Thursday, December 28, 1995
+</B>
+Err, sorry, I sort of misspoke.
+
+You can use message maps in any CCmdTarget-derived class.  You can add 
+handlers in those message maps for command messages in any CCmdTarget-derived 
+class. You can't add generic message handlers for any class not derived from 
+CWnd.
+
+That is, ON_COMMAND_MESSAGE() will work in CCmdTarget and anything below it.  
+ON_MESSAGE() (or specialized versions of it, like ON_WM_PAINT()) will only 
+work in CWnd-derived classes.  ON_COMMAND_MESSAGE() is usable in a message map 
+for a CWinThread, but ON_MESSAGE() won't work in a message map attached to a 
+CWinThread.
+
+You should try to find the time to read the definitions for these macros in 
+the headers. There's a pointer to a member function cast in there that's part 
+of the trouble. The other problem is that MFC's message pump ignores thread 
+messages.
+
+I checked, and this is fixed for MFC 4.2.  I guess you should expect MFC 4.2 
+in June or July if Microsoft keeps shipping updates every four months (that 
+is, if I don't go postal and wipe out everybody in the cafeteria one fine 
+day).
+
+.B ekiM
+TCHAR szDisclaimer[] = _T("These words are my own; I do not speak for 
+Microsoft.")
+
+----------
+From: 	owner-mfc-l@netcom.com on behalf of Ken Freeman
+Sent: 	Tuesday, December 26, 1995 07:46
+To: 	mfc-l@netcom.com
+Subject: 	Re: Thread Message Map error
+
+Mike Blaszczak wrote:
+> 
+> You can't use message maps in non CWnd-derived objects. I've fixed this for 
+a
+> future version of MFC, but until that's released I think you'll need to rely
+> on overriding PreTranslateMessage() for your CWinThread.
+> 
+
+Mike, what about other classes derived from CCmdTarget, such as CDocument?
+
+Ken
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Stephen Keeler -- <A HREF="mailto:keelers@igs.net">keelers@igs.net</A>
+Thursday, December 28, 1995
+</B>
+> Err, sorry, I sort of misspoke.
+> 
+[  clipped a couple paragraphs... ]
+> 
+> You should try to find the time to read the definitions for these
+> macros in the headers. There's a pointer to a member function cast
+> in there that's part of the trouble. The other problem is that MFC's
+> message pump ignores thread messages.
+> 
+
+What I'd love to see is better macro documentation in the help files, 
+books online, etc.
+
+[ more stuff clipped... ]
+> 
+> .B ekiM
+> TCHAR szDisclaimer[] = _T("These words are my own; I do not speak
+> for Microsoft.")
+> 
+
+Regards,
+
+Stephen Keeler
+On-Line Systems Inc.
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Stephan
+Wednesday, January 03, 1996
+</B>
+
+Ed:
+
+Your problem is that only CWnd-derived objects can receive messages, so you 
+can not do an ON_MESSAGE() inside a class which does not have CWnd in its 
+parent heirarchy.  This should make intuitive sense:  only windows can 
+receive Window messages, after all.
+
+The completely unintuitive "cast to pointer to member must be from related 
+pointer to member" is the result of the expansion of your PrepareToSend 
+function name within the ON_MESSAGE macro;  it wants the function to be a 
+member of a CWnd class (ie, CWnd::PrepareToSend(UINT, LONG)), but in your 
+case, it does not, so the type cast fails.
+
+
+Good luck,
+Stephan!
+ ----------
+I'm trying to use PostThreadMessage(.) in MFC environment, but cannot insert
+the message in the message map. I get compile error "error C2642: cast to
+pointer to member must be from related pointer to member". Any ideas ?
+
+I'm using VC++ 4.0.  My application has many threads. The thread class is
+derived from CWinThread. I added new sub and put messages in the maps as
+shown in the following segments:
+
+=====> .h file
+(note:  I also tried LRESULT and LPARAM instead of LONG and WPARAM for UINT)
+. . . .
+// Implementation
+public:
+     // Generated message map functions
+     //{{AFX_MSG(CSocketThread)
+     //}}AFX_MSG
+     afx_msg LONG PrepareToSend(UINT wParam, LONG lParam); <====== the error
+
+     DECLARE_MESSAGE_MAP()
+
+====> .cpp file
+(note:  the message number is temporary for testing)
+
+IMPLEMENT_DYNAMIC(CSocketThread, CWinThread)
+
+BEGIN_MESSAGE_MAP(CSocketThread, CWinThread)
+     //{{AFX_MSG_MAP(CSocketThread)
+     //}}AFX_MSG_MAP
+     ON_MESSAGE(WM_USER+1995,  PrepareToSend)
+END_MESSAGE_MAP()
+
+. . . . . . .
+LONG CSocketThread::PrepareToSend(UINT wParam, LONG lParam)
+{
+     ::MessageBeep(MB_OK);    //ER122095
+     return 0;
+}
+. . . . .
+
+Thanks,
+Ed
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

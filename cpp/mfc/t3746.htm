@@ -1,0 +1,299 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Static CSplitterWnd focus problem
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Michel Robert -- <A HREF="mailto:michero@login.net">michero@login.net</A>
+Wednesday, January 31, 1996
+</B>
+ClassWizzard, Doc/View, 16bits
+
+        The static splitter contains two columns, one row.  The 'main' view
+is derived from CFormView and the other one from CView.  If I follow a
+'natural' path by creating the CFormView derived pane in the first column
+all is well.
+        But if I want the CView derived pane in the first column with the
+CFormView pane in the second column (for reasons not worth exposing here)
+then I have to set the focus manually to the CFormView pane so that the user
+can start entering data without mouse-clicking (a legitimate requirement).
+        But no matter how I set the focus, the Print option of the File menu
+is disabled and *stays* disabled until the user does a mouse-click.
+        Now this is a data entry form and it is normal to expect that the
+user will not mouse-click at all.  Furthermore, the same problem happens
+with the Edit menu: all options stay disabled until a first mouse-click (the
+handlers work fine after that).  
+
+BOOL CMainFrame::OnCreateClient(LPCREATESTRUCT lpcs, CCreateContext* pContext)
+{
+BOOL retval = m_wndSplitter.CreateStatic(this,1,2);
+retval |= m_wndSplitter.CreateView(0,0,RUNTIME_CLASS(CJunkView), // this is fine
+	CSize(2000,0),pContext);	                         // but switch the
+retval |= m_wndSplitter.CreateView(0,1,RUNTIME_CLASS(COtherView),//columns
+(0,0)<->(0,1)
+	CSize(0,0),pContext);                                    // and problemo!
+return retval;
+}
+
+This is how I'm setting the focus back to the right-hand side CFormView pane
+- not too elegant but it works for getting the focus to the CFormView pane,
+yet Print and Edit options stay disabled.
+
+void COtherView::OnSetFocus(CWnd* pOldWnd)
+{
+	CView::OnSetFocus(pOldWnd);
+	CMainFrame* pWnd = (CMainFrame*)AfxGetMainWnd();
+	CJunkView* pView = (CJunkView*)pWnd->m_wndSplitter.GetPane(0,1);
+	pView->SetFocus();
+	pView->SendMessage(WM_LBUTTONDOWN); // a feeble attempt at getting the
+	pView->SendMessage(WM_LBUTTONUP);   // menu options enabled
+}
+
+        There's another similar problem:  whether the CFormView pane is in
+the left or right column, and whether the above OnSetFocus routine is
+included or not, ,when the splitter bar is manipulated by the user, then the
+caret comes back in the *first* input field regardless of where it was.
+Picture this:  user is entering fields, 1,2,3,4, then activates the
+splitter.  You would want the focus to stay in field 4 of the CFormView.
+Not!!! It's back to field 1 and the user has to TAB back to field 4.  I
+can't even begin to imagine the solution to that one - and I'll spare you
+the results of my unsuccesful research into that subject.  All help will be
+greatly appreciated.
+
+Michel Robert      |*Simple telecommuted contracts accepted-Win 3.1/Win95*
+Computer programmer|After 11 yrs in Basic + 2 in Foxpro, I decided to
+Montreal           |reorient my career and am now 8 months into full-time
+michero@login.net  |studying C++/Win at home. Need experience, will work cheap.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Jim Leavitt -- <A HREF="mailto:jimll@halcyon.com">jimll@halcyon.com</A>
+Thursday, February 01, 1996
+</B>
+Michel:
+
+I can't test this now, it may not be the correct answer, but here goes 
+anyway. 
+
+After you create your splitter panes, you may want to call SetActive 
+view. 
+ie SetActiveView((CView*)m_Splitter.GetPane(0,2); to set the active 
+pane to your second pane. This could be the source of you tabbing 
+problems as well. 
+
+I'm using a splitter window over the top of a CCtrlView derived class 
+that implements a CTabCtrlView. I set my active pane to the first 
+column and I've had no focus problems. (I'm still getting some 
+flashing problems on a treeCtrl, but that's another story).
+
+I'm assuming you're using VC4. Check out the DAOView sample 
+application, there's some nice classes and code there dealing with 
+views in a splitter window. It's on the CD under 
+Samples->MFC->Database.
+
+Jim Leavitt
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Chong Zhang -- <A HREF="mailto:cz@dana.ucc.nau.edu">cz@dana.ucc.nau.edu</A>
+Thursday, February 01, 1996
+</B>
+[Mini-digest: 2 responses]
+
+On Wed, 31 Jan 1996, Michel Robert wrote:
+
+> ClassWizzard, Doc/View, 16bits
+> 
+>         The static splitter contains two columns, one row.  The 'main' view
+> is derived from CFormView and the other one from CView.  If I follow a
+> 'natural' path by creating the CFormView derived pane in the first column
+> all is well.
+>         But if I want the CView derived pane in the first column with the
+> CFormView pane in the second column (for reasons not worth exposing here)
+> then I have to set the focus manually to the CFormView pane so that the user
+> can start entering data without mouse-clicking (a legitimate requirement).
+
+Because the CFrameWnd sets the first view as the active view by default. 
+You can change that by calling SetActiveView to the view you want.
+
+>         But no matter how I set the focus, the Print option of the File menu
+> is disabled and *stays* disabled until the user does a mouse-click.
+
+Same reason, CFrameWnd passes all command to the active view which is the 
+first one unless you set it (or the user clicks) otherwise.
+
+>         Now this is a data entry form and it is normal to expect that the
+> user will not mouse-click at all.  Furthermore, the same problem happens
+> with the Edit menu: all options stay disabled until a first mouse-click (the
+> handlers work fine after that).  
+> 
+> BOOL CMainFrame::OnCreateClient(LPCREATESTRUCT lpcs, CCreateContext* pContext)
+> {
+> BOOL retval = m_wndSplitter.CreateStatic(this,1,2);
+> retval |= m_wndSplitter.CreateView(0,0,RUNTIME_CLASS(CJunkView), // this is fine
+> 	CSize(2000,0),pContext);	                         // but switch the
+> retval |= m_wndSplitter.CreateView(0,1,RUNTIME_CLASS(COtherView),//columns
+> (0,0)<->(0,1)
+> 	CSize(0,0),pContext);                                    // and problemo!
+> return retval;
+> }
+> 
+> This is how I'm setting the focus back to the right-hand side CFormView pane
+> - not too elegant but it works for getting the focus to the CFormView pane,
+> yet Print and Edit options stay disabled.
+> 
+
+Setting focus back is not the right way. You should set the active view 
+instead.
+
+> void COtherView::OnSetFocus(CWnd* pOldWnd)
+> {
+> 	CView::OnSetFocus(pOldWnd);
+> 	CMainFrame* pWnd = (CMainFrame*)AfxGetMainWnd();
+> 	CJunkView* pView = (CJunkView*)pWnd->m_wndSplitter.GetPane(0,1);
+> 	pView->SetFocus();
+> 	pView->SendMessage(WM_LBUTTONDOWN); // a feeble attempt at getting the
+> 	pView->SendMessage(WM_LBUTTONUP);   // menu options enabled
+> }
+> 
+>         There's another similar problem:  whether the CFormView pane is in
+> the left or right column, and whether the above OnSetFocus routine is
+> included or not, ,when the splitter bar is manipulated by the user, then the
+> caret comes back in the *first* input field regardless of where it was.
+> Picture this:  user is entering fields, 1,2,3,4, then activates the
+> splitter.  You would want the focus to stay in field 4 of the CFormView.
+> Not!!! It's back to field 1 and the user has to TAB back to field 4.  I
+> can't even begin to imagine the solution to that one - and I'll spare you
+> the results of my unsuccesful research into that subject.  All help will be
+> greatly appreciated.
+> 
+
+Well, you can do that by remembering the focused item inside of your form 
+view when your form view receives a ON_KILLFOCUS notification message 
+from its controls, and sending the focus to that item when the form view 
+processes WM_SETFOCUS message.
+
+> Michel Robert      |*Simple telecommuted contracts accepted-Win 3.1/Win95*
+> Computer programmer|After 11 yrs in Basic + 2 in Foxpro, I decided to
+> Montreal           |reorient my career and am now 8 months into full-time
+> michero@login.net  |studying C++/Win at home. Need experience, will work cheap.
+> 
+> 
+-----From: "Roger Lamb (RAS+ 95)" <rasplus@lambsoftware.com>
+
+Michel Robert wrote:
+
+>        Now this is a data entry form and it is normal to expect that the
+>user will not mouse-click at all.  Furthermore, the same problem happens
+>with the Edit menu: all options stay disabled until a first mouse-click (the
+>handlers work fine after that).  
+
+>This is how I'm setting the focus back to the right-hand side CFormView pane
+>- not too elegant but it works for getting the focus to the CFormView pane,
+>yet Print and Edit options stay disabled.
+
+<< Snip >>
+
+This should solve your problems:
+
+// put this code in the view you want to set focus to
+
+void COtherView::OnSetFocus(CWnd* pOldWnd) 
+{
+	CView::OnSetFocus(pOldWnd);
+	
+	if(pOldWnd)
+	{
+		m_theControlYouWantTo.SetFocus();
+	}
+}
+
+void COtherView::OnActivateView(BOOL bActivate, CView* pActivateView, CView*
+pDeactiveView) 
+{
+	if (bActivate)
+	{
+		m_theControlYouWantTo.SetFocus();
+	}
+	CView::OnActivateView(bActivate, pActivateView, pDeactiveView);
+}
+
+/////////////////////////////
+// ....... CYourDoc... one of many ways to get a pointer to your view...
+////////////////////////////
+CView* CYourDoc::MyGetView(CString cszClassName)
+{
+	POSITION pos = GetFirstViewPosition();
+	while(pos)
+	{
+		CView* pView = GetNextView(pos);
+		if(pView->GetRuntimeClass()->m_lpszClassName == cszClassName)
+			return pView;
+	}
+	return NULL;
+}
+
+/////////////////////////////
+// ....... Magic code to switch your view
+////////////////////////////
+
+        // Now, anytime  you want to switch to COtherView, add:
+        AfxGetMain()->SetActiveView((CView*)GetYourDoc()->GetView("COtherVie
+w"));	// just give it the name of the class
+
+Sincerely,
+Roger C. Lamb Jr.
+
+Lamb Software Inc.
+RAS+ 95
+Email: rasplus@lambsoftware.com
+Upates: http://www.lambsoftware.com
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

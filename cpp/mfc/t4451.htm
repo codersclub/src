@@ -1,0 +1,655 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Child windows in MDI child
+</B></FONT>
+<BR>
+<PRE>
+<B>
+rick cameron -- <A HREF="mailto:rick_cameron@msn.com">rick_cameron@msn.com</A>
+Monday, March 25, 1996
+</B>
+Hi, Pedro
+
+An OWL program and an MFC program take different approaches
+to creating child windows.
+
+In OWL, you declare a pointer member in the parent window class,
+and allocate the child window object in the constructor of the parent
+window, using 'new'. OWL takes care of actually creating the Windows windows
+for both parent and child.
+
+e.g.
+
+class TParent : public TWindow
+{
+  ...
+  protected:
+    TChild *child;
+  ...
+};
+
+TParent::TParent (...)
+{
+  ...
+  child = new TChild (this, ...);
+  ...
+}
+
+In MFC, you declare an instance of the child class as a member variable of the 
+
+parent class. In the Create (or OnCreate) member function of the parent class
+you call the Create member of the child.
+
+e.g.
+
+class CParent : public CWnd
+{
+  ...
+  protected:
+    CChild child;
+  ...
+};
+
+BOOL CParent::Create (...)
+{
+  ...
+  if (!child.Create (this, ...))
+    return FALSE;
+  ...
+}
+
+If you change over to doing things this way, you may get better results.
+
+You should use CMDIChildWnd as the base class for your MDI child frame.
+
+If (most of) the child windows really do behave like toolbars, you may want to 
+consider
+deriving them from CControlBar; then MFC will take care of geometry management 
+(i.e.
+rearranging the child windows when the MDI child frame changes size).
+
+In any case, calling MoveWindow inside a WM_PAINT message is (to put it 
+mildly) rather unusual
+and a recipe for disaster: if moving the child window leads to a need to 
+repaint the parent 
+(which is currently processing its WM_PAINT), you will get undesired redraw 
+behaviour.
+
+As a rule, I try to restrict what my code does in handling WM_PAINT to simply 
+repainting the
+requested portion of this window; any other behaviour I handle in some other 
+message.
+
+Hope this helps!
+
+- rick
+----------
+From: 	owner-mfc-l@netcom.com on behalf of Pedro Vicente
+Sent: 	March 25, 1996 0:29
+To: 	'mfc list mfc-l@netcom.com'
+Subject: 	FW: Child windows in MDI child
+
+
+Environment: VC++ 4.0 / Win 95
+
+Hi
+I am a Windows programmer for some years now but
+I ' ve been tied up only to Borland. I started learning MFC some 
+time ago. What I am doing now is converting some of my old OWL 1.0 
+programs to MFC 4.0. 
+
+I am trying to display several child windows inside a MDI child
+window (in MFC). 
+
+I used this approach in an old OWL program I did,
+a graphical interface for displaying data (I work in
+oceanography) . A version of this application, called MODBWin, is available
+in www on
+http://modb.oce.ulg.ac.be//
+or
+http://modb.oce.ulg.ac.be/ModbWin.html
+(My adress is changed, it is now :
+http://hidro1.ist.utl.pt/people/maretec/mare1.htm
+or
+http://hidro1.ist.utl.pt/people/maretec/vicente/vicente_p.htm
+(sorry, pages mostly in Portuguese)
+
+so you can get an idea of what the program is. The program
+displays several things in a MDI child window : a map, a legend, 
+some tools, and some numeric info . * All * these
+things are OWL child windows (whose parent is the MDI child).
+
+The code looks something like this:
+
+//****************************************************************************
+*****
+
+//--------------------------- TMyChildWindow -----------------------------
+
+class TMyChildWindow: public TWindow
+{
+ protected:
+  PTBar ToolBar;
+  PTBar ToolBarPoli;
+  PTBar ToolBarSoma;  //these are several chil windows to display info
+
+ public:
+  TMyChildWindow( PTWindowsObject AParent, LPSTR ATitle );
+  virtual void Paint( HDC DC, PAINTSTRUCT& PS );
+  virtual void MoveWindows();
+   TState State;
+ };
+
+TMyChildWindow::TMyChildWindow( PTWindowsObject AParent, LPSTR ATitle )
+  : TWindow( AParent, ATitle )
+{
+ Attr.Style = Attr.Style | WS_MAXIMIZE;
+ State.DrawTool = NULL;
+ State.hBitMap = 0; // change data between windows
+ ToolBar = new TToolBar( this, &State );
+ ToolBarPoli = new TToolBarPoli( this, &State );
+
+ ...
+}
+
+void TMyChildWindow::Paint( HDC, PAINTSTRUCT& )
+{
+ MoveWindows();
+}
+
+void TMyChildWindow::MoveWindows()
+{
+  MoveWindow( State.Mapa->HWindow,
+  SP, SP,
+  CM, LM, TRUE );
+... //etc
+}
+
+//****************************************************************************
+*****
+
+What I do is to initialize several Toolbars (which are 
+child windows) inside the MDI child and to use the ::MoveWindow
+function inside a Paint method to display them. The child windows
+all have a Paint method of their own , so all my stull gets
+nicely into the screen. This 
+works fine.
+
+Now I am trying to convert the OWL code to MFC. I did the following:
+
+//****************************************************************************
+*****
+
+//this is the child that is to be displayed inside the MDI child
+
+class CMapWindow: public CFrameWnd
+{
+ public:
+  CMapWindow();
+  afx_msg void OnPaint();
+//other stuff
+ };
+
+void CMapWindow::OnPaint()
+{
+ //draw something
+}
+
+/////////////////////// now for the MDI child ///////////////////////////////
+
+class CHelloWnd : public CMDIChildWnd
+{
+ public:
+  CHelloWnd();
+   CMapWindow *pCMapWindow;  //pointer to the chil window
+    afx_msg void OnPaint();
+	
+};
+
+BOOL CHelloWnd::Create(LPCTSTR szTitle, LONG style /* = 0 */,
+	const RECT& rect /* = rectDefault */,
+	CMDIFrameWnd* parent /* = NULL */)
+{
+ pCMapWindow = new CMapWindow;
+ pCMapWindow->Create( this );
+//create the child window
+
+ return CMDIChildWnd::Create(lpszHelloClass, szTitle, style, rect, parent);
+}
+
+void CHelloWnd::OnPaint()
+{
+ ::MoveWindow( pCMapWindow->m_hWnd, 10, 10, 100, 100, TRUE ); 
+}
+
+//display it. BUT THIS DOES WORK, it does not display anything
+
+Can anyone give some hints on this ? Thanks in advance.
+
+Pedro Vicente
+
+
+
+
+
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Pedro Vicente -- <A HREF="mailto:vicente@hidro1.ist.utl.pt">vicente@hidro1.ist.utl.pt</A>
+Wednesday, April 03, 1996
+</B>
+Hi Rick
+
+Thanks for the advice. I bought Kruglinsky's book on VC++ and
+I am on MFC now.
+
+Anyway , I still have some doubts about rearranjing the child windows
+inside a MDI child. The aproach I did to solve this was not to define 
+several childs but instead paint several things on the MDI child
+client dc.
+
+The disavantadge is that I loose flexibility on the control
+of the program.
+
+What I do now is this
+
+void CHidroView::Show()
+{
+	CClientDC dc(this);
+	Mapa->Mostra( dc.m_hDC, m_hWnd, pDoc->transfer );
+	Grafico->Mostra( dc.m_hDC, m_hWnd, pDoc->transfer );
+}
+
+The Mapa and Grafico are objects that were OWL windows before.  
+
+Pedro Vicente
+
+----------
+From: 	rick cameron[SMTP:rick_cameron@msn.com]
+Sent: 	terca-feira, 26 de marco de 1996 0:20
+To: 	mfc-l@netcom.com
+Subject: 	RE: Child windows in MDI child
+
+Hi, Pedro
+
+An OWL program and an MFC program take different approaches
+to creating child windows.
+
+In OWL, you declare a pointer member in the parent window class,
+and allocate the child window object in the constructor of the parent
+window, using 'new'. OWL takes care of actually creating the Windows windows
+for both parent and child.
+
+e.g.
+
+class TParent : public TWindow
+{
+  ...
+  protected:
+    TChild *child;
+  ...
+};
+
+TParent::TParent (...)
+{
+  ...
+  child = new TChild (this, ...);
+  ...
+}
+
+In MFC, you declare an instance of the child class as a member variable of the 
+
+parent class. In the Create (or OnCreate) member function of the parent class
+you call the Create member of the child.
+
+e.g.
+
+class CParent : public CWnd
+{
+  ...
+  protected:
+    CChild child;
+  ...
+};
+
+BOOL CParent::Create (...)
+{
+  ...
+  if (!child.Create (this, ...))
+    return FALSE;
+  ...
+}
+
+If you change over to doing things this way, you may get better results.
+
+You should use CMDIChildWnd as the base class for your MDI child frame.
+
+If (most of) the child windows really do behave like toolbars, you may want to 
+consider
+deriving them from CControlBar; then MFC will take care of geometry management 
+(i.e.
+rearranging the child windows when the MDI child frame changes size).
+
+In any case, calling MoveWindow inside a WM_PAINT message is (to put it 
+mildly) rather unusual
+and a recipe for disaster: if moving the child window leads to a need to 
+repaint the parent 
+(which is currently processing its WM_PAINT), you will get undesired redraw 
+behaviour.
+
+As a rule, I try to restrict what my code does in handling WM_PAINT to simply 
+repainting the
+requested portion of this window; any other behaviour I handle in some other 
+message.
+
+Hope this helps!
+
+- rick
+----------
+From: 	owner-mfc-l@netcom.com on behalf of Pedro Vicente
+Sent: 	March 25, 1996 0:29
+To: 	'mfc list mfc-l@netcom.com'
+Subject: 	FW: Child windows in MDI child
+
+
+Environment: VC++ 4.0 / Win 95
+
+Hi
+I am a Windows programmer for some years now but
+I ' ve been tied up only to Borland. I started learning MFC some 
+time ago. What I am doing now is converting some of my old OWL 1.0 
+programs to MFC 4.0. 
+
+I am trying to display several child windows inside a MDI child
+window (in MFC). 
+
+I used this approach in an old OWL program I did,
+a graphical interface for displaying data (I work in
+oceanography) . A version of this application, called MODBWin, is available
+in www on
+http://modb.oce.ulg.ac.be//
+or
+http://modb.oce.ulg.ac.be/ModbWin.html
+(My adress is changed, it is now :
+http://hidro1.ist.utl.pt/people/maretec/mare1.htm
+or
+http://hidro1.ist.utl.pt/people/maretec/vicente/vicente_p.htm
+(sorry, pages mostly in Portuguese)
+
+so you can get an idea of what the program is. The program
+displays several things in a MDI child window : a map, a legend, 
+some tools, and some numeric info . * All * these
+things are OWL child windows (whose parent is the MDI child).
+
+The code looks something like this:
+
+//****************************************************************************
+*****
+
+//--------------------------- TMyChildWindow -----------------------------
+
+class TMyChildWindow: public TWindow
+{
+ protected:
+  PTBar ToolBar;
+  PTBar ToolBarPoli;
+  PTBar ToolBarSoma;  //these are several chil windows to display info
+
+ public:
+  TMyChildWindow( PTWindowsObject AParent, LPSTR ATitle );
+  virtual void Paint( HDC DC, PAINTSTRUCT& PS );
+  virtual void MoveWindows();
+   TState State;
+ };
+
+TMyChildWindow::TMyChildWindow( PTWindowsObject AParent, LPSTR ATitle )
+  : TWindow( AParent, ATitle )
+{
+ Attr.Style = Attr.Style | WS_MAXIMIZE;
+ State.DrawTool = NULL;
+ State.hBitMap = 0; // change data between windows
+ ToolBar = new TToolBar( this, &State );
+ ToolBarPoli = new TToolBarPoli( this, &State );
+
+ ...
+}
+
+void TMyChildWindow::Paint( HDC, PAINTSTRUCT& )
+{
+ MoveWindows();
+}
+
+void TMyChildWindow::MoveWindows()
+{
+  MoveWindow( State.Mapa->HWindow,
+  SP, SP,
+  CM, LM, TRUE );
+... //etc
+}
+
+//****************************************************************************
+*****
+
+What I do is to initialize several Toolbars (which are 
+child windows) inside the MDI child and to use the ::MoveWindow
+function inside a Paint method to display them. The child windows
+all have a Paint method of their own , so all my stull gets
+nicely into the screen. This 
+works fine.
+
+Now I am trying to convert the OWL code to MFC. I did the following:
+
+//****************************************************************************
+*****
+
+//this is the child that is to be displayed inside the MDI child
+
+class CMapWindow: public CFrameWnd
+{
+ public:
+  CMapWindow();
+  afx_msg void OnPaint();
+//other stuff
+ };
+
+void CMapWindow::OnPaint()
+{
+ //draw something
+}
+
+/////////////////////// now for the MDI child ///////////////////////////////
+
+class CHelloWnd : public CMDIChildWnd
+{
+ public:
+  CHelloWnd();
+   CMapWindow *pCMapWindow;  //pointer to the chil window
+    afx_msg void OnPaint();
+	
+};
+
+BOOL CHelloWnd::Create(LPCTSTR szTitle, LONG style /* = 0 */,
+	const RECT& rect /* = rectDefault */,
+	CMDIFrameWnd* parent /* = NULL */)
+{
+ pCMapWindow = new CMapWindow;
+ pCMapWindow->Create( this );
+//create the child window
+
+ return CMDIChildWnd::Create(lpszHelloClass, szTitle, style, rect, parent);
+}
+
+void CHelloWnd::OnPaint()
+{
+ ::MoveWindow( pCMapWindow->m_hWnd, 10, 10, 100, 100, TRUE ); 
+}
+
+//display it. BUT THIS DOES WORK, it does not display anything
+
+Can anyone give some hints on this ? Thanks in advance.
+
+Pedro Vicente
+
+
+
+
+
+
+
+
+
+
+begin 600 WINMAIL.DAT
+M>)\^(B@5`0:0" `$```````!``$``0>0!@`(````Y 0```````#H``$-@ 0`
+M`@````$``0`!!) &``P!```!````# ````,``# #````"P`/#@`````"`?\/
+M`0```#\`````````@2L?I+ZC$!F=;@#=`0]4`@````!M9F,M;$!N971C;VTN
+M8V]M`%--5% `;69C+6Q ;F5T8V]M+F-O;0``'@`", $````%````4TU44 ``
+M```>``,P`0```!$```!M9F,M;$!N971C;VTN8V]M``````,`%0P!`````P#^
+M#P8````>``$P`0```!,````G;69C+6Q ;F5T8V]M+F-O;2<```(!"S !````
+M%@```%--5% Z349#+4Q 3D540T]-+D-/30````,``#D`````"P! .@$````"
+M`?8/`0````0````````#/RP!"( '`!@```!)4$TN36EC<F]S;V9T($UA:6PN
+M3F]T90`Q" $$@ $`'P```%)%.B!#:&EL9"!W:6YD;W=S(&EN($U$22!C:&EL
+M9 `5"@$%@ ,`#@```,P'! `#`!8`'P`U``,`1P$!(( #``X```#,!P0``P`6
+M`!\`-0`#`$<!`0F `0`A````03<S0S S.3$P-#A#0T8Q,4$Y,$4P.# P,D(S
+M-#0V-T8`_@8!`Y &`/@/```2````"P`C```````#`"8``0````L`*0``````
+M`P`V``````! `#D`@#?TEYPANP$>`' ``0```!\```!213H@0VAI;&0@=VEN
+M9&]W<R!I;B!-1$D@8VAI;&0```(!<0`!````%@````&[(9R7R_ VM.6-GA'/
+MJ0X(`"LT1G\``!X`'@P!````!0```%--5% `````'@`?# $````:````=FEC
+M96YT94!H:61R;S$N:7-T+G5T;"YP= ````,`!A#KG=>M`P`'$)03```>``@0
+M`0```&4```!(25))0TM42$%.2U-&3U)42$5!1%9)0T5)0D]51TA42U)51TQ)
+M3E-+65-"3T]+3TY60RLK04Y$24%-3TY-1D-.3U=!3EE705DL25-424Q,2$%6
+M15-/345$3U5"5%-!0D]55%)%``````(!"1 !````;@X``&H.```7(0``3%I&
+M=?B70&/_``H!#P(5`J@%ZP*#`% "\@D"`&-H"L!S970R-P8`!L,"@S(#Q0(`
+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
+,``!213H@`````.*-
+`
+end
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

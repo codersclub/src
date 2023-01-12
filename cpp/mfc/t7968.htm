@@ -1,0 +1,179 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+GetDlgItem and Assertion Failed.
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Marco Altese -- <A HREF="mailto:marko@mbox.vol.it">marko@mbox.vol.it</A>
+Monday, November 25, 1996
+</B>
+Environment: VC++ 1.52, Windows 95
+
+I have created a Dialog that opens a second Dialog through a button. In the
+second Dialog there are 96 Cedit controls and I have initialized them in the
+OnInitDialog function. I have defined, into OnInitDialog, a pointer variable,
+CEdit* pEd, and I use this variable for all the CEdit controls in the following
+way:
+
+        pEd = (CEdit*) GetDlgItem(IDC_EDIT1);
+	pEd->SetWindowText("  1");        
+	pEd = (CEdit*) GetDlgItem(IDC_EDIT2);
+	pEd->SetWindowText("  2");        
+	pEd = (CEdit*) GetDlgItem(IDC_EDIT3);
+	pEd->SetWindowText("  3.");       
+        ....................................
+        ....................................
+
+Now, if I open the second Dialog and then close it with the Cancel button for
+many times in sequence (Open and Close, Open and Close, .....) the application
+reports an assertion failed in file dlgcore.cpp line 69. Which is the problem?
+If I remove all the lines above the problem disappear. GetDlgItem "eats" any 
+resource?
+
+Thanks.
+
+     Marco Altese
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+David Lowndes -- <A HREF="mailto:David.Lowndes@bj.co.uk">David.Lowndes@bj.co.uk</A>
+Wednesday, November 27, 1996
+</B>
+[Mini-digest: 5 responses]
+
+> I have created a Dialog that opens a second Dialog through a button. 
+In the
+second Dialog there are 96 Cedit controls and I have initialized them 
+in the
+OnInitDialog function. I have defined, into OnInitDialog, a pointer 
+variable,
+CEdit* pEd, and I use this variable for all the CEdit controls in the 
+following
+way:
+
+<
+
+Marco,
+
+You're probably running out of memory because CWnd::GetDlgItem creates 
+temporary CWnd's that are normally deleted in the default MFC idle 
+processing. In your situation under 16 bit MFC you're not getting back 
+to the idle loop, so these resources aren't being freed off.
+
+The solution is to use the SetDlgItemText routine which doesn't create 
+any intermediate CWnds:
+
+pEd = (CEdit*) GetDlgItem(IDC_EDIT1);
+	pEd->SetWindowText("  1");
+
+is equivalent to:
+
+	SetDlgItemText( IDC_EDIT1, "  1" );
+
+Dave Lowndes
+
+-----From: Mario Contestabile
+
+>I have created a Dialog that opens a second Dialog through a button. In the
+>second Dialog there are 96 Cedit controls and I have initialized them in the
+>OnInitDialog function. I have defined, into OnInitDialog, a pointer variable,
+>CEdit* pEd, and I use this variable for all the CEdit controls in the following
+>way:
+>
+>        pEd = (CEdit*) GetDlgItem(IDC_EDIT1);
+> pEd->SetWindowText("  1");        
+> pEd = (CEdit*) GetDlgItem(IDC_EDIT2);
+
+Perhaps you should try SetDlgItemText(IDC_EDIT1, "  1");
+to avoid the casting and reduce the number of function calls by half.
+
+mcontest@universal.com
+
+-----From: "Umesh Chandwani" <Umesh.Chandwani@eng.efi.com>
+
+I think the problem is this.
+MFC deletes temporary CWnd objects during OnIdle processing.
+You are using modal dialog boxes which i think block this processing.
+The temporary objects created using GetDlgItem do not get deleted 
+& the system runs out of memory causing the assertion. I do not have VC 1.52 to
+check the nature of the assertion.
+
+Suggestion:-> Use permanent windows objects using DDX_CONTROL
+
+
+-----From: Michael Patterson <patterso@sprynet.com>
+
+Can you use a loop?  Such as:
+
+      for (int iT = 0; iT < 96; iT++)
+      {
+           CEdit* pEdit = (CEdit*)GetDlgItem(IDC_EDIT1 + iT);
+           ::wsprintf(szTemp, "  %d", iT); // sample text
+           pEdit->SetWindowText((LPCSTR)szTemp);
+      }
+
+Here's the text that goes along w/ your error message:
+"Warning: something went wrong in dialog init\n"
+
+Mike
+
+
+-----From: =?iso-8859-1?Q?Klaus_G=FCtter?= <KG@it-gmbh.de>
+
+The Assertion in dlgcore.cpp, line 69, is hit when there is an exception
+during dialog initialization (WM_SETFONT and WM_INITDIALOG). 
+f you run your app under the debugger, you should see a trace in the
+output window telling you the type of exception (e.g. CMemoryException).
+If you know this type, put a breakpoint in the corresponding
+AfxThrow...Exception function (e.g. AfxThrowMemoryException) function.
+When the debugger stops, look at the call stack to determine tha exact
+location and cause of the failure.
+
+- Klaus
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

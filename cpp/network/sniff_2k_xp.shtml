@@ -1,0 +1,131 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Пример простейшего сниффера для W2K/XP.</h3>
+    <p>Компилятор: Visual C++</p>
+    <p><img src="sniff_2k_xp.gif" width="668" height="331"></p>
+    <p>Ниже приведён полный код программы. Данный код
+    не претендует на звание крутого снифера, однако
+    при желании его можно доработать, чтобы можно
+    было просматривать содержимое пакетов. Так же на
+    его основе можно легко сделать простой
+    анализатор трафика. А главное - не надо делать
+    всяких драйверов; всё просто и понятно.</p>
+    <p>Суть этого сниффера заключается в том, что
+    используются сокеты второй версии и созданный
+    сокет переводится в режим promiscuous (прослушивания).</p>
+    <p>--------------------------------------------------------------------------------------------------------------</p>
+    <pre>#include &lt;conio.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;winsock2.h&gt;
+
+#define MAX_PACKET_SIZE    0x10000
+#define SIO_RCVALL         0x98000001
+// Буфер для приёма данных
+char Buffer[MAX_PACKET_SIZE]; // 64 Kb
+
+//Структура заголовка IP-пакета
+
+typedef struct IPHeader {
+  UCHAR   iph_verlen;   // версия и длина заголовка
+  UCHAR   iph_tos;      // тип сервиса
+  USHORT  iph_length;   // длина всего пакета
+  USHORT  iph_id;       // Идентификация
+  USHORT  iph_offset;   // флаги и смещения
+  UCHAR   iph_ttl;      // время жизни пакета
+  UCHAR   iph_protocol; // протокол
+  USHORT  iph_xsum;     // контрольная сумма
+  ULONG   iph_src;      // IP-адрес отправителя
+  ULONG   iph_dest;     // IP-адрес назначения
+} IPHeader;
+
+char src[10];
+char dest[10];
+char ds[15];
+unsigned short lowbyte;
+unsigned short hibyte;
+
+void main()
+{
+  WSADATA     wsadata;   // Инициализация WinSock.
+  SOCKET      s;         // Cлущающий сокет.
+  char        name[128]; // Имя хоста (компьютера).
+  HOSTENT*    phe;       // Информация о хосте.
+  SOCKADDR_IN sa;        // Адрес хоста
+  IN_ADDR sa1;        //
+  unsigned long        flag = 1;  // Флаг PROMISC Вкл/выкл.
+
+  // инициализация
+  WSAStartup(MAKEWORD(2,2), &amp;wsadata);
+  s = socket( AF_INET, SOCK_RAW, IPPROTO_IP );
+  gethostname(name, sizeof(name));
+  phe = gethostbyname( name );
+  ZeroMemory( &amp;sa, sizeof(sa) );
+  sa.sin_family = AF_INET;
+  sa.sin_addr.s_addr = ((struct in_addr *)phe-&gt;h_addr_list[0])-&gt;s_addr;
+  bind(s, (SOCKADDR *)&amp;sa, sizeof(SOCKADDR));
+  
+  // Включение promiscuous mode.
+  ioctlsocket(s, SIO_RCVALL, &amp;flag);
+
+  // Бесконечный цикл приёма IP-пакетов.
+  while( !_kbhit() )
+  {
+    int count;
+    count = recv( s, Buffer, sizeof(Buffer), 0 );
+    // обработка IP-пакета
+    if( count &gt;= sizeof(IPHeader) )
+    {
+      IPHeader* hdr = (IPHeader *)Buffer;
+      //Начинаем разбор пакета...
+
+	strcpy(src,&quot;Пакет: &quot;);
+	CharToOem(src,dest);
+	printf(dest);
+	// Преобразуем в понятный вид адрес отправителя.
+	printf(&quot;From &quot;);
+	sa1.s_addr = hdr-&gt;iph_src;
+	printf(inet_ntoa(sa1));
+
+	// Преобразуем в понятный вид адрес получателя.
+	printf(&quot; To &quot;);
+	sa1.s_addr = hdr-&gt;iph_dest;
+	printf(inet_ntoa(sa1));
+
+	// Вычисляем протокол. Полный список этих констант
+	// содержится в файле winsock2.h
+	printf(&quot; Prot: &quot;);
+	if(hdr-&gt;iph_protocol == IPPROTO_TCP) printf(&quot;TCP &quot;);
+	if(hdr-&gt;iph_protocol == IPPROTO_UDP) printf(&quot;UDP &quot;);
+
+	// Вычисляем размер. Так как в сети принят прямой порядок
+	// байтов, а не обратный, то прийдётся поменять байты местами.
+	printf(&quot;Size: &quot;);
+	lowbyte = hdr-&gt;iph_length&gt;&gt;8;
+	hibyte = hdr-&gt;iph_length&lt;&lt;8;
+	hibyte = hibyte + lowbyte;
+	printf(&quot;%s&quot;,itoa(hibyte,&quot;&quot;,10));
+
+	// Вычисляем время жизни пакета.
+	printf(&quot; TTL:%s&quot;,itoa(hdr-&gt;iph_ttl,&quot;&quot;,10));
+	printf(&quot;\n&quot;);
+
+    }
+  }
+
+  closesocket( s );
+  WSACleanup();
+}</pre>
+    <p>&nbsp;</p>
+    <p>Для успешной компиляции, необходимо подключить
+    к проекту файл ws2_32.lib.</p>
+    <p>Источник: <a href="http://www.rsdn.ru">rsdn.ru</a></p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

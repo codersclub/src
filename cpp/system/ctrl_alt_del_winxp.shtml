@@ -1,0 +1,267 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как запретить Ctrl-Alt-Del или Alt-Tab в Windows XP.</h3>
+    <p>Компилятор: Visual C++ 6.0</p>
+    <p>Автор: <a href="mailto:cppqa@microsoft.com">Paul DiLascia</a></p>
+    <p><a href="CAQ0209.exe">Скачать исходник к статье - 56 Кб</a></p>
+    <p>&nbsp;&nbsp; Наверное, нет такого программиста,
+    который не догадывается для чего необходимо
+    отключать так называемую &quot;комбинацию из трёх
+    пальцев&quot;. В первую очередь это необходимо,
+    чтобы пользователь не смог заметить приложение
+    удалённого управления его компьютером (в
+    простонародье называемым Троянским конём).
+    Однако, есть и масса других случаев, когда
+    необходимо запретить Ctrl+Alt+Del. Так же,
+    справедливости ради, стоит заметить, что очень
+    часто вызов менеджера задач, это единственный
+    способ снять зависшее приложение.</p>
+    <p>&nbsp;&nbsp; В таких операционных системах как Windows 95,
+    Windows 98 и Windows Me можно запретить Ctrl+Alt+Del (а так же
+    любые другие комбинации клавиш для переключения
+    задач), введя операционную систему в заблуждение,
+    заставив её думать, что запущен скринсейвер,
+    следующей командой:</p>
+    <pre>BOOL bOldState;
+SystemParametersInfo(SPI_SETSCREENSAVERRUNNING, TRUE, &amp;bOldState, 0);
+</pre>
+    <p>&nbsp;&nbsp; Однако, такая команда не сработает в Windows
+    NT®, Windows 2000 и Windows XP. Эти версии операционных
+    систем используют Winlogon и GINA (сокращение от Graphical
+    Identification and Authentication). Winlogon это часть Windows, которая
+    обеспечивает интерактивный вход в систему, а GINA,
+    это DLL, которую использует Winlogon, для проведения
+    авторизации. DLL GINA экспортирует некоторые
+    функции, такие как WlxInitialize для инициализации
+    самой себя и WlxActivateUserShell для запуска
+    пользовательского шелла. Для проведения обычной
+    авторизации по имени и паролю в Windows используется
+    msgina.dll, однако, любой разработчик (т.е. Вы) спокойно
+    может заменить msgina.dll своей собственной GINA.
+    Например, это может потребоваться для включения
+    авторизации по смарткартам, retinal-scan, DNA-check, или Divine
+    Awareness&nbsp; и т.д.</p>
+    <p>В <a href="gina_functions_table.shtml" target="_blank">Таблице</a>
+    приведён полный список функций GINA. Одна из них
+    WlxLoggedOnSAS, которая вызывается Winlogon-ом когда он
+    получает &quot;secure attention sequence,&quot; больше известную
+    как Ctrl+Alt+Del. По умолчанию GINA отображает диалог
+    входа в систему и Вы начинаете авторизоваться....
+    Один из способов запретить Ctrl+Alt+Del, это написать
+    новую MyGina.dll с заглушками, которые будут вызывать
+    старую msgina.dll и перехватить нужным образом
+    WlxLoggedOnSAS. Второй способ, это написание драйвера
+    клавиатуры.</p>
+    <p>&nbsp;&nbsp; Оба выше перечисленных способа требуют
+    приложить давольно много усилий. Есть конечно и
+    более простые способы. Например, чтобы запретить
+    Ctrl+Alt+Del достаточно установить политики. Для этого
+    идём в меню &quot;Пуск&quot;, выбираем Выполнить...(Run), и
+    запускаем Редактор Политики Групп (&quot;gpedit.msc&quot;).
+    Смотрим в User Configuration | Administrative Templates | System и там уже
+    можно найти секцию с именем Ctrl+Alt+Del Options:</p>
+    <p><img src="fig029.gif" width="500" height="335"></p>
+    <p>&quot;Remove Task Manager&quot; это тот самый ключ, который
+    запрещает Ctrl+Alt+Del. Программно можно просто
+    добавить в реестр ключ:<br>
+    </p>
+    <pre>HKCU\
+ Software\
+  Microsoft\
+   Windows\
+    CurrentVersion\
+     Policies\
+      System\DisableTaskMgr = dword:1
+</pre>
+    <p>Теперь, если пользователь нажмёт Ctrl+Alt+Del, то
+    получит сообщение:</p>
+    <p><img height="92" src="fig039.gif" width="260"></p>
+    <p>&nbsp;</p>
+    <p>&nbsp;&nbsp; Итак, это первая половина ответа в
+    опросе запрета Ctrl+Alt+Del в Windows XP. Я предполагаю, что
+    Вы уже отключили Ctrl+Alt+Del для входа в систему
+    установив &quot;Use the Welcome screen&quot; в Control Panel | User Accounts:</p>
+    <p><img height="263" src="fig049.gif" width="380"></p>
+    <p>иначе Вы бы не спрашивали про Менеджер задач.
+    Если же Вы не используете экран Welcome, то установка
+    DisableTaskMgr запрещает кнопку Менеджера задач в
+    диалоге входа/выхода из системы.<br>
+    <br>
+    &nbsp;&nbsp; Ключ DisableTaskMgr является
+    недокументированным, и я обнаружил его через GPEDIT.
+    GPEDIT очень полезная утилитка, которая позволяет
+    контролировать многие аспекты Windows, от прав
+    доступа до классического вида Microsoft® Internet Explorer;
+    от отображения панели Places в диалогах до
+    разрешения вызова Менеджера задач при помощи
+    Ctrl+Alt+Del. При помощи этой утилиты можно изменить
+    сотни настроек пользовательского интерфейса,
+    заставив системного администратор пускать слюни
+    :)<br>
+    <br>
+    &nbsp;&nbsp; Каков механизм поиска в реестре
+    определённой политики? Есть два способа. Первый,
+    это &quot;в лоб&quot;: экспортируя ключи реестра в файл
+    .reg, а затем изменяя политики и сравнивая
+    различия. Все политики находятся в одном из
+    четырёх ключей:<br>
+    </p>
+    <pre>// относятся к данному пользователю
+HKEY_CURRENT_USER\Software\Policies 
+HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Policies
+
+// относятся к локальной машине
+HKEY_LOCAL_MACHINE\Software\Policies 
+HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Policies
+</pre>
+    <p>&nbsp;&nbsp; Второй способ заключается в
+    исследовании административных шаблонов (файлы
+    .adm), которые описаны в политиках. Ниже
+    представлен отрывок из \windows\system32\GroupPolicy\Adm\system.adm,
+    который описывает DisableTaskMgr:</p>
+    <pre>CATEGORY !!CADOptions
+    #if version &gt;= 4
+        EXPLAIN !!CADOptions_Help
+    #endif
+    KEYNAME &quot;Software\Microsoft\Windows\CurrentVersion\Policies\System&quot;
+
+    POLICY !!DisableTaskMgr    
+        #if version &gt;= 4
+            SUPPORTED !!SUPPORTED_Win2k
+        #endif
+
+        EXPLAIN !!DisableTaskMgr_Help
+        VALUENAME &quot;DisableTaskMgr&quot;
+    END POLICY
+
+    ;
+    ; More Ctrl+Alt+Del policies here...
+    ;
+
+END CATEGORY ; Ctrl+Alt+Del options
+
+•••
+
+DisableTaskMgr_Help=&quot;Prevents users from starting Task Manager 
+(Taskmgr.exe).\n\nIf this setting is enabled and users try to start
+Task Manager, a message appears explaining that a policy prevents the 
+action.\n\nTask Manager lets users start and stop programs; monitor the 
+performance of their computers; view and monitor all programs running 
+on their computers, including system services; find the executable 
+names of programs; and change the priority of the process in which 
+programs run.&quot;
+
+DisableTaskMgr=&quot;Remove Task Manager&quot;
+</pre>
+    <p>&nbsp;&nbsp; Для указания ключа в реестре и его
+    значения используются две основные команды KEYNAME
+    и VALUENAME. Вы можете создать свой собственный
+    административный шаблон и политики для своего
+    приложения, но редактировать его нужно
+    редактором, поддерживающим Unicode. Мой любимы Epsilon
+    11.0, но Notepad и WordPad тоже подойдут. Административные
+    шаблоны позволяют сисадмину конфигурировать
+    системы в масштабах предприятия (вот где сила!).
+    Более подробно см. &quot;Administrative Template File Format&quot; в
+    Platform SDK.</p>
+    <p>&nbsp;&nbsp; Перед тем как двинуться дальше,
+    позвольте заметить, что DisableTaskMgr позволяет
+    запретить Ctrl+Alt+Del, но не перехватить её. Для
+    перехвата Ctrl+Alt+Del, необходима любая из трёх вещей:
+    написать собственную заглушку для GINA, написать
+    драйвер клавиатуры, или заменить TaskMgr.exe
+    собственной программой.</p>
+    <p>&nbsp;&nbsp; Теперь давайте посмотрим, что можно
+    сделать с комбинацией Alt+Tab и другими клавишами
+    переключения задач. Например, в Windows 3.1, можно было
+    обработать WM_SYSKEYDOWN. В Windows 95 и Windows 98 срабатывает
+    тот же обманный метод SPI_SETSCREENSAVERRUNNING, который я
+    упоминал в самом начале статьи. Но опять же, в Windows
+    NT 4.0 (SP3 и позже), Windows 2000, и Windows XP эти штучки не
+    пройдут. Прийдётся писать низкоуровневую
+    ловушку для клавиатуры. Уж извиняйте. Впринципе
+    это не так сложно. В <a href="taskkeyhook.shtml" target="_blank">Примере</a>
+    демонстрируется DLL (TaskKeyHook.dll), которую я написал и,
+    которая делает всю необходимую работу. TaskKeyHook
+    экспортирует две функции, DisableTaskKeys и AreTaskKeysDisabled.
+    Первая устанавливает ловушку WH_KEYBOARD_LL; а вторая
+    сообщает - установлена ли ловушка. Сама по себе
+    процедура ловушки перехватывает Alt+Tab, Ctrl+Esc, Alt+Esc,
+    а так же виндузовык клавиши (VK_LWIN и VK_RWIN, о которых
+    я расскажу ниже). Как только срабатывает одна из
+    этих комбинаций клавиш, то управление передаётся
+    сразу же в вызывающую программу, и не происходит
+    вызова CallNextHookEx.<br>
+    </p>
+    <pre>LRESULT CALLBACK MyTaskKeyHookLL(...)
+{
+   if (/* нужная комбинация клавиш *)
+      return 1;
+   return CallNextHookEx(...);
+}
+</pre>
+    <p>&nbsp;&nbsp; Код TaskKeyHook не сложен. Единственная
+    хитрость заключается в использовании #pragma data_seg
+    для имени сегмента данных, который содержит
+    глобальные данные, и #pragma comment (linker...), чтобы
+    указать линковщику сделать этот сегмент
+    доступным (расшаренным).<br>
+    <br>
+    <img height="185" src="fig079.gif" width="340"><br>
+    Рисунок 7 TrapKeys<br>
+    <br>
+    &nbsp;&nbsp; Так же я написал небольшую программу TrapKeys
+    (см. Рисунок 7 и <a href="trapkeys.shtml" target="_blank">Пример</a>),
+    которая совмещает всё вместе: DisableTaskMgr,
+    клавиатурную ловушку, и запрещение панели задач.
+    Если уж Вам понадобится запретить переключение
+    задач, то возможно потребуется и запрещение
+    самой панели задач:<br>
+    </p>
+    <pre>HWND hwnd = FindWindow(&quot;Shell_traywnd&quot;, NULL);
+EnableWindow(hwnd, FALSE); // запрещаем его
+</pre>
+    <p>&nbsp;&nbsp; Здесь присутствует небольшая причуда.
+    Если Вы запретите панель задач, а затем нажмёте
+    клавишу Windows (которая находится на клавиатуре
+    между Ctrl и Alt), то откроется меню Пуск. Упс!
+    Очевидно, панель задач перед нажатием VK_LWIN не
+    проверяет - доступна она или нет. Если окно
+    заблокировано (после вызова EnableWindow(FALSE)), то оно не
+    должно обрабатывать пользовательский ввод.
+    Похоже, что обработка VK_LWIN происходит каким-то
+    другим способом, поэтому мне пришлось добавить
+    обработку таких клавиш в TaskKeyHook. Теперь, если
+    нажать клавишу меню Пуск, то ничего не
+    произойдёт.</p>
+    <p>&nbsp;&nbsp; Чтобы облегчить жизнь, я включил все
+    запрещающие функции в класс CTaskKeyMgr (см. <a
+    href="taskkeymgr.shtml" target="_blank">Пример</a>). Все функции
+    статические. Вы можете спокойно использовать
+    этот класс в своих приложениях для блокирования
+    переключения задач, а так же для блокирования
+    самой панели задач. Например, чтобы
+    заблокировать переключение задач или саму
+    панель задач, но не Ctrl+Alt+Del, достаточно вызвать
+    следующий метод:</p>
+    <pre>CTaskKeyMgr::Disable(CTaskKeyMgr::TASKKEYS |
+                     CTaskKeyMgr::TASKBAR, TRUE);
+</pre>
+    <p>Так же в классе присутствуют функции для
+    определения, что в данный момент заблокировано и
+    можно даже подать звуковой сигнал, если
+    пользователь нажмёт одну из ключевых комбинаций
+    клавиш.<br>
+    </p>
+    <p><strong>При публикации материала ссылка на сайт
+    обязательна!</strong></p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

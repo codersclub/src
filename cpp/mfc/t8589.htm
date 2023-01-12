@@ -1,0 +1,215 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Strange CSingleLock crash in Multi-threaded OCX
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Sam Gentile -- <A HREF="mailto:sgentile@gensym.com">sgentile@gensym.com</A>
+Friday, December 20, 1996
+</B>
+Environment: MSVC 4.2b Windows NT 4.0
+
+I am getting a strange crash in my OCX if I use in VB Design Mode or in a
+Visual C++ program. I have an 32-bit OCX that has two threads. Basically,
+there is one thread that runs every 100 milliseconds to do some work and
+the other regular OCX thread. The code that crashes seems to run OK
+hundreds of times I make the VB user program an EXE or run VC++ in
+non-debug mode. But if I run VC++ in Debug or I put the control in any OLE
+container in design mode, it crashes.
+
+A stack dump shows:
+
+The line where the problem starts:
+	CSingleLock csl(&m_critGsiInterface);
+Where: CCriticalSection m_critGsiInterface is a member of the class.
+
+The line in the constructor:
+	ASSERT(pObject->IsKindOf(RUNTIME_CLASS(CSyncObject)));
+The debugger shows me that pObject is "CSyncObject". I don't get it.
+CCriticalSection is certainly dervived from CSyncObject.
+
+Then the line of the actual crash:
+	CRuntimeClass* pClassThis = GetRuntimeClass();
+
+in CObject::IsKindOf()
+
+What is going on here? Also, how do I stop a thread when someone exits the
+program?
+
+Thanks,
+Sam Gentile
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Saturday, December 21, 1996
+</B>
+At 11:58 12/20/96 -0500, Sam Gentile wrote:
+>Environment: MSVC 4.2b Windows NT 4.0
+
+>I am getting a strange crash in my OCX if I use in VB Design Mode or in a
+>Visual C++ program. I have an 32-bit OCX that has two threads. Basically,
+>there is one thread that runs every 100 milliseconds to do some work and
+>the other regular OCX thread. The code that crashes seems to run OK
+>hundreds of times I make the VB user program an EXE or run VC++ in
+>non-debug mode. But if I run VC++ in Debug or I put the control in any OLE
+>container in design mode, it crashes.
+
+>A stack dump shows:
+
+>The line where the problem starts:
+>	CSingleLock csl(&m_critGsiInterface);
+>Where: CCriticalSection m_critGsiInterface is a member of the class.
+
+>The line in the constructor:
+>	ASSERT(pObject->IsKindOf(RUNTIME_CLASS(CSyncObject)));
+>The debugger shows me that pObject is "CSyncObject". I don't get it.
+>CCriticalSection is certainly dervived from CSyncObject.
+
+This is a symptom of not having your moudle state set correctly.  What
+you've described suggests that you have missed a AFX_MANAGE_STATE()
+call somewhere that you need it.
+
+>Also, how do I stop a thread when someone exits the program?
+
+You might be tempted to post a message to it during your control's
+ExitInstance(), but this is dangerous.  In an OLE Control, ExitInstance()
+is called from the control's DllMain() handler.  If you terminate the
+thread during this time, the thread's death will cause Windows to reenter
+your DllMain() function and that means that you'll end up in a deadlock:
+Windows won't let you enter the DllMain(), but your thread can't
+terminate until it has successfully notified DllMain() of its death.
+
+You'll probably be better off terminating your suboordinate thread in
+an override of COleControl::OnClose(), which happens before the control's
+OCX is unloaded but after the control is done being used.
+
+You should post a message to your thread and wait on the thread handle
+to make sure it really is dead.  Don't, ever, under any circumstances ever,
+call the TerminateThread() API.
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+I'm afraid I've become some sort of speed freak.
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+TA -- <A HREF="mailto:siemens@inet.uni-c.dk">siemens@inet.uni-c.dk</A>
+Monday, December 23, 1996
+</B>
+
+Sam Gentile wrote:
+----------
+> From: Sam Gentile <sgentile@gensym.com>
+> To: mfc-l@netcom.com
+> Subject: Strange CSingleLock crash in Multi-threaded OCX
+> Date: 20. december 1996 17:58
+> 
+> Environment: MSVC 4.2b Windows NT 4.0
+> 
+> I am getting a strange crash in my OCX if I use in VB Design Mode or in a
+> Visual C++ program. I have an 32-bit OCX that has two threads. Basically,
+> there is one thread that runs every 100 milliseconds to do some work and
+> the other regular OCX thread. The code that crashes seems to run OK
+> hundreds of times I make the VB user program an EXE or run VC++ in
+> non-debug mode. But if I run VC++ in Debug or I put the control in any
+OLE
+> container in design mode, it crashes.
+> 
+> A stack dump shows:
+> 
+> The line where the problem starts:
+> 	CSingleLock csl(&m_critGsiInterface);
+> Where: CCriticalSection m_critGsiInterface is a member of the class.
+> 
+> The line in the constructor:
+> 	ASSERT(pObject->IsKindOf(RUNTIME_CLASS(CSyncObject)));
+> The debugger shows me that pObject is "CSyncObject". I don't get it.
+> CCriticalSection is certainly dervived from CSyncObject.
+> 
+> Then the line of the actual crash:
+> 	CRuntimeClass* pClassThis = GetRuntimeClass();
+> 
+> in CObject::IsKindOf()
+> 
+> What is going on here? Also, how do I stop a thread when someone exits
+the
+> program?
+> 
+> Thanks,
+> Sam Gentile
+> 
+> 
+
+In Mike Blaszczak's book 'MFC programming with Visual C++' on p. 479 he
+states that:
+"Even though CSingleLock can accept a pointer to a CCriticalSectionObject,
+don't try it; it won't work. CCriticalSection uses a different access
+pattern than the rest of the objects do. You will get an ASSERT message if
+you try."
+
+I've tried this and he's actually right, which means that the online books
+contain an error as they tell you that it's possible to do so! This goes
+for the CMultiLock as well.
+
+If you need to access a CCriticalSection, just use the Lock() and Unlock()
+members of it. If you need to use CMultiLock, for example, use a CMutex
+instead of a CCriticalSection even though it's a lot heavier and slower.
+
+Mike Thomas Jakobsen
+Siemens@inet.uni-c.dk
+Siemens A/S
+Borupvang 3
+DK-2750 Ballerup
++45 4477 4477
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

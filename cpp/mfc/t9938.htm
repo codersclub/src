@@ -1,0 +1,384 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+calling OCX from a thread
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Michael Bermudez -- <A HREF="mailto:MichaelBermudez@www.ebsco.com">MichaelBermudez@www.ebsco.com</A>
+Thursday, March 06, 1997
+</B>
+Environment: VC++4.2b,Win95,NT4sp2
+
+I have an MFC app that is a WinSock server. Whenever this server accepts a 
+socket it spawns off a thread. I want to be able to use an OLE control from 
+this thread. What steps do I need to make this happen. I have added the 
+AfxOleInit and AfxEnableControlContainer calls to the InitInstance of my 
+CWinThread derived class. When I try to use Create with the object ( as 
+shown below ), the thread just hangs.
+
+	C_R3270 obj3270;
+	obj3270.Create( NULL, WS_DISABLED, CRect( 0, 0, 0, 0 ), GetMainWnd(),
+					IDC_3270 );
+
+Do I need to do more from a container aspect?
+
+Any help would be appreciated,
+Michael
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Sunday, March 09, 1997
+</B>
+[Mini-digest: 4 responses]
+
+At 13:48 3/6/97 -0600, Michael Bermudez wrote:
+>Environment: VC++4.2b,Win95,NT4sp2
+
+>I have an MFC app that is a WinSock server. Whenever this server accepts a 
+>socket it spawns off a thread. I want to be able to use an OLE control from 
+>this thread. What steps do I need to make this happen. I have added the 
+>AfxOleInit and AfxEnableControlContainer calls to the InitInstance of my 
+>CWinThread derived class. When I try to use Create with the object ( as 
+>shown below ), the thread just hangs.
+>
+>	C_R3270 obj3270;
+>	obj3270.Create( NULL, WS_DISABLED, CRect( 0, 0, 0, 0 ), GetMainWnd(),
+>					IDC_3270 );
+
+Where, exactly, does it hang?
+
+MFC can contain controls and let you use them on multiple threads.  But
+some controls just can't stand that arrangement.  Maybe you have one of
+those controls.
+
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+These words are my own. I do not speak on behalf of Microsoft.
+           This performance was not lip-synched.
+
+-----From: "Doug Brubacher" <Doug_Brubacher@compuware.com>
+
+     I am not familiar with this specific problem but taking a wild guess, 
+     what is GetMainWnd() returning? Perhaps you need to override this 
+     function to return a valid CWnd.
+     
+     Regards,
+     
+     Doug Brubacher
+     Doug_Brubacher@compware.com
+
+-----From: mzinner@berlin.snafu.de
+
+> I have an MFC app that is a WinSock server. Whenever this server accepts a 
+> socket it spawns off a thread. I want to be able to use an OLE control from 
+> this thread. What steps do I need to make this happen. I have added the 
+> AfxOleInit and AfxEnableControlContainer calls to the InitInstance of my 
+> CWinThread derived class. When I try to use Create with the object ( as 
+> shown below ), the thread just hangs.
+> 
+> 	C_R3270 obj3270;
+> 	obj3270.Create( NULL, WS_DISABLED, CRect( 0, 0, 0, 0 ), GetMainWnd(),
+> 					IDC_3270 );
+> 
+> Do I need to do more from a container aspect?
+
+Michael,
+
+there is a lot of OLE conversation going on between  server (== 
+control) and client (==container) when the control is created. 
+Various container interfaces (IOleContainer, IOleClientSite, ...) are 
+involved.
+MFC handles this almost transparantly by it's non-published classes 
+COleControlContainer, COleControlSite and COccManager. They are 
+created when needed (on your first Control->Create()), and they are 
+enabled by AfxEnableControlContainer(). I'm quite shure that 
+COccManager (and every container/site it creates) is thread-local, 
+and you have only one of them (in your main thread), not in every 
+sub-thread.
+
+Perhaps you could try to use your own OccManager in your thread; 
+AfxEnableControlContainer accepts an undocumented argument, like 
+this:
+
+AfxEnableControlContainer(&myOccManager);
+
+-manfred
+-----From: Michael Bermudez <MichaelBermudez@www.ebsco.com>
+
+I have figured out my problem. I had to change the way my server was 
+implemented and use some of the asynchronous Winsock functions. Using these 
+allowed the Window attached to the main process to receive and process 
+messages rather than blocking from an accept function. This is what was 
+causing the OCX as well as message boxes and anything else GUI related to 
+fail in my threads. I am now able to call my OCX from a simple worker 
+thread as well as a CWinThread derived UI thread.
+
+Thanks,
+Michael
+
+-----Original Message-----
+From:	Jean Libera [SMTP:jean.libera@tdata.com]
+Sent:	Monday, March 10, 1997 8:20 AM
+To:	MichaelBermudez@www.ebsco.com
+Subject:	Re: calling OCX from a thread
+
+Does the thread which owns the OCX have a message loop?  I have recently
+read things which imply that this is necessary, although I don't understand
+why.
+
+Jean Libera
+jlibera@tdata.com
+
+At 01:48 PM 3/6/97 -0600, you wrote:
+>Environment: VC++4.2b,Win95,NT4sp2
+>
+>I have an MFC app that is a WinSock server. Whenever this server accepts a 
+>socket it spawns off a thread. I want to be able to use an OLE control 
+from
+>this thread. What steps do I need to make this happen. I have added the
+>AfxOleInit and AfxEnableControlContainer calls to the InitInstance of my
+>CWinThread derived class. When I try to use Create with the object ( as
+>shown below ), the thread just hangs.
+>
+>	C_R3270 obj3270;
+>	obj3270.Create( NULL, WS_DISABLED, CRect( 0, 0, 0, 0 ), GetMainWnd(),
+>					IDC_3270 );
+>
+>Do I need to do more from a container aspect?
+>
+>Any help would be appreciated,
+>Michael
+>
+>
+>
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Sunday, March 09, 1997
+</B>
+[Mini-digest: 4 responses]
+
+At 13:48 3/6/97 -0600, Michael Bermudez wrote:
+>Environment: VC++4.2b,Win95,NT4sp2
+
+>I have an MFC app that is a WinSock server. Whenever this server accepts a 
+>socket it spawns off a thread. I want to be able to use an OLE control from 
+>this thread. What steps do I need to make this happen. I have added the 
+>AfxOleInit and AfxEnableControlContainer calls to the InitInstance of my 
+>CWinThread derived class. When I try to use Create with the object ( as 
+>shown below ), the thread just hangs.
+>
+>	C_R3270 obj3270;
+>	obj3270.Create( NULL, WS_DISABLED, CRect( 0, 0, 0, 0 ), GetMainWnd(),
+>					IDC_3270 );
+
+Where, exactly, does it hang?
+
+MFC can contain controls and let you use them on multiple threads.  But
+some controls just can't stand that arrangement.  Maybe you have one of
+those controls.
+
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+These words are my own. I do not speak on behalf of Microsoft.
+           This performance was not lip-synched.
+
+-----From: "Doug Brubacher" <Doug_Brubacher@compuware.com>
+
+     I am not familiar with this specific problem but taking a wild guess, 
+     what is GetMainWnd() returning? Perhaps you need to override this 
+     function to return a valid CWnd.
+     
+     Regards,
+     
+     Doug Brubacher
+     Doug_Brubacher@compware.com
+
+-----From: mzinner@berlin.snafu.de
+
+> I have an MFC app that is a WinSock server. Whenever this server accepts a 
+> socket it spawns off a thread. I want to be able to use an OLE control from 
+> this thread. What steps do I need to make this happen. I have added the 
+> AfxOleInit and AfxEnableControlContainer calls to the InitInstance of my 
+> CWinThread derived class. When I try to use Create with the object ( as 
+> shown below ), the thread just hangs.
+> 
+> 	C_R3270 obj3270;
+> 	obj3270.Create( NULL, WS_DISABLED, CRect( 0, 0, 0, 0 ), GetMainWnd(),
+> 					IDC_3270 );
+> 
+> Do I need to do more from a container aspect?
+
+Michael,
+
+there is a lot of OLE conversation going on between  server (== 
+control) and client (==container) when the control is created. 
+Various container interfaces (IOleContainer, IOleClientSite, ...) are 
+involved.
+MFC handles this almost transparantly by it's non-published classes 
+COleControlContainer, COleControlSite and COccManager. They are 
+created when needed (on your first Control->Create()), and they are 
+enabled by AfxEnableControlContainer(). I'm quite shure that 
+COccManager (and every container/site it creates) is thread-local, 
+and you have only one of them (in your main thread), not in every 
+sub-thread.
+
+Perhaps you could try to use your own OccManager in your thread; 
+AfxEnableControlContainer accepts an undocumented argument, like 
+this:
+
+AfxEnableControlContainer(&myOccManager);
+
+-manfred
+-----From: Michael Bermudez <MichaelBermudez@www.ebsco.com>
+
+I have figured out my problem. I had to change the way my server was 
+implemented and use some of the asynchronous Winsock functions. Using these 
+allowed the Window attached to the main process to receive and process 
+messages rather than blocking from an accept function. This is what was 
+causing the OCX as well as message boxes and anything else GUI related to 
+fail in my threads. I am now able to call my OCX from a simple worker 
+thread as well as a CWinThread derived UI thread.
+
+Thanks,
+Michael
+
+-----Original Message-----
+From:	Jean Libera [SMTP:jean.libera@tdata.com]
+Sent:	Monday, March 10, 1997 8:20 AM
+To:	MichaelBermudez@www.ebsco.com
+Subject:	Re: calling OCX from a thread
+
+Does the thread which owns the OCX have a message loop?  I have recently
+read things which imply that this is necessary, although I don't understand
+why.
+
+Jean Libera
+jlibera@tdata.com
+
+At 01:48 PM 3/6/97 -0600, you wrote:
+>Environment: VC++4.2b,Win95,NT4sp2
+>
+>I have an MFC app that is a WinSock server. Whenever this server accepts a 
+>socket it spawns off a thread. I want to be able to use an OLE control 
+from
+>this thread. What steps do I need to make this happen. I have added the
+>AfxOleInit and AfxEnableControlContainer calls to the InitInstance of my
+>CWinThread derived class. When I try to use Create with the object ( as
+>shown below ), the thread just hangs.
+>
+>	C_R3270 obj3270;
+>	obj3270.Create( NULL, WS_DISABLED, CRect( 0, 0, 0, 0 ), GetMainWnd(),
+>					IDC_3270 );
+>
+>Do I need to do more from a container aspect?
+>
+>Any help would be appreciated,
+>Michael
+>
+>
+>
+
+
+-----From: Blane Nelson <blanen@coresoft.com>
+
+Michael,
+
+It sounds like you already have an instance of the OCX on another thread =
+There is a problem on Win95 where it locks up if you create an apartment =
+threaded object on one thread and then try to create another instance of =
+the same object on another thread.  I saw a tech note or a bug report on =
+it a while back, but don't remember the number.
+
+I'm not sure what you are try to do, but there are several good article =
+about OCX's and apartment  threading on the MSDN.  You can do it but you =
+have to be very careful about where and when objects are created and =
+destroyed.
+
+-Blane Nelson
+-Coresoft Technologies
+
+----------
+From: 	Michael Bermudez[SMTP:MichaelBermudez@www.ebsco.com]
+Sent: 	Thursday, March 06, 1997 12:48 PM
+To: 	mfc-l@netcom.com
+Subject: 	calling OCX from a thread
+
+Environment: VC++4.2b,Win95,NT4sp2
+
+I have an MFC app that is a WinSock server. Whenever this server accepts =
+a=20
+socket it spawns off a thread. I want to be able to use an OLE control =
+from=20
+this thread. What steps do I need to make this happen. I have added the=20
+AfxOleInit and AfxEnableControlContainer calls to the InitInstance of my =
+
+CWinThread derived class. When I try to use Create with the object ( as=20
+shown below ), the thread just hangs.
+
+	C_R3270 obj3270;
+	obj3270.Create( NULL, WS_DISABLED, CRect( 0, 0, 0, 0 ), GetMainWnd(),
+					IDC_3270 );
+
+Do I need to do more from a container aspect?
+
+Any help would be appreciated,
+Michael
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+    <A HREF="http://www.digiday.com/mfcpro/joinmfcl.htm">Become an MFC-L member</A>
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

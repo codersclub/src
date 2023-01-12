@@ -1,0 +1,305 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+ODBC count elements
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Marco Valerio -- <A HREF="mailto:valeriom@smfds2.milano.italtel.it">valeriom@smfds2.milano.italtel.it</A>
+Thursday, August 01, 1996
+</B>
+Environment: Visual C++ 4.1, Win95
+
+Hi,
+
+I've a table that contains about 50000 elements.
+I use the GetCount(CRecordset *) function, but is very slow.
+Wich is the quickest way to count the elements in a table ?
+
+
+regards.
+
+---------------------------------------
+Marco Valerio 
+
+valeriom@smfds2.milano.italtel.it
+---------------------------------------
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Frank McGeough -- <A HREF="mailto:fm@synchrologic.com">fm@synchrologic.com</A>
+Monday, August 05, 1996
+</B>
+[Mini-digest: 8 responses]
+
+At 09:17 AM 8/1/96 +0000, you wrote:
+>Environment: Visual C++ 4.1, Win95
+>
+>Hi,
+>
+>I've a table that contains about 50000 elements.
+>I use the GetCount(CRecordset *) function, but is very slow.
+>Wich is the quickest way to count the elements in a table ?
+
+I would recommend you use straight SQL/ODBC to get the count of
+rows (SQLExecDirect - select count(*) from tableX. Bind a long
+to get the count. The performance will vary depending on the
+db vendor, but it's the fastest way programmatically.
+
+>valeriom@smfds2.milano.italtel.it
+
+-----From: Mike Blaszczak <mikeblas@nwlink.com>
+
+The  quickest way is to have the database do the work: write a
+SQL statement that does a SELECT COUNT of what you want.
+
+.B ekiM
+http://www.nwlink.com/~mikeblas/
+These words are my own. I do not speak on behalf of Microsoft.
+
+-----From: Herb Warren <warren@jws.com>
+
+GetCount( CRecordset *) should translate into SQL as something like "select
+count(*) from <tablename>," which is slow, plain and simple. If you are
+dealing with tables with large amounts of data, it is usually worthwhile to
+have a table to cache data that is time consuming to compute on the fly. The
+problem with this is that it's one more table to maintain.
+
+Some of the better relational database systems let you create, manipulate &
+query sequences, which are system objects, so the RDBMS takes care of that
+kind of data for you. If you are going through ODBC, you can't depend on
+having that sort of capability and therefore you will have to do it yourself.
+
+The short answer is, without a modification of your database, you are going
+to have to live with the current performance.
+ ________________________________________________________________________
+ Herb Warren - Junior G-Man, Rocket Scientist.  AM/FM/GIS Services
+ James W Sewall Company                         Voice:  207-827-4456
+ 147 Center Street                              Fax:    207-827-3641
+ Old Town, Maine 04468                          Email:  warren@jws.com
+_________________________________________________________________________
+
+-----From: David Lloyd <sdjl@csn.net>
+
+The easiest (and probably fastest) way is to create a 
+query using the COUNT directive - example
+
+  SELECT COUNT (supplier_name) FROM suppliers
+
+David Lloyd
+
+-----From: Vincent Mascart <100425.1337@CompuServe.COM>
+
+I don't know this function. I think it's one you have written yourself, isn't it
+?
+
+>Wich is the quickest way to count the elements in a table ?
+
+I use the following code and it worked perfectly and as fast as I needed.
+
+You can even use m_strFilter to tailor the count you want.
+
+// Header file
+class CRecordCounter : public CRecordset
+{
+protected:
+	long	m_lRowCount;
+	CString	m_strTable;
+
+protected:
+	//{{AFX_VIRTUAL(CRecordCounter)
+	public:
+	virtual	CString	GetDefaultSQL(); 				//
+Default SQL for Recordset
+	virtual	void	DoFieldExchange(CFieldExchange* pFX);	// RFX support
+	//}}AFX_VIRTUAL
+
+public:
+	CRecordCounter(CDatabase* pDatabase);
+
+	long	GetRowCount(LPCTSTR lpszTable);
+
+	DECLARE_DYNAMIC(CRecordCounter)
+};
+
+
+// .cpp file
+
+IMPLEMENT_DYNAMIC(CRecordCounter, CRecordset)
+
+CRecordCounter::CRecordCounter(CDatabase* pdb)
+	: CRecordset(pdb)
+{
+	m_lRowCount = 0;
+	m_nFields = 1;
+}
+
+CString CRecordCounter::GetDefaultSQL()
+{
+	return m_strTable;
+}               
+
+void CRecordCounter::DoFieldExchange(CFieldExchange* pFX)
+{
+	pFX->SetFieldType(CFieldExchange::outputColumn);
+	RFX_Long(pFX, "COUNT(*)", m_lRowCount);
+}
+
+long CRecordCounter::GetRowCount(LPCTSTR lpszTable)
+{
+	ASSERT(lpszTable!=NULL);
+
+	TRACE1("[COUNTER]   Retrieving row count for %s\n",lpszTable);
+
+	if(m_strTable!=lpszTable)
+	{
+		if( IsOpen() )
+			Close();
+		m_strTable = lpszTable;
+	}
+
+	TRY
+	{
+		if(!IsOpen())
+		{
+			CRecordset::Open(CRecordset::dynaset,
+lpszTable,CRecordset::readOnly);
+		}
+		else
+		{
+			Requery();
+		}
+	}
+	CATCH(CException,e)
+	{
+		TRACE0("[COUNTER]   Error: exception by CRecordset in
+GetRowCount().\n");
+		ASSERT(FALSE);
+		return -1;
+	}
+	END_CATCH
+	return m_lRowCount;
+}
+
+HTH
+
+Vincent Mascart
+100425.1337@compuserve.com
+
+-----From: "Lee, Benny" <blee@filenet.com>
+
+
+You may want to use ODBC direct calls.
+
+Benny
+-----From: Mike Morel <mmorel@mushroomsoft.com>
+
+I suspect the fastest way to get the count of rows in a very large result
+set is to create another query similar to the first, but with "select
+count(*)" as the select clause.  Use the same filter.  This will return a
+single row with a single column that is the rowcount.  This works in some
+situations, but there are two problems that I've run across:
+        1. If there is a lot of activity on the database, rows can be added
+or deleted between the time you run the "count" query and the "real" query,
+so you'll just get a good approximation.
+
+        2. Some queries cannot be changed to count queries and be
+syntactically correct.  For instance, if the "real" query is "select
+distinct x, y...", then "select count( distinct x,y)" or "select distinct
+count(x,y)" will get a syntax error.
+
+ODBC gives you another way to speed things up, but I have yet to find a
+driver which implements it.  You should be able to turn off data retrieval
+in a recordset, move to the end, then turn data retrieval back on.  This
+should eliminate the overhead of retrieving the data, and caching it in the
+cursor lib.  Then you could use GetRecordCount() to get the last row number.
+It would look something like this:
+
+long CMySet::GetCount()
+{
+        ::SQLSetStmtOption(m_hstmt, SQL_RETRIEVE_DATA, SQL_RD_OFF);
+        MoveLast();
+        ::SQLSetStmtOption(m_hstmt, SQL_RETRIEVE_DATA, SQL_RD_ON);
+        return GetRecordCount();
+}
+
+But like I said, any driver I have tried takes just as long to get to the
+end of the set this way.
+
+Mike Morel
+Mushroom Software
+mmorel@mushroomsoft.com
+www.mushroomsoft.com/mushroom
+216-659-4743
+
+-----From: "Alistair Israel" <aisrael@hotmail.com>
+
+BTW, where'd you get GetCount()? I know CRecordset has a GetRecordCount()
+member function, but this is unreliable/inexact and also possible slow.
+
+IAC, your GetCount() is probably doing a 'table scan' that is, fetching each
+record in the table then incrementing a counter.
+
+>Which is the quickest way to count the elements in a table ?
+
+The fastest way would be to create a custom CRecordset derived-class that
+queries for an aggregate function on a table.  In your case, you would use the
+SQL function 'COUNT(*)'.  I don't know if you can do this using any wizards or
+what, but it can easily be done programmatically.
+
+HTH!
+
+"Walk the earth, Surf the Net"
+
+- Alistair Israel (aisrael@hotmail.com)
+Developer Dude
+Pilipino Data Network, Inc.
+http://202.47.133.168 [0800-2000 GMT+0800 only]
+
+---------------------------------------------------------
+Get Your *Web-Based* Free Email at http://www.hotmail.com
+---------------------------------------------------------
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

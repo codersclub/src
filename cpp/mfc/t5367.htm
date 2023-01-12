@@ -1,0 +1,274 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Flushing cached writes of CDatabase objects with Jet3.0
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Ed Lenox -- <A HREF="mailto:101721.2225@CompuServe.COM">101721.2225@CompuServe.COM</A>
+Friday, May 31, 1996
+</B>
+VC4.1 / Win95
+
+I am having a problem disabling the asynchronous behaviour of Jet 3.0 when doing
+updates to an ODBC database (Access7)
+
+Background:
+I have two CRecordsets pointing to the same table in an Access 7 database. I am
+using a different CDatabase object for each recordset (one recordset is in a COM
+object, so I can't pass it a CDatabase pointer, as it may be in a different
+process space). I'll call these RecA, RecB and dbA and dbB. 
+
+Problem:
+The problem is that if RecA adds a new record to the database, and then RecB
+does a Requery(), the new record is not shown immediately. Requerying RecB at a
+later time get the new record, but I want it asap.
+
+If I use the same CDatabase object for both recordsets, the problem goes away.
+This is what should normally be done (by passing the CDatabase* to the
+constructor of RecB), but, as I explained, this is not possible due to the
+system design.
+
+Using an Access 2.0 database cures the problem, so it seems it must be caused by
+the asynchronous behaviour allowed by Jet 3.0 engine. (Write-behind caching)
+
+What I want to do is one of the following:
+1. Flush the cached write of RecA, before requerying RecB
+2. Disable the asynchronous behaviour of the Jet Engine for this write/read
+3. Generate a message when the write has been completed
+	
+Attempted solutions:
+1. Use CDatabase::SetSynchronousMode(TRUE) 
+	- No effect when used on either or both dbA and dbB at any point. Why
+not?
+
+2. Wrap RecA's update in a transaction
+	- No effect (Email me if you want to know how to enable transactions for
+an MS Access CDatabase, and don't have MSDN)
+
+3. Add registry keys for Jet Engine
+HKEY_LOCAL_MACHINE\SOFTWARE\MICROSOFT\JET\3.0\ENGINES\JET 
+key:ImplicitCommitSync  value: "No" 
+	- No effect
+ *Note   Microsoft Jet 3.0 incorrectly reverses the Boolean sense of the
+ImplicitCommitSync and UserCommitSync keys when these values are specified in
+the Registry so that a setting of No would be interpreted as Yes.  - But I tried
+both ways to make sure
+
+	key:Threads	value: 1
+	- No effect 
+
+4. Change registry keys for Jet Engine
+HKEY_LOCAL_MACHINE\SOFTWARE\MICROSOFT\JET\3.0\ENGINES\ODBC
+	key: DisableAsync = 1
+	- No effect
+I'd rather not change these registry settings anyway, as I don't want to disable
+the asynchronous writing for all cases. From what I can tell from the docs the
+ODBC Desktop drivers use the Jet Engine. But maybe I misunderstand...
+
+5. Use ::Sleep() to cause a delay before requerying RecB
+	- Works erratically but is not really desired as it causes unecessary
+delay
+
+6. Closing and opening the recordsets has no effect, but closing and opening dbB
+after the update of RecA works. However, this is not desired because of the
+overhead of reopening a hdbc. This may be doing some sort of flushing in
+CDatabase::Open() or CDatabase::Close(), but I can't see exactly where. 
+
+Any ideas??
+
+Thank you for reading so far in such a long message......apologies, grovels etc.
+_____________________
+Ed Lenox
+POWERCOM-2000 (Ireland)
+101721.2225@compuserve.com
+______________________
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Vincent Mascart -- <A HREF="mailto:100425.1337@compuserve.com">100425.1337@compuserve.com</A>
+Monday, June 03, 1996
+</B>
+>From: 	Ed Lenox
+>
+>VC4.1 / Win95
+>
+>I am having a problem disabling the asynchronous behaviour of Jet 3.0 when
+doing
+>updates to an ODBC database (Access7)
+>
+>Background:
+>I have two CRecordsets pointing to the same table in an Access 7 database. I am
+>using a different CDatabase object for each recordset (one recordset is in a
+COM
+>object, so I can't pass it a CDatabase pointer, as it may be in a different
+>process space). I'll call these RecA, RecB and dbA and dbB. 
+>
+>Problem:
+>The problem is that if RecA adds a new record to the database, and then RecB
+>does a Requery(), the new record is not shown immediately. Requerying RecB at a
+>later time get the new record, but I want it asap.
+
+I also have the same problem. What you didn't mention is that the problem also
+appear if you Edit() then Update() on record with RecA, then requery with RecB.
+Sometimes you get the old data, sometimes the new one (if enough time elapsed).
+
+>If I use the same CDatabase object for both recordsets, the problem goes away.
+>This is what should normally be done (by passing the CDatabase* to the
+>constructor of RecB), but, as I explained, this is not possible due to the
+>system design.
+
+Same for me.
+
+[snip]
+	
+>Attempted solutions:
+>1. Use CDatabase::SetSynchronousMode(TRUE) 
+>    No effect when used on either or both dbA and dbB at any point. Why not?
+>2. Wrap RecA's update in a transaction
+>    No effect (Email me if you want to know how to enable transactions for
+>    an MS Access CDatabase, and don't have MSDN)
+
+Same for me for both solution.
+To support transaction, do the following:
+
+- Open your CDatabase setting the bUseCursorLib parameter to FALSE
+- Change the member m_bTransactions to TRUE
+
+Your Database now support transactions
+
+[snip]
+
+>5. Use ::Sleep() to cause a delay before requerying RecB
+>   Works erratically but is not really desired as it causes unecessary delay
+>
+>6. Closing and opening the recordsets has no effect, but closing and opening
+dbB
+>after the update of RecA works. However, this is not desired because of the
+>overhead of reopening a hdbc. This may be doing some sort of flushing in
+>CDatabase::Open() or CDatabase::Close(), but I can't see exactly where. 
+
+Same for me with the same considerations.
+The minimum sleep time I found to be *quite reliable* was 5000 on a P100 with
+32Mb (ouch !)
+The only "safe" way is effectively to close en re-open the CDatabase. I also
+think is a very poor workaround.
+
+Contacting Microsoft support, they didn't find any solution for now ... I'm
+still waiting ...
+
+Vincent Mascart
+100425.1337@compuserve.com
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Vincent Mascart -- <A HREF="mailto:100425.1337@compuserve.com">100425.1337@compuserve.com</A>
+Tuesday, July 16, 1996
+</B>
+>From: 	Ed Lenox
+>Sent: 	lundi 3 juin 1996 9:31
+>To: 	"'mfc-l'"
+>Subject: 	Flushing cached writes of CDatabase objects with Jet3.0
+>
+>VC4.1 / Win95
+>
+>I am having a problem disabling the asynchronous behaviour of Jet 3.0 when
+doing
+>updates to an ODBC database (Access7)
+>
+>Background:
+>I have two CRecordsets pointing to the same table in an Access 7 database. I am
+>using a different CDatabase object for each recordset (one recordset is in a
+COM
+>object, so I can't pass it a CDatabase pointer, as it may be in a different
+>process space). I'll call these RecA, RecB and dbA and dbB. 
+>
+>Problem:
+>The problem is that if RecA adds a new record to the database, and then RecB
+>does a Requery(), the new record is not shown immediately. Requerying RecB at a
+>later time get the new record, but I want it asap.
+>
+>If I use the same CDatabase object for both recordsets, the problem goes away.
+>This is what should normally be done (by passing the CDatabase* to the
+>constructor of RecB), but, as I explained, this is not possible due to the
+>system design.
+>
+>Using an Access 2.0 database cures the problem, so it seems it must be caused
+by
+>the asynchronous behaviour allowed by Jet 3.0 engine. (Write-behind caching)
+>
+>What I want to do is one of the following:
+>1. Flush the cached write of RecA, before requerying RecB
+>2. Disable the asynchronous behaviour of the Jet Engine for this write/read
+>3. Generate a message when the write has been completed
+
+Ed,
+	
+I know it's a long time you posted your question, but I received the answer
+today from Microsoft. I hope you already found the answer, and if not, that
+you're not too desperate and still alive.
+
+You should check their Knowledge Base Article ID Q153046 (dated 28 june 96)
+
+Briefly, you should set the PageTimeout key in
+HKEY_LOCAL_MACHINE\Software\Microsoft\Jet\3.0\Engines\Jet which specifies the
+length ot time, in milliseconds, between when data is placed in the Jet internal
+cache and when its checked to be potentially invalidated. The default value is
+five (5) seconds.
+
+I tested it and it works fine.
+
+HTH
+
+Vincent Mascart
+100425.1337@compuserve.com
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

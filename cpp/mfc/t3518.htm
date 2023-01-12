@@ -1,0 +1,324 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CMemoryException problem
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Rafa Barbera -- <A HREF="mailto:rbarb@astro.gea.cesca.es">rbarb@astro.gea.cesca.es</A>
+Friday, January 19, 1996
+</B>
+Hello,
+
+I'm using VC++ and MFC from a year or so. I'm using 1.52c and 4.0 VC++
+on a 486DX4 24Mb and Win95. My problem arryse with VC++ 1.52c.
+
+I have a simple class definition
+
+class CPtoGrafica {
+public:
+	float	x;
+	float	y;
+	BYTE	obs;
+};
+
+when i need some instances i use the new operator:
+
+int cPoint = <some big value>;
+
+CPtoGrafica * pGra = new CProGrafica [cPoint];
+
+and i assume that the framework throw a CMemoryException when it can
+give me the memory. The problem is that i can't see any memory
+exception, i get a not NULL pointer, but when i begin to use the
+pointer i get a GPF.
+
+Debuging this code i can see that the new operator recive a value
+diferent that cPoint! This value is small that cPoint and the framework
+assign this amoun of memory and don't throw the exception. Obiously
+when i go form 0 to cPoint working with pGra y get a GPF.
+
+I'm compiling without any optimization flag (i read about this on MSDN CD)
+
+¿Is this a bug? ¿Is for design? ¿How can i resolve this problem?
+
+Thanks for your time,
+Rafael Barberá
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+David W. Gillett -- <A HREF="mailto:DGILLETT@expertedge.com">DGILLETT@expertedge.com</A>
+Monday, January 22, 1996
+</B>
+[Mini-digest: 2 responses]
+
+> int cPoint = <some big value>;
+> 
+> CPtoGrafica * pGra = new CProGrafica [cPoint];
+
+  I assume that this error is just in your message, "Pro" vs "Pto", 
+right?
+
+ 
+> and i assume that the framework throw a CMemoryException when it can
+> give me the memory. The problem is that i can't see any memory
+> exception, i get a not NULL pointer, but when i begin to use the
+> pointer i get a GPF.
+> 
+> Debuging this code i can see that the new operator recive a value
+> diferent that cPoint! This value is small that cPoint and the framework
+> assign this amoun of memory and don't throw the exception. Obiously
+> when i go form 0 to cPoint working with pGra y get a GPF.
+
+  We've sometimes seen a problem in our own code when the size of an 
+array goes over 64K.  Typically the size is the product of some 
+number of elements and some element size.  If both of these 
+quantities are 16-bit, the multiplication is done only in 16 bits and 
+so the high word of the result is lost.  Instead of getting the full 
+needed allocation, we get only the allocation modulo 64K.
+  It's possible that the 1.52c implementation of new has a similar 
+problem.  Try changing cPoint from "int" to "long", to force the size 
+calculation to be done in 32 bits.
+
+  You may also need to adjust your struct alignment under project 
+options.  Since your struct contains floats, which are 4 bytes, a 
+struct alignment setting of less than 4 (default is 2!) means that if 
+your array is bigger than 128K, there will be a segment boundary in 
+the middle of one of your data members.  I don't think this will 
+cause a GPF, but it *will* produce incorrect results.
+  If the alignment value is not a power of 2 and >= element size 
+(which in this case is 9, so it would have to be 16...), there can be 
+a segment boundary in the middle of one of your structs, too.  1.52c 
+*might* handle this correctly if you declare your pointer as "huge", 
+but many 16-bit compilers do not and so I would not bet on it.
+
+  16-bit ints and segment problems with large arrays are, of course, 
+artifacts of the 16-bit environment that become irrelevant in 32-bit 
+code.  If you really need an array bigger than 64K, you should 
+strongly consider whether your program can't be written for 32 bits 
+rather than 16.
+
+Dave
+
+-----From: Niels Ull Jacobsen <nuj@kruger.dk>
+
+> I'm using VC++ and MFC from a year or so. I'm using 1.52c and 4.0 VC++
+> on a 486DX4 24Mb and Win95. My problem arryse with VC++ 1.52c.
+> 
+> I have a simple class definition
+> 
+> class CPtoGrafica {
+> public:
+> 	float	x;
+> 	float	y;
+> 	BYTE	obs;
+> };
+> 
+> when i need some instances i use the new operator:
+> 
+> int cPoint = <some big value>;
+> 
+> CPtoGrafica * pGra = new CProGrafica [cPoint];
+> 
+> and i assume that the framework throw a CMemoryException when it can
+> give me the memory. The problem is that i can't see any memory
+> exception, i get a not NULL pointer, but when i begin to use the
+> pointer i get a GPF.
+
+No. CMemoryException's are thrown by MFC in CObArray::SetSize() and
+places like that - not by the plain C++ new operator.
+
+New should just return NULL if there isn't sufficient memory, unless
+you have set up a handler with _set_new_handler.
+
+> 
+> Debuging this code i can see that the new operator recive a value
+> diferent that cPoint! This value is small that cPoint and the framework
+> assign this amoun of memory and don't throw the exception. Obiously
+> when i go form 0 to cPoint working with pGra y get a GPF.
+
+Sorry, but this is rather unclear to me. How do you step into operator new?
+I didn't think that was possible in VC 1.5?
+
+Come to think of it, could your problem be an overflow error? What
+values of cPoint are you using? Each of your cPoint's are 9 bytes +
+padding and the standard operator new can't allocate blocks larger
+than 64K.  It could be that you need to use a __huge array? BTW, in
+this case you must make sure that sizeof(cPoint) == 2^n if you wan't
+the wrapping to work. This will waste quite a lot of memeory in you
+case.
+
+
+
+
+
+> 
+> I'm compiling without any optimization flag (i read about this on MSDN CD)
+> 
+> ¿Is this a bug? ¿Is for design? ¿How can i resolve this problem?
+> 
+> Thanks for your time,
+> Rafael Barberá
+> 
+> 
+> 
+
+
+--
+Niels Ull Jacobsen, Kruger A/S
+
+Everything stated herein is THE OFFICIAL POLICY of the entire Kruger
+group and should be taken as legally binding in every respect. Pigs
+will grow wings and fly.
+
+
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Rafa Barbera -- <A HREF="mailto:rbarb@astro.gea.cesca.es">rbarb@astro.gea.cesca.es</A>
+Wednesday, January 24, 1996
+</B>
+[Mini-digest: 2 responses]
+
+> CPtoGrafica * pGra =3D new CProGrafica [cPoint];
+
+>  I assume that this error is just in your message, "Pro" vs "Pto",=20
+>right?
+
+Yes, it's an typo in this message.
+
+
+>  We've sometimes seen a problem in our own code when the size of an=20
+>array goes over 64K.  Typically the size is the product of some=20
+>number of elements and some element size.  If both of these=20
+>quantities are 16-bit, the multiplication is done only in 16 bits and=20
+>so the high word of the result is lost.  Instead of getting the full=20
+>needed allocation, we get only the allocation modulo 64K.
+ > It's possible that the 1.52c implementation of new has a similar=20
+>problem.  Try changing cPoint from "int" to "long", to force the size=20
+>calculation to be done in 32 bits.
+
+Well, i try this aproach and don't work :-(. Tracing the code y see that =
+the new operator have a size_t argument and on 16 bits environement this =
+is a 16 bit integer, so i can't do what i want :-(.
+
+>You may also need to adjust your struct alignment under project=20
+>options.  Since your struct contains floats, which are 4 bytes, a=20
+>struct alignment setting of less than 4 (default is 2!) means that if=20
+>your array is bigger than 128K, there will be a segment boundary in=20
+>he middle of one of your data members.  I don't think this will=20
+>ause a GPF, but it *will* produce incorrect results.
+
+I try 4 and 16 bits and in both cases, VC have troubles. I get a couple =
+of warnings with 4 bits align and a lot more with 16... =BFis it posible =
+to work with packing of struct different of 2 and MFC in 16 bytes =
+environement?
+
+>  16-bit ints and segment problems with large arrays are, of course,=20
+>artifacts of the 16-bit environment that become irrelevant in 32-bit=20
+>code.  If you really need an array bigger than 64K, you should=20
+>strongly consider whether your program can't be written for 32 bits=20
+>rather than 16.
+
+Yes, this is the solution, but some of my users are on Win 3.11 and i =
+don=B4t want to send him Win32s (and win32s don't solve the memory =
+problems if i understand the documentation).
+
+>-----From: Niels Ull Jacobsen <nuj@kruger.dk>
+
+>No. CMemoryException's are thrown by MFC in CObArray::SetSize() and
+>places like that - not by the plain C++ new operator.
+
+I trace the code and y found a AfxThrowMemoryException in the code of =
+the operator new, just where it found that don't have sufficient memory. =
+The problem is other. Is on the size of the argument of operator new =
+(see upwards in this message)
+
+>New should just return NULL if there isn't sufficient memory, unless
+>you have set up a handler with _set_new_handler.
+
+This is "a C aproach" that don't work because the new operator get an =
+erroneus argument and allocate this amount of memory that is smaller =
+that i ask. I expected that the compiler MUST say anything and don't let =
+me crass without warning....
+
+>Sorry, but this is rather unclear to me. How do you step into operator =
+new?
+>I didn't think that was possible in VC 1.5?
+
+Well, i only press F8 ;-). Yes, the new operator is available for trace
+
+>Come to think of it, could your problem be an overflow error? What
+>values of cPoint are you using? Each of your cPoint's are 9 bytes +
+>padding and the standard operator new can't allocate blocks larger
+>than 64K.  It could be that you need to use a __huge array? BTW, in
+>this case you must make sure that sizeof(cPoint) =3D=3D 2^n if you =
+wan't
+>the wrapping to work. This will waste quite a lot of memeory in you
+>case.
+
+All seems that this is my problem. What surprise me is that when i ask =
+for N elements of size S, the code don't test an overflow on N*S before =
+it pass the result to the new operator :-?
+
+Thanks for your time,
+Rafael Barber=E1
+
+-----From: Martijn Vels <Vels0020@exact.nl>
+
+Maybe some overflow in the size???
+If you derived the object from CObject or whatever, CPoint * size class 
+might be just too much....
+Also, make sure you have the correct (Large) model afx library?....
+M.
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Âåðíóòüñÿ â êîðåíü Àðõèâà</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

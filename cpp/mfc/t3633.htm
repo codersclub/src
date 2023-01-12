@@ -1,0 +1,269 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Launch task and Wait in MFC
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Borenstein Andrei -- <A HREF="mailto:boren@actcom.co.il">boren@actcom.co.il</A>
+Thursday, January 25, 1996
+</B>
+
+Hello, 
+
+Could anybody point me to a source code for "launch task and wait" using 
+MFC ?
+There is an example TASKWAIT in MSDN CD-ROM but may be somebody already 
+ported it to MFC and could save me a work ?
+
+Thanks in advance ,
+
+Andrei Borenstein , boren@actcom.co.il
+
+
+ 			     //=====================================\\   
+ 			    //    Andrei Borenstein, SD Ltd.         \\  
+ 			   < P.O. Box 101, Migdal Haemek, ISRAEL 10551 > 
+ 			   \\ Tel. (972)6-547567 , FAX (972)6-547507 //  
+ 			    \\      E-mail :  boren@actcom.co.il    //   
+ 			     \\         CIS: 100274,2710           //    
+ 			      \\==================================//     
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Christoph P. Kukulies -- <A HREF="mailto:kuku@gilberto.physik.rwth-aachen.de">kuku@gilberto.physik.rwth-aachen.de</A>
+Saturday, January 27, 1996
+</B>
+[Mini-digest: 3 responses]
+
+> Could anybody point me to a source code for "launch task and wait" using 
+> MFC ?
+> There is an example TASKWAIT in MSDN CD-ROM but may be somebody already 
+> ported it to MFC and could save me a work ?
+> 
+> Thanks in advance ,
+
+The snippet of my Execute isn't terribly MFC specific, it's just Win32
+and I believe it doesn't run under Win 32s. In addition it
+redirects stdout of the launched process to a file for later
+inspection. You may ommit this.
+
+BOOL CMyDlg::Execute(char * str,int show)
+{
+    static HANDLE hOutputFile;
+    SECURITY_ATTRIBUTES sa          = {0};
+    STARTUPINFO         si          = {0};
+    PROCESS_INFORMATION pi          = {0};
+    HANDLE              hProcess    = NULL;
+    BOOL bRet;
+
+    sa.nLength = sizeof (sa);
+    sa.bInheritHandle = FALSE;
+    sa.lpSecurityDescriptor = NULL;
+
+    si.cb = sizeof(si);
+    si.dwFlags = STARTF_USESHOWWINDOW|STARTF_USESTDHANDLES;
+
+    si.wShowWindow = show;               // was HIDE
+    hOutputFile = CreateFile ("exec.log",
+                     GENERIC_WRITE|GENERIC_READ,
+                     FILE_SHARE_READ|FILE_SHARE_WRITE,
+                     &sa,
+                     CREATE_ALWAYS,
+                     FILE_ATTRIBUTE_NORMAL,
+                     NULL);
+    si.hStdInput  = GetStdHandle (STD_INPUT_HANDLE);
+    si.hStdOutput = hOutputFile;
+    si.hStdError  = hOutputFile;
+    bRet=CreateProceÜs (NULL,
+            str,
+            NULL,
+            NULL,
+            TRUE,
+            0,
+            NULL,
+            NULL,
+            &si,
+            &pi);
+
+     WaitForSingleObject (pi.hProcess, INFINITE);
+     CloseHandle(hOutputFile);
+     if(bRet){
+        CloseHandle (pi.hProcess);
+        CloseHandle (pi.hThread);
+    }
+    return bRet;
+}
+
+
+--Chris Christoph P. U. Kukulies kuku@gil.physik.rwth-aachen.de
+
+-----From: mikeblas@interserv.com
+
+On Thu, 25 Jan 1996, Borenstein Andrei <boren@actcom.co.il> wrote:
+
+>Could anybody point me to a source code for "launch task and wait" using 
+>MFC ?
+>There is an example TASKWAIT in MSDN CD-ROM but may be somebody already 
+>ported it to MFC and could save me a work ?
+
+This is relatively trivial to code: Call CreateProcess() with your program 
+name and parameters. When CreateProcess() returns, it will have propulated 
+the PROCESS_INFORMATION structure you gave it.
+
+In the PROCESS_INFORMATION structure is a handle to the process which you 
+just created.  You can call WaitForSingleObject() against that handle.  Or, 
+you can call GetProcessExitCode() against that handle--if that function 
+indicates the process is still running, you know it's still running and need 
+to waste more time before checking again.
+
+I'm not sure what you'd like to have "ported to MFC"... this whole mechanism 
+only involves only a couple of API calls.
+
+.B ekiM
+--
+TCHAR szDisc[] = _T("These words are my own; I do not speak for Microsoft.");
+
+-----From: Brad Wilson <bradw@netnet.net>
+
+Borenstein Andrei wrote:
+ 
+> Could anybody point me to a source code for "launch task and wait" using
+> MFC ?
+
+What operating system?  Is your app 16- or 32-bit?  Are you launching 16- or
+32-bit applications?  Are you launching DOS applications?
+
+In general, I use CreateProcess() and wait on the hProcess that I get back
+from this function.  I've only ever launched 32-bit from 32-bit with this
+function and I'm not close to the docs, so caveats apply.
+
+--
+class CBradWilson : public CWorldWatchProgrammingTeam {
+  public:
+    void GetInetAddr  ( CString& s ) { s = "bradw@exptech.com";      }
+    void GetE164Addr  ( CString& s ) { s = "+1 (810) 620-9803";      }
+    void GetURL       ( CString& s ) { s = "http://www.exptech.com"; }
+    void GetDisclaimer( CString& s ) { s = "All I say is fact :-p";  }
+};
+
+//  QOTW:  "Don't think of yourself as the least intelligent creature in this
+//          room ... if you consider the entire planet, you're smarter than
+//          literally hundreds of people."  - Dogbert to Dilbert
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Borenstein Andrei -- <A HREF="mailto:boren@actcom.co.il">boren@actcom.co.il</A>
+Monday, January 29, 1996
+</B>
+[Mini-digest: 3 responses]
+
+> I'm not sure what you'd like to have "ported to MFC"... this whole mechanism 
+> only involves only a couple of API calls.
+> 
+> .B ekiM
+> --
+> TCHAR szDisc[] = _T("These words are my own; I do not speak for Microsoft.");
+> 
+> -----From: Brad Wilson <bradw@netnet.net>
+> 
+> Borenstein Andrei wrote:
+> 
+> > Could anybody point me to a source code for "launch task and wait" using
+> > MFC ?
+> 
+> What operating system?  Is your app 16- or 32-bit?  Are you launching 16- or
+> 32-bit applications?  Are you launching DOS applications?
+> 
+Sorry  , it was my fault. I didn't ask precisely. I'm talking about 
+launching 16 bits Windows AND DOS applications in Windows 3.11.
+
+I emphasized MFC issue , because I'm afraid just to use MSDN examples 
+justas they are, because they are temporarily changing window callback 
+procedures and I don't know will it cause any conflict with MFC internals.
+
+Therefore to be precise : 
+
+There  are two ae on MSDN treating this issue : 
+
+- Launching Other Windows-Based Applications
+  (including AppExec example) 
+
+- TERMWAIT
+"TERMWAIT installs a notification callback function using NotifyRegister 
+before calling WinExec to launch the child task. All system tasks call 
+this notification function befor..."
+
+I don't know is it legitimate to use this notification callback function 
+within MFC.
+Could anybody help ?
+
+
+Thank for a patience , 
+
+Andrei Borenstein.
+
+-----From: kitk@mudshark.sunquest.com (Kit Kauffmann)
+
+No translation is needed, and the code needs to stay pretty much the way it 
+is, so just use it as provided (I do!), and it should be fine.
+
+-----From: Tim Hagemann <100063.323@compuserve.com>
+
+Andrei,
+
+The example TERMWAIT, you mentioned above, is designed for win 3.1 ... 
+If you're using Win 32, use CreateProcess to start the child-process and
+WaitForSingleObject to wait for it's completion. Note that the tread which
+invoked WaitForSingleObject is blocked while waiting.
+
+Tim Hagemann
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Âåðíóòüñÿ â êîðåíü Àðõèâà</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,143 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+DECLARE/IMPLEMENT_DYNACREATE()
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Mario Contestabile -- <A HREF="mailto:Mario_Contestabile.UOS__MTL@UOSMTL2.universal.com">Mario_Contestabile.UOS__MTL@UOSMTL2.universal.com</A>
+Tuesday, April 30, 1996
+</B>
+MSVC 4.1 (NT 3.51 SP4, Win95 SP1)
+
+The following code should not compile if "B_member" is not a public member of 
+class B:
+
+class A{
+   B m_BClass;
+};
+
+// A ctor
+A::A(){
+   m_BClass.B_member = 5;  // "B_member" must obviously be public
+}
+
+If class "B" uses DECLARE/IMPLEMENT_DYNACREATE() it will compile
+and run even if "B_member" is *private*.
+
+Do the macros change the access specifiers for members or perform other magic 
+tricks?
+
+mcontest@universal.com
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:bop@gandalf.se">bop@gandalf.se</A>
+Wednesday, May 01, 1996
+</B>
+> From Mario Contestabile <Mario_Contestabile.UOS__MTL @ UOSMTL2.universal.com> 
+>
+> MSVC 4.1 (NT 3.51 SP4, Win95 SP1)
+>
+> The following code should not compile if "B_member" is not a public member of 
+> class B:
+>
+> class A{
+>    B m_BClass;
+> };
+>
+> // A ctor
+> A::A(){
+>    m_BClass.B_member = 5;  // "B_member" must obviously be public
+> }
+>
+> If class "B" uses DECLARE/IMPLEMENT_DYNACREATE() it will compile
+> and run even if "B_member" is *private*.
+>
+> Do the macros change the access specifiers for members or perform other magic 
+> tricks?
+
+No "magic" really, but if you look closely at the code below (from afx.h)
+you will see that the macros "sneak in" a "public" keyword.
+
+DECLARE_DYNCREACTE calls DECLARE_DYNAMIC, which
+contains a "public:".
+
+//////////////////////////////////////////////////////////////////////////////
+// Helper macros for declaring CRuntimeClass compatible classes
+
+#ifdef _AFXDLL
+#define DECLARE_DYNAMIC(class_name) \
+protected: \
+ static CRuntimeClass* PASCAL _GetBaseClass(); \
+public: \
+ static AFX_DATA CRuntimeClass class##class_name; \
+ virtual CRuntimeClass* GetRuntimeClass() const; \
+
+#else
+#define DECLARE_DYNAMIC(class_name) \
+public: \
+ static AFX_DATA CRuntimeClass class##class_name; \
+ virtual CRuntimeClass* GetRuntimeClass() const; \
+
+#endif
+
+// not serializable, but dynamically constructable
+#define DECLARE_DYNCREATE(class_name) \
+ DECLARE_DYNAMIC(class_name) \
+ static CObject* PASCAL CreateObject();
+
+#define DECLARE_SERIAL(class_name) \
+ DECLARE_DYNCREATE(class_name) \
+ friend CArchive& AFXAPI operator>>(CArchive& ar, class_name* &pOb);
+
+
+
+Bo Persson
+bop@gandalf.se
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

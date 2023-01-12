@@ -1,0 +1,426 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Problems with Subclassing a CListView
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Menny Hamburger -- <A HREF="mailto:Mennyh@imagenet.co.il">Mennyh@imagenet.co.il</A>
+Tuesday, January 28, 1997
+</B>
+Environment: NT 4.0, VC++ 4.1
+
+I am using a CListView-derived class.  
+I have my own CListCtrl and I want to use it instead of implementing all
+my logic in the CListView derivative.
+I use SubclassWindow in my OnInitialUpdate but it fails when trying to
+attach the CListCtrl window handle to my CListCtrl derived class.
+I looked at the MFC code and it fails because the Attach function
+assumes
+that the window handle being attached is not already in the permanent
+map,
+which is impossible because we have the CListCtrl object inside the
+CListView.
+
+Does anyone know how to perform this subclassing.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Marshall -- <A HREF="mailto:marshall@milner.com">marshall@milner.com</A>
+Wednesday, January 29, 1997
+</B>
+[Mini-digest: 2 responses]
+
+ There was a thread on this a few months ago and what you are trying to do is
+non-trivial to say the least, and I don't believe anyone came up with a workable
+solution.
+
+The problem is this:  There are NOT separate view and list ctrl windows when
+a CListView is displayed.  The list view and the list ctrl are the SAME window.
+(They have the same m_hWnd!).  When you call GetListCtrl(), you just get
+a cast, dereferenced pointer to the CListView.  Look at CListView::GetListCtrl
+below:
+
+_AFXCVIEW_INLINE CListCtrl& CListView::GetListCtrl() const
+	{ return *(CListCtrl*)this; }
+
+The CListView is really just returning a dereferenced pointer to himself,
+and it's "faked" by casting it to a reference to a CListCtrl.
+
+This leaves you with a catch 22:  If you detach the window from your CListView
+derived class, and attach it to you custom list control class object, you lose all
+the default CView behavior, but if you don't , you need to re-implement all your
+custom behavior in the CListView derived class, which is what you are trying
+to avoid in the first place.
+
+I've yet to see a clean solution to this problem.
+
+Mike
+
+
+
+----------
+From:  Menny  Hamburger[SMTP:Mennyh@imagenet.co.il]
+Sent:  Tuesday, January 28, 1997 1:05 AM
+To:  'Microsoft Pro'
+Subject:  Problems with Subclassing a CListView
+
+Environment: NT 4.0, VC++ 4.1
+
+I am using a CListView-derived class.  
+I have my own CListCtrl and I want to use it instead of implementing all
+my logic in the CListView derivative.
+I use SubclassWindow in my OnInitialUpdate but it fails when trying to
+attach the CListCtrl window handle to my CListCtrl derived class.
+I looked at the MFC code and it fails because the Attach function
+assumes
+that the window handle being attached is not already in the permanent
+map,
+which is impossible because we have the CListCtrl object inside the
+CListView.
+
+Does anyone know how to perform this subclassing.
+
+
+-----From: Doncho Angelov <alian@plovdiv.techno-link.com>
+
+I can suggest you to implement this CListView as a CFormView with =
+CListCtrl inside. Then you'll be able to subclass the control of a form =
+without a problem. Of cource, there are some differences and =
+difficulties this way:
+a) you have to add you own handlers OnMove, which are going to resize =
+you CListCtrl to the new CFormView size.
+b) you'll not have the function GetListCtrl() (but it's easy to =
+implement it)
+	I use this way very frequently and I find it more useful rather than =
+using the ready CListView class.
+
+Doncho
+
+----------
+From: 	Menny  Hamburger[SMTP:Mennyh@imagenet.co.il]
+Sent: 	Tuesday, January 28, 1997 9:05 AM
+To: 	'Microsoft Pro'
+Subject: 	Problems with Subclassing a CListView
+
+Environment: NT 4.0, VC++ 4.1
+
+I am using a CListView-derived class. =20
+I have my own CListCtrl and I want to use it instead of implementing all
+my logic in the CListView derivative.
+I use SubclassWindow in my OnInitialUpdate but it fails when trying to
+attach the CListCtrl window handle to my CListCtrl derived class.
+I looked at the MFC code and it fails because the Attach function
+assumes
+that the window handle being attached is not already in the permanent
+map,
+which is impossible because we have the CListCtrl object inside the
+CListView.
+
+Does anyone know how to perform this subclassing.
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:James.Durie@ubs.com">James.Durie@ubs.com</A>
+Friday, January 31, 1997
+</B>
+One possibilty might be to make a copy of the CListView class, call it 
+CListViewEx or something, and then replace all references to CListCtrl to your 
+own CListCtrl derived class.
+
+This way you will in effect be creating a new view type derived from CCtrlView.
+
+There is also an example showing how to do something similar with CAnimateCtrl. 
+Sorry i don't remember what this is called.
+
+James
+
+______________________________ Reply Separator _________________________________
+
+
+From:   Menny  Hamburger[SMTP:Mennyh@imagenet.co.il] 
+Sent:   Tuesday, January 28, 1997 9:05 AM
+To:     'Microsoft Pro'
+Subject:        Problems with Subclassing a CListView
+     
+Environment: NT 4.0, VC++ 4.1
+     
+I am using a CListView-derived class. =20
+I have my own CListCtrl and I want to use it instead of implementing all 
+my logic in the CListView derivative.
+I use SubclassWindow in my OnInitialUpdate but it fails when trying to 
+attach the CListCtrl window handle to my CListCtrl derived class.
+I looked at the MFC code and it fails because the Attach function 
+assumes
+that the window handle being attached is not already in the permanent 
+map,
+which is impossible because we have the CListCtrl object inside the 
+CListView.
+     
+Does anyone know how to perform this subclassing.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Serge Wautier -- <A HREF="mailto:serge.wautier@ontonet.be">serge.wautier@ontonet.be</A>
+Monday, February 03, 1997
+</B>
+[Mini-digest: 2 responses]
+
+> From: James.Durie@ubs.com
+> 
+> One possibilty might be to make a copy of the CListView class, call it 
+> CListViewEx or something, and then replace all references to CListCtrl to
+your 
+> own CListCtrl derived class.
+> 
+> This way you will in effect be creating a new view type derived from
+CCtrlView.
+
+I doubt it is that  simple. Unfortunately.
+
+As said earlier in this thread, CListView creates a window of class
+WC_LISTVIEW. It does it by setting this class name in its PreCreateWindow.
+
+CListView.GetListCtrl() simply casts the pointer. It works because
+CListCtrl is nothing more than a wrapper around a window (i.e. a window of
+class WC_LISTVIEW. CListCtrl doesnot have any data or virtual methods. So
+its binary image is the same as Cwnd, which is a base class of CListView).
+
+In this case, one wants to replace CListCtrl by CMyListCtrl which is most
+probably more than wrapper around the control (i.e.: It has data members ).
+
+--> Casting the view (a control and not more) to CMyListCtrl( a control +
+class data ) will not work since creating an instance of CListViewEx will
+not imply creation of CMyListCtrl and CMyListCtrl is not a base class of
+CListViewEx.
+
+The only solution i found so far to this problem is, as written earlier in
+this thread, to create a basic CView and put a child member CMyListCtrl in
+it. In CView::OnSize(), resize the MyListCtrl. In CView::OnDestroy, destroy
+and delete the MyListCtrl, etc...
+
+Hope this helps.
+
+Serge Wautier,
+Techno Trade s.a.
+Belgium
+serge.wautier@ontonet.be
+<A HREF="http://www.tbox.fr">http://www.tbox.fr</A>
+
+----------
+> From: James.Durie@ubs.com
+> To: 
+> Subject: Re: RE: Problems with Subclassing a CListView
+> Date: vendredi 31 janvier 1997 17:32
+> 
+> One possibilty might be to make a copy of the CListView class, call it 
+> CListViewEx or something, and then replace all references to CListCtrl to
+your 
+> own CListCtrl derived class.
+> 
+> This way you will in effect be creating a new view type derived from
+CCtrlView.
+> 
+> There is also an example showing how to do something similar with
+CAnimateCtrl. 
+> Sorry i don't remember what this is called.
+> 
+> James
+> 
+> ______________________________ Reply Separator
+_________________________________
+> 
+> 
+> From:   Menny  Hamburger[SMTP:Mennyh@imagenet.co.il] 
+> Sent:   Tuesday, January 28, 1997 9:05 AM
+> To:     'Microsoft Pro'
+> Subject:        Problems with Subclassing a CListView
+>      
+> Environment: NT 4.0, VC++ 4.1
+>      
+> I am using a CListView-derived class. =20
+> I have my own CListCtrl and I want to use it instead of implementing all 
+> my logic in the CListView derivative.
+> I use SubclassWindow in my OnInitialUpdate but it fails when trying to 
+> attach the CListCtrl window handle to my CListCtrl derived class.
+> I looked at the MFC code and it fails because the Attach function 
+> assumes
+> that the window handle being attached is not already in the permanent 
+> map,
+> which is impossible because we have the CListCtrl object inside the 
+> CListView.
+>      
+> Does anyone know how to perform this subclassing.
+-----From: Lance Lovette <Lovette@iftech.com>
+
+I had the same problem. My solution was turn my new CListCtrl derived
+class into a template that the TEMPLDEF tool could take and produce two
+classes. Depending on the template arguments it can generate a
+CMyListView class that is derived from CListView and a CMyListCtrl class
+derived from CListCtrl. After TEMPLDEF is done, there are a set of
+sources for each class that look just as if I had typed them in myself.
+It is kind of a headache to maintain, but it is an automated way to
+generate the two classes from a single code base.
+
+Lance
+lovette@iftech.com
+
++-------------------------------------------------------------------+
+Interface Technologies, Inc.
+
+For a collection of free tutorials covering a variety of programming
+and computer-related topics such as Visual C++, MFC, and Windows NT
+check out the ITI On-line Training Center at <A HREF="http://www.iftech.com.">http://www.iftech.com.</A>
+
+>----------
+>From: 	Mike Marshall[SMTP:marshall@milner.com]
+>Sent: 	Wednesday, January 29, 1997 11:50 AM
+>To: 	'MFC Listserv'
+>Subject: 	RE: Problems with Subclassing a CListView
+>
+>[Mini-digest: 2 responses]
+>
+> There was a thread on this a few months ago and what you are trying to do is
+>non-trivial to say the least, and I don't believe anyone came up with a
+>workable
+>solution.
+>
+>The problem is this:  There are NOT separate view and list ctrl windows when
+>a CListView is displayed.  The list view and the list ctrl are the SAME
+>window.
+>(They have the same m_hWnd!).  When you call GetListCtrl(), you just get
+>a cast, dereferenced pointer to the CListView.  Look at
+>CListView::GetListCtrl
+>below:
+>
+>_AFXCVIEW_INLINE CListCtrl& CListView::GetListCtrl() const
+>	{ return *(CListCtrl*)this; }
+>
+>The CListView is really just returning a dereferenced pointer to himself,
+>and it's "faked" by casting it to a reference to a CListCtrl.
+>
+>This leaves you with a catch 22:  If you detach the window from your
+>CListView
+>derived class, and attach it to you custom list control class object, you
+>lose all
+>the default CView behavior, but if you don't , you need to re-implement all
+>your
+>custom behavior in the CListView derived class, which is what you are trying
+>to avoid in the first place.
+>
+>I've yet to see a clean solution to this problem.
+>
+>Mike
+>
+>
+>
+>----------
+>From:  Menny  Hamburger[SMTP:Mennyh@imagenet.co.il]
+>Sent:  Tuesday, January 28, 1997 1:05 AM
+>To:  'Microsoft Pro'
+>Subject:  Problems with Subclassing a CListView
+>
+>Environment: NT 4.0, VC++ 4.1
+>
+>I am using a CListView-derived class.  
+>I have my own CListCtrl and I want to use it instead of implementing all
+>my logic in the CListView derivative.
+>I use SubclassWindow in my OnInitialUpdate but it fails when trying to
+>attach the CListCtrl window handle to my CListCtrl derived class.
+>I looked at the MFC code and it fails because the Attach function
+>assumes
+>that the window handle being attached is not already in the permanent
+>map,
+>which is impossible because we have the CListCtrl object inside the
+>CListView.
+>
+>Does anyone know how to perform this subclassing.
+>
+>
+>-----From: Doncho Angelov <alian@plovdiv.techno-link.com>
+>
+>I can suggest you to implement this CListView as a CFormView with =
+>CListCtrl inside. Then you'll be able to subclass the control of a form =
+>without a problem. Of cource, there are some differences and =
+>difficulties this way:
+>a) you have to add you own handlers OnMove, which are going to resize =
+>you CListCtrl to the new CFormView size.
+>b) you'll not have the function GetListCtrl() (but it's easy to =
+>implement it)
+>	I use this way very frequently and I find it more useful rather than =
+>using the ready CListView class.
+>
+>Doncho
+>
+>----------
+>From: 	Menny  Hamburger[SMTP:Mennyh@imagenet.co.il]
+>Sent: 	Tuesday, January 28, 1997 9:05 AM
+>To: 	'Microsoft Pro'
+>Subject: 	Problems with Subclassing a CListView
+>
+>Environment: NT 4.0, VC++ 4.1
+>
+>I am using a CListView-derived class. =20
+>I have my own CListCtrl and I want to use it instead of implementing all
+>my logic in the CListView derivative.
+>I use SubclassWindow in my OnInitialUpdate but it fails when trying to
+>attach the CListCtrl window handle to my CListCtrl derived class.
+>I looked at the MFC code and it fails because the Attach function
+>assumes
+>that the window handle being attached is not already in the permanent
+>map,
+>which is impossible because we have the CListCtrl object inside the
+>CListView.
+>
+>Does anyone know how to perform this subclassing.
+>
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,425 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+STL support in VC++ 4.2
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Dinesh Jindal -- <A HREF="mailto:dinesh@XOX.com">dinesh@XOX.com</A>
+Monday, July 29, 1996
+</B>
+Environment: Windows 95, VC++ 4.2
+
+I am working on a project which is using various STL classes. I was
+using 
+the HP STL supplied with VC++ 4.1 and life was cool. But after upgrading
+to
+4.2 it all broke down.( STL is part of standard C++ library in ver 4.2).
+
+After banging my head in all directions, I could bring it down to this 
+small code where problem can be reproduced. This one compiles fine
+with ver 4.1 (using HP STL) but errs in 4.2 (using built-in STL).
+
+It is a complete program. (just 23 lines)
+>>>>
+#include "stl.h"     /* #include "map.h" in version 4.1 */
+
+class Manager{
+public:
+    class ObjectId {
+    public:
+        ObjectId() {}
+        ObjectId( const ObjectId& rhs ) {}
+        bool operator< ( const ObjectId& rhs ) const { return true; }
+        bool operator== ( const ObjectId& rhs ) const { return false; }
+    };
+
+    class Object {
+    public:
+        Object() {}
+    };
+
+    typedef map < ObjectId, Object*, less< ObjectId > > ObjectMap;
+
+private:
+    ObjectMap _lookupMap;
+};
+
+void main()
+{ }
+
+<<<<<<<<
+
+On version 4.2 the errors reported are:
+d:\MSDEV\INCLUDE\utility(20) : error C2440: 'initializing' : cannot
+convert from 'class Manager::Object' to 'class Manager::Object *' (new
+behavior; please see help)
+d:\MSDEV\INCLUDE\utility(20) : error C2439: 'second' : member could not
+be initialized
+d:\MSDEV\INCLUDE\stl.h(76) : error C2664: 'map<class
+Manager::ObjectId,class Manager::Object *,struct less<class
+Manager::ObjectId>,class allocator<class Manager::Object *>>::map<class
+Manager::ObjectId,class Manager::Object *,struct less<class
+Manager::ObjectId>,class allocator<class Manager::Object *>>(const
+struct pair<class Manager::ObjectId,class Manager::Object *> *,const
+struct pair<class Manager::ObjectId,class Manager::Object *> *,const
+struct less<class Manager::ObjectId> &,const class allocator<class
+Manager::Object *> &)' : cannot convert parameter 1 from 'class
+_Tree<class Manager::ObjectId,struct pair<class Manager::ObjectId,class
+Manager::Object *>,struct map<class Manager::ObjectId,class
+Manager::Object *,struct less<class Manager::ObjectId>,class
+allocator<class Manager::Object *>>::_Kfn,struct less<class
+Manager::ObjectId>,class allocator<class Manager::Object
+*>>::const_iterator' to 'const struct pair<class Manager::ObjectId,class
+Manager::Object *> *' (new behavior; please see help)
+Error executing cl.exe.
+
+Any ideas as to what is wrong with the code?
+
+Thanks,
+
+Dinesh.
+-----------------------------------------------------------------------
+"He who is overcautious about himself falls into dangers at every step;
+ he who is afraid of losing honor and respect, gets only disgrace; he
+ who is always afraid of loss always loses."
+- Vivekananda
+------------------------------------------------------------------------
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:bop@gandalf.se">bop@gandalf.se</A>
+Sunday, August 04, 1996
+</B>
+Environment: Windows 95, VC++ 4.2
+
+> From  {Dinesh Jindal <dinesh @ XOX.com>
+> 
+> I am working on a project which is using various STL classes. I was
+> using 
+> the HP STL supplied with VC++ 4.1 and life was cool. But after upgrading
+> to 4.2 it all broke down.( STL is part of standard C++ library in ver 4.2).
+>
+> After banging my head in all directions, I could bring it down to this 
+> small code where problem can be reproduced. This one compiles fine
+> with ver 4.1 (using HP STL) but errs in 4.2 (using built-in STL).
+> 
+> It is a complete program. (just 23 lines)
+> >>>>
+> #include "stl.h"     /* #include "map.h" in version 4.1 */
+>
+> class Manager{
+> public:
+>     class ObjectId {
+>     public:
+>         ObjectId() {}
+>         ObjectId( const ObjectId& rhs ) {}
+>         bool operator< ( const ObjectId& rhs ) const { return true; }
+>         bool operator== ( const ObjectId& rhs ) const { return false; }
+>     };
+>
+>     class Object {
+>     public:
+>         Object() {}
+>     };
+>
+>     typedef map < ObjectId, Object*, less< ObjectId > > ObjectMap;
+> 
+> private:
+>     ObjectMap _lookupMap;
+> };
+
+[... lots of error code ...]
+
+> Any ideas as to what is wrong with the code?
+
+Nothing much really!
+
+The only problem here is that Visual C++ seems to not like initializers 
+in nested classes any more. Moving them outside the Manager 
+class removes 2 of the error messages.
+
+
+The real problem is that the STL in standard C++ is slightly different
+from the STL library distributed by HP (and with VC++ 4.1)! 
+The mayor difference is that the standard library uses default
+template parameters, like:
+
+template<class Key, class T, 
+         class Pred = less<Key>, class A = allocator>
+    class map {
+
+Visual C++ does not support the "= allocator" construct! 
+To overcome this, Microsoft have supplied us with REALLY ugly
+hack in "stl.h". They derive new classes from the standard templates
+and then use #define to rename them back again(!), like:
+
+class Map : public map< ... >
+...
+#define map Map
+
+Not only is this extremely bad style, the mfc.h file also contains
+a couple of typos and few plain errors. I have modified the file,
+to get it t ocompile cleanly. Below is the Diff from the original
+file (mfc.old).
+
+
+Bo Persson
+bop@gandalf.se
+
+_______________________________________________________
+
+****** stl.old
+    33:          typedef allocator<_TYPE> _A;
+    34:          explicit Deque()
+    35:                  : deque<_TYPE, _A>() {}
+    36:          explicit Deque(size_type _N, const _TYPE& _V = _TYPE())
+****** stl.h
+    33:          typedef allocator<_TYPE> _A;
+    34:          explicit Deque(const _A& _Al = _A())
+    35:                  : deque<_TYPE, _A>(_Al) {}
+    36:          explicit Deque(size_type _N, const _TYPE& _V = _TYPE())
+******
+
+****** stl.old
+    73:                  : map<_K, _TYPE, _Pr, _A>(_Pred) {}
+    74:          typedef const_iterator _It;
+    75:          Map(_It _F, _It _L, const _Pr& _Pred = _Pr())
+****** stl.h
+    73:                  : map<_K, _TYPE, _Pr, _A>(_Pred) {}
+    74:          //typedef const_iterator _It;
+    75:          Map(_It _F, _It _L, const _Pr& _Pred = _Pr())
+******
+
+****** stl.old
+    92:                  : multimap<_K, _TYPE, _Pr, _A>(_Pred) {}
+    93:          typedef const_iterator _It;
+    94:          Multimap(_It _F, _It _L, const _Pr& _Pred = _Pr())
+****** stl.h
+    92:                  : multimap<_K, _TYPE, _Pr, _A>(_Pred) {}
+    93:          //typedef const_iterator _It;
+    94:          Multimap(_It _F, _It _L, const _Pr& _Pred = _Pr())
+******
+
+****** stl.old
+   104:  template<class _K, class _Pr>
+   105:          class Set : public set<_K, _Pr, allocator<_TYPE> > {
+   106:  public:
+****** stl.h
+   104:  template<class _K, class _Pr>
+   105:          class Set : public set<_K, _Pr, allocator<_K> > {
+   106:  public:
+******
+
+****** stl.old
+   110:                  : set<_K, _Pr, _A>(_Pred) {}
+   111:          typedef const_iterator _It;
+   112:          Set(_It _F, _It _L, const _Pr& _Pred = _Pr())
+****** stl.h
+   110:                  : set<_K, _Pr, _A>(_Pred) {}
+   111:          //typedef const_iterator _It;
+   112:          Set(_It _F, _It _L, const _Pr& _Pred = _Pr())
+******
+
+****** stl.old
+   127:                  : multiset<_K, _Pr, _A>(_Pred) {}
+   128:          typedef const_iterator _It;
+   129:          Multiset(_It _F, _It _L, const _Pr& _Pred = _Pr())
+****** stl.h
+   127:                  : multiset<_K, _Pr, _A>(_Pred) {}
+   128:          //typedef const_iterator _It;
+   129:          Multiset(_It _F, _It _L, const _Pr& _Pred = _Pr())
+******
+
+****** stl.old
+   143:          typedef allocator<_TYPE> _A;
+   144:          explicit Vector()
+   145:                  : vector<_TYPE, _A>(_Al) {}
+****** stl.h
+   143:          typedef allocator<_TYPE> _A;
+   144:          explicit Vector(const _A& _Al = _A())
+   145:                  : vector<_TYPE, _A>(_Al) {}
+******
+
+****** stl.old
+   181:                  : public priority_queue<_C::value_type, _C, _Pr,
+   182:                          allocator<_TYPE> > {
+   183:  public:
+****** stl.h
+   181:                  : public priority_queue<_C::value_type, _C, _Pr,
+   182:                          allocator<_C::value_type> > {
+   183:  public:
+******
+
+****** stl.old
+   195:          class Queue
+   196:                  : public queue<_C::value_type, _C, allocator<_TYPE> > {
+   197:          };
+****** stl.h
+   195:          class Queue
+   196:                  : public queue<_C::value_type, _C, 
+allocator<_C::value_type> > {
+   197:          };
+******
+
+****** stl.old
+   201:          class Stack
+   202:                  : public stack<_C::value_type, _C, allocator<_TYPE> > {
+   203:          };
+****** stl.h
+   201:          class Stack
+   202:                  : public stack<_C::value_type, _C, 
+allocator<_C::value_type> > {
+   203:          };
+******
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Dan Kirby -- <A HREF="mailto:dkirby@accessone.com">dkirby@accessone.com</A>
+Tuesday, August 06, 1996
+</B>
+You probably have resolved this by now.  STL.H should not have been 
+included.  The correct way of doing what you are trying to do is to include 
+<map> instead.
+--dan
+
+
+>----------
+>From: 	Dinesh Jindal[SMTP:dinesh@XOX.com]
+>Sent: 	Monday, July 29, 1996 11:55 AM
+>To: 	MFC List
+>Subject: 	STL support in VC++ 4.2
+>
+>Environment: Windows 95, VC++ 4.2
+>
+>I am working on a project which is using various STL classes. I was
+>using
+>the HP STL supplied with VC++ 4.1 and life was cool. But after upgrading
+>to
+>4.2 it all broke down.( STL is part of standard C++ library in ver 4.2).
+>
+>After banging my head in all directions, I could bring it down to this
+>small code where problem can be reproduced. This one compiles fine
+>with ver 4.1 (using HP STL) but errs in 4.2 (using built-in STL).
+>
+>It is a complete program. (just 23 lines)
+>>>>>
+>#include "stl.h"     /* #include "map.h" in version 4.1 */
+>
+>class Manager{
+>public:
+>    class ObjectId {
+>    public:
+>        ObjectId() {}
+>        ObjectId( const ObjectId& rhs ) {}
+>        bool operator< ( const ObjectId& rhs ) const { return true; }
+>        bool operator== ( const ObjectId& rhs ) const { return false; }
+>    };
+>
+>    class Object {
+>    public:
+>        Object() {}
+>    };
+>
+>    typedef map < ObjectId, Object*, less< ObjectId > > ObjectMap;
+>
+>private:
+>    ObjectMap _lookupMap;
+>};
+>
+>void main()
+>{ }
+>
+><<<<<<<<
+>
+>On version 4.2 the errors reported are:
+>d:\MSDEV\INCLUDE\utility(20) : error C2440: 'initializing' : cannot
+>convert from 'class Manager::Object' to 'class Manager::Object *' (new
+>behavior; please see help)
+>d:\MSDEV\INCLUDE\utility(20) : error C2439: 'second' : member could not
+>be initialized
+>d:\MSDEV\INCLUDE\stl.h(76) : error C2664: 'map<class
+>Manager::ObjectId,class Manager::Object *,struct less<class
+>Manager::ObjectId>,class allocator<class Manager::Object *>>::map<class
+>Manager::ObjectId,class Manager::Object *,struct less<class
+>Manager::ObjectId>,class allocator<class Manager::Object *>>(const
+>struct pair<class Manager::ObjectId,class Manager::Object *> *,const
+>struct pair<class Manager::ObjectId,class Manager::Object *> *,const
+>struct less<class Manager::ObjectId> &,const class allocator<class
+>Manager::Object *> &)' : cannot convert parameter 1 from 'class
+>_Tree<class Manager::ObjectId,struct pair<class Manager::ObjectId,class
+>Manager::Object *>,struct map<class Manager::ObjectId,class
+>Manager::Object *,struct less<class Manager::ObjectId>,class
+>allocator<class Manager::Object *>>::_Kfn,struct less<class
+>Manager::ObjectId>,class allocator<class Manager::Object
+>*>>::const_iterator' to 'const struct pair<class Manager::ObjectId,class
+>Manager::Object *> *' (new behavior; please see help)
+>Error executing cl.exe.
+>
+>Any ideas as to what is wrong with the code?
+>
+>Thanks,
+>
+>Dinesh.
+>-----------------------------------------------------------------------
+>"He who is overcautious about himself falls into dangers at every step;
+> he who is afraid of losing honor and respect, gets only disgrace; he
+> who is always afraid of loss always loses."
+>- Vivekananda
+>------------------------------------------------------------------------
+>
+>
+>
+>
+>
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

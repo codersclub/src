@@ -1,0 +1,237 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+dbgheap.c assertion
+</B></FONT>
+<BR>
+<PRE>
+<B>
+<A HREF="mailto:Paul.B.Folbrecht@JCI.Com">Paul.B.Folbrecht@JCI.Com</A>
+Monday, December 30, 1996
+</B>
+     Environment: VC++ 4.1, Win95 & NT 4.0
+     
+     I am getting an assertion on line 1029 of dbgheap.c:
+     
+     if (!CheckBytes(pbData(pHead) + pHead->nDataSize, 
+     _bNoMansLandFill, nNoMansLandSize))
+     _RPT3(_CRT_ERROR, "DAMAGE: after %hs block (#%d) at 
+     0x%08X.\n",
+     szBlockUseName[_BLOCK_TYPE(pHead->nBlockUse)], pHead->lRequest,
+     (BYTE *) pbData(pHead));
+     
+     This is the situation: I have a tabbed dialog (using a CTabCtrl) with 
+     several pages.  Changing a field on one page causes child windows 
+     (which are actually modeless dialogs) on another page to be 
+     dynamically destroyed and possibly recreated.  The assertion comes 
+     when the dialog is closed, from the destructor of one of the child 
+     dialogs on the page I mentioned.  The call stack is as follows:
+     
+     _free_dbg_lk(int 4, void * 0x00d850a0) line 1033 + 63 bytes 
+     _free_dbg(int 4, void * 0x00d850a0) line 970 + 13 bytes 
+     CObject::operator delete(void * 0x00d850a0) line 44 + 12 bytes 
+     CAnalogBarDlg::`scalar deleting destructor'() + 39 bytes
+     
+     CAnalogBarDlg is ultimately derived from CDialog (with two other 
+     intermediate base classes in between), and each level defines a 
+     virtual destructor. 
+     
+     I know this is not likely enough information to diagnose the problem, 
+     and the immediate suspicion has to be that there is memory being 
+     corrupted, but I'd like to try to get a general idea of the kind of 
+     errors that would cause this, if possible.  What has me perplexed is 
+     that I am virtually certain there are no memory overwrites or other 
+     errors that could cause this, and indeed the program continues with no 
+     other errors, and has no problems in release mode either.  heapchk() 
+     returns valid at all times.
+     
+     -Paul Folbrecht
+     Compuware Corp.
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Kenneth A. Argo -- <A HREF="mailto:argo@rias.COM">argo@rias.COM</A>
+Tuesday, December 31, 1996
+</B>
+The assertion is a result of deleting something which the checking code =
+feels is invalid.  This is most commonly called by deleting something 2 =
+times.  Be sure after you call delete on a variable you set its value to =
+NULL.
+
+Ken
+
+
+
+----------
+From:  Paul.B.Folbrecht@JCI.Com[SMTP:Paul.B.Folbrecht@JCI.Com]
+Sent:  Monday, December 30, 1996 5:30 PM
+To:  mfc-l@netcom.com
+Subject:  dbgheap.c assertion
+
+     Environment: VC++ 4.1, Win95 & NT 4.0
+    =20
+     I am getting an assertion on line 1029 of dbgheap.c:
+    =20
+     if (!CheckBytes(pbData(pHead) + pHead->nDataSize,=20
+     _bNoMansLandFill, nNoMansLandSize))
+     _RPT3(_CRT_ERROR, "DAMAGE: after %hs block (#%d) at=20
+     0x%08X.\n",
+     szBlockUseName[_BLOCK_TYPE(pHead->nBlockUse)], pHead->lRequest,
+     (BYTE *) pbData(pHead));
+    =20
+     This is the situation: I have a tabbed dialog (using a CTabCtrl) =
+with=20
+     several pages.  Changing a field on one page causes child windows=20
+     (which are actually modeless dialogs) on another page to be=20
+     dynamically destroyed and possibly recreated.  The assertion comes=20
+     when the dialog is closed, from the destructor of one of the child=20
+     dialogs on the page I mentioned.  The call stack is as follows:
+    =20
+     _free_dbg_lk(int 4, void * 0x00d850a0) line 1033 + 63 bytes=20
+     _free_dbg(int 4, void * 0x00d850a0) line 970 + 13 bytes=20
+     CObject::operator delete(void * 0x00d850a0) line 44 + 12 bytes=20
+     CAnalogBarDlg::`scalar deleting destructor'() + 39 bytes
+    =20
+     CAnalogBarDlg is ultimately derived from CDialog (with two other=20
+     intermediate base classes in between), and each level defines a=20
+     virtual destructor.=20
+    =20
+     I know this is not likely enough information to diagnose the =
+problem,=20
+     and the immediate suspicion has to be that there is memory being=20
+     corrupted, but I'd like to try to get a general idea of the kind of =
+
+     errors that would cause this, if possible.  What has me perplexed =
+is=20
+     that I am virtually certain there are no memory overwrites or other =
+
+     errors that could cause this, and indeed the program continues with =
+no=20
+     other errors, and has no problems in release mode either.  =
+heapchk()=20
+     returns valid at all times.
+    =20
+     -Paul Folbrecht
+     Compuware Corp.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Blane Nelson -- <A HREF="mailto:blanen@coresoft.com">blanen@coresoft.com</A>
+Tuesday, December 31, 1996
+</B>
+Paul,
+
+I've seen something like this before.  Some objects on a dialog are what =
+MFC calls temp objects.  MFC will pass you a pointer to the object (or =
+in some strange cases you created the object) but you are not allowed to =
+delete/release the object.  MFC keeps a pointer to these temp objects =
+and when the dialog is destroyed it destroys all of the temp objects.  =
+It sounds like you deleted one of these temp objects that MFC still has =
+a pointer to.  Make sure that you did not delete/release the =
+CAnalogBarDlg object in your code.
+
+-Blane Nelson
+-Coresoft Technologies
+
+
+----------
+From: 	Paul.B.Folbrecht@JCI.Com[SMTP:Paul.B.Folbrecht@JCI.Com]
+Sent: 	Monday, December 30, 1996 9:30 AM
+To: 	mfc-l@netcom.com
+Subject: 	dbgheap.c assertion
+
+     Environment: VC++ 4.1, Win95 & NT 4.0
+    =20
+     I am getting an assertion on line 1029 of dbgheap.c:
+    =20
+     if (!CheckBytes(pbData(pHead) + pHead->nDataSize,=20
+     _bNoMansLandFill, nNoMansLandSize))
+     _RPT3(_CRT_ERROR, "DAMAGE: after %hs block (#%d) at=20
+     0x%08X.\n",
+     szBlockUseName[_BLOCK_TYPE(pHead->nBlockUse)], pHead->lRequest,
+     (BYTE *) pbData(pHead));
+    =20
+     This is the situation: I have a tabbed dialog (using a CTabCtrl) =
+with=20
+     several pages.  Changing a field on one page causes child windows=20
+     (which are actually modeless dialogs) on another page to be=20
+     dynamically destroyed and possibly recreated.  The assertion comes=20
+     when the dialog is closed, from the destructor of one of the child=20
+     dialogs on the page I mentioned.  The call stack is as follows:
+    =20
+     _free_dbg_lk(int 4, void * 0x00d850a0) line 1033 + 63 bytes=20
+     _free_dbg(int 4, void * 0x00d850a0) line 970 + 13 bytes=20
+     CObject::operator delete(void * 0x00d850a0) line 44 + 12 bytes=20
+     CAnalogBarDlg::`scalar deleting destructor'() + 39 bytes
+    =20
+     CAnalogBarDlg is ultimately derived from CDialog (with two other=20
+     intermediate base classes in between), and each level defines a=20
+     virtual destructor.=20
+    =20
+     I know this is not likely enough information to diagnose the =
+problem,=20
+     and the immediate suspicion has to be that there is memory being=20
+     corrupted, but I'd like to try to get a general idea of the kind of =
+
+     errors that would cause this, if possible.  What has me perplexed =
+is=20
+     that I am virtually certain there are no memory overwrites or other =
+
+     errors that could cause this, and indeed the program continues with =
+no=20
+     other errors, and has no problems in release mode either.  =
+heapchk()=20
+     returns valid at all times.
+    =20
+     -Paul Folbrecht
+     Compuware Corp.
+
+
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

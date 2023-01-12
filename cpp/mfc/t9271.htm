@@ -1,0 +1,243 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Problem with readonly CEdit on bitmapped Dialog
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Greg Powers -- <A HREF="mailto:pow@cruzio.com">pow@cruzio.com</A>
+Tuesday, January 28, 1997
+</B>
+Environment: Win95, VC++ 4.2b
+
+I'm having a problem with edit boxes which are set "read only"
+(ES_READONLY) when they are placed on a dialog with a bitmap background.
+The edit box contents do not seem to get erased properly when I either
+replace the text, or even just erase, resulting in a real garbled mess
+when new contents are written into the control.
+
+This is behavior is happening whether I use member variables and DDX, or
+SetDlgItemText(). 
+
+(I guess a hint is that edit boxes marked read only don't ever get their
+background colored; that is, they retain the background bitmap coloring.
+Only trouble is, I don't know what to make of this hint...)
+
+
+The OnCtlColor() code used to color edit box text backgrounds: 
+
+        case CTLCOLOR_EDIT      :
+                CDialog::OnCtlColor (pDC, pWnd, nCtlColor);
+                pDC->SetBkMode (OPAQUE);
+                pDC->SetBkColor (RGB (some value));
+                return CFillBrush();
+                break;
+
+where CFillBrush() returns an (HBRUSH) of (for now) the same (RGB (some
+value)). FillBrush() does use a CBrush member variable, initialized just
+once, and yes it returns an HBRUSH). The code works great for all CEdit
+controls not in possession of the ES_READONLY attribute. It just doesn't
+like these readonly CEdits... and it also works fine if I don't paint a
+bitmap on the dialog background.
+
+Any help greatly appreciated.
+
+Greg
+-- 
+
+
+<<<< Greg Powers, pow@cruzio.com, Entriade Systems >>>>
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Jim Lawson Williams -- <A HREF="mailto:jimlw@mail.ccur.com.au">jimlw@mail.ccur.com.au</A>
+Friday, January 31, 1997
+</B>
+G'day!
+This may give you an idea:
+
+void CMyDialog::ForceRepaint()
+{
+	CWnd* pWnd = GetDlgItem(IDC_READONLY_EDIT);
+	pWnd->GetClientRect(&rect);
+	InvalidateRect(&rect);
+}
+
+Regards,
+Jim LW
+
+
+At 02:50 PM 28/01/97 -0800, Greg Powers <pow@cruzio.com> wrote:
+>Environment: Win95, VC++ 4.2b
+>
+>I'm having a problem with edit boxes which are set "read only"
+>(ES_READONLY) when they are placed on a dialog with a bitmap background.
+>The edit box contents do not seem to get erased properly when I either
+>replace the text, or even just erase, resulting in a real garbled mess
+>when new contents are written into the control.
+>
+>This is behavior is happening whether I use member variables and DDX, or
+>SetDlgItemText(). 
+>
+>(I guess a hint is that edit boxes marked read only don't ever get their
+>background colored; that is, they retain the background bitmap coloring.
+>Only trouble is, I don't know what to make of this hint...)
+>
+>
+>The OnCtlColor() code used to color edit box text backgrounds: 
+>
+>        case CTLCOLOR_EDIT      :
+>                CDialog::OnCtlColor (pDC, pWnd, nCtlColor);
+>                pDC->SetBkMode (OPAQUE);
+>                pDC->SetBkColor (RGB (some value));
+>                return CFillBrush();
+>                break;
+>
+>where CFillBrush() returns an (HBRUSH) of (for now) the same (RGB (some
+>value)). FillBrush() does use a CBrush member variable, initialized just
+>once, and yes it returns an HBRUSH). The code works great for all CEdit
+>controls not in possession of the ES_READONLY attribute. It just doesn't
+>like these readonly CEdits... and it also works fine if I don't paint a
+>bitmap on the dialog background.
+>
+>Any help greatly appreciated.
+>
+>Greg
+>-- 
+>
+>
+><<<< Greg Powers, pow@cruzio.com, Entriade Systems >>>>
+>
+
+
+>From the BBC's "Barchester Chronicles":
+
+    "I know that ultimately we are not supposed to understand.
+    But I also know that we must try."
+
+       -- the Reverend Septimus Harding, crypt-analyst, clog-dancer, C++ programmer
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+George Pavlou -- <A HREF="mailto:georgep@MPGN.COM">georgep@MPGN.COM</A>
+Tuesday, February 04, 1997
+</B>
+A read only edit box behaves like a static text with client edge. The only
+difference between these two is that the edit box can get focused.
+
+You get that mess because you have the static texts transparent to the
+background. The background bitmap makes the mess, but it's not the problem 
+
+You could just replace the read only edit box with a static text or (if you
+need it to get focused) you need to have a special case in OnCtrlColor in
+the case of CTLCOLOR_STATIC something like:
+
+case CTLCOLOR_STATIC:
+	if (pWnd->m_hWnd != GetDlgItem(IDC_READONLY_EDIT)->m_hWnd) {
+		//Your code for Static texts here
+		break;
+	}
+case CTLCOLOR_EDIT:
+	//Your code here
+	...
+
+if you want the read only edit box to look like a normal edit box.
+
+George
+
+George Pavlou                    georgep@tansoft.com         
+PC Software Specialist        www.mpgn.com
+Tantalus, Inc                       Key West, FL
+
+
+----------
+> From: Greg Powers <pow@cruzio.com>
+> To: MFC Mailing List <mfc-l@netcom.com>
+> Subject: Problem with readonly CEdit on bitmapped Dialog
+> Date: Tuesday, January 28, 1997 5:50 PM
+> 
+> Environment: Win95, VC++ 4.2b
+> 
+> I'm having a problem with edit boxes which are set "read only"
+> (ES_READONLY) when they are placed on a dialog with a bitmap background.
+> The edit box contents do not seem to get erased properly when I either
+> replace the text, or even just erase, resulting in a real garbled mess
+> when new contents are written into the control.
+> 
+> This is behavior is happening whether I use member variables and DDX, or
+> SetDlgItemText(). 
+> 
+> (I guess a hint is that edit boxes marked read only don't ever get their
+> background colored; that is, they retain the background bitmap coloring.
+> Only trouble is, I don't know what to make of this hint...)
+> 
+> 
+> The OnCtlColor() code used to color edit box text backgrounds: 
+> 
+>         case CTLCOLOR_EDIT      :
+>                 CDialog::OnCtlColor (pDC, pWnd, nCtlColor);
+>                 pDC->SetBkMode (OPAQUE);
+>                 pDC->SetBkColor (RGB (some value));
+>                 return CFillBrush();
+>                 break;
+> 
+> where CFillBrush() returns an (HBRUSH) of (for now) the same (RGB (some
+> value)). FillBrush() does use a CBrush member variable, initialized just
+> once, and yes it returns an HBRUSH). The code works great for all CEdit
+> controls not in possession of the ES_READONLY attribute. It just doesn't
+> like these readonly CEdits... and it also works fine if I don't paint a
+> bitmap on the dialog background.
+> 
+> Any help greatly appreciated.
+> 
+> Greg
+> -- 
+> 
+> 
+> <<<< Greg Powers, pow@cruzio.com, Entriade Systems >>>>
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,213 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Modeless Property Sheet (resizing)
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Karen Fura -- <A HREF="mailto:kfura@pop.seanet.com">kfura@pop.seanet.com</A>
+Tuesday, October 29, 1996
+</B>
+
+>From: Karen Fura <kfura@pop.seanet.com>
+>> "jben" <jben@privatei.com> wrote:
+>> >Just create your property sheet and property page classes like you would
+>if
+>> >you were going to pop up a modal property sheet.  Then, create the
+>property
+>> >sheet as a child window of whatever window you want (i.e. the view you
+>want
+>> >to appear as a property sheet).  The code would look something like this
+>in
+>> >your view's WM_CREATE handler (OnCreate()).
+>> 
+>> Environment: Visual C++ 4.1, Win 95
+>> 
+>> The above worked fine for me, thanks for such a clear explanation!  I now
+>> want to be able to resize my View - Property Sheet - Property
+>> Pages and so added the following function to the view:
+>> 
+>> // resizes the transcript property sheet when this view resizes
+>> void CTranscriptView::OnSize(UINT nType, int cx, int cy) 
+>> {
+>> CRect rect;
+>> 
+>>     CView::OnSize(nType, cx, cy);
+>> 	
+>>     GetClientRect ( rect );
+>>     m_pTranscriptSht->SetWindowPos ( 
+>>                                            &wndTop, 0, 0,   
+>>                                            rect.right - rect.left,
+>> 		           rect.bottom - rect.top, 
+>>                                            SWP_SHOWWINDOW );
+>> }
+>> 
+>> This sizes the sheet to the view but does not take care of sizing the
+>> pages to the sheet.  My attempts at adding an OnSize() member 
+>> function to the sheet failed ( the tabs disappear altogether ).
+>> How would I go about doing this?  The only control I have on each
+>> of my pages is a multiline edit control.
+>> 
+>
+>Sorry I couldn't get back to you right away.  I have never done what you're
+>asking, and don't really have time to try it out this week, but here's what
+>you'll need to do.
+>
+>The property pages won't automatically resize themselves.  You will have to
+>add a message handler in your property sheet class that handles one of the
+>sizing messages.  I always use WM_WINDOWPOSCHANGED just because WM_SIZE
+>doesn't get called when the window first comes up.  One of the parameters
+>into any of the size/position message handlers is the new position.  You'll
+>have to size each of your pages to this size.  Your code will have to check
+>if the page is loaded or not before sizing it too.  It might be easier to
+>load all the pages before giving the user control.  You can do this by
+>calling SetActivePage() for each page and then SetActivePage(0) to go to
+>the first page.
+>
+>Here's an example of sizing the pages:
+>for( int i=0; i<GetPageCount(); i++ ) {
+>	if( GetPage(i)->m_hWnd ) {
+>		GetPage(i)->SetWindowPos(coordinates relative to property sheet's client
+>area);
+>	}
+>}
+>
+>And, yes there's more, you're going to end up adding handlers in the
+>property pages that will resize the multi-line edit control to fit the
+>page.  I think your best bet is to make sure all the pages are loading
+>before you size them so you don't have to add code to each page to get it
+>to size itself to the property sheet when it is loaded.  Good luck!
+>
+
+I am having a difficult time figuring out how to do this.  I added a 
+handler to my property sheet for WM_WINDOWPOSCHANGED, and handlers for
+WM_SIZE to each of my pages.  After resizing, the property page is a
+mess ( I know that isn't very specific but don't know how else to 
+put it ).  Another problem is the OnSize() handler for 
+the page is called before the page is fully created.  Can anyone give
+me an example of this?  I would think that this is hardly the most
+difficult thing to do!  Here is my code:
+
+// Property sheet
+void CTranscript::OnWindowPosChanged(WINDOWPOS FAR* lpwndpos) 
+{
+	CPropertySheet::OnWindowPosChanged(lpwndpos);
+	
+	for( int i = 0; i < GetPageCount(); i++ ) {
+		SetActivePage ( i );
+		if( GetPage( i )->m_hWnd ) {
+		    GetActivePage( )->SetWindowPos( &wndTop,  
+				                    lpwndpos->x, 
+						    lpwndpos->y,
+lpwndpos->cx,
+                                                    lpwndpos->cy,
+                                                    lpwndpos->flags );
+		}
+        }
+
+	SetActivePage ( 0 );
+}
+
+// resize the one and only control on the page-a multiline
+// edit control.  It needs to take up most of the room
+// on the page.
+void CLinkPage::OnSize(UINT nType, int cx, int cy) 
+{
+	CPropertyPage::OnSize(nType, cx, cy);
+	
+	CTranscript* psht = ( CTranscript* ) GetParent ();
+	if ( !psht->m_sheetCreated )
+		return;
+
+	CEdit* pEd = ( CEdit* ) GetDlgItem ( IDC_LINK_TRANS_EDIT );
+
+	pEd->SetWindowPos( &wndTop, 
+				20, 
+				20,
+				cx - 20,
+				cy - 20,
+				SWP_NOZORDER );
+}
+
+Thanks for any help.
+
+Karen T. Fura
+kfura@levetate.com
+Levetate Design Systems
+Seattle, WA
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:ganeshs@nationwide.com">ganeshs@nationwide.com</A>
+Thursday, October 31, 1996
+</B>
+Environment: Visual C++ 4.1, Win 95
+
+> I am having a difficult time figuring out how to do this.  I added a
+> handler to my property sheet for WM_WINDOWPOSCHANGED, and handlers for
+> WM_SIZE to each of my pages.  After resizing, the property page is a
+> mess ( I know that isn't very specific but don't know how else to
+> put it ).  Another problem is the OnSize() handler for
+> the page is called before the page is fully created.  Can anyone give
+> me an example of this?  I would think that this is hardly the most
+> difficult thing to do!  Here is my code:
+>   .
+>   .
+>   .
+> Thanks for any help.
+
+    Check out MSKB article Q143291: "How to Resize CPropertyPages at Run
+Time"... Basically, you  need to resize the Property  Sheet, Tab Control
+and the Property  Pages in your OnInitDialog() override,  and resize the
+pages when  you receive TCN_SELCHANGE  notifications and when  the Apply
+button is pressed...
+
+/ ___|    / ___| __ _ _ __   ___  ___| |    I do not speak for
+\___ \   | |  _ / _` | '_ \ / _ \/ __| '_ \ Tata   Unisys   or
+ ___) |  | |_| | (_| | | | |  __/\__ \ | | |Nationwide    Ins.
+|____(_)  \____|\__,_|_| |_|\___||___/_| |_|------------------
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

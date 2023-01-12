@@ -1,0 +1,118 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+New MFC 4.2 deadlock problem
+</B></FONT>
+<BR>
+<PRE>
+<B>
+michael berganovsky -- <A HREF="mailto:michael_berganovsky@ibi.com">michael_berganovsky@ibi.com</A>
+Wednesday, August 21, 1996
+</B>
+     Environment: MSVC 4.2, NT 3.51 SP4
+
+     We are building single threaded OLE intensive MFC application using
+     MFC 4.2 DLL. We are running  into very serious problem which we
+     believe is attributable to MFC 4.2 implementation.
+
+     APPLICATION USING MFC 4.2 and OLE2 HANGS!!!
+
+     To make things simple - whenever our application makes call to a
+     functions from OLE32.DLL, OLEAUT32.DLL or OLEPRO32.DLL for the first
+     time it ends up in GetProcAddress for the specified function. (see
+     oledata.cpp and oleimpl.h in MFC sources). At least in WinNT (and
+     according to Matt Pietrek in Win95) GetProcAddress acquires process'
+     critical section. In MFC 4.2 Microsoft added new code in DLLMain
+     implementation which may conflict with GetProcAddress (or any other
+     synchronized on process' critical section calls). In shared build of
+     MFC this code is linked into MFC42.DLL and in debug build into
+     MFC42D.DLL and MFCO42D.DLL (see dllmodul.cpp and dllole.cpp in MFC
+     sources).
+
+     In our case DllMain from MFCO42D.DLL or MFC42.DLL got called with
+     DLL_THREAD_DETACH when some service thread (created by KERNEL32) other
+     then our main thread exits. It is guarded by process critical section.
+     But our main thread is running and calls some function from
+     OLEAUT32.DLL for example VariantClear, which ends up in
+     GetProcAddress( hInstance, "VariantClear" ), which in turn blocks on
+     acquiring process critical section.
+
+     Now main thread is waiting for DllMain to return to release critical
+     section. But inside of DllMain AfxOleTermOrFreeLib calls
+     CoFreeUnusedLibraries which tries to SendMessage to the window created
+     in main thread which is blocked on process critical section. That does
+     it. We hang!
+
+     It looks like ANY application using shared MFC 4.2 or ActiveX
+     components linked with MFC 4.2 is in danger!
+
+     --Good luck
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Sunday, August 25, 1996
+</B>
+At 12:35 PM 8/21/96 edt, you wrote:
+
+>     Now main thread is waiting for DllMain to return to release critical
+>     section. But inside of DllMain AfxOleTermOrFreeLib calls
+>     CoFreeUnusedLibraries which tries to SendMessage to the window created
+>     in main thread which is blocked on process critical section. That does
+>     it. We hang!
+
+>     It looks like ANY application using shared MFC 4.2 or ActiveX
+>     components linked with MFC 4.2 is in danger!
+
+This problem has been fixed for the MFC 4.2a patch.
+
+.B ekiM
+http://www.nwlink.com/~mikeblas   <--- trip report central
+1995 Honda VFR750F (Serial number 00050!)  4 Corners 1996!
+1987 Yamaha FZ700 (damaged)                AMA, HRC, VFROC
+     These words are my own: I do not speak for Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,225 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="650" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <font color="red"><h2 align="center">MCF и OpenGL.</font></h2>
+    <p align="right"><i>&quot;Подать сюда MFС!!! - кричил он, топая
+    всеми 4-мя лапами.&quot;</i> </p>
+    <p>Сижу тут как-то, программку сочиняю, тут смотрю,
+    царь зверей пожаловал. Вопрос задать пришел.
+    Спрашивает как же <b>OpenGL</b> в <b>MFC</b> то вставить?
+    Сначала думал отмажусь, потом смотрю,
+    настойчивый такой царь попался. Письма шлет,
+    желает знать как же все-таки её туда вставить-то.
+    Вот и решил я примерчик на <b>MFC</b> состроить дабы
+    цари меньше утруждали себя, а больше на солнышке
+    бы нежились, чтоб у царей спокойно и хорошо все
+    было, тогда и нам, простым зверушкам жить хорошо
+    будет. И так поехали. </p>
+    <p>Для начала сделаем приложение <b>MFC</b> как диалог.
+    Я назвал его <b>BitScroll</b>. Как это делать? Смотрите
+    шаги по <b>MFC</b>. </p>
+    <p>Теперь, при помощи визарда добавим функцию </p>
+    <pre>BOOL CBitScrollDlg::PreCreateWindow(CREATESTRUCT&amp; cs)
+{
+	cs.style |= WS_CLIPSIBLINGS | WS_CLIPCHILDREN;
+	return CDialog::PreCreateWindow(cs);
+}
+</pre>
+    <p>Помните, мы устанавливали слиль окна в функции <b>CreateWindow</b>
+    ? Так вот это действие по смыслу тоже самое.
+    Напомню как это выглядело в <b>Win32API</b>: </p>
+    <pre>hWnd = CreateWindow(&quot;Skeleton&quot;, &quot;Skeleton&quot;, WS_OVERLAPPEDWINDOW |
+	 WS_CLIPCHILDREN | WS_CLIPSIBLINGS, 50, 50,700, 400, NULL,
+	 NULL, hInst ,NULL);
+</pre>
+    <p>Теперь обратимся к функции <b>OnInitDialog()</b>. В ней
+    сначала вызывается функция базового класса, т.е. <b>CDialog</b>,
+    а потом устанавливаются иконки для диалога.
+    Давайте вставим наш код между иконками и <b>CDialog::OnInitDialog()</b>.
+    </p>
+    <pre>SetWindowPos(&amp;wndTop, 0, 0, WIDTH, HEIGHT, SWP_NOMOVE);
+pDC = GetDC();
+CenterWindow();
+Init();
+SetTimer(1,SPEED, NULL);
+</pre>
+    <p>Теперь посмотрим, что мы сделали. Сначала
+    сделаем окно нужного нам размера (макросы <b>WIDTH</b>
+    и <b>HEIGHT</b> объявлены так <b>#define WIDTH 640</b> и <b>#define HEIGHT
+    480</b> в заголовочном файле). </p>
+    <p>Затем получим контекст для рисования.
+    Установимся в центр вселеной и... вот, тут самое
+    интересное, тут мы вызываем нашу собственную
+    функцию, которая будет инициализировать <b>OpenGL</b>
+    (напоминаю, что тоже самое делала ф-ция <b>Initial</b> в
+    программе на <b>Win32API</b>). </p>
+    <p>А потом включаем таймер, чтобы обеспечить
+    анимацию. Обратимся теперь к <b>Init()</b>. Выглядит
+    она итак: </p>
+    <pre>void CBitScrollDlg::Init()
+{
+	CRect rect;
+	HGLRC hrc;
+	if (!bSetupPixelFormat())
+		return;
+	hrc = wglCreateContext(pDC-&gt;GetSafeHdc());
+	ASSERT(hrc != NULL);
+	wglMakeCurrent(pDC-&gt;GetSafeHdc(), hrc);
+
+	GetClientRect(&amp;rect);
+	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+	glClearDepth(1.0);
+	glDepthFunc(GL_LESS);
+	glEnable(GL_DEPTH_TEST);
+	glShadeModel(GL_SMOOTH);
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	gluPerspective(45.0f, (GLfloat)rect.right / 
+		(GLfloat)rect.bottom, 0.1f, 100.0f);
+	glMatrixMode(GL_MODELVIEW);
+
+}
+</pre>
+    <p>Что мы тут делаем? Прежде всего вызываем ф-ию <b>SetupPixelFormat()</b>,
+    это опять наша функция и мы посмотрим ее чуть
+    позже. </p>
+    <p>Далее, как и раньше, получаем контекст
+    рендеринга (маленькая деталь, ранее <b>pDC</b>(а
+    точнее эта переменная называлась <b>hDC</b>) была
+    объявлена как <b>static HDC hDC</b>, сейчас контекст
+    рисования является пременной типа <b>CDC</b>, а ф-ция <b>wglCreateContext</b>
+    и другие ф-ции <b>OpenGL</b> требуют в качестве
+    аргумента переменную типа <b>HDC</b>. Поэтому мы
+    получаем этот <b>hardware context</b> с помощью <b>pDC-&gt;GetSafeHdc()</b>).
+    </p>
+    <p>Затем делаем этот контекст текущим и
+    настраиваем область отображения, так как это
+    делалось в <b>Initial()</b> (<b>Win32API</b>) </p>
+    <p>Функция <b>bSetupPixelFormat()</b> содержит следующее: </p>
+    <pre>BOOL CBitScrollDlg::bSetupPixelFormat()
+{
+	static PIXELFORMATDESCRIPTOR pfd =
+	{
+		sizeof(PIXELFORMATDESCRIPTOR), // size of this pfd
+		1, // version number
+		PFD_DRAW_TO_WINDOW | // support window
+		PFD_SUPPORT_OPENGL | // support OpenGL
+		PFD_DOUBLEBUFFER, // double buffered
+		PFD_TYPE_RGBA, // RGBA type
+		24, // 24-bit color depth
+		0, 0, 0, 0, 0, 0, // color bits ignored
+		0, // no alpha buffer
+		0, // shift bit ignored
+		0, // no accumulation buffer
+		0, 0, 0, 0, // accum bits ignored
+		32, // 32-bit z-buffer
+		0, // no stencil buffer
+		0, // no auxiliary buffer
+		PFD_MAIN_PLANE, // main layer
+		0, // reserved
+		0, 0, 0 // layer masks ignored
+	};
+
+	int pixelformat;
+
+	if ((pixelformat = ChoosePixelFormat(pDC-&gt;GetSafeHdc(), &amp;pfd)) == 0)
+	{
+		MessageBox(&quot;ChoosePixelFormat failed&quot;);
+		return FALSE;
+	}
+
+	if (SetPixelFormat(pDC-&gt;GetSafeHdc(), pixelformat, &amp;pfd) == FALSE)
+	{
+		MessageBox(&quot;SetPixelFormat failed&quot;);
+		return FALSE;
+	}
+	return TRUE;
+}
+</pre>
+    <p>Как не трудно заметить, она почти полностью
+    взята из <b>Win32API</b> приложения за исключением того,
+    что <b>hDC</b> заменена на <b>pDC-&gt;GetSafeHdc()</b> </p>
+    <p>Теперь добавим в нашу программку обработчик от
+    таймера (мы его недавно сделали в ф-ции <b>Init()</b>) </p>
+    <pre>void CBitScrollDlg::OnTimer(UINT nIDEvent)
+{
+	DrawScene();
+	CDialog::OnTimer(nIDEvent);
+}
+</pre>
+    <p>Все тривиально. По смыслу ясно, что каждый раз,
+    когда срабатывает обработчик таймера (а делает
+    он это часто) рисуется сцена. Таким образом
+    получается анимация. Посмотрим на эту ф-цию: </p>
+    <pre>void CBitScrollDlg::DrawScene()
+{
+	static GLfloat angle = 0;
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glLoadIdentity();
+	glTranslatef(0.0f, 0.0f, -2.0f);
+	glRotatef(angle, 1.0f, 0.5f, 0.3f);
+	glBegin(GL_QUADS);
+	glColor3f(1.0f, 0.0f, 1.0f);
+	glVertex3f(-0.5f, 0.5f, 0.0f);
+	glColor3f(1.0f, 1.0f, 1.0f);
+	glVertex3f(0.5f, 0.5f, 0.0f);
+	glColor3f(0.0f, 1.0f, 1.0f);
+	glVertex3f(0.5f, -0.5f, 0.0f);
+	glColor3f(0.0f, 0.0f, 1.0f);
+	glVertex3f(-0.5f, -0.5f, 0.0f);
+	glEnd();
+	glFinish();
+	SwapBuffers(wglGetCurrentDC());
+	angle += 0.5f;
+}
+</pre>
+    <p>По моему проще уже некуда. Я надеюсь, что все
+    ясно. </p>
+    <p>Ну вот казалось бы и все. Единственное, что
+    остается сделать - убраться за собой. Т.е. надо при
+    выходе удалить контекст рендеринга и убить
+    таймер. </p>
+    <p>Эти вещи надо сделать в 2-х обработчиках <b>OnClose</b>
+    и <b>OnDestroy</b>. Посмотрим на них: </p>
+    <pre>void CBitScrollDlg::OnClose()
+{
+	// TODO: Add your message handler code here and/or call default
+	HGLRC hrc;
+	KillTimer(1);
+	hrc = ::wglGetCurrentContext();
+	::wglMakeCurrent(NULL, NULL);
+	if (hrc)
+		::wglDeleteContext(hrc);
+	CDialog::OnClose();
+}
+</pre>
+    <p>и </p>
+    <pre>void CBitScrollDlg::OnDestroy()
+{
+	CDialog::OnDestroy();
+	// TODO: Add your message handler code here
+	HGLRC hrc;
+	KillTimer(1);
+	hrc = ::wglGetCurrentContext();
+	::wglMakeCurrent(NULL, NULL);
+	if (hrc)
+		::wglDeleteContext(hrc);
+}
+</pre>
+    <p>Она приактически одинаковые. Работают так же
+    как и <b>case WM_CLOSE</b> в <b>Win32API</b>. Т.е. убиваем таймер,
+    получаем контекст рендеринга, если он есть -
+    удаляем его. </p>
+    <p>Ну вот и все. Еще добавлю, что в проекте есть
+    ф-ция <b>OnSize</b> для обработки изменений размеров
+    окна. В данном случае она не нужна, но если
+    вставлять <b>OpenGL</b> в <b>SDI</b> или <b>MDI</b>, то она вам
+    понадобится.</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

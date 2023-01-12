@@ -1,0 +1,248 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+? in title bar of property sheets
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Mats Månhav -- <A HREF="mailto:manhav@connectum.skurup.se">manhav@connectum.skurup.se</A>
+Wednesday, June 19, 1996
+</B>
+-- [ From: Mats Manhav * EMC.Ver #2.5.02 ] --
+
+ENV: SVC 4.1 NT 4.0 beta 1
+
+Hi,
+
+I would like to have a question mark at the top of my Property sheet.
+How should I achieve this. I have found no way of doing this. 
+
+I tried to set the Context Help check mark in extended styles for the pages
+that should go into the property sheets. And I tried to modify the style for
+the property sheet itself. I then got an assertion from MFC that told me
+that the PropertySheet API does not support extended styles.
+But when I use the wordpad coming with Windows 95 they use the question mark
+for one of their property sheets, and it is also used for the property
+sheets to set time and date in the control panel.
+
+I very much would like to have it.
+
+Mats
+--
+==========================================================================
+Mats Månhav (Mats Manhav for 7-bit people)
+email:manhav@connectum.skurup.se   WWW: http://connectum.skurup.se/~manhav
+FAX:  (int) 46 (0) 414 243 05      Phone: (int) 46 (0) 414 243 05         
+==========================================================================
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Shiva Shenoy -- <A HREF="mailto:shiva@netbuild.com">shiva@netbuild.com</A>
+Tuesday, June 25, 1996
+</B>
+[Mini-digest: 7 responses]
+
+Refer to KB article Q125670. This gives you information on how to 
+add Context-Sensitive help on dialogs. 
+
+It does not tell how to do it for PropertySheets and pages.
+
+Look at the WORDPAD sample on the VC4.1 CD.
+
+(This has  a bug. PreCreateWindow is not called for PropertySheet.
+So you may want to override ::OnCreate. After the call to the create
+function returns, use ModifyStyleEx( ) to set the WS_EX_CONTEXTHELP.
+
+-SS
+
+-----From: Roger Onslow/Newcastle/Computer Systems Australia/AU <Roger_Onslow@compsys.com.au>
+
+Mats wrote:
+>I would like to have a question mark at the top of my Property sheet.
+>How should I achieve this. I have found no way of doing this. 
+
+Look at source for WordPad which comes with VC4 etc.
+It has classes for Dialgos, Pages and Sheets with context sensitive help
+ CCSDialog,
+ CCSPropertyPage,
+ CCSPropertySheet
+
+For example, to allow context sensitive help in a property sheet the key 
+routines are
+
+BEGIN_MESSAGE_MAP(CCSPropertySheet, CPropertySheet)
+ ON_MESSAGE(WM_HELP, OnHelp)
+ ON_MESSAGE(WM_CONTEXTMENU, OnHelpContextMenu)
+END_MESSAGE_MAP()
+LONG CCSPropertySheet::OnHelp(UINT wParam, LONG lParam) {
+ GetActivePage()->SendMessage(WM_HELP, wParam, lParam);
+ return 0;
+}
+LONG CCSPropertySheet::OnHelpContextMenu(UINT wParam, LONG lParam) {
+ GetActivePage()->SendMessage(WM_CONTEXTMENU, wParam, lParam);
+ return 0;
+}
+BOOL CCSPropertySheet::PreCreateWindow(CREATESTRUCT& cs) {
+ cs.dwExStyle |= WS_EX_CONTEXTHELP;
+ return CPropertySheet::PreCreateWindow(cs);
+}
+
+Then you need handlers in the pages for WM_CONTEXTHELP
+BEGIN_MESSAGE_MAP(CCSPropertyPage, CPropertyPage)
+ ON_MESSAGE(WM_HELP, OnHelp)
+ ON_MESSAGE(WM_CONTEXTMENU, OnHelpContextMenu)
+END_MESSAGE_MAP()
+LONG CCSPropertyPage::OnHelp(UINT, LONG lParam) {
+ ::WinHelp( (HWND)((LPHELPINFO)lParam)->hItemHandle, 
+AfxGetApp()->m_pszHelpFilePath,
+  HELP_WM_HELP, (DWORD)(LPVOID)GetHelpIDs());
+ return 0;
+}
+LONG CCSPropertyPage::OnHelpContextMenu(UINT wParam, LONG) {
+ ::WinHelp((HWND)wParam, AfxGetApp()->m_pszHelpFilePath,
+  HELP_CONTEXTMENU, (DWORD)(LPVOID)GetHelpIDs());
+ return 0;
+}
+
+Hope this helps.
+
+You also might like to try adding tooltips to you controls as an alternative or 
+in addition to context (?) help.
+If you cannot find it, I'll gladly post info to you.
+
+I've posted info on this to mfc-l not long ago (along with an update which 
+simplifies some of the code I originally supplied)
+
+           /|\        Roger Onslow
+      ____|_|.\       ============
+    _/.........\Senior Software Engineer
+   /CCC.SSS..A..\
+  /CC..SS...A.A..\   Computer
+ /.CC...SS..AAA...\       Systems
+/\.CC....SSAA.AA../            Australia
+\ \.CCCSSS.AA.AA_/
+ \ \...........//      Ph: +61 49 577155
+  \ \...._____//      Fax: +61 49 675554
+   \ \__|_/\_//    RogerO@compsys.com.au
+    \/_/  \//
+
+
+-----From: rsomrek@smtpgate.ssmc.noaa.gov
+
+The MS Knowledge Base contains an article (Q138505) that covers adding
+a context-sensitive help buttton to a Win95 dialog box. The procedure
+is similar for a property sheet/page. The WordPad source code contains
+source code that implements this feature. See the classes
+CCSPropertySheet, CCSPropertyPage and CCSDialog in file chicdial.cpp
+for the generic code inherited by derived classes (e.g., WordPad's
+docopt.cpp).
+
+-----From: "Frederic Steppe" <FredericS@msn.com>
+
+The version of Wordpad that ships with VC++ samples doesn't include the 
+question mark in the options dialog.
+
+That's not good...
+
+Frederic Steppe (frederics@msn.com)
+-----From: Neal Stublen <nstublen@syncro.com>
+
+I'm not sure about MSVC 4.1, but version 2.1 has the source code for
+WordPad.  If you check out the CHICDIAL.CPP class, you will see how they
+implemented the context-sensitive help button.  It basically overrides
+the OnInitDialog() for a normal dialog box, and overrides
+PreCreateWindow() for a property sheet.  Within these overrides, they
+modify the windows style to include WS_EX_CONTEXTHELP.  This may work a
+little differently for 4.1, since I believe the property sheet classes
+are implemented using the OS's property sheet controls.
+
+
+-----From: Niels Ull Jacobsen <nuj@kruger.dk>
+
+Set the PSH_HASHELP flag in your sheet:
+  sheet.m_psh.dwFlags |= PSH_HASHELP;
+
+-----From: Christine Hagberg <CHAGBERG@datx.com>
+
+
+This is what I did to add the "Whats this" help to a property sheet.
+This works with both VC++ 2.0/MFC 3.0 and VC++ 4.0
+
+//xxxxx I added this to change the style
+static BOOL AFXAPI ChangeStyle(HWND hWnd, int nStyleOffset,
+ DWORD dwRemove, DWORD dwAdd, UINT nFlags)
+{
+ ASSERT(hWnd != NULL);
+ DWORD dwStyle = ::GetWindowLong(hWnd, nStyleOffset);
+ DWORD dwNewStyle = (dwStyle & ~dwRemove) | dwAdd;
+ if (dwStyle == dwNewStyle)
+  return FALSE;
+
+ ::SetWindowLong(hWnd, nStyleOffset, dwNewStyle);
+ if (nFlags != 0)
+ {
+  ::SetWindowPos(hWnd, NULL, 0, 0, 0, 0,
+   SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE | nFlags);
+ }
+ return TRUE;
+}
+
+int COptionSheet::OnCreate(LPCREATESTRUCT lpCreateStruct)
+{
+ if (CPropertySheet::OnCreate(lpCreateStruct) == -1)
+  return -1;
+ 
+ CWnd *pWnd = (CWnd *)this;
+
+ //xxxxx I added this to change the style
+ ChangeStyle(pWnd->m_hWnd, GWL_EXSTYLE, 0, WS_EX_CONTEXTHELP, 0);
+
+ return 0;
+ }
+Hope this helps!
+ Chris Hagberg (chagberg@datx.com)
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Âåðíóòüñÿ â êîðåíü Àðõèâà</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

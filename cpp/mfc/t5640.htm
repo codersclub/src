@@ -1,0 +1,230 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Changing text color on a Btn?
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Mario Contestabile -- <A HREF="mailto:Mario_Contestabile.UOS__MTL@UOSMTL2.universal.com">Mario_Contestabile.UOS__MTL@UOSMTL2.universal.com</A>
+Wednesday, June 26, 1996
+</B>
+MSVC 4.1 NT3.51 and Win95
+
+Changing the properties on buttons in a way that works on both os' seems a bit 
+chaotic
+at the moment.
+
+Using OnCtlColor() works only on NT.
+
+Using the BS_ICON or BS_BITMAP styles works only on 95.
+
+The only straightforward method which works evenly on both platforms is
+using a CBitmapButton. Since I only want to change the text color
+on the button, doesn't using a CBitmapButton seem like much?
+
+TIA
+mcontest@universal.com
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Roger Onslow -- <A HREF="mailto:Roger_Onslow@compsys.com.au">Roger_Onslow@compsys.com.au</A>
+Monday, July 08, 1996
+</B>
+>>>The only straightforward method which works evenly on both platforms is
+>>>using a CBitmapButton. Since I only want to change the text color
+>>>on the button, doesn't using a CBitmapButton seem like much?
+>
+>>You could always make it owner-drawn and draw the text yourself. It's fairly 
+>>simply to do, and saves having lots of bitmaps.
+>>Only trickyness is the 3D appearance.
+>>I could send you this code if required.
+>
+>I'd like that, thanks,
+>mcontest@universal.com
+
+Here's some code (editted from my own classes.. hope I've translated back to 
+"vanilla" MFC ok)
+This draws the raised edges, focus rectangle etc...
+
+void CMyButton::DrawItem(LPDRAWITEMSTRUCT lpDIS) {
+ CDC* pDC = CDC::FromHandle(lpDIS->hDC);
+ ASSERT_VALID(pDC);
+ CRect rect = lpDIS->rcItem;
+ if (lpDIS->itemAction & (ODA_SELECT | ODA_DRAWENTIRE)) {
+  if (IsChecked() || (lpDIS->itemState & ODS_SELECTED)) {
+   
+pDC->Draw3dRect(rect,::GetSysColor(COLOR_WINDOWFRAME),::GetSysColor(COLOR_BTNHIGHLIGHT)); 
+   rect.Inflate(-1,-1);
+   pDC->Draw3dRect(rect,::GetSysColor(COLOR_BTNSHADOW), 
+::GetSysColor(COLOR_BTNFACE));
+   rect.Inflate(-1,-1);
+  } else {
+   pDC->Draw3dRe
+ct(rect,::GetSysColor(COLOR_BTNHIGHLIGHT),::GetSysColor(COLOR_WINDOWFRAME));
+   rect.Inflate(-1,-1);
+   pDC->Draw3dRect(rect,::GetSysColor(COLOR_BTNFACE), 
+::GetSysColor(COLOR_BTNSHADOW));
+   rect.Inflate(-1,-1);
+  }
+ } else {
+  rect.Inflate(-2,-2);
+ }
+ CBrush facebrush(::GetSysColor(COLOR_BTNFACE));
+ if (lpDIS->itemAction & (ODA_FOCUS | ODA_DRAWENTIRE)) {
+  pDC->FrameRect(rect,&facebrush)); 
+  if (lpDIS->itemState & ODS_FOCUS) {
+   pDC->DrawFocusRect(rect); 
+  }
+ }
+ rect.Inflate(-1,-1);
+ if (lpDIS->itemAction & ODA_DRAWENTIRE) {
+  pDC->FillRect(rect,&facebrush); 
+  rect.Inflate(-1,-1);
+  if (IsChecked() || (lpDIS->itemState & ODS_SELECTED)) {
+   rect += CPoint(+1,+1); // offset image when pressed
+  }
+// draw the inside of the button here
+ }
+}
+
+           /|\        Roger Onslow
+      ____|_|.\       ============
+    _/.........\Senior Software Engineer
+   /CCC.SSS..A..\
+  /CC..SS...A.A..\   Computer
+ /.CC...SS..AAA...\       Systems
+/\.CC....SSAA.AA../            Australia
+\ \.CCCSSS.AA.AA_/
+ \ \...........//      Ph: +61 49 577155
+  \ \...._____//      Fax: +61 49 675554
+   \ \__|_/\_//    RogerO@compsys.com.au
+    \/_/  \//
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Roger Onslow -- <A HREF="mailto:Roger_Onslow@compsys.com.au">Roger_Onslow@compsys.com.au</A>
+Monday, July 15, 1996
+</B>
+>Just to learn what how this is done without the bitmaps, I grabbed your code 
+>from mfc-l and added it to a test project.  
+>
+>I changed the rect.Inflate() calls to rect.InflateRect(), however I have one 
+>question.  
+
+The original code used some of my own special classes (rather than plain 
+CRect), so I tried changing back to standard MFC -- obviously got it wrong for 
+the InflateRect call !!!
+
+>Where does the IsChecked() come from?  I could not find this function in
+>the online help.
+
+Another result of cutting sample code from another app...
+
+The IsChecked method is a member of my bitmap button class.
+Here's whats in my header for this (and for a stretch to size flag)
+...
+private:
+ BOOL m_check;
+ BOOL m_stretch;
+public:
+ BOOL IsChecked() { return m_check; }
+ void Check(BOOL check) { if (m_check == check) return; m_check = check; 
+Invalidate(); }
+ BOOL IsStretch() const { return m_bStretch; }
+ void SetStretch(BOOL bStretch=TRUE) { m_bStretch = bStretch; }
+...
+
+The idea is to allow the these buttons to be used as radio-like or 
+check-box-like controls
+(Rather than single push on-off, able to keep permanentliy in/out)
+
+Here is code, by the way, that I use to draw the bitmaps...
+(at the end of OnDrawItem)
+This is straight from my code, so it uses my QBitmap class.
+You can substitute CBitmap but will need to directly call
+BitBlt or StretchBlt to draw bitmap onto the control.
+(My QBitmap class adds (among other things) a "Draw"
+function to draw a bitmap into a rect on a DC)
+
+ // use the main bitmap for up, the selected bitmap for down
+ QBitmap* pBitmap = (QBitmap*)&m_bitmap;
+ UINT state = lpDIS->itemState;
+ if ((state & ODS_SELECTED) && m_bitmapSel.m_hObject != NULL) {
+  pBitmap = (QBitmap*)&m_bitmapSel;
+#ifndef _MAC
+ } else if ((state & ODS_FOCUS) && m_bitmapFocus.m_hObject != NULL) {
+#else
+ } else if ((state & ODS_FOCUS) && m_bitmapFocus.m_hObject != NULL &&
+  (GetParent()->GetStyle() & DS_WINDOWSUI)
+ ) {
+#endif
+  pBitmap = (QBitmap*)&m_bitmapFocus;   // third image for focused
+ } else if ((state & ODS_DISABLED) && m_bitmapDisabled.m_hObject != NULL) {
+  pBitmap = (QBitmap*)&m_bitmapDisabled;   // last image for disabled
+ }
+
+ if (IsStretch()) {
+  pBitmap->Draw(pDC,rect,TRUE); // stretch/shrink bitmap to fit button
+ } else {
+  pBitmap->Draw(pDC,rect.TopLeft(),TRUE); // draw same size as bitmap
+ }
+
+NOTE: I also overrode a copy of CBitmapButton's AutoLoad to only do size to 
+content if not stretching to fit
+ ie: at the end I changed to be like this...
+ if (! IsStretch()) SizeToContent();
+
+Hope this helps
+
+Roger
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

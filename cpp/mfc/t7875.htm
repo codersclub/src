@@ -1,0 +1,180 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Tooltips for static text.
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Scott Andrew -- <A HREF="mailto:sandrew@pacbell.net">sandrew@pacbell.net</A>
+Wednesday, November 20, 1996
+</B>
+Environment: VC++ 4.2-flat, Win 95, WinNT 4.0
+
+Has anyone had any luck with using tool tips on static text? I am wondering
+if I need to create my own static class that handles tool tips properly.
+
+I am in a strange position where the static text needs to have  localized
+and english text for the tool tip. (ie. Bonjour/Hello). 
+
+The standard tool tip handling doesn't seem to work. Any suggestions?
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+GoroKhM1 -- <A HREF="mailto:gorokhm1@SMTP.ATG-NET.COM">gorokhm1@SMTP.ATG-NET.COM</A>
+Friday, November 22, 1996
+</B>
+[Mini-digest: 3 responses]
+
+Instead of static text, you may use edit control without border
+with style Read-only.
+
+-mg
+
+MarkG@usa.net
+
+-----From: Sven Plastwich <sven.plastwich@flensburg.netsurf.de>
+
+Hi,
+Let's assume a CDialog with Statics - You have to check "Notify Parent" in
+the resource-ed (Example needed?)
+
+Regardz
+Sven
+
+
+----------
+From: 	Scott Andrew[SMTP:sandrew@pacbell.net]
+Sent: 	Donnerstag, 21. November 1996 03:02
+To: 	mfc-l@netcom.com
+Subject: 	Tooltips for static text.
+
+Environment: VC++ 4.2-flat, Win 95, WinNT 4.0
+
+Has anyone had any luck with using tool tips on static text? I am wondering
+if I need to create my own static class that handles tool tips properly.
+
+I am in a strange position where the static text needs to have  localized
+and english text for the tool tip. (ie. Bonjour/Hello). 
+
+The standard tool tip handling doesn't seem to work. Any suggestions?
+
+
+
+-----From: Dong Chen <d_chen@ix.netcom.com>
+
+Try this:
+I am putting my static control in a CDialogBar derived class: CTestDlgBar. I
+believe this will work for a CDialog derived class too.
+
+1) Set the style of the static control to SS_NOTIFY (Notify check box in the
+style property page).
+
+2) Setup the message map as:
+BEGIN_MESSAGE_MAP(CTestDlgBar, CDialogBar)
+	//{{AFX_MSG_MAP(CTestDlgBar)
+                ......
+	//}}AFX_MSG_MAP
+	ON_NOTIFY_EX( TTN_NEEDTEXT, 0, OnToolTipNotify )
+END_MESSAGE_MAP()
+
+3) In the header file of CTestDlgBar class, add following lines:
+int OnToolHitTest(CPoint point, TOOLINFO* pTI) const;
+BOOL OnToolTipNotify( UINT id, NMHDR * pTTTStruct, LRESULT * pResult );
+
+4)Write your OnToolHitTest function similar to:
+int CTestDlgBar::OnToolHitTest(CPoint point, TOOLINFO* pTI) const
+{
+        // find child window which hits the point
+        CWnd* pWndChild = ChildWindowFromPoint(point, CWP_ALL);
+        if (pWndChild != NULL)
+        {
+	int nHit = ::GetDlgCtrlID(pWndChild->m_hWnd);
+	if (pTI != NULL)
+	{
+                       pTI->hwnd = m_hWnd;
+	       pTI->uId = (UINT)pWndChild->m_hWnd;
+	       pTI->uFlags |= (TTF_IDISHWND | TTF_ALWAYSTIP);
+	       pTI->lpszText = LPSTR_TEXTCALLBACK;
+                        
+                       int ret = ::SendMessage(pWndChild->m_hWnd,
+WM_GETDLGCODE, 0, 0);
+	       // this will screen out all the controls except static controls and
+buttons
+                       // you can customize it as you want
+                       // another way to do this is to put a hit test
+function here to check
+                       // if the hit is on the bachground of the dialog bar
+                       if ( !(ret & DLGC_BUTTON) && !(ret & DLGC_STATIC) )
+return -1;
+	}
+	return nHit;
+        }
+        return -1;  // not found
+}
+
+5) Provide you tips
+BOOL CTestDlgBar::OnToolTipNotify( UINT id, NMHDR * pNMHDR, LRESULT * pResult )
+{
+    TOOLTIPTEXT *pTTT = (TOOLTIPTEXT *)pNMHDR;
+    UINT nID =pNMHDR->idFrom;
+    nID = ::GetDlgCtrlID((HWND)nID);
+    if( nID )
+   {
+        if (pTTT->uFlags & TTF_IDISHWND)
+        {
+	wsprintf(pTTT->lpszText, "Your tool tip text for ID: %d", nID);
+	return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+This worked for me.
+--
+Dong
+d_chen@ix.netcom.com
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

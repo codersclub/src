@@ -1,0 +1,444 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+How to add Tooltip support for the CStatusBar?
+</B></FONT>
+<BR>
+<PRE>
+<B>
+<A HREF="mailto:dle@abbott.SanDiegoCA.ATTGIS.COM">dle@abbott.SanDiegoCA.ATTGIS.COM</A>
+Sunday, January 28, 1996
+</B>
+Hi,
+
+I would like to add tooltip support for the CStatusBar in my
+MDI application.  I created the application using the AppWizard.
+I have tried two methods, but both of them are not working for me.
+
+Method 1:
+I created a new class CMyStatusBar derived from CStatusBar.  I 
+added "EnableToolTip(TRUE)" call in to CMyStatusBar::OnCreate method.
+Then I added CMyStatusBar::OnToolHitTest(...)  
+
+Method 2:
+I added a CToolTipCtrl m_ToolTip attribute to my CMainFrame class.
+In the OnCreate method, I did this:
+	m_ToolTip.create(this);
+
+	CString str;
+	str.LoadString(IDS_PRESS_HERE);
+	m_ToolTip.AddTool(this, str, &rect, ID_VIEW_STATUS_BAR);
+	m_ToolTip.Activate(TRUE):
+
+But the two methods did not work.
+
+What did I do wrong?  A sample code would be nice.
+I am using MSVC4.0 and win95/NT3.51
+
+--Jake
+
+
+-- 
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Roy Browning -- <A HREF="mailto:ctf@friday.houston.net">ctf@friday.houston.net</A>
+Monday, January 29, 1996
+</B>
+[Mini-digest: 3 responses]
+
+>I would like to add tooltip support for the CStatusBar in my
+>MDI application.  I created the application using the AppWizard.
+>I have tried two methods, but both of them are not working for me.
+>
+>Method 1:
+>I created a new class CMyStatusBar derived from CStatusBar.  I 
+>added "EnableToolTip(TRUE)" call in to CMyStatusBar::OnCreate method.
+>Then I added CMyStatusBar::OnToolHitTest(...)  
+>
+>Method 2:
+>I added a CToolTipCtrl m_ToolTip attribute to my CMainFrame class.
+>In the OnCreate method, I did this:
+
+>What did I do wrong?  A sample code would be nice.
+>I am using MSVC4.0 and win95/NT3.51
+
+Jake;
+
+If you ToolBar buttons are associated with menu items ( the normal case )
+then all you have to do is the following:
+
+    append "\nText" to the prompt string;
+
+    Example Menu item:
+
+        ID:         ID_EDIT_COPY
+        Caption     &Copy\tCtrl+C
+        Prompt      Copy the selection and put it on the Clipboard\nCopy
+
+
+Believe it or not it is just that simple, took me awhile to catch on myself.
+
+Roy Browning
+
+////////////////////////////////////////
+
+C o n t r o l l i n g  the  F u t u r e
+    Software Design & Development
+
+            800-CTF-0032
+
+    Roy Browning - ctf@sccsi.com
+
+///////////////////////////////////////
+
+
+-----From: Huaming Hu <hu@wgcgps.com>
+
+I don't know how exactly you implemet OnToolHiTest(), but the
+following codes works for me. Specify tool tip text as the way you
+do for tool bar buttons. The only limitation I know now is that tool
+tip text can not be changed inside program.
+
+int CMyStatusBar::OnToolHitTest(CPoint point, TOOLINFO* pTI) const
+{
+	ASSERT_VALID(this);
+	ASSERT(::IsWindow(m_hWnd));
+
+	// check child windows first by calling CControlBar
+	int nHit = CControlBar::OnToolHitTest(point, pTI);
+	if (nHit != -1)
+		return nHit;
+
+	// now hit test against CTipStatusBar panes
+	int nPanes = GetCount();
+	for (int i = 0; i < nPanes; i++)
+	{
+		CRect rect;
+		GetItemRect(i, &rect);
+		if (rect.PtInRect(point))
+		{
+			int nHit = GetItemID(i);
+			if (pTI != NULL)
+			{
+				pTI->hwnd = m_hWnd;
+				pTI->rect = rect;
+				pTI->uId = nHit;
+				pTI->lpszText = LPSTR_TEXTCALLBACK;
+			}
+			// found matching rect, return the ID of the pane
+			return nHit != 0 ? nHit : -1;
+		}
+	}
+	return -1;
+}
+
+>
+>Method 2:
+>I added a CToolTipCtrl m_ToolTip attribute to my CMainFrame class.
+>In the OnCreate method, I did this:
+>	m_ToolTip.create(this);
+>
+>	CString str;
+>	str.LoadString(IDS_PRESS_HERE);
+>	m_ToolTip.AddTool(this, str, &rect, ID_VIEW_STATUS_BAR);
+>	m_ToolTip.Activate(TRUE):
+>
+>But the two methods did not work.
+
+I didn't try this way. But at least you miss one thing:
+	you need to relay all mainframe WM_MOUSEMOVE, WM_LBUTTONDOWN,
+WM_LBUTTONUP, WM_RBUTTONDOWN, and WM_RBUTTONUP messages
+to the tool tip control (for example, by setting window get-message hook.)
+
+Hope this will help!
+
+Hua M. Hu
+-------------------------------------
+Name: Hua Ming Hu
+Western Geophysical
+E-mail: hu@wgcgps.com
+01/30/96 15:41:20
+-------------------------------------
+
+-----From: Stephan.Jou@Cognos.COM (Jou, Stephan)
+
+
+Jake:
+
+I finally got tool tips working for a CListBox-derived object (different 
+tool tips depending on which item the cursor is over).  The principles 
+should be the same for a CStatusBar object, so here's how I did it.
+
+(Note:  I tried the EnableToolTip() approach too, but in vain.  It appears 
+that it works great if you are using a different tool tip for different 
+child windows/controls, which was not the case for me (and presumably for 
+you).  I'd love to be told I'm wrong and given an easier approach than the 
+one I did, though.)
+
+I simplified the code;  obviously you shouldn't hard code as much as I did 
+here for this example.
+
+1. I derived a class from CListBox;  let's call it CMyListBox.
+
+2. I added CToolTipCtrl m_ToolTipCtrl as a member.
+
+3. In CMyListBox::OnCreate:
+          :
+     // Enable tool tips.
+     VERIFY( m_ToolTipCtrl.Create( this ) );
+
+     // Register three regions with the tool tip.
+     CRect rect;
+     rect.SetEmptyRect();     // For now.  They are properly set in 
+OnSize().
+
+     m_ToolTipCtrl.AddTool( this, LPSTR_TEXTCALLBACK, rect, 1 ); // first 
+region
+     m_ToolTipCtrl.AddTool( this, LPSTR_TEXTCALLBACK, rect, 2 ); // second 
+region
+     m_ToolTipCtrl.AddTool( this, LPSTR_TEXTCALLBACK, rect, 3 ); // third 
+region         
+
+4. In CMyListBox::OnSize:
+          :
+     // Compute the bounding rectangles of my "tools" (really just hot 
+regions within my control.
+     CRect rect1;
+     CRect rect2;
+     CRect rect3;
+
+     rect1.SetRect ...   // probably depends on the current size of the 
+client window
+     rect2.SetRect ...
+     rect3.SetRect ...
+
+     // Update the rectangles.
+     m_ToolTipCtrl.SetToolRect( this, 1, rect1 );
+     m_ToolTipCtrl.SetToolRect( this, 2, rect2 );
+     m_ToolTipCtrl.SetToolRect( this, 3, rect3 );
+
+5. The tricky part.  To set the tool tip text dynamically (in my situation 
+the text can change at run time, whcih is why I used call backs), you need 
+to override WM_NOTIFY in CMyListBox::OnNotify:
+
+     LPNMHDR lpNotifyStruct = (LPNMHDR) lParam;
+     switch( lpNotifyStruct->code ) {
+     case TTN_NEEDTEXT: {
+          LPTOOLTIPTEXT lpToolTipText = (LPTOOLTIPTEXT) lpNotifyStruct;
+
+          // Which region are we over?
+          const int iRegion = GetTopIndex() + lpToolTipText->hdr.idFrom;
+
+          // Set the tool tip text.
+          CString s;
+          s.Format( "Region %d", iRegion );  // Do something more 
+appropriate here.
+
+          // Put it into a temporary buffer.
+          static CHAR szBuffer[255];
+          ASSERT( s.GetLength() < 255 );
+          strcpy( szBuffer, s );
+
+          // Pass it on to the tool tip.
+          lpToolTipText->lpszText = szBuffer;
+
+          *pResult = 0;
+          return TRUE;
+     }
+     :
+
+6. Finally, this is probably why your solution didn't work.  You need to 
+make sure that mouse messages are relayed to your tool tip control. 
+ Override PreTranslateMessage:
+
+     BOOL CMyListBox::PreTranslateMessage(MSG* pMsg)
+     {
+          // Make sure the tool tip gets a crack at messages.
+          m_ToolTipCtrl.RelayEvent( pMsg );
+          return CListBox::PreTranslateMessage(pMsg);
+     }
+
+
+Hope that helps,
+Stephan Jou,
+Stephan.Jou@cognos.com, stephan@synapse.net
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:dle@abbott.SanDiegoCA.ATTGIS.COM">dle@abbott.SanDiegoCA.ATTGIS.COM</A>
+Tuesday, January 30, 1996
+</B>
+Forwarded message:
+>From dle Tue Jan 30 20:30:20 1996
+Subject: Re: How to add Tooltip support for the CStatusBar?
+To: hu@wgcgps.com (Huaming Hu)
+Date: Tue, 30 Jan 1996 20:30:20 -0800 (PST)
+From: "Jake Q. Le" <dle@abbott>
+In-Reply-To: <Chameleon.4.01.960130155303.hu@hu> from "Huaming Hu" at Jan 30, 96 03:41:20 pm
+Organization: AT&T Global Information Solutions - San Diego 
+Reply-To: Jake.Le@SanDiegoCA.ATTGIS.COM (Jake Quoc Le)
+X-Mailer: ELM [version 2.4 PL24]
+Content-Type: text
+Content-Length: 3343      
+
+Huaming and Jou,
+
+I combined Jou's OnNotify method and Huaming's EnableTooltips(TRUE) and
+OnToolHitTest(..).  Now, I got my CStatusBar class enable to
+support Tooltip.  Thanks.
+
+By the way, I don't know if this is a bug or a undocumented feature,
+there is a new, undocumented MFC class.  The new class is
+CToolInfo.  I got a compile error when I tried to pass in LPTOOLINFO
+struct into CToolTipCtrl::GetToolInfo(LPTOOLINFO, CWnd *, int).  
+You must pass in CToolInfo & in order for it your program to 
+compile...
+
+I search the online help and MSDN but were unsuccessful to find anything
+on CToolInfo.  
+
+--Jake
+
+>
+>>I would like to add tooltip support for the CStatusBar in my
+>>MDI application.  I created the application using the AppWizard.
+>>I have tried two methods, but both of them are not working for me.
+>>
+>>Method 1:
+>>I created a new class CMyStatusBar derived from CStatusBar.  I 
+>>added "EnableToolTip(TRUE)" call in to CMyStatusBar::OnCreate method.
+>>Then I added CMyStatusBar::OnToolHitTest(...)  
+>
+>I don't know how exactly you implemet OnToolHiTest(), but the
+>following codes works for me. Specify tool tip text as the way you
+>do for tool bar buttons. The only limitation I know now is that tool
+>tip text can not be changed inside program.
+>
+>int CMyStatusBar::OnToolHitTest(CPoint point, TOOLINFO* pTI) const
+>{
+>	ASSERT_VALID(this);
+>	ASSERT(::IsWindow(m_hWnd));
+>
+>	// check child windows first by calling CControlBar
+>	int nHit = CControlBar::OnToolHitTest(point, pTI);
+>	if (nHit != -1)
+>		return nHit;
+>
+>	// now hit test against CTipStatusBar panes
+>	int nPanes = GetCount();
+>	for (int i = 0; i < nPanes; i++)
+>	{
+>		CRect rect;
+>		GetItemRect(i, &rect);
+>		if (rect.PtInRect(point))
+>		{
+>			int nHit = GetItemID(i);
+>			if (pTI != NULL)
+>			{
+>				pTI->hwnd = m_hWnd;
+>				pTI->rect = rect;
+>				pTI->uId = nHit;
+>				pTI->lpszText = LPSTR_TEXTCALLBACK;
+>			}
+>			// found matching rect, return the ID of the pane
+>			return nHit != 0 ? nHit : -1;
+>		}
+>	}
+>	return -1;
+>}
+>
+>>
+>>Method 2:
+>>I added a CToolTipCtrl m_ToolTip attribute to my CMainFrame class.
+>>In the OnCreate method, I did this:
+>>	m_ToolTip.create(this);
+>>
+>>	CString str;
+>>	str.LoadString(IDS_PRESS_HERE);
+>>	m_ToolTip.AddTool(this, str, &rect, ID_VIEW_STATUS_BAR);
+>>	m_ToolTip.Activate(TRUE):
+>>
+>>But the two methods did not work.
+>
+>I didn't try this way. But at least you miss one thing:
+>	you need to relay all mainframe WM_MOUSEMOVE, WM_LBUTTONDOWN,
+>WM_LBUTTONUP, WM_RBUTTONDOWN, and WM_RBUTTONUP messages
+>to the tool tip control (for example, by setting window get-message hook.)
+>
+>Hope this will help!
+>
+>Hua M. Hu
+>-------------------------------------
+>Name: Hua Ming Hu
+>Western Geophysical
+>E-mail: hu@wgcgps.com
+>01/30/96 15:41:20
+>-------------------------------------
+>
+>
+
+
+-- 
+\\\======================================================================\\\
+\\\                 AT&T Global Information Solutions                    \\\
+\\\----------------------------------------------------------------------\\\
+\\\ Jake Q. Le                    || Jake.Le@SanDiegoCA.ATTGIS.COM       \\\
+\\\ 17089 Via Del Campo           || http://jakepc.SanDiegoCA.ATTGIS.COM \\\
+\\\ San Diego, CA 92127           ||                                     \\\
+\\\======================================================================\\\
+
+
+-- 
+\\\======================================================================\\\
+\\\                 AT&T Global Information Solutions                    \\\
+\\\----------------------------------------------------------------------\\\
+\\\ Jake Q. Le                    || Jake.Le@SanDiegoCA.ATTGIS.COM       \\\
+\\\ 17089 Via Del Campo           || http://jakepc.SanDiegoCA.ATTGIS.COM \\\
+\\\ San Diego, CA 92127           ||                                     \\\
+\\\======================================================================\\\
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

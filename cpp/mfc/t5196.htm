@@ -1,0 +1,220 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Scrollbars in CMDIFrameWnd
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Wendelin Reich -- <A HREF="mailto:wreich@gwdg.de">wreich@gwdg.de</A>
+Thursday, May 16, 1996
+</B>
+******* G'day folks ********
+
+Environment: VC++ 4.1 / Win 95
+
+Task: In order to let the user use the scrollbars when a MDI-Childf gets
+out of the client-area of the MDIFrame, I want the latter to support
+Scrollbars.
+
+My (wrong) solution: In my CMDIFrameWnd-derived class, I set the
+Scrollbar-Styles as follows:
+
+BOOL CMyownMDIFrameWnd::PreCreateWindow(CREATESTRUCT& cs)
+{
+    BOOL bRet = CMDIFrameWnd::PreCreateWindow(cs);
+
+    cs.dwExStyle |= WS_VSCROLL | WS_HSCROLL;
+
+    return bRet;
+}
+
+Problem: With this solution (and also when I set the style before
+calling the parent::PreCreateWindow() !) I get (during the start-up
+of the app) an *ASSERTION-failure* deep down in MFC, in (as the 
+debugger says) file winocc.cpp:
+
+CWnd* CWnd::GetDlgItem(something) {
+
+   ASSERT(::IsWindow(m_hWnd));   // <-- here
+
+   ...
+}
+
+What did I do wrong? How do I get Scrollbars (like in every other
+Windows-App, like Word and Excel f.ex.)?
+
+BTW, David Elliott wrote:
+
+> Try changing the style before calling PreCreateWindow().
+
+As said, I tried this before, but it makes no difference...
+
+-- 
+cu/ru...
+
+   Wendelin Reich                                       wreich@gwdg.de
+   Dept. of Economic Geography              Tel (Job):  +49-551-398088
+   Geographisches Institut der              Tel (priv.): +49-551-35906
+   Universitaet Goettingen
+   D-37077 Goettingen, Germany
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Frederic Steppe -- <A HREF="mailto:FredericS@msn.com">FredericS@msn.com</A>
+Saturday, May 18, 1996
+</B>
+>Environment: VC++ 4.1 / Win 95
+>
+>Task: In order to let the user use the scrollbars when a MDI-Childf gets
+>out of the client-area of the MDIFrame, I want the latter to support
+>Scrollbars.
+>
+>My (wrong) solution: In my CMDIFrameWnd-derived class, I set the
+>Scrollbar-Styles as follows:
+>
+>BOOL CMyownMDIFrameWnd::PreCreateWindow(CREATESTRUCT& cs)
+>	...
+>    cs.dwExStyle |= WS_VSCROLL | WS_HSCROLL;
+>	...
+
+Well, as WS_HSCROLL and WS_VSCROLL aren't extended styles, you'd better modify 
+the standard style :
+	cs.style |= WS_VSCROLL | WS_HSCROLL;
+
+Even this way, I don't know if you'll get the expected result so easily.
+
+Frederic Steppe (frederics@msn.com)
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Amir Salzberg -- <A HREF="mailto:amirfalz@netvision.net.il">amirfalz@netvision.net.il</A>
+Sunday, May 19, 1996
+</B>
+
+you have to take care of OnHScroll() and OnVScroll() yourself; like this:
+BOOL DetailDlg::OnInitDialog()
+{
+	CDialog::OnInitDialog();
+	
+	// TODO: Add extra initialization here
+	SetScrollRange (SB_HORZ, 0, 10);
+	SetScrollRange (SB_VERT, 0, 135);
+	return TRUE;  // return TRUE  unless you set the focus to a control
+}
+
+void DetailDlg::OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
+{
+	// TODO: Add your message handler code here and/or call default
+	// Scroll the dialog box when needed	
+	CDialog::OnVScroll(nSBCode, nPos, pScrollBar);
+	int pos,gap;
+	pos = GetScrollPos(SB_VERT);
+	switch (nSBCode) {
+	case SB_THUMBPOSITION:
+		SetScrollPos (SB_VERT, nPos);
+		break;
+	case SB_LINEUP:
+		gap = 15;
+		if (pos - gap > 0) {
+		pos -= gap;
+		} else {
+		pos = 0;
+		}
+		SetScrollPos (SB_VERT, pos);
+		if (pos > 0)
+ 		   ScrollWindow(0, 15);
+		break;
+	case SB_LINEDOWN:
+		gap = 15;
+		if (pos + gap < 135) {
+  		   pos += gap;
+		} else {
+		  pos = 135;
+		}
+		SetScrollPos (SB_VERT, pos);
+		if (pos < 135)
+     	   ScrollWindow(0, -15);
+		}
+}
+
+void DetailDlg::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
+{
+	// TODO: Add your message handler code here and/or call default
+	// Scroll the dialog box when needed	
+	
+	CDialog::OnHScroll(nSBCode, nPos, pScrollBar);
+	int pos,gap;
+	pos = GetScrollPos(SB_HORZ);
+	switch (nSBCode) {
+	case SB_THUMBPOSITION:
+		SetScrollPos (SB_HORZ, nPos);
+		break;
+	case SB_LINELEFT:
+		gap = 1;
+		if (pos - gap > 0) {
+		pos -= gap;
+		} else {
+		pos = 0;
+		}
+		SetScrollPos (SB_HORZ, pos);
+		if (pos > 0)
+ 		   ScrollWindow(1, 0);
+		break;
+	case SB_LINERIGHT:
+		gap = 1;
+		if (pos + gap < 10) {
+  		   pos += gap;
+		} else {
+		  pos = 10;
+		}
+		SetScrollPos (SB_HORZ, pos);
+		if (pos < 10)
+     	   ScrollWindow(-1, 0);
+		}
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

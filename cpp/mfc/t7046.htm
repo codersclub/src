@@ -1,0 +1,147 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CAsyncSocket datagram size confusion
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Erik Heuer -- <A HREF="mailto:erik.heuer@ks-t.no">erik.heuer@ks-t.no</A>
+Thursday, October 03, 1996
+</B>
+
+Environment: Win NT 3.51, VC++ 4.1
+
+I am using CAsyncSocket, reading from a SOCK_DGRAM socket which is being
+broadcast to from other machines.  In my OnReceive code I do this:
+
+	DWORD toread;
+	VERIFY(IOCtl(FIONREAD,&toread));
+
+to see how big a buffer I need for the incoming datagram.  
+Despite what the CAsyncSocket:IOCtl() spec says:
+
+	FIONREAD   Determine the maximum number of bytes that can be
+	read with one Receive call from this socket. ...[snip] ... 
+        If this socket is of type SOCK_DGRAM, FIONREAD returns the 
+        size of the first datagram queued on the socket.
+
+I am experiencing (under high incoming datagram rates) that toread 
+contains the total queue size and not just the size of the first 
+datagram, such that the subsequent statement:
+
+	ASSERT((actualread = Receive(buff,toread)) == toread);
+
+asserts, with actualread set to the datagram size.
+
+Have you experienced this problem?  Do you know any solution or workaround?
+
+Thanks....
+Erik Heuer, Kongsberg Simulation & Training, 3600 Kongsberg, Norway
+E-mail: erik.heuer@ks-t.no  Phone:(+47) 32735766 Fax:(+47) 32736965
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Gabriel Parlea-Visalon -- <A HREF="mailto:Gabriel@derivs.demon.co.uk">Gabriel@derivs.demon.co.uk</A>
+Tuesday, October 08, 1996
+</B>
+In your message dated Thursday 3, October 1996 you wrote :
+> 
+> Environment: Win NT 3.51, VC++ 4.1
+> 
+> I am using CAsyncSocket, reading from a SOCK_DGRAM socket which is being
+> broadcast to from other machines.  In my OnReceive code I do this:
+> 
+> 	DWORD toread;
+> 	VERIFY(IOCtl(FIONREAD,&toread));
+> 
+> to see how big a buffer I need for the incoming datagram.  
+> Despite what the CAsyncSocket:IOCtl() spec says:
+> 
+> 	FIONREAD   Determine the maximum number of bytes that can be
+> 	read with one Receive call from this socket. ...[snip] ... 
+>         If this socket is of type SOCK_DGRAM, FIONREAD returns the 
+>         size of the first datagram queued on the socket.
+> 
+> I am experiencing (under high incoming datagram rates) that toread 
+> contains the total queue size and not just the size of the first 
+> datagram, such that the subsequent statement:
+> 
+> 	ASSERT((actualread = Receive(buff,toread)) == toread);
+> 
+> asserts, with actualread set to the datagram size.
+> 
+> Have you experienced this problem?  Do you know any solution or workaround?
+> 
+> Thanks....
+> Erik Heuer, Kongsberg Simulation & Training, 3600 Kongsberg, Norway
+> E-mail: erik.heuer@ks-t.no  Phone:(+47) 32735766 Fax:(+47) 32736965
+> 
+> 
+
+CAsyncSocket::Receive() entry in the Class Library Reference clearly says that 
+for datagram sockets, data is extracted from the first enqued datagram, up to 
+the size of the buffer supplied. The buffer need not necessarily be filled 
+entirely.
+
+That is why your code asserts, as it should, if the buffer size is larger or 
+equal to the datagram size.
+
+Rather than VERIFY() and ASSERT() it would be worth probably checking those 
+errors first, especilly if you expect high incoming datagram rates. There's a 
+handy function GetLastError() to retrieve them.
+
+I hope this helps you.
+
+Gabriel
+
+-- 
+                             Gabriel Parlea-Visalon
+                               Software Engineer
+                           Derivative Trading Systems
+                           gabriel@derivs.demon.co.uk
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

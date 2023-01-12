@@ -1,0 +1,353 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+MFC Multithreaded OLE controls
+</B></FONT>
+<BR>
+<PRE>
+<B>
+<A HREF="mailto:BRIAN_DEHAMER@HP-MountainView-om2.om.hp.com">BRIAN_DEHAMER@HP-MountainView-om2.om.hp.com</A>
+Tuesday, October 01, 1996
+</B>
+Item Subject: cc:Mail Text
+     Environment: VC++ 4.2, NT 3.51
+     
+     I'm in the process of using MFC to create an OLE control.  The control 
+     starts a thread that does some DB access work and then, when the 
+     thread finishes, I want it to fire an event back up to the container.  
+     According to Adam Denning's "OLE Controls Inside Out," I need to be 
+     firing the event from the main control thread and not the worker 
+     thread.  With that knowledge, I decided that I would have the worker 
+     thread post a message back to the main thread and have the event fired 
+     in the course of handling the message.  This is where I'm having the 
+     problem.  I'm either posting the message inproperly or I'm not 
+     handling it correctly upon receipt.  Here's a stripped down version of 
+     my code.  Any help available would be greatly appreciated.
+     
+     
+     //////////////////////////// test.h //////////////////////////////
+     class CTestCtrl : public COleControl
+     {
+     
+     // Message maps
+     
+        afx_msg void OnTest();
+     
+        DECLARE_MESSAGE_MAP()
+     
+     // Dispatch maps
+     
+        afx_msg BOOL ExecuteThread();
+     
+        DECLARE_DISPATCH_MAP()
+     
+     // Event maps
+     
+        void FireQueryComplete()
+                {FireEvent(eventidQueryComplete,EVENT_PARAM(VTS_NONE));}
+     
+        DECLARE_EVENT_MAP()
+     
+     
+        static UINT QueryThread(LPVOID lpr);
+     
+     // Dispatch and event IDs
+     public:
+        enum {
+        dispidExecute = 4L,
+        eventidQueryComplete = 1L,
+        };
+     
+     };
+     
+     
+     
+     
+     //////////////////////////// test.c //////////////////////////////
+     
+     //////////////////////////////////////////////////////////////////////
+     ///////
+     // Message map
+     
+     BEGIN_MESSAGE_MAP(CTestCtrl, COleControl)
+        ON_COMMAND(IDS_TEST, OnTest)
+        ON_OLEVERB(AFX_IDS_VERB_PROPERTIES, OnProperties)
+     END_MESSAGE_MAP()
+     
+     
+     //////////////////////////////////////////////////////////////////////
+     ///////
+     // Dispatch map
+     
+     BEGIN_DISPATCH_MAP(CTestCtrl, COleControl)
+        DISP_FUNCTION(CTestCtrl, "Execute", Execute, VT_BOOL, VTS_NONE)
+     END_DISPATCH_MAP()
+     
+     
+     //////////////////////////////////////////////////////////////////////
+     ///////
+     // Event map
+     
+     BEGIN_EVENT_MAP(CTestCtrl, COleControl)
+        EVENT_CUSTOM("QueryComplete", FireQueryComplete, VTS_NONE)
+     END_EVENT_MAP()
+     
+     
+     
+     
+     BOOL CTestCtrl::Execute() 
+     {
+        HANDLE hThread;
+        
+        idThread = GetCurrentThreadId();
+     
+        hThread = AfxBeginThread(QueryThread, this);
+     
+        return TRUE;
+     }
+     
+     
+     
+     UINT CTestCtrl::QueryThread(LPVOID lpr)
+     {
+        CTestCtrl *ctrl = (CTestCtrl*)lpr;
+     
+        /* Do thread stuff here */
+     
+        PostThreadMessage(ctrl->idThread, IDS_TEST, 0, 0);
+        return 0;
+     
+     }
+     
+     
+     void CTestCtrl::OnTest() 
+     {
+        FireQueryComplete();    
+     }
+     
+     
+     
+     Thanks.
+     
+     Brian De Hamer
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Noel Burton-Krahn -- <A HREF="mailto:noel@harleystreet.com">noel@harleystreet.com</A>
+Thursday, October 03, 1996
+</B>
+[Mini-digest: 2 responses]
+
+First:  Your PostThreadMessage and ON_COMMAND are wrong.  see
+  	PSS ID Number: Q142415
+in the knowledge base.  Make a WM_USER message and trap it in your app's 
+PreTranslateMessage.
+
+Second: I have noticed problems with thread messages myself.  see "Lost 
+thread messages" posted to this list.  I haven't been able to confirm this, 
+but I believe that thread messages are often thrown away by 
+DispatchMessage().  Here's the scenario:
+
+1) you post a thread message
+2) the destination thread puts up a dialog, or some other gizmo that has 
+its own   message loop (like CRectTracker)
+3) The gizmo calls GetMessage() and gets your thread message
+4) The gizmo doesn't know what to do with your message, so it calls 
+DispatchMessage() with your thread message
+5) The problem now is that a thread message is not associated with a 
+window, so where could DispatchMessge send it?  I suspect that it gets sent 
+to the void, never to be seen again.
+
+Mind you, I still have to get confirmation on this.  What I know, though is 
+that I lost Thread messages, but as soon as I sent messages to another 
+_window_ they always arrived.
+
+So, I suggest you try:
+1) posting messages to one of you main thread's windows
+2) using MsgWaitForMultipleEvents()
+
+--Noel
+
+
+----------
+From: 
+	BRIAN_DEHAMER@HP-MountainView-om2.om.hp.com[SMTP:BRIAN_DEHAMER@HP-Mount  
+ainView-om2.om.hp.com]
+Sent: 	Tuesday, October 01, 1996 1:55 PM
+To: 	mfc-l@netcom.com
+Subject: 	MFC Multithreaded OLE controls
+
+Item Subject: cc:Mail Text
+     Environment: VC++ 4.2, NT 3.51
+
+     I'm in the process of using MFC to create an OLE control.  The control 
+     starts a thread that does some DB access work and then, when the
+     thread finishes, I want it to fire an event back up to the container. 
+     According to Adam Denning's "OLE Controls Inside Out," I need to be
+     firing the event from the main control thread and not the worker
+     thread.  With that knowledge, I decided that I would have the worker
+     thread post a message back to the main thread and have the event fired 
+     in the course of handling the message.  This is where I'm having the
+     problem.  I'm either posting the message inproperly or I'm not
+     handling it correctly upon receipt.  Here's a stripped down version of 
+     my code.  Any help available would be greatly appreciated.
+
+
+     //////////////////////////// test.h //////////////////////////////
+     class CTestCtrl : public COleControl
+     {
+
+     // Message maps
+
+        afx_msg void OnTest();
+
+        DECLARE_MESSAGE_MAP()
+
+     // Dispatch maps
+
+        afx_msg BOOL ExecuteThread();
+
+        DECLARE_DISPATCH_MAP()
+
+     // Event maps
+
+        void FireQueryComplete()
+                {FireEvent(eventidQueryComplete,EVENT_PARAM(VTS_NONE));}
+
+        DECLARE_EVENT_MAP()
+
+
+        static UINT QueryThread(LPVOID lpr);
+
+     // Dispatch and event IDs
+     public:
+        enum {
+        dispidExecute = 4L,
+        eventidQueryComplete = 1L,
+        };
+
+     };
+
+
+
+
+     //////////////////////////// test.c //////////////////////////////
+
+     //////////////////////////////////////////////////////////////////////
+     ///////
+     // Message map
+
+     BEGIN_MESSAGE_MAP(CTestCtrl, COleControl)
+        ON_COMMAND(IDS_TEST, OnTest)
+        ON_OLEVERB(AFX_IDS_VERB_PROPERTIES, OnProperties)
+     END_MESSAGE_MAP()
+
+
+     //////////////////////////////////////////////////////////////////////
+     ///////
+     // Dispatch map
+
+     BEGIN_DISPATCH_MAP(CTestCtrl, COleControl)
+        DISP_FUNCTION(CTestCtrl, "Execute", Execute, VT_BOOL, VTS_NONE)
+     END_DISPATCH_MAP()
+
+
+     //////////////////////////////////////////////////////////////////////
+     ///////
+     // Event map
+
+     BEGIN_EVENT_MAP(CTestCtrl, COleControl)
+        EVENT_CUSTOM("QueryComplete", FireQueryComplete, VTS_NONE)
+     END_EVENT_MAP()
+
+
+
+
+     BOOL CTestCtrl::Execute()
+     {
+        HANDLE hThread;
+
+        idThread = GetCurrentThreadId();
+
+        hThread = AfxBeginThread(QueryThread, this);
+
+        return TRUE;
+     }
+
+
+
+     UINT CTestCtrl::QueryThread(LPVOID lpr)
+     {
+        CTestCtrl *ctrl = (CTestCtrl*)lpr;
+
+        /* Do thread stuff here */
+
+        PostThreadMessage(ctrl->idThread, IDS_TEST, 0, 0);
+        return 0;
+
+     }
+
+
+     void CTestCtrl::OnTest()
+     {
+        FireQueryComplete();
+     }
+
+
+
+     Thanks.
+
+     Brian De Hamer
+
+
+
+
+-----From: "Luke Stephens" <luker@tfs.net>
+
+I believe you need to do the following:
+PostThreadMessage(ctrl->idThread, WM_COMMAND,IDS_TEST, 0);
+or use ON_MESSAGE(IDS_TEST,OnTest)
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

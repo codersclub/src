@@ -1,0 +1,166 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CSplashWnd destroys other windows or generates assert when
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Dean Wiles -- <A HREF="mailto:deanw@isc-br.isc-br.com">deanw@isc-br.isc-br.com</A>
+Wednesday, September 11, 1996
+</B>
+Environment: VC++4.2/WinNT3.51
+
+The CSplashWnd component from MSVC4.2 is handy but creates problems when
+it's destroyed (in HideSplashScreen()) if it had been visible when another
+window/dialog/messagebox is created.  If a window/dialog/messagebox is
+created without specifying a parent, and the SplashWnd is visible but the
+mainframe window is not visible, then the newly created window will assume
+the splash screen is its parent (for example, see CDialog::PreModal()).
+Then, later when the SplashWnd is destroyed (due to timer or keyboard/mouse
+input), its surrogate children also get destroyed, which will cause a
+messagebox to close or a dialog to generate an assert because it loses its
+window handle.
+
+So, you might say, give the new window/dialog/messagebox a parent and be
+done with it!-)  Well, that works if I explicitely create a window, but if
+MFC or other DLL (in my case ODBC) pops up a window, I still have the same
+problem.
+
+Is there a way to sterilize CSplashWnd (so that it can't have child
+windows), or has anyone else come across this anomaly and have a fix for it?
+
+Thanks, Dean.
+--------------------------------------------------------------------------
+Dean Wiles (deanw@mail.isc-br.com)          Olivetti North America
+Phone:  (509)927-7037                       22425 East Appleway Ave
+Fax:    (509)927-2499                       Liberty Lake, WA 99019-9534
+If the Son sets you free, you will be free indeed.  (John 8:36)
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Roger Onslow/Newcastle/Computer Systems Australia/
+Friday, September 13, 1996
+</B>
+[Mini-digest: 2 responses]
+
+>If a window/dialog/messagebox is
+>created without specifying a parent,
+>and the SplashWnd is visible but the
+>mainframe window is not visible, then
+>the newly created window will assume
+>the splash screen is its parent
+
+I investigated this, and it is not really a problem of CSplash... class at all
+It is the way MFC works internally when trying to find a parent and there is no 
+main window yet for the app.
+I'll have another look and find the code that does this (but too busy to dig it 
+up again just now :-)
+
+So.. I don't believe you can fix the splash screen to stop it happening.
+
+Perhaps what you could do is reparent its children to your main window before 
+you kill the splash screen... but then you'd need to know which children are 
+controls of the splash (if any) and which are not.
+Or make sure you don't generate dialogs etc until you have a real main window.
+(That's what I ended up doing from memory)
+
+Roger Onslow
+-----From: marty <marty@concentra.com>
+
+Yep- we hit exactly the same problem. 
+
+I'm not sure what the rationale for using the timer is. Anyway, we nuked
+the 
+use of the timer to kill the splashscreen. Instead, we start the
+splashscreen
+at the beginning of the apps InitInstance, and then we kill it at the
+end of InitInstance.
+
+BOOL CSGApp::InitInstance()
+{
+	{
+		// Just use this for the splash screen, although it can be extended
+		CCommandLineInfo	cmdInfo;
+		ParseCommandLine(cmdInfo);
+		CSplashWnd::EnableSplashScreen(cmdInfo.m_bShowSplash);
+	}
+
+	CSplashWnd::ShowSplashScreen();
+
+... more stuff here....
+
+
+	CSplashWnd::RemoveSplashScreen();
+
+
+	return TRUE;
+}
+
+void CSplashWnd::ShowSplashScreen(CWnd* pParentWnd /*= NULL*/)
+{
+	if (!c_bShowSplashWnd || c_pSplashWnd != NULL)
+		return;
+
+	// Allocate a new splash screen, and create the window.
+	c_pSplashWnd = new CSplashWnd;
+	if (!c_pSplashWnd->Create(pParentWnd))
+		delete c_pSplashWnd;
+	else
+		c_pSplashWnd->UpdateWindow();
+}
+
+void CSplashWnd::RemoveSplashScreen ()
+{
+	if (!c_bShowSplashWnd || c_pSplashWnd == NULL)
+		return;
+	
+	ASSERT_VALID (c_pSplashWnd);
+
+	c_pSplashWnd->HideSplashScreen ();
+
+}
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

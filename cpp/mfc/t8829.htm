@@ -1,0 +1,265 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CListCtrl Column Resizing
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Sridhar Rao Chedalla -- <A HREF="mailto:C.Sridhar@blr.sni.de">C.Sridhar@blr.sni.de</A>
+Tuesday, January 07, 1997
+</B>
+Hello,
+
+        Environment : Visual C++4.2-flat , Window NT 4.0
+
+	I have one CListCtrl in which I have 6 columns. Everything is working
+fine except that it is possible to resize columns. But I want the
+facility to resize some of the columns and  some other columns I do not
+want to resize at all and width of it has to be fixed.. Any one of you
+can help me in this aspect.
+
+
+C.Sridhar
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Sridhar Rao Chedalla -- <A HREF="mailto:C.Sridhar@blr.sni.de">C.Sridhar@blr.sni.de</A>
+Wednesday, January 08, 1997
+</B>
+Hello,
+
+        Environment : Visual C++4.2-flat , WinNT 4.0
+
+        I have one CListCtrl in which I have 6 columns. Everything is
+working
+fine except that it is possible to resize columns. But I want the
+facility to resize some of the columns and  some other columns I do not
+want to resize at all and width of it has to be fixed.. Any one of you
+can help me in this aspect.
+
+
+C.Sridhar
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Wednesday, January 08, 1997
+</B>
+[Mini-digest: 3 responses]
+
+At 18:05 1/7/97 -0800, Sridhar Rao Chedalla wrote:
+
+>        Environment : Visual C++4.2-flat , Window NT 4.0
+
+Please upgrade to 4.2b by installing the patch.  4.2-flat works
+only against beta operating system components and will get you
+into trouble sooner or later.
+
+>I have one CListCtrl in which I have 6 columns. Everything is working
+>fine except that it is possible to resize columns. But I want the
+>facility to resize some of the columns and  some other columns I do not
+>want to resize at all and width of it has to be fixed.. Any one of you
+>can help me in this aspect.
+
+In your WM_INITDIALOG handler obtain a pointer to the header control
+and dynamically subclass the window.
+
+In your subclass, trap HDN_BEGINTRACK and return FALSE to disallow
+the tracking (and, therefore, the sizing).  You can conditionally
+return FALSE if the notification is related to column which you
+do or don't want to size.
+
+
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+Why does the "new" Corvette look like a 1993 RX-7?
+These words are my own. I do not speak on behalf of Microsoft.
+
+-----From: derek.groft@utiligent.com (Derek F. Groft - UTL)
+
+I cut and paste this stuff out of my code and tweaked it by hand, so it may
+not compile as is, but it should give you the basics.  Also, my code turns
+off resizing for  ALL columns so you will need to peak at pNotifyStruct to
+handle sizing on a per-column basis.  I derived CMyHeaderCtrl from
+CHeaderCtrl, and the have only the following 2 functions and a public
+m_bSizeable flag.  I ripped out error checking, so don't just use this
+blindly.
+
+I'm interested in comments on better ways to do this from anyone else out
+there, but this works for me.
+
+BEGIN_MESSAGE_MAP(CMyHeaderCtrl, CHeaderCtrl)
+		ON_NOTIFY_REFLECT( HDN_ENDTRACKA, Resize )
+		ON_NOTIFY_REFLECT( HDN_ENDTRACKW, Resize )
+		ON_NOTIFY_REFLECT( HDN_TRACKA, Resize )
+		ON_NOTIFY_REFLECT( HDN_TRACKW, Resize )
+		ON_NOTIFY_REFLECT( HDN_TRACK, Resize )
+		ON_NOTIFY_REFLECT( HDN_BEGINTRACKA, Resize )
+		ON_NOTIFY_REFLECT( HDN_BEGINTRACKW, Resize )
+		ON_WM_SETCURSOR()
+END_MESSAGE_MAP()
+
+void CMyHeaderCtrl::Resize(NMHDR * pNotifyStruct, LRESULT* pResult)
+{
+	//pResult should be TRUE if resizing is not allowed, 
+	//pResult should be FALSE if resizing is allowed.
+	*pResult = (m_bSizeable == TRUE) ? FALSE : TRUE;
+}
+
+The user isn't going to want to see a resizing mouse cursor if they can't
+resize the list box, so handle the OnSetCursor message as well:
+
+void CMyHeaderCtrl::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message) 
+{
+	if ( m_bSizeable == FALSE )
+	{
+		return TRUE;
+	}
+	return CHeaderCtrl::OnSetCursor(pWnd, nHitTest, message);
+}
+
+In order to get the header ctrl class instantiated, get the handle in the
+listctrl PreSubclassWindow as follows:
+
+void CMyListCtrl::PreSubclassWindow() 
+{
+	CListCtrl::PreSubclassWindow();
+
+	m_pHeader = new CMyHeaderCtrl;
+
+	ASSERT( GetDlgItem(0) ); //This fails if "Visible" attribute is not set in
+				   //resource editor..
+	m_pHeader->SubclassWindow( GetDlgItem(0)->m_hWnd );
+}
+
+Hope this helps,
+
+Derek
+	
+
+----------
+> From: Sridhar Rao Chedalla <C.Sridhar@blr.sni.de>
+> To: mfc-l@netcom.com
+> Subject: CListCtrl Column Resizing
+> Date: Tuesday, January 07, 1997 8:05 PM
+> 
+> Hello,
+> 
+>         Environment : Visual C++4.2-flat , Window NT 4.0
+> 
+> 	I have one CListCtrl in which I have 6 columns. Everything is working
+> fine except that it is possible to resize columns. But I want the
+> facility to resize some of the columns and  some other columns I do not
+> want to resize at all and width of it has to be fixed.. Any one of you
+> can help me in this aspect.
+> 
+> 
+> C.Sridhar
+-----From: Barry Tannenbaum <barry@dddv.com>
+
+At 08:57 AM 1/8/97 -0800, you wrote:
+
+> I have one CListCtrl in which I have 6 columns. Everything is working
+> fine except that it is possible to resize columns. But I want the
+> facility to resize some of the columns and  some other columns I do not
+> want to resize at all and width of it has to be fixed.. Any one of you
+> can help me in this aspect.
+
+The following routine allowed me to prevent a column from getting too small.
+I'm sure you can modify it to prevent a column from being resized.
+
+/*
+ * WindowProc
+ *
+ * Called to process windows messages.  This routine is used to get access to
+ * WM_NOTIFY messages.  Unfortunately, I'm unable to pass the HDN_TRACK messages
+ * on the the base class for processing unless I implement my own WindowProc.
+ * Failing to pass the messages on results in missing feedback for the user.
+ *
+ * I have to specify *both* the ASCII and Unicode version of the messages since
+ * NT is sending me Unicode messages when I'm in ASCII mode.  This is likely to
+ * change someday when NT gets fixed, so I'd better handle both now.
+ */
+
+LRESULT CAgentListCtrl::WindowProc (UINT message, WPARAM wParam, LPARAM lParam) 
+{
+    HD_NOTIFY *pNotify = (HD_NOTIFY *)lParam;
+
+    if (WM_NOTIFY == message)
+    {
+//      TRACE ("Notify code %d\n", pNotify->hdr.code);
+        switch (pNotify->hdr.code)
+        {
+            case HDN_TRACKA:
+            case HDN_TRACKW:
+                if (0 != pNotify->iItem)      // Make sure this is column 0
+                    break;
+
+                if (pNotify->pitem->cxy < m_cxMin[0])         // Enforce minimum
+                    pNotify->pitem->cxy = m_cxMin[0];
+                break;
+	}
+    }
+
+    // Let the base class do it's thing
+	
+    return CListCtrl::WindowProc(message, wParam, lParam);
+}
+
+
+        - Barry
+
+--------------------------------------------------------------------------------
+
+3DV Technology, Inc              Phone: (603) 595-2200 X228
+410 Amherst St., Suite 150       Fax:   (603) 595-2228
+Nashua, NH  03063                Net:   barry@dddv.com
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

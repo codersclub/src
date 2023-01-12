@@ -1,0 +1,285 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+DAO and BLOBS
+</B></FONT>
+<BR>
+<PRE>
+<B>
+RIchard -- <A HREF="mailto:kdtexas@Onramp.NET">kdtexas@Onramp.NET</A>
+Tuesday, February 11, 1997
+</B>
+Environment: Win95;MSVC 4.2b
+
+
+     Has any one found a decent way to use Blobs under DAO? If so,
+please let me know.Performance won't be a problem because I will have a
+reference file that the user will interact with that will hold a foriegn
+key to the file containing the Blob data so the binary file will never
+be scrolled thru. The only file that the end user will interact with
+will not contain a binary field.
+    The situation is this. I have a program that has a large data
+structure in it (12134 bytes). This structure contains about 1200
+seperate data fields (it is not one big struct but rather a structure
+containing other structures). I want to read/write this data as a binary
+field rather than as several files of discrete data because the
+structure will change from time to time.
+    The logic for the progam is complete and tested as I have had a
+version using the Sequiter Codebase++ library under Win 3.1 released for
+some time. I need to use DAO under Win95 due to a customer request to
+link to a MSAccess accounting system that they are running. I could use
+ODBC but I think DAO offers more.
+    If anyone can help or point me to a source for guidance it will be
+greatly appreciated.
+
+Thank you
+
+Richard Stringer (ISS Software)
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Geoffrey Nicholls -- <A HREF="mailto:geoff@gazelle.com">geoff@gazelle.com</A>
+Wednesday, February 12, 1997
+</B>
+At 11:12 PM 2/11/97 -0600, you wrote:
+>Environment: Win95;MSVC 4.2b
+>     Has any one found a decent way to use Blobs under DAO?
+
+I don't know if its decent, but it works:
+
+STRUCUTRES:
+===========
+
+CByteArray      m_abaValue;
+
+typedef union
+{
+    LONG        m_lValue;
+    BYTE        m_abValue[4];
+} LONGANDBYTE;
+
+DAO PART:
+=========
+
+void MyClass::DoFieldExchange(CDaoFieldExchange * pFX)
+{
+ ...
+ DFX_Binary( pFX, m_strColumn, m_abaValue,
+             AFX_DAO_BINARY_DEFAULT_SIZE, AFX_DAO_ENABLE_FIELD_CACHE );
+ ...
+}
+
+STREAM IN PART:
+===============
+
+for ( int nItem = 0; nItem < m_pcData->m_abaValue.GetSize( ); )
+{
+ trans.m_abValue[0] = m_pcData->m_abaValue[nItem++];
+ trans.m_abValue[1] = m_pcData->m_abaValue[nItem++];
+ trans.m_abValue[2] = m_pcData->m_abaValue[nItem++];
+ trans.m_abValue[3] = m_pcData->m_abaValue[nItem++];
+ lOutput = trans.m_lValue;
+}
+
+STREAM OUT PART:
+================
+
+for ( int nItem = 0; nItem < m_auiValue.GetSize( ); nItem++ )
+{
+ trans.m_lValue = lOutput;
+ m_abaValue.Add( trans.m_abValue[0] );
+ m_abaValue.Add( trans.m_abValue[1] );
+ m_abaValue.Add( trans.m_abValue[2] );
+ m_abaValue.Add( trans.m_abValue[3] );
+}
+
+Hope this helps,
+Geoff Nicholls
+
+
+--------------------------------------
+Geoffrey Nicholls
+Gazelle Software
+415/323-5545 (voice)
+415/323-1913 (fax)
+<A HREF="http://www.gazelle.com">http://www.gazelle.com</A>
+667 Marion Ave
+Palo Alto, CA, 94301
+--------------------------------------
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Deirdre Collins -- <A HREF="mailto:deirdre@technicon.com">deirdre@technicon.com</A>
+Thursday, February 13, 1997
+</B>
+[Mini-digest: 2 responses]
+
+MFC/ODBC allows for BLOB type data - reading/writing through CLongBinary
+or CByteArray.
+I haven't experimented with DAO.  A word of warning though - if the
+value of this field, which in MSAccess is defined as an OLE Object and
+is limited to 1gb, is set/modified through MSAccess directly, an
+undocumented header block will be inserted before the data...  Microsoft
+have an unsupported work-around for this for MSAccess 95.
+
+This may not be an issue for you if you entirely control reading and
+writing of this BLOB, but I just thought I should mention it.
+If anyone is interested in the work-around sample code (OLEFLD) I can
+send them a copy of it.
+
+Deirdre Collins.
+
+>-----Original Message-----
+>From:	RIchard [SMTP:kdtexas@Onramp.NET]
+>Sent:	Wednesday, February 12, 1997 5:12 AM
+>To:	mfc-l@netcom.com
+>Subject:	DAO and BLOBS
+>
+>Environment: Win95;MSVC 4.2b
+>
+>
+>     Has any one found a decent way to use Blobs under DAO? If so,
+>please let me know.Performance won't be a problem because I will have a
+>reference file that the user will interact with that will hold a foriegn
+>key to the file containing the Blob data so the binary file will never
+>be scrolled thru. The only file that the end user will interact with
+>will not contain a binary field.
+>    The situation is this. I have a program that has a large data
+>structure in it (12134 bytes). This structure contains about 1200
+>seperate data fields (it is not one big struct but rather a structure
+>containing other structures). I want to read/write this data as a binary
+>field rather than as several files of discrete data because the
+>structure will change from time to time.
+>    The logic for the progam is complete and tested as I have had a
+>version using the Sequiter Codebase++ library under Win 3.1 released for
+>some time. I need to use DAO under Win95 due to a customer request to
+>link to a MSAccess accounting system that they are running. I could use
+>ODBC but I think DAO offers more.
+>    If anyone can help or point me to a source for guidance it will be
+>greatly appreciated.
+>
+>Thank you
+>
+>Richard Stringer (ISS Software)
+-----From: "BVining" <bvining@isdlink1.hisd.harris.com>
+
+     Richard,
+     
+     We had a problem implementing blobs thru DAO also.  It seems I 
+     couldn't get the blob to be written out to the Database table, yet all 
+     the other data in the set would be written.  It turned out that we 
+     needed to do the following:
+     
+     
+        // The next two calls must be done for the message object because
+        // the default for data exchange is disable field caching.
+        
+        pMsgHistorySet->SetFieldDirty(&pMsgHistorySet->m_MessageBody);
+        pMsgHistorySet->SetFieldNull(&pMsgHistorySet->m_MessageBody,FALSE);
+        
+        
+     
+     In my case m_MessageBody was the binary blob we were trying to write 
+     to the database.  The following is the AFX description of our 
+     recordset as used with DAO: 
+     
+         // Field/Param Data
+             //{{AFX_FIELD(MsgHistorySet, CDaoRecordset)
+             long    m_ID;
+             long    m_Message_Type;
+             long    m_Source_ID;
+             CString m_Client_ID;
+             long    m_Start_Time;
+             long    m_End_Time;
+             long    m_Sequence_Number;
+             long    m_Transaction_Status;
+             long    m_Message_Length;
+             long    m_Completion_Status;
+             CByteArray  m_MessageBody;
+             //}}AFX_FIELD
+         
+        
+     Bruce Vining
+     
+     
+
+
+______________________________ Reply Separator _________________________________
+Subject: DAO and BLOBS
+Author:  mfc-l@netcom.com at smtp
+Date:    2/12/97 9:31 PM
+
+
+Environment: Win95;MSVC 4.2b
+     
+     
+     Has any one found a decent way to use Blobs under DAO? If so,
+please let me know.Performance won't be a problem because I will have a 
+reference file that the user will interact with that will hold a foriegn 
+key to the file containing the Blob data so the binary file will never 
+be scrolled thru. The only file that the end user will interact with 
+will not contain a binary field.
+    The situation is this. I have a program that has a large data
+structure in it (12134 bytes). This structure contains about 1200 
+seperate data fields (it is not one big struct but rather a structure 
+containing other structures). I want to read/write this data as a binary 
+field rather than as several files of discrete data because the 
+structure will change from time to time.
+    The logic for the progam is complete and tested as I have had a
+version using the Sequiter Codebase++ library under Win 3.1 released for 
+some time. I need to use DAO under Win95 due to a customer request to 
+link to a MSAccess accounting system that they are running. I could use 
+ODBC but I think DAO offers more.
+    If anyone can help or point me to a source for guidance it will be
+greatly appreciated.
+     
+Thank you
+     
+Richard Stringer (ISS Software)
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+    <A HREF="http://www.digiday.com/mfcpro/joinmfcl.htm">Become an MFC-L member</A>
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

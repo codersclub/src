@@ -1,0 +1,192 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Accessing MFC objects in other threads
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Erik van der Goot -- <A HREF="mailto:erik.van-der-goot@jrc.it">erik.van-der-goot@jrc.it</A>
+Tuesday, February 27, 1996
+</B>
+Hi there,
+
+In a multithreading application it is suggested by Microsoft that a thread
+can only access MFC objects that it created. (Multiprogramming: Programming
+tips).
+
+However, after messing around, probably making some mistakes, I could not
+get my worker thread to update a window (CPropertyPage) in the main thread,
+so I just passed the pointer to the workerthread (and cast it to CDialog in
+the process) and now I am happily updating my window by doing a
+pDlg->SetDlgItemInt().
+
+Did I misundertand the docs? Am I just lucky?? I am in the process of
+designing a rather large app and I am trying to understand the implication
+of various things before I launch into the real project.
+
+Thanks
+
+Erik
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@interserv.com">mikeblas@interserv.com</A>
+Friday, March 01, 1996
+</B>
+On Tue, 27 Feb 96, Erik van der Goot <erik.van-der-goot@jrc.it> wrote:
+
+>In a multithreading application it is suggested by Microsoft that a thread
+>can only access MFC objects that it created. (Multiprogramming: Programming
+>tips).
+
+>However, after messing around, probably making some mistakes, I could not
+>get my worker thread to update a window (CPropertyPage) in the main thread,
+>so I just passed the pointer to the workerthread (and cast it to CDialog in
+>the process) and now I am happily updating my window by doing a
+>pDlg->SetDlgItemInt().
+
+>Did I misundertand the docs?
+
+No, you misunderstood threading.  All that SetDlgItemInt() does is send a 
+message to the m_hWnd of the pDlg that you're working with.  This doesn't 
+violate any rules--you're not relying on MFC's thread-local map for a mapping 
+between a m_hWnd and a CWnd* that your thread doesn't own.
+
+Instead, you're blocking the thread that calls SetDlgItemInt() and asking the 
+system to let the thread that owns the target window run.  When it is done 
+processing the message, it suspends (or, eventually, goes and does something 
+else) and then your calling thread is resumed since it has the return value.
+
+So, in essence, the code that surrounds your call to SetDlgItemInt() is 
+wasting time.  It's stalling one thread to resume another.  This just adds to 
+the overhead of your application... you're wasting time switching tasks when 
+you could be getting real work done.
+
+>I am in the process of
+>designing a rather large app and I am trying to understand the implication
+>of various things before I launch into the real project.
+
+You owe it to yourself to read up a little bit more on threading in 
+Windows... even without MFC involved.
+
+.B ekiM
+--
+TCHAR szDisc[] = _T("These words are my own; I do not speak for Microsoft.");
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Erik van der Goot -- <A HREF="mailto:erik.van-der-goot@jrc.it">erik.van-der-goot@jrc.it</A>
+Sunday, March 03, 1996
+</B>
+At 01:20 01/03/96 -0800, you wrote:
+>On Tue, 27 Feb 96, Erik van der Goot <erik.van-der-goot@jrc.it> wrote:
+>
+>>In a multithreading application it is suggested by Microsoft that a thread
+>>can only access MFC objects that it created. (Multiprogramming: Programming
+>>tips).
+>
+>>However, after messing around, probably making some mistakes, I could not
+>>get my worker thread to update a window (CPropertyPage) in the main thread,
+>>so I just passed the pointer to the workerthread (and cast it to CDialog in
+>>the process) and now I am happily updating my window by doing a
+>>pDlg->SetDlgItemInt().
+>
+>>Did I misundertand the docs?
+>
+>No, you misunderstood threading.  All that SetDlgItemInt() does is send a 
+>message to the m_hWnd of the pDlg that you're working with.  This doesn't 
+>violate any rules--you're not relying on MFC's thread-local map for a mapping 
+>between a m_hWnd and a CWnd* that your thread doesn't own.
+
+I'm sorry Mike, but I don't quite get that. The 'method' that I am invoking
+definitely belongs to an 'object' that the invoking thread has not created.
+What goes on behind the scenes is a different matter (although admittedly
+rather important :-)). When I pass the pDlg to my thread, the m_hWnd of the
+windows is still very much null. This is one of the 'problems' that I had,
+because I initialize the threads from the constructor of the CPropertySheet
+that contains the CPropertyPages that I want to access. By the time I call
+pDlg->SetDlgItemInt the window does of course exist. But where does the
+m_hWnd now live?? I can test for it at that time in my thread and it yields
+the proper window. 
+But I guess that what you are saying is that as long as I just send messages
+it will work. Right?
+
+>
+>Instead, you're blocking the thread that calls SetDlgItemInt() and asking the 
+>system to let the thread that owns the target window run.  When it is done 
+>processing the message, it suspends (or, eventually, goes and does something 
+>else) and then your calling thread is resumed since it has the return value.
+>
+>So, in essence, the code that surrounds your call to SetDlgItemInt() is 
+>wasting time.  It's stalling one thread to resume another.  This just adds to 
+>the overhead of your application... you're wasting time switching tasks when 
+>you could be getting real work done.
+
+Ok, don't get me wrong, the SetDlgItemInt was very much a quick and dirty
+test to see what would happen. To simply update a window I would rather use
+PostMessage. However, I have a real need for something similar, where I need
+to get at some information entered by the user on one of the pages. Without
+that info, there is not much that the thread can do. As a matter of fact, I
+got stuck, (as the docs predicted) a few days ago when I tried to implement
+a function to get the data from a page in my wizard. Using an event I signal
+to the waiting (but initialized thread) that my user-info is ready and I
+call a function of the page to get it. Alas, I get as far as executing the
+first line which is (not surprisingly) 'UpdateData' and here it stops...  
+
+
+>You owe it to yourself to read up a little bit more on threading in 
+>Windows... even without MFC involved.
+Thanks Mike, but perhaps I will not react to this in public  :-) :-)
+
+Ciao
+
+Erik
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

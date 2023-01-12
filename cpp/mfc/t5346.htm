@@ -1,0 +1,171 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Destroying the Modal Property sheet
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Ram Kumar K.Thalanki -- <A HREF="mailto:vatram@m-net.arbornet.org">vatram@m-net.arbornet.org</A>
+Thursday, May 30, 1996
+</B>
+Hello everybody,
+
+MSVC 4.0 ; MFC 4.0 ; Win 95
+
+I have an application with more than one frame window. From one of the =
+frame windows,
+I am calling DoModal() of CPropertySheet derived class. At some point of =
+time, in another frame window, I get a pointer to this property sheet =
+and from that window, I want to destroy the property sheet when it is =
+still in it's modal loop.=20
+
+I tried calling EndDialog(TRUE), DestroyWindow(), sending/posting =
+message to that property sheet, PressButton(PSBTN_CANCEL) and 'delete' =
+on the property sheet C++ object. The property sheet is getting =
+destroyed and I'm getting access voilation message and it is coming to=20
+
+	if (!ContinueModal())
+			goto ExitModal;
+	(line 3573 in wincore.cpp)
+
+I'm not able to make out what out what is happening. I am stuck up. =
+Please help me.
+
+Thanks,
+
+Ram Kumar
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Paul Pettigrew -- <A HREF="mailto:chilli@iinet.net.au">chilli@iinet.net.au</A>
+Monday, June 03, 1996
+</B>
+[Mini-digest: 2 responses]
+
+Ram Kumar K.Thalanki[SMTP:vatram@m-net.arbornet.org] wrote:
+>Hello everybody,
+>
+>MSVC 4.0 ; MFC 4.0 ; Win 95
+>
+>I have an application with more than one frame window. From one of the =
+frame windows,
+>I am calling DoModal() of CPropertySheet derived class. At some point =
+of time, in another frame window, I get a pointer to this property sheet =
+and from that window, I want to destroy the property sheet when it is =
+still in it's modal loop.=20
+>
+>I tried calling EndDialog(TRUE), DestroyWindow(), sending/posting =
+message to that property sheet, PressButton(PSBTN_CANCEL) and 'delete' =
+on the property sheet C++ object. The property sheet is getting =
+destroyed and I'm getting access voilation message and it is coming to=20
+>
+>	if (!ContinueModal())
+>			goto ExitModal;
+>	(line 3573 in wincore.cpp)
+>
+>I'm not able to make out what out what is happening. I am stuck up. =
+Please help me.
+>
+>Thanks,
+>
+>Ram Kumar
+
+Assuming your pointer to the dlg is valid, you may like to try the =
+method that I have employed.
+
+Basically, you are programatically tring to perform the equivalent of =
+the user clicking on the OK button.
+
+Go to the .H file for your dlg, and place a public access function as =
+follows
+public:
+   void DoOk();
+
+in your .CPP, place this
+void CMyDialog::DoOk()
+{
+   // Call protected, framework default handler.
+   OnOk();
+}
+
+All there is to it!
+--
+Paul Pettigrew
+chilli@iinet.net.au || pmpet2@mugc.cc.monash.edu.au
+http://www.iinet.net.au/~chilli/
+
+-----From: "David W. Gillett" <DGILLETT@expertedge.com>
+
+  My hunch is that the only way this can be happening at all is if 
+each of your frame windows has its own thread, right?  That could be 
+important (but maybe not -- read on).
+
+  I'd pick PressButton(PSBTN_CANCEL) as the safest approach.  All of 
+the others should eventually be called in the process of handling 
+this; my preference is to let the framework orchestrate that.
+
+  ...
+
+  My original hunch was that this was going to be an issue of 
+cross-thread handle-mapping, but checking out the MFC sources for 
+ContinueModal(), I have another theory:
+
+  Are you, perhaps, deriving your own class from CPropertySheet and 
+making your CPropertyPage-derived objects members of that class?  
+This is unnecessary, and may be the actual problem.  The 
+CPropertySheet destructor may be trying to invoke 
+CPropertyPage::ContinueModal() against the current page, an object 
+destroyed as part of the sheet-derived class's destructor.  Oops.
+
+  There are cases where it is necessary and useful to derive a class 
+from CPropertySheet, but they're the exception rather than the rule.  
+The CPropertyPage objects should not be members of such a derivative 
+class.  They could be members of the owning frame class, or its 
+associated document or view.
+
+Dave
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

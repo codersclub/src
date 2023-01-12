@@ -1,0 +1,331 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+SOLVED : Fastest Method To Find Selected Items
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Raja Segar -- <A HREF="mailto:rsz@pc.jaring.my">rsz@pc.jaring.my</A>
+Saturday, January 04, 1997
+</B>
+Environment : Win95, NT 3.51 Visual C++ 4.0
+
+
+Okay here is the method which can be applied to ListCtrl, ListBox etc ...
+The problem was simple - to find out all the selected items in the ListCtrl.
+The only official method was to use GetNextItem to query for the selected flag.
+
+The problem was it too slow as the items in the list grows.
+But with the method below it does not matter whether you have 10 or
+1 million items, finding the selected items is a snap and it's superfast too :)
+
+The idea is to keep a list of items in an array as the user is selecting them
+instead of searching the listctrl for the selected items.
+This would be use full in a Explorer like application where certain action must
+be performed on the selected items etc ....
+
+BTW i would like to thank Dean Wiles & Kenneth A. Argo  .... for giving their
+views on the the problem.
+
+Here i present a enhanced version of the code posted by Dean Wiles. 
+Thanks Dean. :)
+
+I duplicated the exact behaviour of the ListCtrl in terms of selecting
+items using Control or Shift key using the mouse. BTW u still have to handle
+selection of items using the keyboard. Haven't got around it yet but it should
+be a snap after this experience.
+
+
+1) First step is to setup an array to hold the selected rows.
+   int SelectedRows[LIMIT] or etc ....
+   
+   I personally created a very simple list class with 5 function.
+   AddTail(), GetTail(), NotDuplicate(), RemoveAll() & GetCount() 
+   functions. The functions should be self explanary. 
+
+2) As each item are selected update the array above while duplicating
+   the selection behaviour of the ListCtrl.
+
+
+Ok folks here is the code. Feel free to enhance it or whatever.
+If there is any bug please let me know :) 
+
+//-*******************************************************************-//
+//- User Selected an item in listctrl
+//-*******************************************************************-//
+void CListCtrlBox::OnItemchanging(NMHDR* pNMHDR, LRESULT* pResult) 
+{
+    // the only purpose of this function is to get the current item
+    // the processing is done in the click handler.
+    NM_LISTVIEW* pNMListView = (NM_LISTVIEW*)pNMHDR;
+
+    if ( (pNMListView->uNewState & LVIS_SELECTED) ||
+         (pNMListView->uOldState & LVIS_SELECTED) )
+    {
+        m_CurItem = pNMListView->iItem; 
+    }
+     // BTW,  m_CurItem is global to the class ( member variable )
+
+    *pResult = 0;
+}
+
+
+void CListCtrlBox::OnClick(NMHDR* pNMHDR, LRESULT* pResult) 
+{
+    // Was CTRL or SHIFT down while this key was pressed ?
+    if ((GetKeyState(VK_SHIFT) > -1) && (GetKeyState(VK_CONTROL) > -1))
+    {
+       // Nope , so do what we have to 
+       KeyStack.RemoveAll();              // Dump all selected items
+       KeyStack.AddTail(m_CurItem);       // Just add the current one.
+       *pResult = 0;
+       return;                            // Bail out 
+    }
+
+    if ( GetKeyState(VK_CONTROL) < 0 )    // Control Key Down ?
+    {
+       if ( KeyStack.NotDuplicate(m_CurItem) )
+          KeyStack.AddTail(m_CurItem);
+       else
+          KeyStack.RemoveRow(m_CurItem);
+    }
+
+    if ( GetKeyState(VK_SHIFT) < 0)       // Shift Key Down ?
+    {
+       // If no selected items so far
+       if (! KeyStack.GetCount() )
+       {
+          KeyStack.AddTail(m_CurItem);
+       }
+       else   
+       {
+          // Ok get the last selected item 
+          int m_LastItem = KeyStack.GetRowNo (KeyStack.GetTail());
+          if ( m_LastItem != m_CurItem )    // Make sure not the same key
+          {
+             if ( m_LastItem > m_CurItem )  // Swap it around if nessary
+             {
+                int temp   = m_LastItem;
+                m_CurItem  = m_LastItem;
+                m_LastItem = m_CurItem;
+             }
+
+             KeyStack.RemoveAll();    // Dump all selected items
+             for (int j = m_LastItem ; j <= m_CurItem; j++)
+             {
+                KeyStack.AddTail(j);
+             }
+          }
+       }
+    }
+	
+    *pResult = 0;
+}
+
+Bye .. If anyone needs any explanation, feel free to email me.
+ (  _ \/ __)(_   )
+  )   /\__ \ / /_ 
+ (_)\_)(___/(____)@pc.jaring.my
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Saturday, January 04, 1997
+</B>
+At 22:59 1/4/97 +0800, Raja Segar wrote:
+>Environment : Win95, NT 3.51 Visual C++ 4.0
+
+>Okay here is the method which can be applied to ListCtrl, ListBox etc ...
+>The problem was simple - to find out all the selected items in the ListCtrl.
+>The only official method was to use GetNextItem to query for the selected flag.
+
+>The problem was it too slow as the items in the list grows.
+>But with the method below it does not matter whether you have 10 or
+>1 million items, finding the selected items is a snap and it's superfast too :)
+
+>The idea is to keep a list of items in an array as the user is selecting them
+>instead of searching the listctrl for the selected items.
+
+This is unnecessary. The problem you were experiencing was because your
+GetNextItem() loop was incorrectly coded. A properly coded GetNextItem()
+might execute in _one ten thousandth_ of the time that the loop you presented
+would take to execute. You weren't using information that you already had
+available to you, and were searching through items you'd already searched
+through.
+
+In a previous note to this list with the suject "Re: Fastest Method To
+Find Slected Items", I show a properly coded list that doesn't take long
+to execute--even on a 75 Mhz Pentium laptop with a list control that has
+nearly 9000 items in it.
+
+>Bye .. If anyone needs any explanation, feel free to email me.
+
+I'm dying to know: did you not trace through the loop you originally posted
+here?  It would be easy to see, if you did, that it looped both for each
+selected item _and_ each item between each selected item!  Did you actually
+post the wrong code?  I'm mesmerized because other people have also coded
+handlers for selection changes to maintain they're own selection lists even
+when it seems completely unnecessary to me: the code I wrote runs very
+quickly even with 8800 items in the list on the slowest machine I have.
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>
+I'm afraid I've become some sort of speed freak.
+These words are my own. I do not speak on behalf of Microsoft.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Raja Segar -- <A HREF="mailto:rsz@pc.jaring.my">rsz@pc.jaring.my</A>
+Sunday, January 05, 1997
+</B>
+At 12:40 04/01/1997 -0800, you wrote:
+>At 22:59 1/4/97 +0800, Raja Segar wrote:
+>>Environment : Win95, NT 3.51 Visual C++ 4.0
+
+
+>>The idea is to keep a list of items in an array as the user is selecting them
+>>instead of searching the listctrl for the selected items.
+>
+>This is unnecessary. The problem you were experiencing was because your
+>GetNextItem() loop was incorrectly coded. A properly coded GetNextItem()
+>might execute in _one ten thousandth_ of the time that the loop you presented
+>would take to execute. You weren't using information that you already had
+>available to you, and were searching through items you'd already searched
+>through.
+
+Ok i've checked and it seams i have misunderstood the documentation on
+GetNextItem. What you said was correct. Using GetNextItem the way you
+suggested was just a tad slower than maintaining a list of selected items.
+I must say it's was a stupid mistake on my part.
+
+// THE CORRECT METHOD TO USE GetNextItem
+int y = -1;
+while ( (y = this->GetNextItem (y, LVNI_SELECTED )) >=0 )
+{
+   pItem->iItem = y;
+  // do work with it ...
+}
+
+My mistake for not stepping into the code line by line to see exactly why
+it was so slow. Anyway, thanks a lot Mike for pointing it out.
+At end of the day it was a good experience for me to duplicate the selection
+behaviour of the ListCtrl and also i learned a lot about nNewState etc..
+
+>I'm dying to know: did you not trace through the loop you originally posted
+>here?  It would be easy to see, if you did, that it looped both for each
+>selected item _and_ each item between each selected item!  Did you actually
+>post the wrong code?  I'm mesmerized because other people have also coded
+>handlers for selection changes to maintain they're own selection lists even
+>when it seems completely unnecessary to me: the code I wrote runs very
+>quickly even with 8800 items in the list on the slowest machine I have.
+
+Well Mike ..people learn from making mistakes.
+We made a mistake and since We know it we are wiser now. :)
+ 
+Maybe the cause of all the problem is the lack of examples in the MFC
+I wish it could be more like the C Function reference. They always
+throw in an example after the explanations.
+
+Anyway that is what the MFC List is for anyway, to learn.
+If people are not making mistakes, well this list would be
+a ghost list.
+
+Anyway i would like to take this opportunity to thanks all the guys
+who take their time to solve other people's problems.
+Bye. 
+
+
+ (  _ \/ __)(_   )
+  )   /\__ \ / /_ 
+ (_)\_)(___/(____)@pc.jaring.my
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Mike Blaszczak -- <A HREF="mailto:mikeblas@nwlink.com">mikeblas@nwlink.com</A>
+Sunday, January 05, 1997
+</B>
+At 11:43 1/5/97 +0800, Raja Segar wrote:
+
+>My mistake for not stepping into the code line by line to see exactly why
+>it was so slow. Anyway, thanks a lot Mike for pointing it out.
+
+Great, I'm glad it worked out for you.
+
+>Well Mike ..people learn from making mistakes.
+>We made a mistake and since We know it we are wiser now. :)
+
+I was just very surprised that noobdy else noticed the fundamental
+problem, and had gone so far to work around the problem.  How could
+I have been the only one to see the real problem?  Tools like the
+debugger and the profiler would point out the real problem in very
+short order.
+ 
+>Maybe the cause of all the problem is the lack of examples in the MFC
+>I wish it could be more like the C Function reference. They always
+>throw in an example after the explanations.
+
+We add examples as we have time. I'll see if the doc team can toss
+some in for the common control classes. At this time, the team is very
+shorthanded (in fact, for the last six months, I, by myself, have been
+the only full-time developer on MFC) so these things haven't received
+the attention they deserve lately.
+
+.B ekiM
+<A HREF="http://www.nwlink.com/~mikeblas/">http://www.nwlink.com/~mikeblas/</A>      <-- trip report central!
+95 Honda VFR-750F / 88 Yamaha FZ-700 (damaged) / 94 Mazda RX-7
+Serial #00050!    /      AMA - HRC - VFROC     / Wang Dang Wankel
+         I am bored of this talk. It is time now for the dancing!
+These words are my own - I do not speak on behalf of Microsoft.
+
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,359 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+      
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CDoc::Serialize() w/ version info
+</B></FONT>
+<BR>
+<PRE>
+<B>
+codeware -- <A HREF="mailto:riddell@kudos.net">riddell@kudos.net</A>
+Tuesday, March 04, 1997
+</B>
+Environment: MSVC 4.2b, Windows95, NT 4
+
+I am working on an application with a document that must be able to
+serialize and deserialize itself.  I have added the lines:
+DECLARE_SERIAL(CMyDoc) and 
+IMPLEMENT_SERIAL(CMyDoc, CDocument, ERSIONABLE_SCHEMA | 3)
+Actually, I replaced the DYNCREATE lines.  According to the documentation,
+the SERIAL macros to all of the DYNCREATE stuff and more.
+
+My override of Serialize for the document looks something like:
+void CMyDoc::Serialize(CArchive& ar)
+{
+        if (ar.IsStoring)
+        {
+                ... some stuff
+        }
+        else
+        {
+                UINT nVersion = ar.GetObjectSchema();
+                ... some more stuff
+        }
+
+nVersion always comes back as the UINT equivalent of -1 when I would expect
+3 to be returned.  Why is this?  I can get GetObjectSchema() to work for
+other CObject derived classes, but I can't get it to work for CDocument
+derived classes (which are ultimately derived from CObject as well).
+
+Is this by design or am I doing something wrong?
+
+Cory Riddell (riddell@kudos.net)
+Codeware
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:CraigTT@ccmail01.PE-Nelson.COM">CraigTT@ccmail01.PE-Nelson.COM</A>
+Wednesday, March 05, 1997
+</B>
+[Mini-digest: 3 responses]
+
+     Cory,
+     
+     The MFC schema for object versioning only works for objects serialized 
+     via pointers using the insertion (<<) and extraction (>>) operators.  
+     Objects which are serialized by calling Serialized directly, such as 
+     your document, embedded object class members, and base classes don't 
+     get any version services from MFC.  If you want versions for objects 
+     in this situation (the bulk in my experience), you have to handle it 
+     yourself.
+     
+     This means that if you're writing a general purpose object and don't 
+     know how (or can't control how it will be serialized), you have to 
+     handle versioning yourself.
+     
+     Tim Craig
+
+
+______________________________ Reply Separator _________________________________
+Subject: CDoc::Serialize() w/ version info
+Author:  mfc-l@netcom.com at SMTPLINK-PEN
+Date:    3/5/97 1:28 PM
+
+
+Received: by ccmail from lax.PE-Nelson.COM 
+>From owner-mfc-l@majordomo.netcom.com
+X-Envelope-From: owner-mfc-l@majordomo.netcom.com
+Received: from majordomo.netcom.com (listless.netcom.com) by lax.PE-Nelson.COM 
+(5.65c/IDA/PE-Nelson)
+    id AA09072; Wed, 5 Mar 1997 13:26:13 -0800
+Received: by majordomo.netcom.com (8.7.5/8.7.3/(NETCOM MLS v1.01)) id KAA14098; 
+Wed, 5 Mar 1997 10:02:40 -0800 (PST)
+Message-Id: <1.5.4.32.19970304210953.009218f4@gateway> 
+X-Sender: riddell#mail.kudos.net@gateway
+X-Mailer: Windows Eudora Light Version 1.5.4 (32) 
+Mime-Version: 1.0
+Content-Type: text/plain; charset="us-ascii" 
+Date: Tue, 04 Mar 1997 16:09:53 -0500
+To: mfc-l@netcom.com
+From: riddell@kudos.net (codeware)
+Subject: CDoc::Serialize() w/ version info 
+Sender: owner-mfc-l@majordomo.netcom.com 
+Errors-To: owner-mfc-l@majordomo.netcom.com 
+Precedence: bulk
+Reply-To: mfc-l@netcom.com  
+Environment: MSVC 4.2b, Windows95, NT 4
+     
+I am working on an application with a document that must be able to 
+serialize and deserialize itself.  I have added the lines: 
+DECLARE_SERIAL(CMyDoc) and 
+IMPLEMENT_SERIAL(CMyDoc, CDocument, ERSIONABLE_SCHEMA | 3)
+Actually, I replaced the DYNCREATE lines.  According to the documentation, 
+the SERIAL macros to all of the DYNCREATE stuff and more.
+     
+My override of Serialize for the document looks something like: 
+void CMyDoc::Serialize(CArchive& ar)
+{
+        if (ar.IsStoring)
+        {
+                ... some stuff
+        }
+        else
+        {
+                UINT nVersion = ar.GetObjectSchema(); 
+                ... some more stuff
+        }
+     
+nVersion always comes back as the UINT equivalent of -1 when I would expect 
+3 to be returned.  Why is this?  I can get GetObjectSchema() to work for 
+other CObject derived classes, but I can't get it to work for CDocument 
+derived classes (which are ultimately derived from CObject as well).
+     
+Is this by design or am I doing something wrong?
+     
+Cory Riddell (riddell@kudos.net)
+Codeware
+     
+
+-----From: "Serge Wautier" <serge.wautier@ontonet.be>
+
+Hi 'codeware',
+
+I had the same problem recently.
+
+I haven't spent enough time on it to be able to give the exact explanation
+of this behaviour but my conclusion is that it is useless declaring a
+CDocument as DECLARE_SERIAL.
+I guess this comes from the fact that the document is at the origin of the
+serialization process. I mean serialization is initiated by the document,
+so the usual framework code that leads to having a object serialized is not
+executed for the document. The file is an image of the document and not a
+container for it.
+
+All this to say that i think one can't get a schema for the document. My
+solution was to add a m_nDocVersion member to my document. This solution
+works fine if you can afford not supporting previous versions of your
+documents (i.e;: If you're still developping version 1.0 of your app).
+
+Note that using versionable schema for objects members of the document
+works of course very well.
+
+To all of you who wish to use versionable schemas : note for some reason
+(which one???), ar.GetObjectSchema() may be called only once in a Serialize
+function. If you call it a second or more time, it returns -1.
+
+Hope this helps,
+
+Serge Wautier,
+Techno Trade s.a.
+Belgium
+serge.wautier@ontonet.be
+<A HREF="http://www.tbox.fr">http://www.tbox.fr</A>
+
+----------
+> From: codeware <riddell@kudos.net>
+> To: mfc-l@netcom.com
+> Subject: CDoc::Serialize() w/ version info
+> Date: mardi 4 mars 1997 22:09
+> 
+> Environment: MSVC 4.2b, Windows95, NT 4
+> 
+> I am working on an application with a document that must be able to
+> serialize and deserialize itself.  I have added the lines:
+> DECLARE_SERIAL(CMyDoc) and 
+> IMPLEMENT_SERIAL(CMyDoc, CDocument, ERSIONABLE_SCHEMA | 3)
+> Actually, I replaced the DYNCREATE lines.  According to the
+documentation,
+> the SERIAL macros to all of the DYNCREATE stuff and more.
+> 
+> My override of Serialize for the document looks something like:
+> void CMyDoc::Serialize(CArchive& ar)
+> {
+>         if (ar.IsStoring)
+>         {
+>                 ... some stuff
+>         }
+>         else
+>         {
+>                 UINT nVersion = ar.GetObjectSchema();
+>                 ... some more stuff
+>         }
+> 
+> nVersion always comes back as the UINT equivalent of -1 when I would
+expect
+> 3 to be returned.  Why is this?  I can get GetObjectSchema() to work for
+> other CObject derived classes, but I can't get it to work for CDocument
+> derived classes (which are ultimately derived from CObject as well).
+> 
+> Is this by design or am I doing something wrong?
+> 
+> Cory Riddell (riddell@kudos.net)
+> Codeware
+-----From: Ben Burnett <benner@supernet.ab.ca>
+
+void CMyDoc::Serialize(CArchive& ar)
+{
+        if (ar.IsStoring)
+        {
+                ... some stuff
+        }
+        else
+        {
+                UINT nVersion = ar.GetObjectSchema();
+                ... some more stuff
+        }
+}
+
+  Is this by design or am I doing something wrong?
+
+Cory, the CArchive machanisim only suports fixed size types. UINT is not
+a fixed type
+it is 16 bits in Win 3.1 and 32 bits in Win NT and Win 95. Try using the
+WORD cast as
+folows:
+
+void CMyDoc::Serialize(CArchive& ar)
+{
+        if (ar.IsStoring)
+        {
+                ar << (WORD)m_UINTvariable  // use the WORD cast to make
+the type fixed
+                ... some stuff
+        }
+        else
+        {
+                WORD w;
+
+                ar >> w;  // read WORD
+                m_UINTvariable = w; // copy value to variable
+                ... some more stuff
+        }
+}
+
+This should do the trick.
+
+Ben.
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Jim Lawson Williams -- <A HREF="mailto:jimlw@mail.ccur.com.au">jimlw@mail.ccur.com.au</A>
+Friday, March 07, 1997
+</B>
+At 16:09 04-03-97 -0500, codeware wrote:
+>Environment: MSVC 4.2b, Windows95, NT 4
+>
+>I am working on an application with a document that must be able to
+>serialize and deserialize itself.  I have added the lines:
+>DECLARE_SERIAL(CMyDoc) and=20
+>IMPLEMENT_SERIAL(CMyDoc, CDocument, ERSIONABLE_SCHEMA | 3)
+>Actually, I replaced the DYNCREATE lines.  According to the documentation,
+>the SERIAL macros to all of the DYNCREATE stuff and more.
+>
+>My override of Serialize for the document looks something like:
+>void CMyDoc::Serialize(CArchive& ar)
+>{
+>        if (ar.IsStoring)
+>        {
+>                ... some stuff
+>        }
+>        else
+>        {
+>                UINT nVersion =3D ar.GetObjectSchema();
+>                ... some more stuff
+>        }
+>
+>nVersion always comes back as the UINT equivalent of -1 when I would expect
+>3 to be returned.  Why is this?  I can get GetObjectSchema() to work for
+>other CObject derived classes, but I can't get it to work for CDocument
+>derived classes (which are ultimately derived from CObject as well).
+>
+>Is this by design or am I doing something wrong?
+>
+>Cory Riddell (riddell@kudos.net)
+>Codeware
+>
+G'day!
+
+>From TN002:
+
+Calling Serialize Directly
+There are many cases where the overhead of the general object archive
+scheme of WriteObject and ReadObject is not necessary or desired.
+  <snip>
+=B7	Your code does not need to recover from old schema numbers. This makes
+your document serialization code responsible for encoding schema numbers,
+file format version numbers or whatever magic numbers desired at the start
+of your data files.
+                       ****************
+
+Stick in your own version number as the 1st stored object.
+
+Regards,
+Jim LW
+                 =20
+
+
+>From the BBC's "Barchester Chronicles":
+
+    "I know that ultimately we are not supposed to understand.
+    But I also know that we must try."
+
+       -- the Reverend Septimus Harding,=20
+          tax-consultant, crypt-analyst, clog-dancer, C++ programmer
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+    <A HREF="http://www.digiday.com/mfcpro/joinmfcl.htm">Become an MFC-L member</A>
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

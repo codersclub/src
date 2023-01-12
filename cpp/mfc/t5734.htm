@@ -1,0 +1,217 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+Page Layout...
+</B></FONT>
+<BR>
+<PRE>
+<B>
+David W. Taylor -- <A HREF="mailto:detayls@sprynet.com">detayls@sprynet.com</A>
+Sunday, July 07, 1996
+</B>
+MFC 4.1 Windows 95
+
+--
+
+I am investigating the possibility of writing an application to do page
+layout for a particular kind of data.
+
+Although I have written a couple of largeish applications using MFC, this
+will be the first time that I have had to completely understand the MFC
+document/view mechanisms.
+
+The main requirement is that the application should immediately display a
+scrollable view sized to the page size and orientation for the user's
+default printer. It will show the page in the style of PageMaker/Quark
+Xpress with a pasteboard style background.  This would allow the user to see
+the entire page and a gray background surrounding the page. Items part on
+and part off the "page" would only have the "page" part printed.
+
+My questions are these:
+
+1. How do I *SILENTLY* obtain the page size and orientation for the user's
+default printer? 
+
+Currently I am doing the following, which brings up a Page Setup Dialog,
+whenever a new document is first created, which is what Quark Xpress does.
+It's ugly and baffling to the new user though.
+
+void CMyDoc::InitDocument(BOOL getPageSizeFromUser)
+{
+  if (getPageSizeFromUser)
+  {
+  	CPageSetupDialog pageDialog(TRUE);
+
+  	// show the standard page setup dialog
+  	pageDialog.DoModal();
+
+  	LPDEVMODE pDevMode = pageDialog.GetDevMode();
+
+  	if (pDevMode)	// this is the user's choice for this doc
+  	{
+  	  m_sizeDoc = pageDialog.GetPaperSize();
+  	  m_Yresolution = pDevMode->dmYResolution;
+  	}
+  	else  	        // user has made no choice - default
+  	{
+  	  // default doc size - .001" in 8.5 x 11 page
+  	  m_sizeDoc = CSize(8500,11000);
+
+  	  // standard laser 300 dots per inch
+  	  m_Yresolution = 300;
+  	}
+  }
+  else
+  {
+  	...
+  }
+}
+
+2. Has anyone else done all of this layout manager work?
+
+Can I buy a pre-packaged class that abstracts out all of this?  I have no
+real understanding of how hard this is.
+
+Thanks for your time.
+
+David
+
+
+--
+David W. Taylor, Detayls  detayls@SpryNet.com
+
+
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+<A HREF="mailto:David.Lowndes@bj.co.uk">David.Lowndes@bj.co.uk</A>
+Wednesday, July 10, 1996
+</B>
+[Mini-digest: 5 responses]
+
+>My questions are these:
+>
+>1. How do I *SILENTLY* obtain the page size and orientation for the user's
+>default printer? 
+
+David,
+
+Use the PSD_RETURNDEFAULT flag with CPageSetupDialog.
+-----From: Kostya Sebov <sebov@is.kiev.ua>
+
+There's a Win32 bit flag, which sounds like PDS_RETURNDEFAULT, theat suppress UI
+when you call CPageSetupDialog::DoModal().
+
+You should combine this flag with corresponding CPageSetupDialog::m_psd
+structure member variable somewhere between the construction of the dialog
+object and the DoModal call. The rest of your code will work the same way.
+
+Note that when this flaf is set CPageSetupDialog::DoModal returns IDOK in all
+cases except there's no default printer, which usually means no printer at all.
+
+>   2. Has anyone else done all of this layout manager work?
+>
+Our company develops a line of products that handle PostScript's. I programmad
+an application that allows you to scale/shift/orient an Image on the page berfore
+it is printed.
+
+Sincerely,
+--- 
+Kostya Sebov. 
+----------------------------------------------------------------------------
+Tel: (38 044) 266-6387 | Fax: (38 044) 266-6195 | E-mail: sebov@is.kiev.ua
+-----From: Chong Zhang <cz@dana.ucc.nau.edu>
+
+Checkout CPreviewView provided by MFC. You can find almost all answers.
+-----From: Roger Onslow/Newcastle/Computer Systems Australia/AU <Roger_Onslow@compsys.com.au>
+
+BOOL CMyDoc::GetPageSize(CSize& size) {
+ CPrintDialog dlg(FALSE);
+ if (! ::AfxGetApp()->GetPrinterDeviceDefaults(&dlg.m_pd))  return FALSE;
+ // GetPrinterDC returns a HDC so attach it
+ HDC hDC = dlg.CreatePrinterDC(); ASSERT(hDC != NULL);
+ CDC dc; dc.Attach(hDC);
+ // Get the size of the page in mm
+ size.cx = dc.GetDeviceCaps(HORZSIZE);
+ size.cy = dc.GetDeviceCaps(VERTSIZE);
+ // NOTE: use HORZRES/VERTRES for size in pixels
+ return TRUE;
+}
+
+Talk to Stingray, they may well have something (I don't have any connection 
+with them, but have seen ads for their MFC products)
+
+           /|\        Roger Onslow
+      ____|_|.\       ============
+    _/.........\Senior Software Engineer
+   /CCC.SSS..A..\
+  /CC..SS...A.A..\   Computer
+ /.CC...SS..AAA...\       Systems
+/\.CC....SSAA.AA../            Australia
+\ \.CCCSSS.AA.AA_/
+ \ \...........//      Ph: +61 49 577155
+  \ \...._____//      Fax: +61 49 675554
+   \ \__|_/\_//    RogerO@compsys.com.au
+    \/_/  \//
+
+
+-----From: Vincent Mascart <100425.1337@CompuServe.COM>
+
+Just do the follwing in your InitDocument() :
+
+	LPDEVMODE pdv;
+	CPrintDialog dlg(TRUE);
+
+	dlg.GetDefaults();
+	pdv = dlg.GetDevMode();
+
+I think you know what to do next ...
+
+HTH
+
+Vincent Mascart
+100425.1337@compuserve.com
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+

@@ -1,0 +1,362 @@
+<!--#include virtual="/ssi/top.html"-->
+
+
+ 
+ 
+
+ 
+
+<TABLE WIDTH=100%>
+  <TR>
+    <TD WIDTH=33>
+    <TD ALIGN=LEFT VALIGN=CENTER>
+       
+    <TD ALIGN=RIGHT VALIGN=CENTER>
+       
+</TABLE>
+
+<DL><DL><BLOCKQUOTE>
+
+
+<BR>
+<FONT COLOR="#009090" SIZE=5><B>
+CCheckListBox is giving me trouble!
+</B></FONT>
+<BR>
+<PRE>
+<B>
+Hulemannen -- <A HREF="mailto:elg2@nobipol.unit.no">elg2@nobipol.unit.no</A>
+Friday, August 02, 1996
+</B>
+Environment:  VC++ 4.0,NT 3.51
+
+Here's my problem:
+- a dialog created with the dialog editor that also 
+contains a list box
+- with class wizard I derived a memeber variable - 
+CListBox m_dlListBox - 
+in the class CMyDialog. I then changed it to a 
+CCheckListBox-class.
+- in OnCreate I added this code: 
+
+	CRect rect;
+
+	m_dlgListBox.GetItemRect(IDC_LIST, &rect);
+
+	int nRet = m_dlgListBox.Create(WS_CHILD | 
+WS_VISIBLE | LBS_STANDARD |
+		LBS_HASSTRINGS | LBS_OWNERDRAWFIXED 
+| LBS_OWNERDRAWVARIABLE ,
+		rect, this, IDC_LIST);
+	ASSERT(nRet != 0);
+
+"GetItemRect(IDC_LIST, &rect);" causes the 
+following ASSERT failure in line 643 in 
+AFXWIN2.INL:
+_AFXWIN_INLINE int CListBox::GetItemRect(int 
+nIndex, LPRECT lpRect) const
+	{ ASSERT(::IsWindow(m_hWnd)); return 
+(int)::SendMessage(m_hWnd, LB_GETITEMRECT, nIndex, 
+(LPARAM)lpRect); }
+
+I have discovered that this function can only be 
+used after Create is called, but I need the 
+parameter 'rect' it passes to run Create correctly. 
+
+I can replace the second paramater 'rect' in Create 
+with CRect(0,0, 200,200) for example and then 
+I can see the list, although it isn't placed 
+correctly in the dialog and seems to be hiding 
+behind
+text,buttons etc. 
+
+Passing NULL instead of 'rect' produces an error 
+and trying to read the listbox-position and size 
+from the dialog editor and passing these doesn't 
+produce produce satisfactory results.     
+-- 
+Name: Steinar M. Elgsaeter (The Caveman)
+E-mail: elg2@nobipol.unit.no
+"The nice thing about C++ is that only your friends 
+can handle your private parts."
+
+</PRE>
+<HR WIDTH=80%>
+<PRE>
+<B>
+Benny -- <A HREF="mailto:blee@filenet.com">blee@filenet.com</A>
+Tuesday, August 06, 1996
+</B>
+[Mini-digest: 8 responses]
+
+Try to intercept it in OnInitDialog.  That should do it.
+
+Benny
+ ----------
+From: owner-mfc-l
+To: mfcpro; mfc-l
+Subject: CCheckListBox is giving me trouble!
+Date: Friday, August 02, 1996 7:08PM
+
+Environment:  VC++ 4.0,NT 3.51
+
+Here's my problem:
+ - a dialog created with the dialog editor that also
+contains a list box
+ - with class wizard I derived a memeber variable -
+CListBox m_dlListBox -
+in the class CMyDialog. I then changed it to a
+CCheckListBox-class.
+ - in OnCreate I added this code:
+
+        CRect rect;
+
+        m_dlgListBox.GetItemRect(IDC_LIST, &rect);
+
+        int nRet = m_dlgListBox.Create(WS_CHILD |
+WS_VISIBLE | LBS_STANDARD |
+                LBS_HASSTRINGS | LBS_OWNERDRAWFIXED
+| LBS_OWNERDRAWVARIABLE ,
+                rect, this, IDC_LIST);
+        ASSERT(nRet != 0);
+
+"GetItemRect(IDC_LIST, &rect);" causes the
+following ASSERT failure in line 643 in
+AFXWIN2.INL:
+_AFXWIN_INLINE int CListBox::GetItemRect(int
+nIndex, LPRECT lpRect) const
+        { ASSERT(::IsWindow(m_hWnd)); return
+(int)::SendMessage(m_hWnd, LB_GETITEMRECT, nIndex,
+(LPARAM)lpRect); }
+
+I have discovered that this function can only be
+used after Create is called, but I need the
+parameter 'rect' it passes to run Create correctly.
+
+I can replace the second paramater 'rect' in Create
+with CRect(0,0, 200,200) for example and then
+I can see the list, although it isn't placed
+correctly in the dialog and seems to be hiding
+behind
+text,buttons etc.
+
+Passing NULL instead of 'rect' produces an error
+and trying to read the listbox-position and size
+from the dialog editor and passing these doesn't
+produce produce satisfactory results.
+ --
+Name: Steinar M. Elgsaeter (The Caveman)
+E-mail: elg2@nobipol.unit.no
+"The nice thing about C++ is that only your friends
+can handle your private parts."
+-----From: "Greg Tighe" <gdt@eng.aisinc.com>
+
+Forget about calling Create()... that will only result in your having 
+two separate listbox controls in your dialog.  Instead, try this:
+
+    m_dlgListBox.SubclassDlgItem (IDC_LIST, this);
+
+This will subclass the listbox control to your CMyCCheckListBox 
+member variable.  Make sure the 'Owner Draw:Fixed' attribute has been 
+chosen in the dialog editor for your listbox.  The listbox should be 
+displayed with checkboxes to the left of each item.
+
+	-Greg Tighe
+	Applied Intelligent Systems, Inc.
+	Ann Arbor, MI
+	gdt@aisinc.com
+-----From: Wolfgang Loch <Wolfgang.Loch@RZ.TU-Ilmenau.DE>
+
+Let the class wizard make a member variable m_List for your
+listbox control and change the class name in (mydlg.h) from
+CListBox to CCheckListBox. 
+
+So why do you want to Create() it ?
+
+Wolfgang
+
+-- 
+/-------------------------------------------------\
+| Wolgang Loch  (Technical University of Ilmenau) |
+|   e-mail: Wolfgang.Loch@rz.TU-Ilmenenau.DE      |
+|   www   : http://www.rz.tu-ilmenau.de/~wolo     |
+\-------------------------------------------------/
+-----From: mjmo@lubrizol.com
+
+     
+You are doing too much work.  Let MFC do most of it.  In the dialog editor, make
+sure the listbox has these styles:
+        owner-draw fixed
+        Has Strings
+        NO SORT
+
+Remove the Create from your OnCreate - the listbox will be created from your 
+dialog template, and MFC will attach it to your CCheckListBox variable (but not 
+until OnInitDialog).  That's all you need to do.
+
+Besides the fact that you do not need to create the list box, I see two other 
+things in your code:
+
+        * There is no window handle for the control until after Create is 
+called.  So calling GetItemRect before Create will ASSERT, as you found out.  
+But of course, that's no longer a problem because the rectangle from the dialog 
+template will be used.
+
+        * You are specifying both LBS_OWNERDRAWFIXED and LBS_OWNERDRAWVARIABLE, 
+which I believe are mutually exclusive.  One will probably override the other, 
+but I'm not sure which.
+
+Mike Morel
+Mushroom Software
+mmorel@mushroomsoft.com
+MFC For Yourself at http://www.mushroomsoft.com/mushroom
+
+
+-----From: Gordon Weakliem <gweakl@metronet.com>
+
+I think you're trying to use a list box in a dialog, but handle it with your
+owner draw class.  What I usually do in these cases is put a static control
+where the owner drawn control goes, then take the static's dimensions for my
+control.  What it seems like you're doing is creating a secong list box on
+top of the one created when the dialog resource is created.  I'm guessing
+the way your code is written, you'll get two list boxes showing up in Spy++.
+The reason taking units from Resource Studio is that RS deals in dialog
+units, not pixels.  Check out GetDialogBaseUnits for details.
+
+>	int nRet = m_dlgListBox.Create(WS_CHILD | 
+>WS_VISIBLE | LBS_STANDARD |
+>		LBS_HASSTRINGS | LBS_OWNERDRAWFIXED 
+>| LBS_OWNERDRAWVARIABLE ,
+>		rect, this, IDC_LIST);
+
+On a side note, I don't understand why your list box is LBS_OWNERDRAWFIXED
+and LBS_OWNERDRAWVARIABLE.  These styles are mutually exclusive; either the
+items are all the same size, or they aren't.
+Gordon Weakliem
+gweakl@metronet.com
+
+-----From: "Frederic Steppe" <FredericS@msn.com>
+
+What a mess ...
+
+You don't have to create a control defined in a dialog template, it will be 
+done for you.
+
+Of course GetItemRect doesn't work, there is no control yet !
+
+By the way, what are you trying to do ???
+
+If you REALLY have to move the control from its original location, you can do 
+it in OnInitDialog (the control will exist at that time).
+
+
+Frederic Steppe (frederics@msn.com)
+-----From: "petter.hesselberg" <petter.hesselberg@ac.com>
+
+In the original question, Steinar M. Elgsaeter (aka The Caveman) attempts
+to call GetItemRect on a listbox that has not yet been created. This MFC 
+function
+is a wrapper for sending the message LB_GETITEMRECT to the listbox;
+since the listbox does not yet exist, no dice.
+
+You say that you need this rect size (which will, in fact, be the size of a 
+single
+item in the listbox) to do your m_dlgListBox.Create properly. Actually, you
+can create it any size you want, and then use MoveWindow to set the actual 
+position.
+And, by the way, OnInitDialog is generally the best place to do this sort of 
+stuff.
+At that point, all the controls you drew in the dialog editor will actually 
+have been
+created.
+
+Your code has a couple of other problems, though. To begin with, using IDC_LIST
+as the first parameter to the GetItemRect call is meaningless. This parameter
+is an index into the list box, not a control ID. At any rate, a CCheckListBox 
+is normally
+LBS_OWNERDRAWFIXED, unless you want to handle the drawing yourself.
+Since it is LBS_OWNERDRAWFIXED, IDC_LIST is as good as any other index,
+so in this case, you'd actually get away with it -- by pure luck.
+
+You attempt to create a listbox which combines LBS_OWNERDRAWVARIABLE
+and LBS_OWNERDRAWFIXED styles -- these styles are not compatible.
+
+You have drawn a listbox in the dialog editor. Why do you want to create another
+one? That way, you will end up with two listboxes. What you want to do is to 
+subclass
+the existing one; in this case, it will retain the position you gave it in the 
+dialog
+editor.
+
+You should be wary of overriding variables generated by ClassWizard. It  may or
+may not be safe in this case, but as a general rule, if I can't select a class 
+in the
+ClassWizard's dialog box, I forego the Wizard on this point, define a variable 
+for the
+control by hand, and use the control's CWnd::SubClass() method in OnInitDialog.
+
+FYI, the coordinates used by the dialog editor are dialog units.
+For more information on dialog units, check out CDialog::MapDialogUnits and
+all the Win32 API functions referenced there.
+
+I don't want to discourage you, but it seems to me that you have only vague
+ideas about what you're doing. I happen to think that MFC and ClassWizard are
+fine and useful tools, but you do need to have at least a rudimentary 
+understanding
+of MFC, the underlying Windows API and the generated code. If you don't, you 
+will
+consistently be led into the kind of quagmire you're in here. Unless you're 
+prepared
+to invest a significant amount of time and effort, you'd be better off sticking 
+with Visual Basic.
+
+Regards,
+
+Petter Hesselberg
+Andersen Consulting
+-----From: Mats Manhav <manhav@connectum.skurup.se>
+
+You don't need to call create at all for doing this.
+
+Assume the listbox in the dialog template has the following id IDC_LIST.
+Declare the variable as before. Make sure that it has the style Owner drawn
+fixed.
+
+Then in the CYourDialog::OnInitDialog()
+do the following
+
+   m_dlgListBox.SubclassDlgItem(IDC_LIST, this);
+
+and the listbox will be a CCheckListBox!
+
+You see, the listbox is already created by having it in the dialog template.
+
+--
+==========================================================================
+Mats Mеnhav (Mats Manhav for 7-bit people)
+email:manhav@connectum.skurup.se   WWW: http://connectum.skurup.se/~manhav
+FAX:  (int) 46 (0) 414 243 05      Phone: (int) 46 (0) 414 243 05         
+==========================================================================
+
+
+</PRE>
+<HR WIDTH=80%>
+ 
+
+<CENTER><FONT SIZE=1>
+  <BR>
+   
+</FONT></CENTER>
+
+<CENTER><FONT SIZE=2><BR>
+     
+  | <A HREF="index.htm">Вернуться в корень Архива</A>
+  |  
+</FONT></CENTER>
+
+ 
+
+ 
+<!--#include virtual="/ssi/bottom.html"-->
+
+
