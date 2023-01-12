@@ -1,0 +1,812 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h2>Программирование Интернет приложений в Borland
+    Kylix. Часть I:</h2>
+    <h2>Создай своих демонов!</h2>
+    <font face="Times New Roman"><p></font>Автор: <a href="mailto:borovsky@yandex.ru">Андрей
+    Боровский</a> (<a href="http://www.kylixportal.chat.ru/">www.kylixportal.chat.ru</a>)<font
+    face="Times New Roman"></p>
+    <p>В этой статье речь пойдет о создании интернет
+    серверов (сетевых демонов) в Linux при помощи среды
+    разработки Kylix и входящего в нее набора
+    компонентов Internet Direct. В качестве примера
+    описывается разработка простого сервера
+    протокола HTTP. </p>
+    <p>Одной из сильных сторон Delphi и Kylix является
+    возможность быстрой разработки мощных Интернет
+    приложений. С этой целью в состав обеих сред
+    включены наборы готовых компонентов для работы с
+    Интернет. В Delphi 6 и Kylix 1.0 эту функцию выполняет
+    Internet Direct component suite ( Indy ). Indy представляет собой
+    набор классов Object Pascal (существует также версия
+    для Borland C++ Builder) для работы с Интернет. Одни
+    классы, такие как TIdTCPConnection, предоставляют
+    базовые функции для низкоуровневой работы с
+    сервисами Интернет, другие классы, такие как
+    TIdHTTPServer, являются готовыми Интернет серверами
+    или клиентами со встроенной поддержкой всех
+    основных функций соответствующих сетевых
+    протоколов. К достоинствам Indy следует отнести
+    качественный механизм многопоточности
+    (multi-threading), доступный как в Windows, так и в Linux версии.
+    Еще одним достоинством Indy является доступность
+    исходных текстов всех компонентов набора. Indy
+    распространяется под двойным лицензированием,
+    что позволяет создавать на его базе как открытые,
+    так и коммерческие приложения. </p>
+    <p>Создать простейший Интернет сервер для Windows в
+    Delphi 6 достаточно легко: бросаем в окно формы
+    соответствующий компонент, назначаем пару
+    обработчиков событий и voila: сервер готов! В Linux все
+    выглядит лишь немного сложнее. </p>
+    <h3>Демоны Linux</h3>
+    <p>Большинство сетевых серверов Linux реализованы в
+    виде <i>демонов</i>. Так, например, популярный
+    web-сервер Apache, это демон протокола HTTP (httpd). Демон
+    (daemon, demon) - это программа, выполняющаяся в фоновом
+    режиме и настроенная на обработку определенного
+    класса событий. После запуска демон находится в
+    состоянии ожидания события. Когда в системе
+    происходит соответствующее событие, демон
+    активизируется и выполняет необходимые действия
+    по его обработке. Важной особенностью демонов
+    является возможность параллельной обработки
+    нескольких событий. Демоны бывают не только
+    сетевыми. Например печатью в Linux управляет демон
+    печати, а записью сообщений в log-файлы - log-демон
+    (logd). </p>
+    <p>Сетевой демон находится в состоянии ожидания
+    запроса на соединение. Когда такой запрос
+    поступает, демон либо устанавливает соединение и
+    выполняет обработку запроса, либо отказывается
+    установить соединение. Сразу отмечу, что
+    программа-сервер Интернет вовсе не обязательно
+    должна быть демоном. В следующих статьях этой
+    серии мы напишем сервер, обладающий полноценным
+    графическим интерфейсом. Однако, если Вы хотите,
+    чтобы Ваш сервер запускался вместе с
+    операционной системой и выполнялся вне
+    зависимости от того, кто из пользователей
+    работает в системе в данный момент, реализация
+    сервера в форме демона представляется наилучшим
+    вариантом. </p>
+    <p>Демон, это консольное приложение,
+    выполняющееся в фоновом режиме. Фоновым режимом
+    (background mode) называется такой режим работы
+    программы, в котором приложение не
+    взаимодействует с терминалом. После запуска
+    демон должен переходить в фоновый режим
+    автоматически. </p>
+    <h3>Орудие демона - функция fork</h3>
+    <p>Прежде чем приступить к программированию
+    демона, следует рассмотреть подробнее функцию
+    fork, которая играет в работе демонов важную роль. <img
+    align="right" height="257" src="fork.gif" width="327"> В Kylix функция fork
+    объявлена в модуле Libc. Объявление функции
+    выглядит следующим образом: </p>
+    <p><font face="Courier New" size="2"><b>function</b> fork: __pid_t; <b>cdecl;</b></font> </p>
+    <p>Функция fork создает новый процесс, являющийся
+    точной копией того процесса, из которого она была
+    вызвана. Выполнение нового процесса начинается с
+    точки возврата функции fork. Таким образом после
+    успешного вызова функция fork возвращает значения
+    уже двум процессам. Новый процесс работает так,
+    как если бы он выполнялся с самого начала, вызвал
+    функцию fork и получил ее значение. Оба процесса
+    принадлежат к одной и той же группе и разделяют
+    открытые дескрипторы файлов. Отличить дочерний
+    процесс от родительского можно по значению,
+    возвращаемому функцией fork. Родительскому
+    процессу fork возвращает pid созданного дочернего
+    процесса, тогда как дочернему процессу
+    возвращается значение 0. </p>
+    <p>Рисунок справа иллюстрирует работу функции fork.
+    Функция fork (в переводе с английского - вилы, вилка)
+    широко используется при программировании
+    демонов. Вот почему демон, изображенный на
+    эмблеме FreeBSD, держит вилы в руках. </p>
+    <h3>Структура демона</h3>
+    <p>Как было указано выше, демон должен быть
+    консольным приложением. В окне New Items (Вызывается
+    командой File|New...) на вкладке New выбираем элемент
+    Console Application. Открывается окно с заготовкой файла
+    проекта консольного приложения. Этот файл будет
+    содержать все основные элементы создаваемого
+    демона. Обычно имя исполняемого файла демона
+    заканчивается на букву d (htppd, ftpd, crond). Назовем
+    создаваемый проект dhttpd. </p>
+    <p>Наша первая задача - перевести запущенный демон
+    в фоновый режим. Для этого при помощи fork
+    создается копия процесса демона, а выполнение
+    исходного процесса завершается: </p>
+    <p>&nbsp;</p>
+    <table border="1" cellPadding="7" cellSpacing="0" width="100%">
+<TBODY>
+      <tr>
+        <td><pre><font color="#000000" face="Courier New" size="2">
+  pid := fork;
+  <b>if</b> pid = <font
+color="#0000aa">-1</font> <b>then</b>   <i><font color="#0000aa">         // fork failed</font></i>
+  <b>begin</b>
+    perror( PChar(<font
+color="#0000aa">'fork 1: '</font>) );
+    Halt( <font color="#0000aa">1</font> );
+  <b>end else</b>
+  <b>if</b> pid &lt;&gt; <font
+color="#0000aa">0</font> <b>then</b> Halt( <font color="#0000aa">0</font> ); <i><font
+color="#0000aa">// parent process exits</font></i>
+  ...
+</font></pre>
+        </td>
+      </tr>
+</TBODY>
+    </table>
+    <p>Здесь pid - глобальная переменная типа Integer. Если
+    при вызове функции fork произошла ошибка, функция
+    возвращает значение -1, и приложение должно
+    завершиться. После удачного вызова функции fork
+    родительскому процессу возвращается pid
+    дочернего процесса, не равный нулю. Родительский
+    процесс завершает работу, а дочерний продолжает
+    выполняться. После завершения родительского
+    процесса контроль над терминалом возвращается
+    запустившей его программе (оболочке), а новый
+    процесс, созданный функцией fork, выполняется в
+    фоновом режиме. Однако наш процесс все еще
+    принадлежит той же группе, что и создавший его
+    процесс. Для того чтобы демон стал полностью
+    независим от запустившего его терминала, новый
+    процесс следует поместить в новую группу, а самый
+    простой способ сделать это - создать новую
+    сессию. (Подробнее о сессиях и группах процессов
+    можно прочесть в <a href="#r3">[3]</a>.) Новая сессия
+    создается вызовом функции setsid: </p>
+    <p>&nbsp;</p>
+    <table border="1" cellPadding="7" cellSpacing="0" width="100%">
+<TBODY>
+      <tr>
+        <td><pre><font color="#000000" face="Courier New" size="2">
+  pid := setsid;
+  <b>if</b> pid = <font
+color="#0000aa">-1</font>  <b>then</b>  <font color="#0000aa"><i>// setsid failed</i></font>
+  <b>begin</b>
+    perror( PChar(<font
+color="#0000aa">'setsid: '</font>) );
+    Halt( <font color="#0000aa">1</font> );
+  <b>end;</b>
+  ...
+</font></pre>
+        </td>
+      </tr>
+</TBODY>
+    </table>
+    <p>Далее мы закрываем стандартный поток ввода и
+    перенаправляем потоки вывода на /dev/null (это
+    необходимо сделать, так как некоторые функции
+    могут использовать стандартные потоки для
+    вывода служебной информации). </p>
+    <p>&nbsp;</p>
+    <table border="1" cellPadding="7" cellSpacing="0" width="100%">
+<TBODY>
+      <tr>
+        <td><pre><font color="#000000" face="Courier New" size="2">
+  Close( Input );    <font
+color="#0000aa"><i>// closing stdin</i></font>
+  AssignFile( Output, <font color="#0000aa">'/dev/null'</font> );
+  Rewrite( Output );
+  AssignFile( ErrOutput, <font
+color="#0000aa">'/dev/null'</font> );
+  Rewrite( ErrOutput );
+  ...
+</font></pre>
+        </td>
+      </tr>
+</TBODY>
+    </table>
+    <p>Теперь процесс выполняется в режиме демона.
+    Сохраним pid процесса в файле dhttpd.pid в каталоге
+    /var/run (зачем это нужно объясняется ниже). Следует
+    отметить, что демон должен запускаться в режиме,
+    предоставляющем полный доступ к ресурсам
+    компьютера, т. е. в режиме root или в ходе загрузки
+    операционной системы. Это необходимо не только
+    для получения доступа к таким каталогам, как
+    /var/run, но и для работы с сокетами, что является
+    основной функцией создаваемого нами приложения. </p>
+    <p>&nbsp;</p>
+    <table border="1" cellPadding="7" cellSpacing="0" width="100%">
+<TBODY>
+      <tr>
+        <td><pre><font color="#000000" face="Courier New" size="2">
+  AssignFile( F, <font
+color="#0000aa">'/var/run/dhttpd.pid'</font> );
+  Rewrite( F );
+  pid := getpid;
+  WriteLn( F, pid );
+  CloseFile( F );
+  ...
+</font></pre>
+        </td>
+      </tr>
+</TBODY>
+    </table>
+    <p>Здесь F - переменная типа Text. </p>
+    <p>Нам еще необходимо организовать обработку
+    сигналов. Сигналы Linux (их не следует путать с
+    сигналами Qt library) очень похожи на прерывания MS-DOS.
+    Фактически сигналы основаны на программных
+    прерываниях. Когда процессу Linux посылается
+    сигнал, для которого установлен обработчик,
+    выполнение процесса прерывается и вызывается
+    процедура обработчика сигнала. По окончании
+    выполнения обработчика основной процесс
+    возобновляется с той точки, в которой он был
+    прерван, если, конечно, обработчик сигнала не
+    завершил процесс. В Linux процессу предоставлены
+    широкие возможности по управлению обработкой
+    большинства сигналов: Процесс может блокировать
+    сигналы, игнорировать сигналы, назначать свои
+    обработчики сигналов или использовать
+    обработчики, назначенные системой по умолчанию.
+    Характерной особенностью сигналов Linux является
+    асинхронность. Это означает, что
+    незаблокированный сигнал может прервать
+    выполнение программы в любой точке. Данный факт
+    нужно учитывать при написании обработчиков
+    сигналов. Сигналы Linux и их обработка подробно
+    описаны в <a href="#r3">[3]</a>. </p>
+    <p>Существует два основных подхода к обработке
+    сигналов Linux: первый подход заключается в том, что
+    все действия по обработке сигнала выполняются в
+    процедуре обработчика. При втором подходе
+    обработчик сигнала лишь изменяет значения
+    некоторых глобальных переменных-флажков.
+    Основной процесс периодически проверяет
+    состояние флажков и в случае их изменения
+    выполняет операции, связанные с соответствующим
+    сигналом. Этот подход позволяет
+    синхронизировать обработку сигналов с
+    выполнением других элементов программы. </p>
+    <p>При программировании нашего демона мы пойдем
+    по второму пути. В программе объявляется
+    глобальная переменная SigNum типа Integer, а в качестве
+    обработчика сигналов служит процедура TranslateSig: </p>
+    <p>&nbsp;</p>
+    <table border="1" cellPadding="7" cellSpacing="0" width="100%">
+<TBODY>
+      <tr>
+        <td><pre><font color="#000000" face="Courier New" size="2">
+  <b>procedure</b> TranslateSig( sig : Integer ); <b>cdecl;</b>
+  <b>begin</b>
+    SigNum := sig;
+  <b>end;</b>
+</font></pre>
+        </td>
+      </tr>
+</TBODY>
+    </table>
+    <p>Функция TranslateSig просто присваевает переменной
+    SigNum номер полученного сигнала. В создаваемом
+    демоне мы ограничемся обработкой сигналов SIGTERM и
+    SIGHUP. Связываем обработчик TranslateSig с этими
+    сигналами: </p>
+    <p>&nbsp;</p>
+    <table border="1" cellPadding="7" cellSpacing="0" width="100%">
+<TBODY>
+      <tr>
+        <td><pre><font color="#000000" face="Courier New" size="2">
+  signal( SIGTERM, @TranslateSig );
+  signal( SIGHUP, @TranslateSig );
+</font></pre>
+        </td>
+      </tr>
+</TBODY>
+    </table>
+    <p>Теперь следует задать цикл обработки сигналов.
+    Можно просто проверять значение SigNum в
+    бесконечном цикле, однако есть более изящный и
+    менее ресурсоемкий способ - функция sigsuspend. В
+    качестве единственного параметра этой функции
+    передается маска сигналов - переменная типа
+    __sigset_t. Функция sigsuspend приостанавливает
+    выполнение вызвавшего ее потока до тех пор, пока
+    не поступит один из сигналов, не включенных в
+    маску. В этом случае, если обработчик сигнала не
+    завершает процесс, функция sigsuspend возвращает
+    управление. В следующем фрагменте выполняется
+    установка маски (переменная SigSet) и организуется
+    цикл обработки сигналов с использованием
+    функции sigsuspend: </p>
+    <p>&nbsp;</p>
+    <table border="1" cellPadding="7" cellSpacing="0" width="100%">
+<TBODY>
+      <tr>
+        <td><pre><font color="#000000" face="Courier New" size="2">
+  sigfillset( SigSet );
+  sigdelset( SigSet, SIGTERM );
+  sigdelset( SigSet, SIGHUP );
+  SigNum := <font
+color="#0000aa">0</font>;
+  <b>while</b> SigNum &lt;&gt; SIGTERM <b>do</b>
+  <b>begin</b>
+    sigsuspend( SigSet );
+    <b>if</b> SigNum = SIGHUP <b>then</b>
+    <b>begin</b>
+      ...
+      pid := fork;
+      <b>if</b> pid &lt;&gt; <font
+color="#0000aa">0</font> <b>then</b> Break;  <font color="#0000aa"><i>// old process exits</i></font>
+      ...
+    <b>end;</b>
+  <b>end;</b>
+</font></pre>
+        </td>
+      </tr>
+</TBODY>
+    </table>
+    <p>Обратите внимание на то, как обрабатывается
+    сигнал SIGHUP. В ответ на сигнал демон создает новую
+    копию процесса (при помощи функции fork), а старый
+    процесс завершается. Именно ради обработки
+    сигнала SIGHUP организован цикл while do. </p>
+    <p>Полный листинг файла <a href="#dpr">dhttpd.dpr</a>
+    приводится в конце статьи. В программу добавлена
+    обработка опций командной строки. Принцип
+    обработки опций командной строки очень прост:
+    новый процесс читает значение, записанное в файл
+    /var/run/dhttpd.pid, с помощью функции kill посылает ранее
+    запущенному процессу соответствующий сигнал и
+    затем завершается. </p>
+    <p>В нашем примере не рассмотрена еще одна функция
+    демона - ведение log-файлов. Большинство сетевых
+    демонов записывают данные о транзакциях и о
+    своей работе в специальные файлы. Каждое
+    приложение ведет свой log-файл. Обычно log-файлы
+    хранятся в директории /var/log/. Разумеется, каждое
+    приложение может само создавать и поддерживать
+    такие файлы, однако в Linux существует
+    централизованный механизм ведения log-файлов -
+    демон logd. Главное преимущество использования
+    демона logd заключается в том, что logd скрывает
+    детали процесса ведения log-файлов от приложения.
+    Такие параметры, как физическое размещение
+    файлов, задаются в процессе конфигурации демона
+    logd и не влияют на работу приложения,
+    записывающего логи. Например, демон logd может быть
+    сконфигурирован таким образом, что запись
+    log-файлов будет производиться на удаленный
+    компьютер. Система Linux предоставляет приложениям
+    простой интерфейс для работы с демоном logd.
+    Основные операции выполняются при помощи трех
+    функций: Функция openlog открывает log-файл, closelog -
+    закрывает файл, syslog выполняет запись. </p>
+    <h3>Остальное - Indy</h3>
+    <p>Наша программа теперь обладает всеми
+    атрибутами демона, но она все еще не выполняет
+    никакой полезной работы. Программирование
+    сетевых демонов - непростая задача. Классические
+    демоны Unix используют дочерние процессы для
+    параллельной обработки соединений. На практике,
+    для ускорения работы приложения-демона, часто
+    применяются более сложные схемы, включающие
+    предварительное создание процессов. Подробности
+    можно найти в <a href="#r2">[2]</a>. </p>
+    <p>В нашем распоряжении, однако, есть компоненты
+    Indy, предоставляющие самый эффективный механизм
+    параллельной обработки соединений -
+    многопоточность. Для того, чтобы при помощи Indy
+    создать Web сервер, обладающий основными
+    функциями по работе с HTTP, нам потребуется создать
+    объект класса TIdHTTPServer (этот класс определен в
+    модуле IdHTTPServer) и назначить обработчик события
+    OnCommandGet. </p>
+    <p>В создаваемом нами приложении все объекты для
+    работы с Web определены в модуле <a href="#pas">WebServ</a>,
+    полный текст которого приводится в конце статьи.
+    Константа HTTPDocsDir содержит путь к каталогу, в
+    котором хранятся HTTP файлы. В Linux Mandrake это /var/www/html.
+    Все операции по работе с протоколом HTTP выполняет
+    объект WebServer класса TWebSerever. Экземпляр TWebSerever
+    создается в начале работы демона и уничтожается
+    при завершении процесса. Для того, чтобы наш
+    сервер не конфликтовал со стандартным Web
+    сервером, мы присвоим ему порт 8800. Разбирать
+    здесь подробно работу с компонентами Indy мы не
+    будем, так как во-первых это уже не имеет
+    непосредственного отношения к программированию
+    демонов, а во-вторых детали работы компонента
+    IdHTTPServer исчерпывающе описаны в справочной
+    системе по Indy и прилагающихся примерах. </p>
+    <p>Теперь можно проверить работу демона.
+    Скомпилировав проект даем в режиме root команду: </p>
+    <p>&nbsp;</p>
+    <pre><font color="#000000" face="Courier New" size="2"># dhttpd</font></pre>
+    <p>&nbsp;</p>
+    <p>Командная строка тут же снова появляется на
+    экране. Так и должно быть, ведь демон сразу
+    переходит в фоновый режим. Для того, чтобы
+    убедиться в том, что демон работает, откроем
+    броузер и введем в строке адреса: http://localhost:8800/
+    (префикс http:// следует указывать потому, что порт
+    8800 не является стандартным портом протокола HTTP).
+    В окне броузера должна появиться страница index.html
+    из каталога, заданного в константе HTTPDocsDir. Если
+    каталог HTTPDocsDir содержит несколько файлов и
+    подкаталогов, можно проверить, как выполняется
+    навигация. При этом следует учесть, что корневому
+    каталогу Web-пространства соответствует каталог
+    HTTPDocsDir. Если значение этой константы - /var/www/html, то
+    URL http://localhost:8800/foo/bar.html будет соответствовать путь
+    /var/www/html/foo/bar.html. Работа демона может быть
+    завершена командой dhttpd -stop, а для перезапуска
+    ранее запущенного демона служит команда dhttpd
+    -restart. </p>
+    <h3>&quot;Вселение демона&quot; в систему</h3>
+    <p>Опции командной строки позволяют нам запускать
+    и останавливать демон в ручном режиме, однако
+    обычно демоны запускаются автоматически в ходе
+    загрузки операционной системы. В таких системах,
+    как Red Hat или Mandrake самый простой способ обеспечить
+    автоматический запуск демона заключается в
+    создании скрипта SysV Init. Скрипты SysV Init можно
+    рассматривать как некий аналог файла autoexec.bat в
+    системе MS-DOS. Скрипты - это исполнимые файлы,
+    написанные на языке сценариев оболочки (shell script
+    language). Для каждого демона создается свой файл
+    скрипта, имя которого обычно совпадает с именем
+    демона. В конце этой статьи приводится скрипт <a
+    href="#script">dhttpd</a>, служащий для запуска демона dhttpd. </p>
+    <p>В Red Hat и Mandrake скрипт dhttpd следует скопировать в
+    каталог /etc/rc.d/init.d/ (не забудьте придать скрипту
+    статус исполнимого файла). Но это еще не все.
+    Каталог /etc/rc.d/ содержит несколько подкаталогов
+    rcX.d, где X - число от 1 до 6, соответствующее уровню,
+    на котором работает система. Каждый из этих
+    каталогов содержит символические ссылки на
+    файлы скриптов, которые следует выполнять при
+    запуске системы на соответствующем уровне. Вы
+    должны создать символические ссылки на скрипт
+    dhttpd в каталогах rcX.d, соответствующих уровням, в
+    которых должен запускаться демон (ссылки можно
+    разместить во всех каталогах). Имя ссылки на
+    скрипт должно соответствовать шаблону SXXname, где XX
+    двузначное число, указывающее очередность
+    запуска программы, а name - любая
+    последовательность символов, обычно
+    соответствующая имени файла скрипта. Например,
+    для скрипта dhttpd имя ссылки может иметь следующий
+    вид: S95dhttpd. Сам исполнимый файл демона, который
+    также имеет имя dhttpd, можно разместить в каталоге
+    /usr/sbin/. </p>
+    <p>Если все сделано правильно, то при следующем
+    запуске системы, в конце списка сообщений,
+    сопровождающих процесс загрузки, можно будет
+    увидеть сообщение о запуске демона dhttpd.
+    Убедиться в том, что демон работает, можно, как и в
+    предыдущем случае, введя в строке адреса
+    броузера URL &quot;http://localhost:8800/&quot;. </p>
+    <h3>Исходные тексты</h3>
+    <p><a name="dpr">&nbsp;</p>
+    <h4>dhttpd.dpr</h4>
+    <p>&nbsp;</p>
+    <table border="1" cellPadding="7" cellSpacing="0" width="100%">
+<TBODY>
+      <tr>
+        <td><pre><font color="#000000" face="Courier New" size="2">
+<b>program</b> dhttpd;
+
+<i><font
+color="#0000aa">{$APPTYPE CONSOLE}</font></i>
+
+<b>uses</b> 
+  Libc, SysUtils, WebServ;
+
+<b>var</b>
+  F : Text;
+  SigSet : __sigset_t;
+  SigNum : Integer;
+  pid : Integer;
+
+<i><font
+color="#0000aa">// Signal handler function</font></i>
+
+<b>procedure</b> TranslateSig( sig : Integer ); <b>cdecl;</b>
+<b>begin</b>
+  SigNum := sig;
+<b>end;</b>
+
+<b>begin</b>
+  
+<i><font
+color="#0000aa">// Processing command line arguments</font></i>
+  
+  <b>if</b> ParamCount &gt; <font
+color="#0000aa">0</font> <b>then</b>
+  <b>begin</b>
+    <b>if</b> ParamCount = <font color="#0000aa">1</font> <b>then</b>
+    <b>begin</b>
+      SigNum := <font
+color="#0000aa">0</font>;
+      <b>if</b> ParamStr(<font color="#0000aa">1</font>) = <font
+color="#0000aa">'-stop'</font> <b>then</b> SigNum := SIGTERM <b>else</b>
+      <b>if</b> ParamStr(<font
+color="#0000aa">1</font>) = <font color="#0000aa">'-restart'</font> <b>then</b> SigNum := SIGHUP;
+      <b>if</b> SigNum &lt;&gt; <font
+color="#0000aa">0</font> <b>then</b>
+      <b>begin</b>
+        <b>if</b> FileExists( <font
+color="#0000aa">'/var/run/dhttpd.pid'</font> ) <b>then</b>
+        <b>begin</b>
+          AssignFile(F, <font
+color="#0000aa">'/var/run/dhttpd.pid'</font> );
+          Reset( F );
+          Read( F, pid );
+          CloseFile( F );
+          <b>if</b> kill( pid, SigNum ) = <font
+color="#0000aa">0</font> <b>then</b>
+          Halt( <font color="#0000aa">0</font> );
+        <b>end;</b>
+        WriteLn( <font
+color="#0000aa">'dhttpd : cannot do '</font> + ParamStr( <font color="#0000aa">1</font> ) + <font
+color="#0000aa">'. Maybe the daemon
+is not running?'</font> );
+        Halt( <font color="#0000aa">0</font> );
+      <b>end;</b>
+    <b>end;</b>
+    WriteLn( <font
+color="#0000aa">'Use dhttpd -stop to stop the daemon or dhttpd -restart to restart it.'</font> );
+    Halt( <font
+color="#0000aa">0</font> );
+  <b>end;</b>
+
+<font color="#0000aa"><i>// Daemon initialization code</i></font>
+
+  pid := fork;
+  <b>if</b> pid = <font
+color="#0000aa">-1</font> <b>then</b>   <i><font color="#0000aa">         // fork failed</font></i>
+  <b>begin</b>
+    perror( PChar(<font
+color="#0000aa">'fork 1: '</font>) );
+    Halt( <font color="#0000aa">1</font> );
+  <b>end else</b>
+  <b>if</b> pid &lt;&gt; <font
+color="#0000aa">0</font> <b>then</b> Halt( <font color="#0000aa">0</font> ); <i><font
+color="#0000aa">// parent process exits</font></i>
+  pid := setsid;
+  <b>if</b> pid = <font
+color="#0000aa">-1</font>  <b>then</b>  <font color="#0000aa"><i>// setsid failed</i></font>
+  <b>begin</b>
+    perror( PChar(<font
+color="#0000aa">'setsid: '</font>) );
+    Halt( <font color="#0000aa">1</font> );
+  <b>end;</b>
+  Close( Input );    <font
+color="#0000aa"><i>// closing stdin</i></font>
+  AssignFile( Output, <font color="#0000aa">'/dev/null'</font> );
+  Rewrite( Output );
+  AssignFile( ErrOutput, <font
+color="#0000aa">'/dev/null'</font> );
+  Rewrite( ErrOutput );
+
+<font color="#0000aa"><i>// Now process runs in the daemon mode</i></font>
+  
+  WebServer := TWebServer.Create;  <font
+color="#0000aa"><i>// Creating server object</i></font>
+  AssignFile( F, <font color="#0000aa">'/var/run/dhttpd.pid'</font> );
+  Rewrite( F );
+  pid := getpid;
+  WriteLn( F, pid );
+  CloseFile( F );  
+  signal( SIGTERM, @TranslateSig );
+  signal( SIGHUP, @TranslateSig );
+  sigfillset( SigSet );
+  sigdelset( SigSet, SIGTERM );
+  sigdelset( SigSet, SIGHUP );
+  SigNum := <font
+color="#0000aa">0</font>;
+  <b>while</b> SigNum &lt;&gt; SIGTERM <b>do</b>
+  <b>begin</b>
+    sigsuspend( SigSet );
+    WebServer.Free;
+    <b>if</b> SigNum = SIGHUP <b>then</b>         <i><font
+color="#0000aa">// Restarting</font></i>
+    <b>begin</b>
+      pid := fork;
+      <b>if</b> pid = <font
+color="#0000aa">-1</font> <b>then</b> Halt(<font color="#0000aa">1</font>);
+      <b>if</b> pid &lt;&gt; <font
+color="#0000aa">0</font> <b>then</b> Break;  <i><font color="#0000aa">// old process exits</font></i>
+      <i><font
+color="#0000aa">// Now we are in the new child process</font></i>
+      WebServer := TWebServer.Create;
+      AssignFile( F, <font
+color="#0000aa">'/var/run/dhttpd.pid'</font> );
+      Rewrite(F);
+      pid := getpid;
+      WriteLn( F, pid );
+      CloseFile(F);
+    <b>end;</b>
+  <b>end;</b>
+<b>end.</b>
+</font></pre>
+        </td>
+      </tr>
+</TBODY>
+    </table>
+    <p></a><a name="pas">&nbsp;</p>
+    <h4>WebServ.pas</h4>
+    <p>&nbsp;</p>
+    <table border="1" cellPadding="7" cellSpacing="0" width="100%">
+<TBODY>
+      <tr>
+        <td><pre><font color="#000000" face="Courier New" size="2">
+<b>unit</b> WebServ;
+
+<b>interface</b>
+
+<b>uses</b>
+
+  IdBaseComponent, IdComponent,
+  IdTCPServer, IdHTTPServer, SysUtils;
+
+<b>type</b>
+
+  TWebServer = <b>class</b>( TObject )
+    IndyHTTP : TIdHTTPServer;
+  <b>private</b>
+    <b>procedure</b> HTTPCommandGet( AThread : TIdPeerThread;
+    RequestInfo : TIdHTTPRequestInfo; ResponseInfo : TIdHTTPResponseInfo);
+  <b>public</b>
+    <b>constructor</b> Create;
+    <b>destructor</b>  Destroy; <b>override;</b>
+  <b>end;</b>
+
+<b>const</b>
+  HTTPDocsDir = <font
+color="#0000aa">'/var/www/html'</font>;
+
+<b>var</b>
+  WebServer : TWebServer;
+
+<b>implementation</b>
+
+<font
+color="#0000aa"><i>// TWebServer methods</i></font>
+
+<b>constructor</b> TWebServer.Create;
+<b>begin</b>
+  <b>inherited</b> Create;
+  IndyHTTP := TIDHTTPServer.Create( <b>nil</b> );
+  <b>with</b> IndyHTTP <b>do</b>
+  <b>begin</b>
+    ServerSoftware := <font
+color="#0000aa">'DAEMONstration Web server. (c) 2001 Andrei Borovsky'</font>;
+    OnCommandGet := HTTPCommandGet;
+    TerminateWaitTime := <font
+color="#0000aa">5000</font>;
+    DefaultPort := <font color="#0000aa">8800</font>;
+    <font
+color="#0000aa"><i>// Activate the Server</i></font>
+    Active  := True;
+  <b>end;</b>
+<b>end;</b>
+
+<b>destructor</b> TWebServer.Destroy;
+<b>begin</b>
+  IndyHTTP.Free;
+  <b>inherited</b> Destroy;
+<b>end;</b>
+
+<b>procedure</b> TWebServer.HTTPCommandGet;
+<b>var</b>
+  FName : String;
+<b>begin</b>
+  FName := HTTPDocsDir + RequestInfo.Document;
+  <b>if</b> FName[ Length(FName) ] = <font
+color="#0000aa">'/'</font> <b>then</b> FName := FName + <font color="#0000aa">'index.html'</font> <b>else</b>
+  <b>if</b> DirectoryExists( FName + <font
+color="#0000aa">'/'</font> ) <b>then</b>
+  <b>begin</b>
+    <font color="#0000aa"><i>// Redirecting directory without a trailing slash </i></font>
+    ResponseInfo.Redirect( RequestInfo.Document + <font
+color="#0000aa">'/'</font> );
+    Exit; 
+  <b>end;</b>  
+  <b>if</b> FileExists( FName ) <b>then</b>
+  <b>begin</b>
+    <font
+color="#0000aa"><i>// Serving content </i></font>
+    IndyHTTP.ServeFile( AThread, ResponseInfo, FName );
+    Exit;
+  <b>end;</b>
+  <font
+color="#0000aa"><i>// Requested URL not found</i></font>
+  ResponseInfo.ResponseNo := <font
+color="#0000aa">404</font>;
+  ResponseInfo.ResponseText := <font color="#0000aa">'Requested URL not found'</font>;
+  ResponseInfo.ContentText := <font
+color="#0000aa">'Error 404 - '</font> + ResponseInfo.ResponseText;
+  ResponseInfo.WriteHeader;
+  ResponseInfo.WriteContent;
+<b>end;</b>
+
+<b>end.</b>
+</font></pre>
+        </td>
+      </tr>
+</TBODY>
+    </table>
+    <p></a><a name="script">&nbsp;</p>
+    <h4>Скрипт dhttpd</h4>
+    <p>&nbsp;</p>
+    <table border="1" cellPadding="7" cellSpacing="0" width="100%">
+<TBODY>
+      <tr>
+        <td><pre><font color="#883333" face="Courier New" size="2">
+#!/bin/sh
+#
+# SysV Init script for DAEMONstration Web server (dhttpd)
+#
+# pidfile: /var/run/dhttpd.pid
+#
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+case $1 in
+    start)
+    echo -n &quot;Starting dhttpd&quot;
+    daemon dhttpd
+    echo
+    touch /var/lock/subsys/dhttpd
+    ;;
+    stop)
+    echo -n &quot;Shutting down dhttpd&quot;
+    killproc dhttpd  
+    echo
+    rm -f /var/lock/subsys/dhttpd
+    rm -f /var/run/dhttpd.pid
+    ;;
+    restart)
+    $0 stop
+    $0 start
+    ;;
+    reload)
+    echo -n &quot;Reloading dhttpd:&quot;
+    killproc dhttpd -HUP
+    echo
+    ;;
+    *)
+    echo &quot;Usage: $(basename $0) start|stop|restart|reload&quot;
+    exit 1
+esac
+exit 0
+</font></pre>
+        </td>
+      </tr>
+</TBODY>
+    </table>
+    <p>Исходные тексты проекта dhttpd можно скачать </a><a
+    href="dhttpd.tar.gz">здесь</a>. </p>
+    <h3>Литература</h3>
+    <p><a name="r1">1. </a><a href="http://www2.linuxjournal.com/lj-issues/issue46/2333.html">Griffin
+    I, Nelson J (1998). Linux Network Programming, Part 1, <i>Linux Journal</i>, #46 February
+    1998</a><br>
+    <a name="r2">2. </a><a href="http://noframes.linuxjournal.com/lj-issues/issue47/2335.html">Griffin
+    I, Nelson J (1998). Linux Network Programming, Part 2, <i>Linux Journal</i>, #47 March
+    1998</a><br>
+    <a name="r3">3. </a><a href="http://www.gnu.org/manual/">GLIBC Manual</a> </p>
+    <p>&nbsp;</p>
+    <p><font size="1">Статья и примеры программ © 2001 Андрей
+    Наумович Боровский. Воспроизведение возможно
+    только с разрешения автора. </font></font></p>
+    <p><br>
+    </p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->
