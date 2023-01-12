@@ -1,0 +1,127 @@
+<!--#include virtual="../template1"-->Сапер изнутри...<!--#include virtual="../template2"-->
+<!--#include virtual="./menu"-->
+<!--#include virtual="../template3"-->
+
+<h1 align=center>Сапер изнутри...</h1>
+
+<b>Автор:</b> <a href="http://forum.sources.ru/index.php?showuser=3352"><i>x2er0</i></a>
+
+<p>Сегодня мы будем играть в замечательную игру "Сапер". Она идет вместе с ОС (У меня XP). Правила у нее просты - тыкай пока не проиграешь =))</p>
+<p>Я пошутил - играть мы не будем, мы напишем АнтиСапер, т.е. программку, которая будет разминировать минное поле этого самого сапера!!!</p>
+<p>Поехали..</p>
+<p>Для начала скопируем из системной папки сам файл winmine.exe. Сначала осмотрим его внешне. Потыкаем по полю на угад .... ты попал на мину - проиграл, ну ладно, не беда! Смотрим верхнее меню, там есть пункт "Новая игра". Нажимаем и видим, что поле заполнено по новому!!! Давайте посмотрим, что происходит по выбору этого пункта....</p>
+<p>Загружаем Сапера в W32Dasm:</p>
+<p>видим, что ID этого пункта меню равен [ID=01FEh]. В поиске вбиваем это значениеи ищем... находим это:</p>
+
+<br>
+<div class="info">
+01001DD3  |.3D FE010000     CMP EAX, 1FE<br>
+01001DD8  |.0F84 EA000000   JE 01001EC8<br>
+</div>
+
+<p>именно тут и происходит выбор ашего пункта, идем по этому адресу. А тут:</p>
+
+<br>
+<div class="info">
+01001EC8  |>E8 AD170000     CALL 0100367A<br>
+</div>
+
+<p>Хорошо идем в эту процедуру... Она начинается так:</p>
+
+<br>
+<div class="info">
+0100367A  /$A1 AC560001     MOV EAX, DWORD PTR DS:[10056AC]<br>
+0100367F  |.8B0D A8560001   MOV ECX, DWORD PTR DS:[10056A8]<br>
+</div>
+
+<p>По этим адресам лежат число клеток по X и Y, они (эти адреса нам понадобятся!). Шагая по этой подпрограмме можно найти адрес с которого начинается рэндомно запоняющаяся карта... у меня он равен: 01005360h. Ну и начиная с этого адреса идут клетки поля, если в них находиться значение 8F, значит тут мина, иначе стоит FF, а начало и конец строки определяются как 10h, причем строчки находятся друг от дргуа на интервале 20h.</p>
+<p>Этого нам достаточно для написания программы, приступим:</p>
+<p>на форме находится sg: TStringGrid...</p>
+<p>Вот код:</p>
+
+<pre class="code">
+unit Unit1;
+
+interface
+
+uses
+  Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
+  Dialogs, StdCtrls, Grids;
+
+type
+  TPole = record
+    x: Byte;
+    y: Byte;
+  End;
+
+type
+  TForm1 = class(TForm)
+    Button1: TButton;
+    sg: TStringGrid;
+    procedure Button1Click(Sender: TObject);
+  private
+    SapMap: Tpole;
+  public
+  end;
+
+var
+  Form1: TForm1;
+
+implementation
+
+{$R *.dfm}
+
+procedure TForm1.Button1Click(Sender: TObject);
+Var
+  hWn: HWND;
+  PID, hProc, dwReaded: DWord;
+  buf: Byte;
+  i, r: Dword;
+  StartAddr: Dword;
+begin
+  hWn := HWND(FindWindow(nil, PChar('Сапер')));
+  If IsWindow(hWn) Then
+  Begin
+     GetWindowThreadProcessId(hWn, PID);
+     hProc := OpenProcess(PROCESS_VM_READ, False, PID);
+     Try
+     If (hProc <> 0) Then
+     Begin
+        ReadProcessMemory(hProc, ptr($10056AC), @buf, 1, dwReaded);
+        SapMap.x := buf;
+        ReadProcessMemory(hProc, ptr($10056A8), @buf, 1, dwReaded);
+        SapMap.y := buf;
+
+        sg.ColCount := SapMap.x;
+        sg.RowCount := SapMap.y;
+        For i := 0 To (sg.ColCount - 1) Do
+           For r := 0 To (sg.RowCount - 1) Do sg.Cells[i,r] := ' ';
+
+        StartAddr := $01005361;
+        For i := 0 To (SapMap.y - 1) Do
+        Begin
+          For r := 0 To (SapMap.x - 1) Do
+          Begin
+             ReadProcessMemory(hProc, ptr((i*$20) + StartAddr + r), @buf, 1, dwReaded);
+             If (buf = $8F) Then sg.Cells[r, i] := 'X';
+          End;
+        End;
+
+     End;
+     Finally
+       CloseHandle(hProc);
+     End;
+  End;
+end;
+
+end.
+</pre>
+
+<p>А вот результат ее работы (на рисунке):</p>
+
+<br>
+<div align="center"><img border="0" width="385" height="266" src="./saper/st6.jpg"></div>
+
+<p>Удачи!!!</p>
+
+<!--#include virtual="../template4"-->

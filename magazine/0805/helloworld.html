@@ -1,0 +1,205 @@
+<!--#include virtual="../template1"-->Hello World<!--#include virtual="../template2"-->
+<!--#include virtual="./menu"-->
+<!--#include virtual="../template3"-->
+
+<h1 align=center>Hello World</h1>
+
+<b>Автор:</b> <a href="http://forum.sources.ru/index.php?showuser=3352"><i>x2er0</i></a>
+
+<p>Сегодня мы напишем программу Hello World на Delphi 6. Обыкновенную программу, которая выводит сообщение с помощью MessageBox(). Отличие в том, что её размер будет отличаться от размера "обычных" программ на Делфи.</p>
+<p>Приступим....</p>
+<p>Вам понадобится блокнот и компилятор dcc32.exe, поставляемый в пакете Delphi (у меня он 14-ой версии). Откройте новый проект, закройте модуль Unit1, выберите Project->View Source. В появившемся окне удалите все лишнее и сохраните результат в отдельную папку. В папке должен появиться файл следующего содержания:</p>
+<pre class="code">
+program pr;
+begin
+
+end.
+</pre>
+
+<p>Чтобы скомпилировать этот файл вручную, скопируйте в эту же папку DCC32.EXE. Для автоматического компилирования создайте .BAT файл следующего содержания:</p>
+<pre class="code">
+Dcc32.Exe Bin\pr.dpr
+pause
+</pre>
+
+<p>Запустив этот файл, Вы соберете проект. Но для сборки программы на Делфи необходимы еще два файла (модуля). Это SysInit.pas и System.pas, которые лежат в папке Delphi6\Source\Rtl\Sys\. Мы не будем их брать оттуда, а перепишем заново. Создайте в Вашем каталоге два файла с именами SysInit.pas и System.pas. Оставьте их "пустыми", то есть, запишите следующее:</p>
+<pre class="code">
+unit SysInit;
+interface
+implementation
+end.
+
+unit System;
+interface
+implementation
+end.
+</pre>
+
+<p>.PAS файлы созданы, теперь создайте для них .DCU файлы. Для этого Вам понадобится следующий .BAT файл:</p>
+<pre class="code">
+dcc32 -q system -m -y -z -$D-
+dcc32 -q sysinit -m -y -z -$D-
+pause
+</pre>
+
+<p>Запустите его. Выпало сообщение о том, что не найдена процедура _HandleFinally. Видимо, она обязательно должна присутствовать. Хорошо, тогда подредактируйте файл System.pas следующим образом:</p>
+<pre class="code">
+unit System;
+
+interface
+procedure _HandleFinally;
+
+implementation
+
+procedure _HandleFinally;
+begin
+end;
+end.
+</pre>
+
+<p>Скомпилируйте. Файл System.dcu создан, но появилась еще одна ошибка, касающаяся TGUID. Придется сделать объявление:</p>
+<pre class="code">
+unit System;
+
+interface
+procedure _HandleFinally;
+
+type 
+  TGUID = packed record
+  end;
+
+implementation
+
+procedure _HandleFinally;
+begin
+end;
+
+end.
+</pre>
+
+<p>Компиляция... Готово - появился и SysInit.dcu. Это хорошо, значит, можно компилировать и сам проект... Опять ошибка! На этот раз связанная с @InitExe. Его тоже надо объявить:</p>
+<pre class="code">
+unit System;
+
+interface
+procedure _HandleFinally;
+procedure _InitExe;
+
+type 
+  TGUID = packed record
+  end;
+
+implementation
+
+procedure _HandleFinally;
+begin
+end;
+
+procedure _InitExe;
+begin
+end;
+
+end.
+</pre>
+
+<p>Опять сборка... Готово! Скомпилируйте проект. Снова ошибка, на этот раз виноват @halt0. Исправьте:</p>
+<pre class="code">
+unit System;
+
+interface
+procedure _HandleFinally;
+procedure _InitExe;
+procedure _halt0;
+
+
+type 
+  TGUID = packed record
+  end;
+
+implementation
+
+procedure _HandleFinally;
+begin
+end;
+
+procedure _InitExe;
+begin
+end;
+
+procedure _halt0;
+begin
+end;
+
+end.
+</pre>
+
+<p>Сборка... Готово. Скомпилируйте пустой проект... Получился .EXE файл размером около 3,5 КБ. Попробуйте его запустить. Что такое? Программа не запускается! Чтобы узнать, в чем дело, придется немного изменить Ваши модули:</p>
+<pre class="code">
+unit System;
+
+interface
+procedure _HandleFinally;
+procedure _InitExe;
+procedure _halt0;
+
+
+type 
+  TGUID = packed record
+  end;
+
+implementation
+
+procedure _HandleFinally;
+begin
+ asm 
+   nop
+ end
+end;
+
+procedure _InitExe;
+begin
+ asm 
+   nop
+   nop
+ end
+end;
+
+procedure _halt0;
+begin
+ asm 
+   nop
+   nop
+   nop
+ end
+end;
+
+end.
+</pre>
+
+<p>После компиляции загрузите файл в OllyDbg:</p>
+<br>
+<div class="info">
+004010C4 &gt; $55              PUSH EBP<br>
+004010C5   .8BEC            MOV EBP, ESP<br>
+004010C7   .83C4 F0         ADD ESP, -10<br>
+004010CA   .B8 A4104000     MOV EAX, 004010A4<br>
+004010CF   .E8 30FFFFFF     CALL 00401004<br>
+004010D4   .E8 2FFFFFFF     CALL 00401008<br>
+</div>
+
+<p>Попав в 00401004, можно увидеть, что там находится _InitExe, а по адресу 00401008 - _halt0. Эти процедуры были оставлены пустыми, значит, придется либо их немного исправить, либо самостоятельно следить за выходом программы.</p>
+<p>Вот он - Hello World!!!</p>
+<pre class="code">
+program pr;
+function MessageBox(hWnd: LongWord;lpText, lpCaption: PChar;uType: LongWord): Integer;stdcall;external 'user32.dll' name 'MessageBoxA';
+procedure ExitProcess(uExitCode: LongWord);stdcall; external 'kernel32.dll' name 'ExitProcess';
+
+begin
+   MessageBox(0, 'Hello World', 'test', 0);
+   ExitProcess(0);
+end.
+</pre>
+
+<p>Hello World выводится, размер программы - 3,5 КБ. Как бы ещё её уменьшить? Урежьте файл с помощью программы PE Optimizer от Dr.Golova и запакуйте с помощью FSG. В итоге получится программа размером 1,18 КБ - достаточно неплохой результат!</p>
+<p>Удачи!</p>
+<!--#include virtual="../template4"-->

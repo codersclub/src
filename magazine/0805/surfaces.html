@@ -1,0 +1,179 @@
+<!--#include virtual="../template1"-->Создание поверхностей<!--#include virtual="../template2"-->
+<!--#include virtual="./menu"-->
+<!--#include virtual="../template3"-->
+
+<h1 align=center>Создание поверхностей</h1>
+
+<b>Автор:</b> <a href="http://forum.sources.ru/index.php?showuser=15089"><i>OSokin</i></a>
+
+<p>Многие, кто знаком с OpenGL и DirectX, знают, что они используют сначала одну поверхность, затем программист их "переключает". Но и у OpenGL, и у DirectX есть недостатки, особенно при создании двухмерного приложения:</p>
+<ol>
+ <li>Они требуют свои библиотеки;</li>
+ <li>Они увеличивают размер исполняемого файла;</li>
+ <li>Они сложны в использовании для новичков.</li>
+</ol>
+
+<p>И так далее. Но многие просто не знают, как сделать подобное "переключение" поверхностей, и из-за этого используют их. Для тех, кто этого не знает, и написана эта статья.</p>
+<p>Добавим в область uses модуль Windows. Только один модуль, и тот стандартный - это означает, что размер программы практически не увеличится.</p>
+<p></p>
+<p>Теперь займемся секцией var. Добавим в нее две переменные:</p>
+<pre class="code">
+var
+  Back: HDC; //Задняя поверхность
+  BackB: HBitmap; //Битмап для нее
+
+
+Все, что требуется для создания "многоповерхностности", - еще один DC и процедура BitBlt. Вот как это делается:
+
+procedure Init(Front: HDC; Width, Height: Integer);
+begin
+  //Создаем поверхность
+  Back := CreateCompatibleDC(Front);
+  //Создаем битмап для нее (многие останавливаются именно здесь - они не знают, что надо создавать еще и битмап)
+  BackB := CreateCompatibleBitmap(Front, Width, Height);
+  //Выбираем этот битмап
+  SelectObject(Back, BackB);
+  //Устанавливаем размеры
+  SetBitmapDimensionEx(BackB, Width, Height,nil);
+end;
+
+procedure DeInit;
+begin
+  //Удаляем битмап
+  DeleteObject(BackB);
+  //Удаляем поверхность
+  DeleteDC(Back);
+end;
+
+procedure SetSize(Width, Height: Integer);
+begin
+  //Удаляем битмап
+  DeleteObject(BackB);
+  //Создаем новый, с новыми размерами
+  BackB := CreateCompatibleBitmap(Front, Width, Height);
+  //Выбираем этот битмап
+  SelectObject(Back, BackB);
+  //Устанавливаем размеры
+  SetBitmapDimensionEx(BackB, Width, Height,nil);
+end;
+
+procedure Draw(Front: HDC);
+var
+  Sizes: SIZE;
+begin
+  GetBitmapDimensionEx(BackB, Sizes);
+  BitBlt(Front, 0, 0, Sizes.cx, Sizes.cy, Front, 0, 0, SRCCOPY);
+end;
+</pre>
+
+<p>Вот и все. Сначала надо инициализировать, потом рисовать на поверхности Back (если используете VCL, то можете создать Canvas, указав ей в качестве Handle этот Back), затем вызываете Draw, поставив параметром тот DC, на который надо рисовать (или сами это делаете, через BitBlt) и, когда уже не надо поверхность, вызываете DeInit. Чтобы узнать размеры поверхности, вызываете GetBitmapDimensionEx(BackB, ваша_переменная), а чтобы установить их - SetSize.</p>
+<p>Да, чуть не забыл. Намного легче оформить это в виде компонента, что я и сделал:</p>
+<pre class="code">
+unit FreeDraw;
+
+interface
+
+uses Windows;
+
+type
+  TFDSurface = class
+  private
+    dc: HDC; //Передняя поверхность
+    dc2: HDC; //Задняя поверхность
+    dc2b: HBitmap; //Описатель задней поверхности (как Bitmap)
+    fWidth,fHeight: Integer; //Размеры поверхности
+    //Общая процедура изменения размеров
+    procedure ChangeSize(Width, Height: Integer);
+  protected
+    //Процедура изменения ширины
+    procedure ChangeWidth(Value: Integer);
+    //Процедура изменения высоты
+    procedure ChangeHeight(Value: Integer);
+  public
+    //Конструктор
+    constructor Create(Window: HWnd; DCWidth, DCHeight: Integer);
+    //Деструктор
+    destructor Destroy;
+    //Процедура вывода задней поверхности на переднюю
+    procedure Draw;
+  published
+    //Ширина
+    property Width: Integer read fWidth write ChangeWidth;
+    //Высота
+    property Height: Integer read fHeight write ChangeHeight;
+    //Идентификатор задней поверхности
+    property SDC: HDC read dc2;
+  end;
+
+implementation
+
+//--- TFDSurface ---//
+
+//Коструктор
+constructor TFDSurface.Create(Window: HWnd; DCWidth, DCHeight: Integer);
+begin
+  //Выполняем действия базового конструктора
+  inherited Create;
+  //Установка базовых размеров
+  fWidth := DCWidth;
+  fHeight := DCHeight;
+  //Получение идентификатора передней поверхности
+  dc := GetDC(Window);
+  //Создание задней поверхности
+  dc2 := CreateCompatibleDC(dc);
+  //Создание описывающего заднюю поверхность битмапа
+  dc2b := CreateCompatibleBitmap(dc, Width, Height);
+  //Выбираем этот битмап
+  SelectObject(dc2, dc2b);
+end;
+
+//Деструктор
+destructor TFDSurface.Destroy;
+begin
+  //Выполняем действия базового деструктора
+  inherited Destroy;
+  //Удаляем описатель задней поверхности...
+  DeleteObject(dc2b);
+  //... и саму поверхность
+  DeleteDC(dc2);
+end;
+
+//Общая процедура изменения размеров
+procedure TFDSurface.ChangeSize(Width, Height: Integer);
+begin
+  //Устанавливаем размеры
+  fWidth := Width;
+  fHeight := Height;
+  //Удаляем описатель
+  DeleteObject(dc2b);
+  //Создаем новый, с новыми размерами
+  dc2b := CreateCompatibleBitmap(dc, Width, Height);
+  //Устанваливаем его
+  SelectObject(dc2, dc2b);
+end;
+
+//Процедура изменения ширины
+procedure TFDSurface.ChangeWidth(Value: Integer);
+begin
+  //Вызываем общую процедуру
+  ChangeSize(Value, fHeight);
+end;
+
+//Процедура изменения высоты
+procedure TFDSurface.ChangeHeight(Value: Integer);
+begin
+  //Вызываем общую процедуру
+  ChangeSize(fWidth, Value);
+end;
+
+//Процедура вывода задней поверхности на переднюю
+procedure TFDSurface.Draw;
+begin
+  //Простое копирование изображения
+  BitBlt(dc, 0, 0, fWidth, fHeight, dc2, 0, 0, SRCCOPY);
+end;
+
+end.
+</pre>
+
+<!--#include virtual="../template4"-->

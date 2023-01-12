@@ -1,0 +1,315 @@
+<!--#include virtual="../template1"-->АСМ для новичков<!--#include virtual="../template2"-->
+<!--#include virtual="./menu"-->
+<!--#include virtual="../template3"-->
+
+<h1 align=center>АСМ для новичков</h1>
+
+<b>Автор:</b> <a href="http://forum.sources.ru/index.php?showuser=9761"><i>miksayer</i></a>
+
+<p>Вот и пришло время для второй статьи цикла "Изучаем Ассемблер". В прошлой статье мы познакомились только с основами ассемблера. Теперь мы создадим окно, поместим на него кнопку и отловим нажатие на нее. Итак, начнем!</p>
+
+<h2>Создаем окно</h2>
+<p>Для начала нам нужно создать пустое окно. Для этого мы будем использовать API-функцию CreateWindowEx. Вот код:</p>
+<pre class="code">
+.386
+     .model flat,stdcall
+     option casemap:none
+     ; Подключаем необходимые библиотеки и описания их структур и функций
+     include windows.inc
+     include user32.inc
+     include kernel32.inc
+     include gdi32.inc
+     include comdlg32.inc
+     includelib user32.lib
+     includelib kernel32.lib
+     includelib gdi32.lib
+     includelib comdlg32.lib
+WinMain proto :DWORD,:DWORD,:DWORD,:DWORD  ; описываем прототип функции
+; Макрос, заносящий значения компонент палитры в регистр EAX
+RGB macro red,green,blue
+         mov     eax,blue shl 16 + green shl 8 + red
+endm
+; Макрос для вставки текста
+szText MACRO Name,Text:VARARG
+        .data
+    Name     db Text,0
+        .code
+endm
+.const
+button1ID    equ 1
+.data?
+hwndbutton1  HWND ?
+hInstance    HINSTANCE ?
+CommandLine  LPSTR ?
+.data
+Textbutton1  db "Button1",0
+;_______________
+ClassName    db "MASM Builder",0
+BtnClName    db "button",0
+StatClName   db "static",0
+EditClName   db "edit",0
+LboxClName   db "listbox",0
+CboxClName   db "combobox",0
+ReditClName  db "richedit",0
+RichEditLib  db "riched32.dll",0
+Caption      db "Form",0
+;_______________
+.code
+start:
+         ; Получаем описатель нашего модуля
+     invoke   GetModuleHandle,NULL
+     mov      hInstance,eax
+     ; Получаем адрес командной строки
+     invoke   GetCommandLine
+     ; Вызываем главную процедуру в стиле C++
+     invoke   WinMain,hInstance,NULL,CommandLine,SW_SHOWDEFAULT
+     ; Завершаем процесс
+     invoke   ExitProcess,eax
+; Главная процедура в стиле C++
+WinMain proc hInst:HINSTANCE,hPrevInst:HINSTANCE,CmdLine:LPSTR,CmdShow:DWORD
+LOCAL   wc  :WNDCLASSEX
+LOCAL   msg     :MSG
+LOCAL   hwnd    :HWND
+         ; Заполняем структуру WNDCLASSEX, хранящую информацию о создаваемом классе окон
+     mov      wc.cbSize,SIZEOF WNDCLASSEX  ; размер структуры
+     mov      wc.style,CS_HREDRAW or CS_VREDRAW  ; стиль окна
+     mov      wc.lpfnWndProc,OFFSET WndProc  ; адрес процедуры обработки сообщений
+     mov      wc.cbClsExtra,NULL  ; кол-во дополнительных байт за структурой класса (0)
+     mov      wc.cbWndExtra,NULL  ; кол-во дополнительных байт за экземпляром окна (0)
+     push     hInst
+     pop      wc.hInstance  ; описатель экземпляра процесса с процедурой обработки сообщений
+     RGB      235,233,216  ; EAX = код серо-бежевого цвета
+     invoke   CreateSolidBrush,eax  ; создаём кисть заполнения однородным цветом EAX
+     mov      wc.hbrBackground,eax  ; кисть для заполнения фона (серо-
+бежевым цветом)
+     mov      wc.lpszClassName,OFFSET ClassName  ; имя класса
+     invoke   LoadIcon,NULL,IDI_APPLICATION  ; загружаем стандартную иконку приложения
+     mov      wc.hIcon,eax  ; большая иконка приложения
+     mov      wc.hIconSm,eax  ; маленькая иконка приложения
+     invoke   LoadCursor,NULL,IDC_ARROW  ; загружаем стандартный курсор
+     mov      wc.hCursor,eax  ; курсор мыши в области окна
+     mov      wc.lpszMenuName,NULL  ; имя или идентификатор меню (0)
+     ; Регистрируем класс и создаём окно
+     invoke   RegisterClassEx,addr wc
+     invoke   CreateWindowEx,0,ADDR ClassName,ADDR Caption,WS_SYSMENU or WS_SIZEBOX,389,82,327,200,0,0,hInst,0
+     ; Показываем окно
+     mov      hwnd,eax
+     INVOKE   ShowWindow,hwnd,SW_SHOWNORMAL
+     INVOKE   UpdateWindow,hwnd
+     ; Цикл обработки сообщений (стандартный)
+     .WHILE TRUE
+         INVOKE   GetMessage,ADDR msg,0,0,0  ; ожидаем и получаем сообщение
+         .BREAK .IF (!eax)                   ; выходим из цикла, если получаем WM_QUIT (выход из приложения)
+         INVOKE   TranslateMessage,ADDR msg  ; преобразуем символьные сообщения
+         INVOKE   DispatchMessage,ADDR msg   ; обрабатываем сообщение
+     .ENDW
+     mov      eax,msg.wParam
+     ret
+WinMain endp
+; Процедура обработки сообщений
+WndProc proc hWnd:HWND,uMsg:UINT,wParam:WPARAM,lParam:LPARAM
+     .IF uMsg == WM_DESTROY  ; сообщение об уничтожении окна (передаётся во время закрытия окна)
+         invoke   PostQuitMessage,NULL  ; отправляем в очередь сообщение WM_QUIT
+     .ELSEIF uMsg == WM_CREATE  ; сообщение о создании окна (передаётся после создания окна)
+             ; создаём кнопку с идентификатором = button1ID (кнопка - это тоже окно)
+         invoke  CreateWindowEx,0,ADDR BtnClName,ADDR Textbutton1,WS_CHILD or WS_VISIBLE or BS_DEFPUSHBUTTON,114,71,75,25,hWnd,button1ID,hInstance,0
+
+         mov      hwndbutton1,eax  ; сохраняем описатель кнопки
+     .ELSEIF uMsg == WM_COMMAND  ; сообщение о команде (например, нажатии на кнопку)
+         mov     eax,wParam
+         .IF lParam != 0  ; описатель контрола (равен нулю, если это НЕ контрол формы)
+            .IF ax == button1ID  ; младшее слово wParam определяет идентификатор контрола
+                 shr eax,16
+                 .IF ax == BN_CLICKED  ; старшее слово wParam определяет код команды
+                         ; Выводим на экран сообщение
+                     invoke   MessageBox,hWnd,addr Textbutton1,NULL,MB_ICONINFORMATION
+                 .ENDIF
+             .ENDIF
+         .ENDIF;
+     .ELSE  ; другое сообщение
+             ; Вызываем стандартный обработчик сообщения
+         invoke   DefWindowProc,hWnd,uMsg,wParam,lParam
+         ret
+     .ENDIF
+     xor     eax,eax  ; сообщение обработано
+     ret
+WndProc endp
+end start                              ; Конец программы с указанием точки в
+</pre>
+
+<p>В коде вы видите несколько новых конструкций .WHILE ... .ENDW и .IF ... .ELSE ... .ENDIF. Если вы раньше изучали какой-либо язык программирования, то понять смысл этих конструкций вам не составит большого труда, иначе давайте разберем, например, такую конструкцию из нашего кода:</p>
+<pre class="code">
+	 .IF uMsg == WM_DESTROY
+		 invoke   PostQuitMessage,NULL
+	 .ELSEIF uMsg == WM_CREATE
+	 .ELSE
+		 invoke   DefWindowProc,hWnd,uMsg,wParam,lParam
+		 ret
+	 .ENDIF
+</pre>
+
+<p>Этот код означает, что если нашему окну послано сообщение WM_DESTROY(.IF), то мы выполняем API-функцию PostQuitMessage, если сообщение WM_CREATE(.ELSEIF), то ничего не делаем, а во всех остальных случаях(.ELSE) вызываем функцию DefWindowProc. Теперь давайте вернемся к нашей кнопке. Создавать мы ее будем с помощью такого кода:</p>
+<pre class="code">
+invoke CreateWindowEx,0,ADDR BtnClName,ADDR Textbutton1,WS_CHILD or WS_VISIBLE or BS_DEFPUSHBUTTON,114,71,75,25,hWnd,button1ID,hInstance,0
+mov 	  hwndbutton1,EAX
+</pre>
+
+<p>Теперь в переменной hwndbutton1 хранится хэндл нашей кнопки. Не забудьте объявить переменную hwndbutton1 в секции .data? так:</p>
+<pre class="code">
+hwndbutton1	 HWND ?
+</pre>
+
+<p>и button1ID в .const так:</p>
+<pre class="code">
+button1ID	 equ 1
+</pre>
+
+<p>Теперь нам нужно добавить такой код вместо нашей конструкции <font color="#ff0000">.IF ... .ELSE ... .ENDIF</font>:</p>
+<pre class="code">
+	 <font color="#0000ff">.IF</font> uMsg == WM_DESTROY
+		 invoke   PostQuitMessage,NULL
+	 <font color="#0000ff">.ELSEIF</font> uMsg == WM_CREATE
+invoke CreateWindowEx,0,ADDR BtnClName,ADDR Textbutton1,WS_CHILD or WS_VISIBLE or BS_DEFPUSHBUTTON,114,71,75,25,hWnd,button1ID,hInstance,0
+		 mov 	  hwndbutton1,EAX
+	 <font color="#0000ff">.ELSEIF</font> uMsg == WM_COMMAND
+		 mov 	 eax,wParam
+		 <font color="#0000ff">.IF</font> lParam != 0
+			 <font color="#0000ff">.IF</font> ax == button1ID
+				 shr eax,16
+				 <font color="#0000ff">.IF</font> ax == BN_CLICKED
+					 invoke 	MessageBox,hWnd,addr Textbutton1,0,MB_ICONINFORMATION
+				 <font color="#0000ff">.ENDIF</font>
+			 <font color="#0000ff">.ENDIF</font>
+		 <font color="#0000ff">.ENDIF;</font>
+	 <font color="#0000ff">.ELSE</font>
+		 invoke   DefWindowProc,hWnd,uMsg,wParam,lParam
+		 ret
+	 <font color="#0000ff">.ENDIF</font>
+</pre>
+
+<p>Здесь мы отлавливаем событие WM_COMMAND и проверяем, не было ли оно передано нашей кнопке, далее проверяем, какое это событие (нам нужно BN_CLICKED), и, если это оно, выкидываем сообщение с текстом из переменной Textbutton1, которую объявляем в секции <font color="#ff0000">.data</font>:</p>
+<pre class="code">
+Textbutton1	 db "Button1",0
+</pre>
+
+<p>Все! Наша программа готова. Если что-то непонятно, то я привожу полный код нашей программы:</p>
+<pre class="code">
+<font color="#ff0000">.386</font>
+	 <font color="#ff0000">.model flat,stdcall</font>
+	 option casemap:none
+	 include \masm32\include\windows.inc
+	 include \masm32\include\user32.inc
+	 include \masm32\include\kernel32.inc
+	 include \masm32\include\gdi32.inc
+	 include \masm32\include\comdlg32.inc
+	 includelib \masm32\lib\user32.lib
+	 includelib \masm32\lib\kernel32.lib
+	 includelib \masm32\lib\gdi32.lib
+	 includelib \masm32\lib\comdlg32.lib
+WinMain proto :DWORD,:DWORD,:DWORD,:DWORD
+RGB macro red,green,blue
+	 xor 	 eax,eax
+	 mov 	 ah,blue
+	 shl 	 eax,8
+	 mov 	 ah,green
+	 mov 	 al,red
+endm
+szText MACRO Name,Text:VARARG
+	LOCAL	 lbl
+	jmp	 lbl
+	Name	 db Text,0
+	lbl:
+ENDM
+<font color="#ff0000">.const</font>
+button1ID	 equ 1
+<font color="#ff0000">.data?</font>
+hwndbutton1	 HWND ?
+hInstance	 HINSTANCE ?
+CommandLine	 LPSTR ?
+<font color="#ff0000">.data</font>
+Textbutton1	 db "Button1",0
+;_______________
+ClassName	 db "MASM Builder",0
+BtnClName	 db "button",0
+StatClName	 db "static",0
+EditClName	 db "edit",0
+LboxClName	 db "listbox",0
+CboxClName	 db "combobox",0
+ReditClName	 db "richedit",0
+RichEditLib	 db "riched32.dll",0
+Caption		 db "Form",0
+;_______________
+<font color="#ff0000">.code</font>
+start:
+	 invoke   GetModuleHandle,NULL
+	 mov      hInstance,eax
+	 invoke   GetCommandLine
+	 invoke   WinMain,hInstance,NULL,CommandLine,SW_SHOWDEFAULT
+	 invoke   ExitProcess,eax
+WinMain proc hInst:HINSTANCE,hPrevInst:HINSTANCE,CmdLine:LPSTR,CmdShow:DWORD
+LOCAL 	wc 	:WNDCLASSEX
+LOCAL 	msg 	:MSG
+LOCAL 	hwnd	:HWND
+	 mov      wc.cbSize,SIZEOF WNDCLASSEX
+	 mov      wc.style,CS_HREDRAW or CS_VREDRAW
+	 mov      wc.lpfnWndProc,OFFSET WndProc
+	 mov      wc.cbClsExtra,NULL
+	 mov      wc.cbWndExtra,NULL
+	 push     hInst
+	 pop      wc.hInstance
+	 RGB      235,233,216
+	 invoke   CreateSolidBrush,eax
+	 mov      wc.hbrBackground,eax
+	 mov      wc.lpszClassName,OFFSET ClassName
+	 invoke   LoadIcon,NULL,IDI_APPLICATION
+	 mov      wc.hIcon,eax
+	 mov      wc.hIconSm,eax
+	 invoke   LoadCursor,NULL,IDC_ARROW
+	 mov      wc.hCursor,eax
+	 invoke   RegisterClassEx,addr wc
+invoke CreateWindowEx,0,ADDR ClassName,ADDR Caption,WS_SYSMENU or WS_SIZEBOX,389,82,327,200,0,0,hInst,0
+	 mov      hwnd,eax
+	 INVOKE   ShowWindow,hwnd,SW_SHOWNORMAL
+	 INVOKE   UpdateWindow,hwnd
+	 <font color="#0000ff">.WHILE</font> TRUE
+		 INVOKE   GetMessage,ADDR msg,0,0,0
+		 <font color="#0000ff">.BREAK .IF</font> (!eax)
+		 INVOKE   TranslateMessage,ADDR msg
+		 INVOKE   DispatchMessage,ADDR msg
+	 <font color="#0000ff">.ENDW</font>
+	 mov      eax,msg.wParam
+	 ret
+WinMain endp
+WndProc proc hWnd:HWND,uMsg:UINT,wParam:WPARAM,lParam:LPARAM
+	 <font color="#0000ff">.IF</font> uMsg == WM_DESTROY
+		 invoke   PostQuitMessage,NULL
+	 <font color="#0000ff">.ELSEIF</font> uMsg == WM_CREATE
+invoke CreateWindowEx,0,ADDR BtnClName,ADDR Textbutton1,WS_CHILD or WS_VISIBLE or BS_DEFPUSHBUTTON,114,71,75,25,hWnd,button1ID,hInstance,0
+		 mov 	  hwndbutton1,EAX
+	 <font color="#0000ff">.ELSEIF</font> uMsg == WM_COMMAND
+		 mov 	 eax,wParam
+		 <font color="#0000ff">.IF</font> lParam != 0
+			 <font color="#0000ff">.IF</font> ax == button1ID
+				 shr eax,16
+				 <font color="#0000ff">.IF</font> ax == BN_CLICKED
+					 invoke 	MessageBox,hWnd,addr Textbutton1,0,MB_ICONINFORMATION
+				 <font color="#0000ff">.ENDIF</font>
+			 <font color="#0000ff">.ENDIF</font>
+		 <font color="#0000ff">.ENDIF;</font>
+	 <font color="#0000ff">.ELSE</font>
+		 invoke   DefWindowProc,hWnd,uMsg,wParam,lParam
+		 ret
+	 <font color="#0000ff">.ENDIF</font>
+	 xor      eax,eax
+	 ret
+WndProc endp
+end start
+</pre>
+
+<h2>Заключение</h2>
+<p>Хочу дать вам небольшое "домашнее задание". Добавьте еще одну кнопку и по нажатию на нее эмулируйте нажатие на другую кнопку (это делается с помощью API-функции SendMessage).</p>
+<p>Надеюсь, вы все поняли из этой статьи, если нет, то пишите письма на miksayer@mail.ru. Удачи!</p>
+<p></p>
+<p>С уважением, Miksayer!</p>
+
+<!--#include virtual="../template4"-->

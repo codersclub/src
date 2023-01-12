@@ -1,0 +1,203 @@
+<!--#include virtual="../template1"-->Как передавать файлы через TClientSocket и TServerSocket<!--#include virtual="../template2"-->
+<!--#include virtual="./menu"-->
+<!--#include virtual="../template3"-->
+
+<h1 align=center>Как передавать файлы через TClientSocket и TServerSocket</h1>
+
+<b>Автор:</b> <a href="http://forum.sources.ru/index.php?showuser=5888"><i>DeVoid</i></a>
+
+<p>Очень часто возникают вопросы по работе с сокетами, а толкового описания работы с ними нету. Максимум что можно найти в Интернете - исходники чата и то для Delphi. Поэтому, чтобы понять принцип работы компонентов TClientSocket и TServerSocket в С++, предлагаю написать программу для обмена файлами.</p>
+<p>В общих чертах передача файлов через сокеты выглядит следующим образом: вся информация передается пакетами, и если в одном из пакетов встречается #file -  это значит, что пришел заголовок файла с последующей информацией о нем (имя, размер)  и клиент должен принимать файл указанного размера. В чистом виде заголовок файла выглядит так: <b>file#filename#filesize#</b>. Когда клиент принимает такой заголовок, он обрабатывает его(выделяет имя файла и его размер), создает буфер размером filesize и в него пишет всю последующую информацию. Когда размер переданной информации равен размеру файла, посылает на сервер команду "end", сервер обрабатывает эту команду и  закрывает поток.</p>
+<p>Итак, начнем мы с того, что определимся, кто будет посылать файл, а кто принимать. В моем примере - Сервер отправляет файл, а клиент принимает, все просто, ничего сложного здесь нету. Дальше нужно оформить внешний вид клиента и сервера. У меня они выглядят так:</p>
+<table border=0 width="100%" cellspacing=5 cellpadding=0>
+<tr align=center>
+<td width="50%"><img border=0 src="./tsocket/client.gif"></td> 
+<td width="50%"><img border=0 src="./tsocket/server.gif"></td>
+</tr>
+</table>
+<p>Я не цеплял на формы ничего лишнего, так как у нас  нету цели сделать программу красивой, наша цель - правильная работа приложения. С внешним видом разобрались, можно переходить непосредственно к программированию.</p>
+<p>Сейчас будем писать сервер - он будет отправлять файлы.</p>
+<h4>Сервер:</h4>
+<p>На форме: OpenDialog1 (TOpenDialog), Server (TServerSocket), Memo1 (TMemo) и две кнопки.</p>
+<p>Сначала настроим Server:</p>
+<pre class=code>
+Port = 1001 ; <font color="#838383">// Порт по которому будет работать и клиент и сервер</font>
+Active = false ; <font color="#838383">// Пока неактивен</font>
+</pre>
+<p>Эти настройки можно выбрать в Object Inspector'е.</p>
+
+<p>Перейдем на вкладку Events и опишем подключение и отключение клиента:</p>
+<p>В <b>OnAccept</b>:</p>
+<pre class=code>
+Memo1->Lines->Add("К Вам подключились ;");
+</pre>
+
+<p>Для <b>OnError</b>:</p>
+<pre class=code>
+ErrorCode = 0 ;
+ShowMessage("Server Error");
+</pre>
+
+<p>Теперь напишем обработчик для нажатия кнопки запуска сервера:</p>
+<pre class=code>
+Server->Active = true ;
+Server->Open() ;
+Memo1->Lines->Add("Создан сервер.");
+</pre>
+
+<p>Теперь нужно создать поток, который мы и будем передавать клиенту:</p>
+<pre class=code>
+TMemoryStream *MS = new TMemoryStream ;
+</pre>
+
+<p>А теперь подходит время к самому главному в описании сервера - передачи файла клиенту. Пишем в обработчике кнопки <b>Send</b> (Отправить файл):</p>
+<pre class=code>
+void *P; <font color="#838383">  // указатель на файл</font>
+int Size ; <font color="#838383">// размер</font>
+if( OpenDialog1->Execute() )
+{
+	MS->LoadFromFile( OpenDialog1->FileName ); <font color="#838383">// выбираем  файл</font> 
+	Memo1->Lines->Add( "Загрузили требуемый файл в поток..." ); <font color="#838383">// заполняем лог</font> 
+}
+Server->Socket->Connections[0]->SendText( "file#" + OpenDialog1->FileName + "#" + IntToStr( MS->Size ) + "#" ); 
+<font color="#838383">// отправляем заголовок</font>
+
+Memo1->Lines->Add ( "Послали заголовок" );
+MS->Position = 0 ; <font color="#838383">     // Устанавливаем поток в начальную позицию ;</font>
+P    = MS->Memory ;  <font color="#838383">   // присваиваем указателю поток файла</font>
+Size = Server->Socket->Connections[0]->SendBuf( P , MS->Size ); <font color="#838383">              // отправляем буфер клиенту; Size
+                                                                              //равно размеру отправленной  информации</font>
+Memo1->Lines->Add( "Отправлено: " + IntToStr( Size ) + " из " + IntToStr( MS->Size ) ); <font color="#838383">// заполняем лог</font>
+</pre>
+
+<p>С отправкой все в порядке, но серверу еще необходимо обработать команду "end", которая придет тогда, когда клиент примет файл. Для этого в <b>OnClientRead</b> пишем:</p>
+<pre class=code>
+if(Server->Socket->Connections[0]->ReceiveText()=="end") <font color="#838383">// если клиент прислал команду "end"</font>
+{
+	Memo1->Lines->Add("Клиент принял файл"); <font color="#838383">// записываем в лог</font>
+	MS->Clear() ; <font color="#838383">                           // Очищаем поток</font>
+}
+</pre>
+
+<p>С сервером и отправкой файла все готово, дальше нужно написать клиента, который бы принимал поток пакетов от сервера. Чем мы и займемся.</p>
+
+<h4>Клиент:</h4>
+<p>Для программы-клиента основной задачей является получение информации о файле, который передает клиент и получение, и сохранение самого файла. Итак, на форме - Client (TClientSocket) , Memo1 (TMemo), SaveDialog1 (TSaveDialog) и кнопка соединения - Button1.</p>
+<p>Снова начнем с того, что настроим <b>Client</b> (TClientSocket1):</p>
+<pre class=code>
+Port = 1001 ; <font color="#838383">        // Клиент и сервер должны работать на одинаковых портах </font>
+Active = false ; <font color="#838383">     // Пока неактивен</font>
+Address = 127.0.0.1 ; <font color="#838383">// Адрес укажем пока свой, что б протестировать работу сервера и клиента локально</font>
+Host = 127.0.01 ;
+</pre>
+
+<p>Далее, объявим переменные, которые нам будут необходимы:</p>
+<p>В <b>*.h</b>-файле проекта, в секции <b>private</b> объявим:</p>
+<pre class=code>
+private:	
+	AnsiString Name; 
+</pre>
+
+<p>После этого в <b>*.cpp</b> файле объявляем:</p>
+<pre class=code>
+TMemoryStream *MS = new TMemoryStream ; <font color="#838383">// создаем поток под принимаемый файл</font>
+void Write( AnsiString Text ); <font color="#838383">         // ф-я записи получаемой информации в поток</font>
+int Size ; <font color="#838383">                             // размер передаваемого файла</font>
+bool Receive ;<font color="#838383">                          // передаем ли мы на данный момент файл</font>
+AnsiString FileName ;<font color="#838383">                   //  имя файла</font>
+</pre>
+
+<p>Следующим шагом создания клиента - будет описание функции <b>Write</b>. Она должна сохранять получаемую информацию в файл.</p>
+<pre class=code>
+void Write( AnsiString Text )
+{
+	if(MS->Size < Size)  <font color="#838383">// если мы еще принимаем файл и размер потока меньше размера файла</font>
+	{
+		MS->Write( Text.c_str() , Text.Length() ); <font color="#838383">        // записываем в поток</font>
+		Form1->Memo1->Lines->Add( "Принимаем данные..." ); <font color="#838383">// пишем лог</font>
+	}
+	if(MS->Size == Size)<font color="#838383"> // если файл принят и размер потока соответствует размеру файла</font>
+	{
+		Receive = false ; <font color="#838383">                        // останавливаем режим передачи</font>
+		MS->Position = 0 ;   <font color="#838383">                     // переводим каретку потока в начало</font>
+		Form1->Client->Socket->SendText( "end" );<font color="#838383"> // пишем серверу, что мы приняли файл</font>
+		CreateDir( "Downloads" ); <font color="#838383">                // создаем папку для сохраненных файлов</font>
+		MS->SaveToFile( "Downloads\\"+FileName ); <font color="#838383">// сохраняем туда наш файл</font>
+		MS->Clear() ; <font color="#838383">                            // освобождаем поток</font>
+		Size = 0 ;
+		Form1->Memo1->Lines->Add("Файл принят !"); <font color="#838383">// пишем в лог что файл принят</font>
+	}
+}
+</pre>
+
+<p>Далее, важно еще правильно описать событие OnRead, вот как оно должен выглядеть:</p>
+<pre class=code>
+void __fastcall TForm1::ClientRead( TObject *Sender,
+      TCustomWinSocket *Socket )
+{
+	AnsiString Rtext ; <font color="#838383"> // текст, который посылает сервер</font>
+	Rtext = Client->Socket->ReceiveText() ;
+	if( Receive == true )<font color="#838383"> // если мы в режиме передачи файла, то</font>
+	{
+		Write( Rtext ); <font color="#838383">// записываем его в поток</font>
+	}
+	else <font color="#838383">// если нет , то</font>
+	{
+		Memo1->Lines->Add( "Приняли текст :" + Rtext ); <font color="#838383">    // пишем в лог все что принимаем от сервера</font>
+		if(Rtext.SubString( 0,Rtext.Pos("#")-1) == "file" ) <font color="#838383">// Если это строка типа 
+		// file#filename#filesize#, то начинаем парсерить полученную информацию :</font>
+		{
+			Rtext.Delete( 1 , Rtext.Pos( "#" ) ) ;  <font color="#838383">          // удаляем слово file</font>
+			Name = Rtext.SubString( 0 , Rtext.Pos( "#" ) -1 );<font color="#838383">// Определяем имя файла</font>
+			FileName = Name.SubString( Name.LastDelimiter( "\\" ) + 1 , Name.Length() );
+			<font color="#838383">// Выделяем чистое имя файла , например с c:\\test.txt , берем test.txt</font>
+			Rtext.Delete( 1 , Rtext.Pos( "#" ) );<font color="#838383">                               // Удаляем последний разделитель</font>
+			Size = StrToInt( Rtext.SubString( 0 , Rtext.Pos( "#" ) - 1) ) ; <font color="#838383">    // Определяем размер файла</font>
+			Rtext.Delete( 1 , Rtext.Pos( "#" ) );<font color="#838383">                               // Удаляем последний разделитель</font>
+			Memo1->Lines->Add( "Размер файла: " + IntToStr( Size ) + " байт" ); <font color="#838383">// Выводим размер файла в лог</font>
+			Memo1->Lines->Add( "Имя файла: " + Name ); <font color="#838383">                         // Выводим имя файла в лог</font>
+			Receive = true; <font color="#838383">
+			// Переводим сервер в режим приёма файла</font>
+			
+		}
+	}
+}
+</pre>
+
+<p>Все самое страшное позади, и теперь осталось только описать события <b>OnConnect</b> и <b>OnError</b>:</p>
+<pre class=code>
+void __fastcall TForm1::ClientConnect( TObject *Sender,
+      TCustomWinSocket *Socket )
+{
+	Memo1->Lines->Add( "Вы присоеденились ;" );
+}
+<font color="#838383">
+//---------------------------------------------------------------------------
+</font>
+void __fastcall TForm1::ClientError( TObject *Sender,
+      TCustomWinSocket *Socket, TErrorEvent ErrorEvent, int &ErrorCode )
+{
+	ErrorCode = 0;
+	ShowMessage( "Client Error" );        
+}
+</pre>
+
+<p>А так же написать обработчик для кнопки соединения:</p>
+<pre class=code>
+void __fastcall TForm1::Button1Click( TObject *Sender )
+{
+	Client->Open() ;  <font color="#838383">// открываем </font>
+	Memo1->Lines->Add( "Коннектимся..." );
+}
+</pre>
+
+<p>Вот и все готово, теперь можно протестировать, что же у нас получилось. Все принятые файлы клиент сохранят в папку Downloads.</p>
+<p style="text-align: left;">Статью написал <a href="mailto:devoid@ua.fm"><b>DeVoid</b></a> © 25.10.04</p>
+
+<hr>
+<h2>Скачать исходники:</h2>
+<ul>
+<li><a href="./tsocket/tsocket.zip">tsocket.zip</a>
+</ul>
+
+<!--#include virtual="../template4"-->

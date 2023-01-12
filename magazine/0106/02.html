@@ -1,0 +1,317 @@
+<!--#include virtual="../template1"-->Полезные функции и процедуры: часть 1<!--#include virtual="../template2"-->
+<!--#include virtual="./menu"-->
+<!--#include virtual="../template3"-->
+
+<h1 align=center>Полезные функции и процедуры: часть 1</h1>
+
+<b>Автор:</b> <a href="http://forum.sources.ru/index.php?showuser=15089"><i>OSokin</i></a>
+
+<P>В этой и следующих статьях я расскажу о некоторых полезностях. Профи они ни к чему, но новичкам могут пригодиться. Здесь рассмотрены многие разделы программирования: математика, графика, сети и т.д. Сразу оговорюсь, что написано всё на Delphi. И еще: то, в чем я не уверен на 99%, я приводить не буду. Скорее всего, будут только уже использовавшиеся участки кода. Надеюсь, что кому-нибудь это пригодится.</P>
+
+<br>
+<H2>Глава 1. Математические функции и процедуры.</H2>
+
+<P>Математика - сложная, но требуемая в программировании вещь. Тот, кто плохо знает математику, вряд ли сможет написать даже простой шутер - нужны поворот за мышью, стрельба, движение... Это все требует тригонометрических расчетов и многого другого. В общем, смотрите.</P>
+
+<P>1. Константы.</P>
+<P>В некоторых функциях нельзя обойтись без этих констант. Хотя можно использовать их альтернативы, например, функцию DegToRad, их использование в чем-то быстрее (не нужно дополнительное деление, к примеру).</P>
+
+<PRE CLASS="code">const
+&nbsp;&nbsp;PiDiv2 = Pi / 180;</PRE>
+
+<P>Константа PiDiv2 используется для перевода градусов в радианы и обратно. Для первого умножайте градусы на это число, для второго - делите.</P>
+
+<P>2. Поворот точки.
+<P>Самая простая вещь. На эту тему говорилось много, но вдруг кто не знает.
+
+<PRE CLASS="code">function RotateX(Angle, X, Y: Real; Xc: Real = 0; Yc: Real = 0): Real;
+var
+&nbsp;&nbsp;Radians: Real;
+begin
+&nbsp;&nbsp;Radians := Angle * PiD2;
+&nbsp;&nbsp;RotateX := (X - Xc) * Cos(Radians) - (Y - Yc) * Sin(Radians) + Xc;
+end;
+
+function RotateY(Angle, X, Y: Real; Xc: Real = 0; Yc: Real = 0): Real;
+var
+&nbsp;&nbsp;Radians: Real;
+begin
+&nbsp;&nbsp;Radians := Angle * PiD2;
+&nbsp;&nbsp;RotateY := (Y - Yc) * Cos(Radians) + (X - Xc) * Sin(Radians) + Yc;
+end;
+
+function RotatePoint(Angle: Real; Point: TPoint; Xc: Real = 0; Yc: Real = 0): TPoint;
+begin
+&nbsp;&nbsp;RotatePoint.X := Round(RotateX(Angle, Point.X, Point.Y, Xc, Yc));
+&nbsp;&nbsp;RotatePoint.Y := Round(RotateY(Angle, Point.X, Point.Y, Xc, Yc));
+end;</PRE>
+
+<P>Здесь X и Y или Point - координаты точки, Xc и Yc - координаты центра, вокруг которого точку нужно повернуть на угол Angle. При повороте не забывайте, что в качестве параметров должны быть координаты не повернутой точки (а то бывает, что повернут по оси X и при повороте по Y используют эту координату, а потом удивляются - почему глючит).</P>
+
+<P>3. Угол между точками.</P>
+<P>Это немного сложнее, но тоже легко - на уровне тригонометрии девятого класса. В основном используется для поворота игрока за курсором мыши и т.п.</P>
+
+<PRE CLASS="code">function GetAngle(X, Y: Real): Real;
+begin
+&nbsp;&nbsp;GetAngle := -(ArcSin(X / Sqrt((X * X + Y * Y))))) / PiDiv2;
+end;</PRE>
+
+<P>Следует отметить, что точка должна находиться относительно в центре координат. Таким образом, для получения угла между точками нужно подставить значения (X - X0), (Y - Y0).</P>
+
+<P>4. Траектория.</P>
+<P>Иногда требуется найти позицию тела, движущегося по определенной траектории, в момент времени. Для этого существует специальная функция:</P>
+
+<PRE CLASS="code">function GetTrajecPos(X, Y, Speed, Angle, Time: Real): TPoint;
+begin
+&nbsp;&nbsp;GetTrajecPos.X := Round(X + Speed * Cos(Angle) * Time);
+&nbsp;&nbsp;GetTrajecPos.Y := Round(Y + Speed * Sin(Angle) * Time + Sqr(Pi * Time) / 2);
+end;</PRE>
+
+<P>Что такое X, Y, Speed, Angle и Time - это, я думаю, и так понятно. Как можно заметить, тут не указана масса тела, однако использовать формулу можно и без нее - уменьшать скорость движения тела обратно пропорционально массе.</P>
+
+<P>5. Псевдослучайные числа.</P>
+<P>Случайных чисел в природе не существует - так учит нас математика. Генераторы псевдослучайных чисел существуют практически во всех языках программирования. Но иногда целесообразнее пользоваться своим собственным генератором, нежели стандартным. Для рассказа о том, как его написать, приведу одну мессагу из эхи FIDO7 RU.HACKER за далекий 1996 год:</P>
+<br>
+<PRE class=outpp>
+- Area: RU.HACKER ------------------------------------------------------------
+&nbsp;&nbsp;Msg#: 232&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Date: 11 Feb 96&nbsp;&nbsp;18:27:00
+&nbsp;&nbsp;From: Vladimir Gorpenko&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Read: No&nbsp;&nbsp;&nbsp;&nbsp; Replied: No 
+&nbsp;&nbsp;&nbsp;&nbsp;To: Tolya Zherdev&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Mark:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+&nbsp;&nbsp;Subj: random number
+------------------------------------------------------------------------------
+&nbsp;&nbsp; Здpавствуй, Tolya!
+
+08 Feb 96 10:13 Tolya Zherdev писал Porfiriev Sergey следующее:
+
+ TZ> Для pавномеpного pаспpеделения:
+ TZ> X(I+1)=F{11X(I)+Pi}, пpи X(0)=0.5 дает около 8000 не повтоpяющихся чисел.
+
+&nbsp;&nbsp;8000 - это что-то очень плохо. Hа 16-pазpядных целых должны получаться все
+65536 неповтоpяющихся чисел.
+
+&nbsp;&nbsp; А что, наpод Кнута совсем читать не хочет?
+
+&nbsp;&nbsp; Вот pецепт (из "выводов" к pазделу о генеpатоpах псевдослучайных чисел):
+
+ "наилучший" и "пpостейший" датчик случайных чисел получается по фоpмуле
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;X(I+1)=(a*X(I)+c) mod m
+
+&nbsp;&nbsp; Умножение должно быть точным (без окpугления и тому подобного).
+
+&nbsp;&nbsp; Пpи выбоpе X(0),a,c и m необходимо соблюдать некотоpые пpавила и
+использовать случайные числа осмысленно, pуководствуясь следующими пpинципами.
+
+i) Число X(0) может быть пpоизвольным.
+
+ii) Число m должно быть велико. Удобно выбиpать его pавным pазмеpу слова
+вычислительной машины (Кнут явно имеет в виду 2**k, где k - pазpядность слова
+или pазpядность слова за вычетом знакового pазpяда - пpим. Го), поскольку пpи
+этом эффективно вычисляется (a*X+c) mod m.
+
+iii) Если m пpедставляет собой степень двойки (т.е. если используется машина,
+pаботающая в двоичной системе счисления), выбеpите a таким, чтобы a mod 8 = 5.
+Пpи таком выбоpе величины a, пpи условии, что c выбиpается описанным ниже
+способом, гаpантиpуется, что датчик случайных чисел даст все m возможных
+pазличных значений X, пpежде чем они начнут повтоpяться и, кpоме того,
+гаpантиpуется&nbsp;&nbsp;высокая "мощность".
+
+iv) Множитель a должен пpевосходить величину Sqrt(m), желательно, чтобы он был
+больше m/100, но меньше m-Sqrt(m). Последовательность pазpядов в двоичном
+пpедставлении a не должна иметь пpостого, pегуляpного вида. Высказанных
+сообpажений обычно бывает достаточно, но если датчик случайных чисел
+используется интенсивно, множитель a, кpоме того, следует выбиpать так, чтобы
+удовлетвоpялся "спектpальный тест".
+
+v) Постоянная c должна быть pавна нечетному числу. Желательно выбиpать c таким
+обpазом, чтобы отношение c/m было бы пpиблизительно pавно величине
+0.2113248654051871.
+
+vi) Менее значимые pазpяды X не очень хоpоши, лучше pассматpивать X как дpобь
+X/m в интеpвале между 0 и 1.
+
+&nbsp;&nbsp; За обоснованием, pазъяснением непонятных слов, методами пpовеpки датчиков -
+пожалуйста, к Кнуту.
+
+ TZ> Hу а начальную инициализацию фоpмулы (Hапp. X(0) или I0) делаешь в
+ TZ> зависимости от текущего вpемени.
+
+&nbsp;&nbsp; Это точно, только хоpошо бы сpазу кpутануть генеpатоp хоть pазок, чтобы
+pазбpос пеpвых значений не так кучковался пpи последовательных запусках.
+
+&nbsp;&nbsp; С уважением,
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Vladimir
+
+-!- GoldED/386 2.42.G0614
+ ! Origin: Огоpошенный сyдьбою, ты все же не отчаивайся! (fidonet 2:5020/157.6)
+</PRE>
+
+<P>Сначала кажется, что числа для подобного генератора найти сложно, однако можно удовлетворить практически все эти условия:</P>
+<P>m = 65536;<BR>
+a = 35789;<BR>
+c = 13849;</P>
+
+<P>Так получаем формулу: X(I+1) = (35789 * X(I) + 13849) mod 65536.</P>
+<P>Таким образом, можно написать свою процедуру Randomize и свою функцию Random:</P>
+
+<PRE CLASS="code">var
+&nbsp;&nbsp;OldX: Integer;
+
+procedure Randomize;
+begin
+&nbsp;&nbsp;OldX := GetTickCount;
+end;
+
+function Random(I: Integer): Integer;
+var
+&nbsp;&nbsp;X: Integer;
+begin
+&nbsp;&nbsp;X := (35789 * OldX + 13849) mod 65536;
+&nbsp;&nbsp;OldX := X;
+&nbsp;&nbsp;Result := X mod I;
+end;</PRE>
+
+<P>Естественно, что такая функция Random будет поддерживать только 16-битные числа, однако на практике этого в 90% случаев достаточно. Для поддержки больших чисел нужно будет подбирать новые значения a и c - m тогда должно соответствовать количеству байт под число.</P>
+
+<br>
+<H2>Глава 2. Графические функции и процедуры.</H2>
+
+<P>Графика - тоже серьезная вещь. Например, новичок в API не сможет загрузить битмап из файла, если не будет знать его размеры. От "мерцания" он тоже вряд ли сможет избавиться.</P>
+
+<P>1. Поверхности.</P>
+<P>О создании поверхностей можно почитать в статье "Поверхности: как это делается". Использование поверхностей избавляет от "мерцания".</P>
+
+<P>2. Загрузка битмапа.</P>
+<P>Рисунки в формате BMP используются практически везде. Формат нетрудный, поддерживается Windows, легко сжимается и прочая, и прочая. Но стандартные функции Windows позволяют загрузить его из файла, только если будет известен размер. Для нормальной загрузки битмапа из файла может послужить следующая функция:</P>
+
+<PRE CLASS="code">function LoadBitmapFromFile(FileName: String): HBITMAP;
+var
+&nbsp;&nbsp;// Файл для загрузки заголовка битмапа.
+&nbsp;&nbsp;F: File;
+&nbsp;&nbsp;// Заголовочные структуры.
+&nbsp;&nbsp;BitmapFileHeader : TBITMAPFILEHEADER;
+&nbsp;&nbsp;BitmapInfoHeader : TBITMAPINFOHEADER;
+&nbsp;&nbsp;// Счетчик чтения файла. Применяется для проверки.
+&nbsp;&nbsp;ReadCount : DWORD;
+begin
+&nbsp;&nbsp;LoadBitmapFromFile := 0;
+&nbsp;&nbsp;// Открытие файла и установка на начало.
+&nbsp;&nbsp;AssignFile(F, FileName);
+&nbsp;&nbsp;Reset(F, 1);
+&nbsp;&nbsp;// Чтение заголовка TBitmapFileHeader.
+&nbsp;&nbsp;BlockRead(F, BitmapFileHeader, SizeOf(TBitmapFileHeader), ReadCount);
+&nbsp;&nbsp;if (ReadCount <> SizeOf(TBitmapFileHeader)) then
+&nbsp;&nbsp;begin //Ошибка чтения.
+&nbsp;&nbsp;&nbsp;&nbsp;CloseFile(F);
+&nbsp;&nbsp;&nbsp;&nbsp;Exit;
+&nbsp;&nbsp;end;
+&nbsp;&nbsp;// Чтение заголовка TBitmapInfoHeader.
+&nbsp;&nbsp;BlockRead(F, BitmapInfoHeader, SizeOf(TBitmapInfoHeader), ReadCount);
+&nbsp;&nbsp;if (ReadCount <> SizeOf(TBitmapInfoHeader)) then
+&nbsp;&nbsp;begin //Ошибка чтения.
+&nbsp;&nbsp;&nbsp;&nbsp;CloseFile(F);
+&nbsp;&nbsp;&nbsp;&nbsp;Exit;
+&nbsp;&nbsp;end;
+&nbsp;&nbsp;CloseFile(F);
+&nbsp;&nbsp;with BitmapInfoHeader do
+&nbsp;&nbsp;begin
+&nbsp;&nbsp;&nbsp;&nbsp;Result := LoadImage(HInstance, PChar(FileName), IMAGE_BITMAP,
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;biWidth, biHeight, LR_LOADFROMFILE);
+&nbsp;&nbsp;&nbsp;&nbsp;SetBitmapDimensionEx(Result, biWidth, biHeight, nil);
+&nbsp;&nbsp;end;
+end;</PRE>
+
+<P>При возникновении ошибки функция вернет 0. Я частично взял эту функцию из статьи <A href="mailto:mirovodin@delphigfx.mastak.ru">Мироводина Дмитрия</A> "Низкоуровневая загрузка растра", которую можно найти на <A href="http://delphigfx.mastak.ru">DelphiGFX</A>. Правда, здесь больше преимуществ: меньше размер, один и тот же код для разных типов и пр.</P>
+
+<P>3. Отображение рисунка частями (pattern drawing).</P>
+<P>Часто требуется отобразить не весь рисунок, а только какую-либо его часть. Примеров куча: графические редакторы, игры и т. п.</P>
+<P>Для следующего примера потребуется переменная Brush типа HBrush, инициализированная с помощью функции CreatePatternBrush(Handle), где Handle - это описатель битмапа. Удаляется эта кисть с помощью DeleteObject(Brush). Можно это делать прямо в процедуре, но тогда сильно снизится скорость. Также перед этим должна быть вызвана функция SetBitmapDimensionEx для того, чтобы процедура могла получить размер рисунка. Эту функцию (SetBitmapDimensionEx) достаточно вызвать только один раз, при изменении размеров рисунка.</P>
+
+<PRE CLASS="code">procedure DrawPattern(DC: HDC; X, Y: Integer; PatWidth, PatHeight: Integer;
+&nbsp;&nbsp;Brush: HBRUSH; Bitmap: HBITMAP; Pattern: Integer = -1);
+var
+&nbsp;&nbsp;BmpSize: SIZE;
+&nbsp;&nbsp;OldObj: HGDIOBJ;
+&nbsp;&nbsp;OldOrg: TPoint;
+begin
+&nbsp;&nbsp;OldObj := SelectObject(DC, Brush);
+&nbsp;&nbsp;//Получить размер рисунка.
+&nbsp;&nbsp;GetBitmapDimensionEx(Bitmap, BmpSize);
+&nbsp;&nbsp;if (Pattern = -1) then
+&nbsp;&nbsp;begin //Отобразить весь рисунок.
+&nbsp;&nbsp;&nbsp;&nbsp;SetBrushOrgEx(DC, X, Y, @OldOrg);
+&nbsp;&nbsp;&nbsp;&nbsp;PatBlt(DC, X, Y, BmpSize.cX, BmpSize.cY, PATCOPY);
+&nbsp;&nbsp;end
+&nbsp;&nbsp;else
+&nbsp;&nbsp;begin //Отобразить только часть рисунка.
+&nbsp;&nbsp;&nbsp;&nbsp;SetBrushOrgEx(DC, X - (Pattern mod (BmpSize.cX div PatWidth)) * PatWidth,
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Y - (Pattern div (BmpSize.cX div PatWidth)) * PatHeight, @OldOrg);
+&nbsp;&nbsp;&nbsp;&nbsp;PatBlt(DC, X, Y, PatWidth, PatHeight, PATCOPY);
+&nbsp;&nbsp;end;
+&nbsp;&nbsp;SetBrushOrgEx(DC, OldOrg.X, OldOrg.Y, nil);
+&nbsp;&nbsp;SelectObject(DC, OldObj);
+end;</PRE>
+
+<P>Теперь пояснения. Windows использует BrushOrg, чтобы рисовать с определенной точки. Так частенько поступают графические редакторы при предпросмотре смещения рисунка. А мы используем это, чтобы отобразить только часть рисунка.</P>
+
+<P>4. Отображение рисунка с поворотом.</P>
+<P>Нижеследующий пример дает изображение похуже, чем те же OpenGL или DirectDraw, но зато не требует дополнительных библиотек. Тут есть и еще один большой недостаток: данный код работоспособен только под Windows семейства NT. Если его немного переделать, то можно отображать рисунок частями. Те, кто прочел первую главу, наверняка заметят некоторое сходство - тут использовались те же формулы.</P>
+
+<PRE CLASS="code">procedure DrawRotated(DC: HDC; Bitmap: HBITMAP; X, Y: Integer; Angle: Real);
+var
+&nbsp;&nbsp;TempDC: HDC;
+&nbsp;&nbsp;BmpSize: SIZE;
+&nbsp;&nbsp;Radians: Real;
+&nbsp;&nbsp;Points: array[0..2] of TPoint;
+&nbsp;&nbsp;Xc, Yc: Integer;
+begin
+&nbsp;&nbsp;TempDC := CreateCompatibleDC(DC);
+&nbsp;&nbsp;SelectObject(TempDC, Bitmap);
+&nbsp;&nbsp;GetBitmapDimensionEx(Bitmap, BmpSize);
+&nbsp;&nbsp;Radians := Angle * Pi / 180;
+
+&nbsp;&nbsp;with BmpSize do
+&nbsp;&nbsp;begin
+&nbsp;&nbsp;&nbsp;&nbsp;//Находим центр.
+&nbsp;&nbsp;&nbsp;&nbsp;Xc := X + (cX div 2);
+&nbsp;&nbsp;&nbsp;&nbsp;Yc := Y + (cY div 2);
+
+&nbsp;&nbsp;&nbsp;&nbsp;//Считаем координаты.
+&nbsp;&nbsp;&nbsp;&nbsp;Points[0].X := Round((X - Xc) * Cos(Radians) - (Y - Yc) * Sin(Radians) + Xc);
+&nbsp;&nbsp;&nbsp;&nbsp;Points[0].Y := Round((Y - Yc) * Cos(Radians) + (X - Xc) * Sin(Radians) + Yc);
+
+&nbsp;&nbsp;&nbsp;&nbsp;Points[1].X := Round((X + cX - Xc) * Cos(Radians) - (Y - Yc) * Sin(Radians) + Xc);
+&nbsp;&nbsp;&nbsp;&nbsp;Points[1].Y := Round((Y - Yc) * Cos(Radians) + (X + cX - Xc) * Sin(Radians) + Yc);
+
+&nbsp;&nbsp;&nbsp;&nbsp;Points[2].X := Round((X - Xc) * Cos(Radians) - (Y + cY - Yc) * Sin(Radians) + Xc);
+&nbsp;&nbsp;&nbsp;&nbsp;Points[2].Y := Round((Y + cY - Yc) * cos(Radians) + (X - Xc) * Sin(Radians) + Yc);
+
+&nbsp;&nbsp;&nbsp;&nbsp;//Выводим.
+&nbsp;&nbsp;&nbsp;&nbsp;PlgBlt(DC, Points, TempDC, 0, 0, cX, cY, 0, 0, 0);
+&nbsp;&nbsp;&nbsp;&nbsp;DeleteDC(TempDC);
+&nbsp;&nbsp;end;
+end;</PRE>
+
+<P>И опять-таки можно сильно оптимизировать этот процесс: TempDC используется лишь для копирования с нее изображения. Каждый раз создавать и удалять контекст устройства - долго. Лучше сразу после загрузки изображения создавать DC и выбирать Bitmap для него, а когда он уже больше не нужен - удалять. Таким же образом можно оптимизировать и предыдущую процедуру:</P>
+
+<PRE CLASS="code">procedure DrawPattern(DC, TempDC: HDC; X, Y, PatWidth, PatHeight: Integer;
+&nbsp;&nbsp;Bitmap: HBITMAP; Pattern: Integer = -1);
+var
+&nbsp;&nbsp;BmpSize: SIZE;
+begin
+&nbsp;&nbsp;//Получить размер рисунка.
+&nbsp;&nbsp;GetBitmapDimensionEx(Bitmap, BmpSize);
+&nbsp;&nbsp;with BmpSize do
+&nbsp;&nbsp;&nbsp;&nbsp;if (Pattern = -1) then
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Отобразить весь рисунок.
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;BitBlt(DC, X, Y, cX, cY, TempDC, 0, 0, SRCCOPY)
+&nbsp;&nbsp;&nbsp;&nbsp;else
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Отобразить только часть рисунка.
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;BitBlt(DC, X, Y, PatWidth, PatHeight, TempDC,
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(Pattern mod (cX div PatWidth)) * PatWidth,
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(Pattern div (cX div PatWidth)) * PatHeight, SRCCOPY);
+end;</PRE>
+
+<P>Так получится гораздо быстрее.</P>
+
+<!--#include virtual="../template4"-->

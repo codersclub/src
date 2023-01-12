@@ -1,0 +1,168 @@
+<!--#include virtual="../template1"-->Cвоя новостная лента на PHP<!--#include virtual="../template2"-->
+<!--#include virtual="./menu"-->
+<!--#include virtual="../template3"-->
+
+<h1 align=center>Cвоя новостная лента на PHP</h1>
+
+<table border=0 cellspacing=1 cellpadding=1>
+ <tr>
+  <td width=75><b>Автор:</b></td>
+  <td><a href="http://forum.sources.ru/index.php?showuser=29526"><i>Darkmaster</i></a></td>
+ </tr>
+ <tr>
+  <td width=75><b>Взято с:</b></td>
+  <td><a href="http://www.pcnext.ru/">http://www.pcnext.ru/</a></td>
+ </tr>
+</table>
+
+<p>Что объединяет все информационные сайты? Что обязательно присутствует на главной странице? Если вы подумали о новостях, то оказались правы! Сегодня мы с вами разберемся как раз в том, как сделать собственную новостную ленту с админкой и защитой на php. Заранее скажу, что дело это совсем не сложное, но и не двухминутное, так что запаситесь всем, что вам нужно (пивом, колой, соком, чипсами...) и вперед! Для начала продумаем структуру новостной ленты. Безусловно, мы будем использовать mysql, а как же без него! В mysql-базе, которую назовем mynews, будут храниться данные. Какие? Cейчас объясню. Разместим в базе mynews таблицу под названием news. А в таблице - вот что:</p>
+
+<div class=outpp>
+News_id - MediumInt длина 9 AutoIncrement, это будет primary key.<br>
+Ntext - текст новости, тип Text.<br>
+Ntitle - заголовок новости, тип varchar, длина 255<br>
+Ndate - это дата, varchar, длина 255<br>
+Nuser - а это имя автора новости, varchar, длина 255.<br>
+</div>
+
+<p>Как все это создать? Почитайте предыдущие тексты на этом сайте, там есть вся необходимая информация. А от себя могу посоветовать отличную, очень удобную программу Mysql-Front, в которой все таблицы создаются визуально. Но идем дальше. Теперь разберемся в том, какие скрипты нужно написать. Я предлагаю написать следующие: admin.php, сreatenews.php (этот скрипт и будет создавать новость), tnews.php (будет отображать новость). Можно было написать скрипт и для удаления новостей, но это вы сможете сделать и сами после выполнения упражнения. Итак, начнем. Для начала напишем скрипт createnews.php. В нем пока будет мало понятного, но все станет на свои места после того, как вы посмотрите на листинг admin.php.</p>
+<p>Листинг 1. Createnews.php</p>
+<pre class=code>
+&lt;?
+$server="localhost";
+$user="";
+$pass="";
+$DB="mynews";
+$ntitle=$title;
+$ntext=$newstext;
+$nuser=$user;
+$now = date(" H : i : s d - m - Y "); // дата будет выводиться в формате "время, дата"
+mysql_connect($server,$user,$pass) or die("Нет коннекта!");
+mysql_select_db($DB);
+mysql_query("Insert INTO news(ntitle,ntext,ndate,nuser) VALUES('".addslashes($ntitle)."','".addslashes($ntext)."','".addslashes($now)."',
+'".addslashes($nuser)."')");
+mysql_close();
+echo "Новость добавлена!";
+?&gt;
+</pre>
+
+<pre class=code>
+'". addslashes ($ ntitle )."' // эта строка нужна для того, чтобы в заголовке правильно отображались кавычки. 
+</pre>
+
+<p>Как видите, вместо mysql-даты используется varchar, так проще. Теперь, чтобы все в рассмотренном скрипте встало на свои места, нужно написать админку. Напишем.</p>
+<p>Листинг 2. Admin.php</p>
+<pre class=code>
+&lt;html&gt;
+&lt;head&gt;
+&lt;title&gt;Добавление новостей&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h3&gt;Добавление новостей&lt;/h3&gt;
+&lt;form action="createnews.php" method="POST"&gt;
+Заголовок новости: &lt;input type="text" Size=70 name="title"&gt;&lt;br&gt;
+Ваше имя: &lt;input type="text" Size=50 name"user"&gt;&lt;br&gt;
+Текст &lt;textarea name="newstext" cols=60 rows=6&gt;
+&lt;/textarea&gt;
+&lt;br&gt;&lt;br&gt;
+&lt;CENTER&gt;
+&lt;input type="Submit" Value="Ok"&gt;
+&lt;input type="reset" Value=" Очистить "&gt;
+&lt;/CENTER&gt;
+&lt;/form&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<p>Очевидно, используется простая html форма. Так зачем же создавать php-скрипт? Затем, что мы совершенно не подумали о безопасности. Безопасность админки можно обеспечить, запретив доступ случайным пользователям, не знающим логин и пароль. Злоумышленник сможет узнать пароль только тогда (и не раньше), когда получит доступ к скрипту, т.е. к директории. Измените admin.php следующим образом:</p>
+<p>Листинг 3. Модифицированный admin.php</p>
+<pre class=code>
+&lt;?
+$itog_usr = 'ваш логин';
+$itog_pass = 'ваш пароль';
+$_GET[$usr];
+$_GET[$pass];
+if (($usr != '') and ($pass != '')):
+{
+if (($usr != $itog_usr) or ($pass != $itog_pass)):
+{
+die("Неверное имя пользователя или пароль");
+}
+else:
+{
+echo "Авторизация прошла удачно";
+?&gt;
+&lt;html&gt;
+&lt;head&gt;
+&lt;title&gt;Добавление новостей&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h3&gt;Добавление новостей&lt;/h3&gt;
+&lt;form action="createnews.php" method="POST"&gt;
+Заголовок новости: &lt;input type="text" Size=70 name="title"&gt;&lt;br&gt;
+Ваше имя: &lt;input type="text" Size=50 name"user"&gt;&lt;br&gt;
+Текст &lt;textarea name="newstext" cols=60 rows=6&gt;
+&lt;/textarea&gt;
+&lt;br&gt;&lt;br&gt;
+&lt;CENTER&gt;
+&lt;input type="Submit" Value="Ok"&gt;
+&lt;input type="reset" Value=" Очистить "&gt;
+&lt;/CENTER&gt;
+&lt;/form&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+&lt;?
+}
+endif;
+}
+else:
+{
+echo "&lt;form method='post'&gt;
+Login:&lt;br&gt;
+&lt;input type='text' name='usr' value=''&gt;&lt;br&gt;
+Password:&lt;br&gt;
+&lt;input type='password' name='pass' value=''&gt;&lt;br&gt;
+&lt;input type='submit' value='LogIN'&gt;
+&lt;/form&gt;";
+}
+endif;
+?&gt;
+</pre>
+
+<p>Давайте разберемся в написанном скрипте. В самом начале двум переменным присваиваются текущие логин и пароль, затем осуществляется проверка введенных. Если введенные данные содержат " (пусто), или не равны тем, что хранятся в переменных, выводится печальная для ][акера надпись "Неверное имя пользователя или пароль". В противном случае выводится "Авторизация прошла успешно" и идет html -код. В самом конце описана форма ввода.</p>
+<p>С админкой все. Теперь переходим к скрипту, который будет выводить новостную ленту.</p>
+<p>Листинг 4. tnews.php:</p>
+<pre class=code>
+&lt;html&gt;
+&lt;head&gt;
+&lt;meta http-equiv="Content-Type" content="text/html; charset=windows-1251"&gt;
+&lt;/head&gt;
+&lt;?
+$server="localhost";
+$user="darkmaster";
+$pass="";
+$DB="mynews";
+mysql_connect($server,$user,$pass) or die("Нет коннекта!");
+mysql_select_db($DB);
+$request= "SELECT ntext, ntitle, ndate, nuser FROM news ORDER BY news_id DESC LIMIT 15";
+$result=mysql_query($request);
+while($row=mysql_fetch_array($result)){
+echo "&lt;table align=center width=98% border=0 cellpadding=3 cellspacing=1 bgcolor=#FDFEFF&gt;";
+echo "&lt;tr&gt;&lt;td bgcolor=#FFFFFF&gt;".$row['ntitle']."&nbsp;&nbsp; Дата ".$row['ndate']."&nbsp;&nbsp; Aiaaaee ".$row['nuser']."&lt;/td&gt;&lt;/tr&gt;";
+echo "&lt;tr&gt;&lt;td bgcolor=#FFFFFF&gt;".$row['ntext']."&lt;/td&gt;&lt;/tr&gt;";
+echo "&lt;tr&gt;&lt;td bgcolor=#F4F4F4&gt;&nbsp&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;br&gt;";
+}
+?>
+</pre>
+
+<p>На что здесь следует обратить внимание? Во-первых, на запрос</p>
+<pre class=code>
+$request = "SELECT ntext , ntitle , ndate , nuser FROM news ORDER BY ndate DESC LIMIT 15"; 
+</pre>
+<p>Здесь написано вот что: выводить новости, отсортированные по дате, причем на странице показывать только 15 первых новостей. Функция mysql _ fetch _ array ($ result ) возвращает массив, который записывается в переменную $ row . Для тех, кто не знает, что такое & nbsp, говорю: это свободное пространство. Все, что осталось сделать - вставить tnews в некоторую готовую страничку, например вот так:</p>
+<pre class=code>
+include("./tnews.php")
+</pre>
+<p>Вот и все, что я хотел рассказать. Если появятся вопросы, задавайте их смело на нашем <a href="http://forum.sources.ru">форуме</a>.</p>
+
+<!--#include virtual="../template4"-->

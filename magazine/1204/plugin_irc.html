@@ -1,0 +1,140 @@
+<!--#include virtual="../template1"-->mIRC + Delphi = WinAmp Plugin<!--#include virtual="../template2"-->
+<!--#include virtual="./menu"-->
+<!--#include virtual="../template3"-->
+
+<h1 align=center>mIRC + Delphi = WinAmp Plugin</h1>
+
+<b>Автор:</b> <a href="http://forum.sources.ru/index.php?showuser=3352" target="_blank"><i>x2er0</i></a>
+
+<h2>Введение</h2>
+<p>В этой статье я хочу рассказать и  на небольшом примере показать, как можно написать простенький скриптовой плагин для IRC, в частности, для mIRC клиента. Часто, сидя в чате, вы можете встерить, как какой  нибудь пользователь пишет, что проигрывает его WinAmp. Конечно можно это сделать и ручками:
+/me слушает песенку [название песни], но тогда это придется делать постоянно! Сами понимаете это никому не надо, да и ненормально это как-то! Лучше, если за Вас это будет делать прогрмма! Если Вы с этим согласны то идем дальше, если нет, то...</p>
+
+<h2>Что необходимо</h2>
+<p>Что нам потребуется для этого? Так как я буду показывать пример на Delphi, то пакет Delphi, обязательно сам клиент mIRC и немного хелпа. Если же вы еще поставите себе IRC сервер, то это будет просто замечательно, т.к. вы сможете, в дальнейшем, не выходя в сеть проверять свои творения!</p>
+
+<h2>План действий</h2>
+<ol>
+<li>Используя Delphi пишем DLL приложение, которое будет грабить с WinAmp'a текущую песенку.
+<li>Напишем скрипт на mIRC, который, используя эту DLL, будет на все каналы пивать, то что нам отдаст DLL.
+</ol>
+
+<h2>Приступим</h2>
+<p>Первое что нам надо, это каким нибудь способом определить текущую песню. Если несколько вариантов:</p>
+<ol>
+<li>Использовать специальные API, которые поддерживает WinAmp (они основываются на ф-ии SendMessage()). Хэлп по этим ф-ям Вы можете поглядеть на официальном сайте WinAmp'a.
+<li>Запуств WinSight32, входящий в пакет Delphi, вы можете увидеть, что есть такое окно, которое "несет в себе" название текущей песни.
+<li>Еще какие нибудь способы...
+</ol>
+
+<h2>Начнем...</h2>
+<p>Запустим Delphi и создадим заготовку для написания библиотеки (об этом Вы можете прочитать в <a href="../0804/delphidll.html">первом журнале</a>). Чтобы знать как писать DLL под IRC клиент Вы должны знать некоторые особенности; вот что говорит хэлп:</p>
+<div class=code><p>Technical notes</p>
+<p>This section contains technical information for programmers who want to create DLLs for use with mIRC.</p>
+
+<p>The routine in the DLL being called must be of the form:</p>
+
+<p>int __stdcall procname(HWND mWnd, HWND aWnd, char *data, char *parms, BOOL show, BOOL nopause)</p>
+
+<p>mWnd is the handle to the main mIRC window.</p>
+
+<p>aWnd is the handle of the window in which the command is being issued, this might not be the currently active window if the command is being called by a remote script.</p>
+
+<p>data is the information that you wish to send to the DLL. On return, the DLL can fill this variable with the command it wants mIRC to perform if any.</p>
+
+<p>parms is filled by the DLL on return with parameters that it wants mIRC to use when performing the command that it returns in the data variable.</p>
+
+<p>Note: The data and parms variables can each hold 900 chars maximum.</p>
+
+<p>show is FALSE if the . prefix was specified to make the command quiet, or TRUE otherwise.</p>
+
+<p>nopause is TRUE if mIRC is in a critical routine and the DLL must not do anything that pauses processing in mIRC, eg. the DLL should not pop up a dialog.</p>
+
+<p>The DLL can return an integer to indicate what it wants mIRC to do:</p>
+
+<p>  0 means that mIRC should /halt processing</p>
+
+<p>  1 means that mIRC should continue processing</p>
+
+<p>  2 means that it has filled the data variable with a command which it wants mIRC to perform, and has filled parms with the parameters to use, if any, when performing the command.</p>
+
+<p>  3 means that the DLL has filled the data variable with the result that $dll() as an identifier should return.</p>
+
+<p>Note: You may need to create a .def file with the procedure names exported when compiling your DLL.</p>
+</div>
+
+<p>Вот что у меня получилось:</p>
+<pre class=code>
+library Project2;
+uses
+  windows,
+  messages;
+
+function getmname:string;
+var h: hwnd;
+    buf: array[0..255] of char;
+    l: integer;
+begin
+ h := findwindow(pchar('winamp v1.x'), nil);
+ l := sendmessage(h, wm_gettextlength, 0, 0);
+ sendmessage(h, wm_gettext, l+1, integer(@buf));
+ result := copy(buf, pos('.', buf)+2, l-pos(' - winamp', buf)-length(' - winamp')-pos('.', buf));
+end;
+
+function procname(mWnd, aWnd: HWND; data, parms: PChar; show, nopause: boolean):integer;stdcall;
+begin
+ lstrcpy(data, PChar(getmname));
+ result:=3;
+end;
+
+exports procname;
+
+begin
+end.</pre>
+
+<p>Так, с библиотекой мы разобрались, настало время писать скрипты. Можно писать скрипты либо во встроеном редакторе, либо в любом текстовом. Откроем новый документ в блокноте.</p>
+
+<pre class=code>
+alias ShowTrack { 
+ ;занесем в переменную любое слово abcEmpty
+  set %Music.LastName abcEmpty  
+ ;включим таймер WinAmp на переодичномть 5
+ ;секунд, ф-ия StartTimerTrack
+  .timerWinAmp 0 5 StartTimerTrack
+}
+
+alias StartTimerTrack {
+  ;посмотрим что вернет нам наша ф-ия из DLL
+  set %Music.CurrentName $dll($mircdir\Project2.dll,procname,abcEmpty)
+  ;если это не таже песня
+  if (%Music.CurrentName != %Music.LastName) {
+  ;то пошлем это сообщение на все каналы
+    ame слушает %Music.CurrentName
+    set %Music.LastName %Music.CurrentName
+  }
+}
+
+  ;для удобства сделаем меню
+  ;работающее по правой кнопке в оуне канала
+menu channel {
+  Показ трэков
+  ;запускаем процедуру
+  .Показывать: ShowTrack
+  ;останавливаем наш таймер
+  .Не показывать: .timerWinAmp off
+}</pre>
+
+<p>Что бы этот скрипт вступил в силу необходимо набрать в консоли клиента следующее: /load -rs имя этогофайла.mrc (если вы его сохранили как .mrc)! Кодинг на этом заканчивается...</p>
+
+<h2>Предостережения</h2>
+<p>Что может повлечь использование данного плагина? С одной стороны это удобство, а с другой - неудобства, есил можно так сказать!? Допустим, какой-то, такой же как и Вы, изобретательный пльзователь захочет проверить ваш скрипт на "безопасность". Он делает следющее: берет любой редактор mp3 тэгов и в любом из полей Title или Artist (т.к. вы выводите эти 2 поля) меняет содержимое на, хотя бы: /exit. Пошлет вам этот файл и попросит послушать, что же он такое на сочинял! Вы его запускаете и .... Что же произойдет? В строчке ame слушает %Music.CurrentName, mIRC заметит еще 1 команду (exit) и конечное же её выполнит! Ладно, если там будет команда exit, особых неприятностей она вам не принесет, но если там окажется что нибудь другое? У вас есть 2 варианта: либо осторожно пользоваться данными вещами, либо доработать скрипт на проверку рзличных специальнх символов!!!</p>
+<p>Так что дерзайте...</p>
+
+<hr>
+<h2>Скачать исходники:</h2>
+<ul>
+<li><a href="./plugin_irc/Project2.dpr">Project2.dpr</a>
+<li><a href="./plugin_irc/pl.mrc">pl.mrc</a>
+</ul>
+
+<!--#include virtual="../template4"-->

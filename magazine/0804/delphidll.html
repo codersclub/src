@@ -1,0 +1,214 @@
+<!--#include virtual="../template1"-->Использование Dll в Delphi<!--#include virtual="../template2"-->
+<!--#include virtual="./menu"-->
+<!--#include virtual="../template3"-->
+
+<h1 align=center>Использование Dll в Delphi</h1>
+
+<b>Автор:</b> <a href="http://forum.sources.ru/index.php?showuser=3352"><i>xZero</i></a>
+
+<h2>Введение</h2>
+<p>Что такое DLL - знает, как минимум, большинство пользователей PC, тем более программисты, к которым Вы, скорее всего и относитесь, раз читаете эту статью. В этой статье я постараюсь пробежаться по всем общим вопросам, касающимся DLL.</p>
+<p>Что конкретно мы рассмотрим:</p>
+<ol>
+<li>Как обычно, из области "Hello World", мы создадим свою первую DLL.
+<li>Научимся пользоваться функциями этой DLL из своих программ.
+<li>Научимся просматривать функции, которые экспортирует определенная DLL.
+<li>Может, что нибудь еще....
+</ol>
+
+<h2>Процесс создания DLL</h2>
+<p>Начнем с самого простого - написание своей первой DLL, которая будет содержать всего лишь одну функцию, которая выводит сообщение "Hello World".</p>
+<p>Начнем...</p>
+<ol>
+<li>Запускаем Delphi (Я использую Delphi 6).
+<li>Далее: File -> New ->Other
+</ol>
+<p>На закладке New дважды щелкаем по объекту DLL Wizard. Откроется новый проект. Сохраните его, например, с именем MyFirstDLL.</p>
+<p>Чистый модуль имеет примерно такое содержание:</p>
+<pre class=code>
+library MyFirstDLL;
+
+uses
+  SysUtils,
+  Classes;
+
+{$R *.res}
+
+begin
+end.
+</pre>
+<p>Теперь напишем всего лишь одну функцию, которая вызовет ShowMessage() из модуля Dialogs. Следовательно, перед началом оформления процедуры допишем в раздел Uses модуль Dialogs. Что, примерно, должно у вас получится:</p>
+<pre class=code>
+library MyFirstDLL;
+uses Dialogs;
+
+procedure MyFirstFunc; stdcall;
+begin
+  ShowMessage('Hello World');
+end;
+
+exports MyFirstFunc;
+begin
+end.
+</pre>
+<p>Как видите, тут нет ничего очень сложного.  Единственное скажу, что можно вызывать функции как по имени, так и по индексу (номеру), для этого надо писать так:</p>
+<pre class="code">
+exports MyFirstFunc index 1;
+</pre>
+<p>Если что не понятно в этом коде, то все таки постарайтесь разобраться сначала сами. Думаю, что с этим проблем не будет... Но если что, то forum.sources.ru Вам всегда рад! Идем дальше, как же можно теперь пользоваться этой (MyFirstFunc) функцией из других проектов?</p>
+
+<h2>Использование функций DLL</h2>
+<p>Первый шаг сделан, дело за малым... Как нам использовать эту функцию?</p>
+<p>Есть, как минимум,  два способа загрузки:</p>
+<ol>
+<li>Статический
+<li>Динамический
+</ol>
+<p>Второй способ предпочтительнее, так во время загрузки мы можем следить за всем происходящим и можем править все ошибки, происходящие при подгружении. Но, сначала, поглядим первый способ:</p>
+<p>Создаем новый проект, бросаем на форму одну кнопку и по событию OnClick этой кнопки и пишем следующее:</p>
+<pre class=code>
+procedure TForm1.Button1Click(Sender: TObject);
+begin
+  MyProc( );
+end;
+</pre>
+<p>Но это еще не все! В разделе implementation проекта запишите:</p>
+<pre class=code>
+implementation
+procedure MyProc( ); stdcall; external 'MyFirstDLL.dll' name
+'MyFirstFunc';
+</pre>
+<p>Готово! Компилируйте проект и жмите на кнопку! Если показалось ваше сообщение, то все ок!</p>
+<p>Теперь рассмотрим способ с динамической загрузкой. Для этого метода используют функцию LoadLibrary( ), а в конце, для выгрузки - FreeLibrary( ).</p>
+<p>Посмотрите на примере:</p>
+<pre class=code>
+procedure TForm1.Button1Click(Sender: TObject);
+type
+  TMyFunc = procedure;
+var
+  DLLInstance : THandle;
+  MyFunc      : TMyFunc;
+begin
+  DLLInstance := LoadLibrary(PChar('MyFirstDLL.dll'));
+  if (DLLInstance = 0) then begin
+    MessageDlg('Невозможно загрузить DLL', mtError, [mbOK], 0);
+    Exit;
+  end;
+  try
+    @MyFunc := GetProcAddress(DLLInstance, 'MyFirstFunc');
+    if Assigned(@MyFunc) then
+      MyFunc( )
+    else
+      MessageDlg('Не найдена искомая процедура!.', mtError, 
+[mbOK], 0);
+  finally
+    FreeLibrary(DLLInstance);
+  end;
+end;
+</pre>
+<p>После успешной загрузки DLL функцией LoadLibrary( ), с помощью GetProcAddress( ) найдем адрес нашей функции, по которому и будем вызывать нашу процедуру из DLL. В конце, обязательно, надо сделать FreeLibrary( ). Это настолько важно, что весь код после успешной загрузки, вполть до FreeLibrary( ) я заключил в блок try finally. Это гарантирует выполнение FreeLibrary, даже если при выполнении действий внутри блока try except, возникнет непредвиденная ошибка в виде исключения (Exception).</p>
+<p>Дело в том, что успешные вызовы LoadLibrary и FreeLibrary обязательно должны быть парными. И вот почему. Система, для каждой загружаемой процессом библиотеки, ведет внутри себя счетчик, который увеличивается на 1 при каждом успешном вызове LoadLibrary. Соответственно, при выполнени FreeLibrary, она уменьшает этот счетчик, и если он становится равным нулю, то это означает что данная библиотека более не нужна данному процессу, и ее можно смело удалить из памяти.</p>
+<p>Если-же правило парности не соблюдать, то это может привести либо к преждевременной выгрузке (при лишнем FreeLibrary) библиотеки из памяти, либо к ее "застревании" там (при недостатке FreeLibrary).</p>
+<p>При соблюдении же этого правила, можно не заботиться о возможной вложенности вызовов LoadLibrary / FreeLibrary.</p>
+
+<h2>Просмотр функций определенной DLL</h2>
+<p>Теперь посмотрим, как можно извлечь все имена функций из файлов PE формата, к которым и относится DLL. Структуру PE формата мы тут рассматривать не будем, следовательно, и исходник будет без пояснений.</p>
+<p>Итак, создайте новый проект, бросьте на форму ListBox, в нём мы будем показывать имена функций.</p>
+<p>Вот весь проект:</p>
+<pre class=code>
+unit Unit1;
+
+interface
+
+uses
+  Windows, Messages, SysUtils, Variants, Classes, Graphics, 
+Controls,
+Forms,
+  Dialogs, StdCtrls;
+
+type
+  TForm1 = class(TForm)
+    lb: TListBox;
+    procedure FormCreate(Sender: TObject);
+  private
+    { Private declarations }
+    cmdline   : String;
+    ImageBase : DWord;
+    DosHeader : PImageDosHeader;
+    PeHeader  : PImageNtHeaders;
+    PExport   : PImageExportDirectory;
+    pname     : PDWord;
+    name      : PChar;
+  public
+    { Public declarations }
+
+  end;
+
+var
+  Form1: TForm1;
+
+implementation
+
+{$R *.dfm}
+
+procedure TForm1.FormCreate(Sender: TObject);
+
+  procedure FatalOsError;
+  begin
+    ShowMessage(SysErrorMessage(GetLastError( )));
+    Abort;
+  end;
+
+Var i: Integer;
+begin
+  try
+    if (ParamCount( ) < 1) then
+      Abort
+    else
+      cmdline := ParamStr(1);
+
+    ImageBase := LoadLibrary(PChar(cmdline));
+    if (ImageBase = 0) then  FatalOsError;
+
+    try
+      DosHeader := PImageDosHeader(ImageBase);
+      if (DosHeader^.e_magic <> IMAGE_DOS_SIGNATURE) then  
+FatalOsError;
+
+      PEHeader := PImageNtHeaders(DWord(ImageBase) +
+DWord(DosHeader^._lfanew));
+      if (PEHeader^.Signature <> IMAGE_NT_SIGNATURE) then  
+FatalOsError;
+
+      PExport := PImageExportDirectory(ImageBase +
+DWord(PEHeader^.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY
+_EXPORT].VirtualAddress));
+      pname   := PDWord(ImageBase + 
+DWord(PExport^.AddressOfNames));
+
+      For i := 0 to PExport^.NumberOfNames - 1 do begin
+        name := PChar(PDWord(DWord(ImageBase)  + PDword(pname)^));
+        lb.Items.Add(name);
+        inc(pname);
+      end;
+    finally
+      FreeLibrary(ImageBase);
+    end;
+
+  except
+    Application.ShowMainForm := False;
+    Application.Terminate;
+  end;
+end;
+
+end.
+</pre>
+<p>Если вы захотите сами разобраться в коде и у вас что-то не будет получаться, то на нашем форуме вам обязательно помогут, заходите!</p>
+
+<h2>Прицепляем наш Viewer ко всем DLL</h2>
+<p>У нас есть готовая DLL с функцией, есть просмотрщик функций. Осталось добавить некой функциональности для удобства дальнейшей работы. Давайте сделаем это.... В проводнике открываем любую папку. Идем в Сервис -> Свойства папки... Переходим на закладку "Типы файлов". В списке ищем формат DLL. Если такого нет, то жмем кнопку "Создать" и в поле "Расширение" пишем - DLL. Жмем ОК. Находим созданный нами тип - DLL. Выделяем его и жмем "Дополнительно". Далее "Создать", в поле "Действии" пишем то, что будет отображаться в контекстном меню, например DLL Viewer. Через обзор ищем нашу программку.</p>
+<p>Все готово!</p>
+<p>Теперь при клике правой кнопкой мыши по файлу формата DLL в меню будет наш DLL Viewer. Выбираем его и смотрим все функции!</p>
+<p>Это все, спасибо за внимание!</p>
+
+<!--#include virtual="../template4"-->

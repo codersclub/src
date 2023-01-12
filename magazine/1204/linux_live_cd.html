@@ -1,0 +1,362 @@
+<!--#include virtual="../template1"-->Linux Live CD - Основы<!--#include virtual="../template2"-->
+<!--#include virtual="./menu"-->
+<!--#include virtual="../template3"-->
+
+<h1 align=center>Linux Live CD - Основы</h1>
+
+<b>Автор:</b> <a href="http://forum.sources.ru/index.php?showuser=1375" target="_blank"><i>RaD</i></a>
+
+<p style="text-align: right; font-size: x-small;"><i>По материалам <a href="http://www.geocities.com/potato.geo/bootlinuxcd.html" target="_blank">забугорного сайта</a></i></p>
+
+<h2>Введение</h2>
+<p>Зачем помещать Linux на загрузочный CD? Такое решение позволяет иметь Linux на практически любом компьютере, не теряя времени на его установку и настройку. Ярким примером является дистрибутив <A href="http://linux.zp.ua/">Blin Linux 1.3</A>, который позволяет смотреть видео на компьютере и требует наличия 64 MB RAM и CD-драйва. Винт ему не требуется, да и CD-драйв освобождается сразу после загрузки системы. Удобно!</p>
+<p>Данная статья описывает создание "основы" для дистрибутива подобного рода, который в дальнейшем можно усовершенствовать до нужного вам состояния.</p>
+<p>Стандартом для загрузочного CD является El Torito, смысл которого заключается в том, что BIOS считает CD-драйв дисководом и ищет на нём загрузочный образ. Но есть альтернатива в виде ISOLINUX, данное решение не использует эмуляции дисковода и позволяет работать со всем CD-диском.</p>
+
+<h2>Процесс загрузки</h2>
+<p>Стандартный процесс загрузки Linux выглядит как-то так:</p>
+<UL>
+  <LI>Компьютер запускает LILO или подобный загрузчик.
+  <LI>LILO знает где находится ядро и запускает его.
+  <LI>Запускается ядро, после проведения стандартных тестов, оно монтирует корневую файловую систему.
+  <LI>После этого запускается <b>/sbin/init</b> и операционная система запускается 
+  в соответствии с <b>/etc/inittab</b> и 
+  скриптами <b>rc.d</b>.
+</UL>
+<p>Процесс загрузки с CD немного отличается. Нам снова нужен загрузчик, но необязательно знать, каким устройством является наш CD-драйв. Он может быть <b>/dev/hdb</b>, <b>/dev/hdc</b> или <b>/dev/hdd</b>. Даже если мы скажем загрузчику, где находится ядро, нам надо будет указать ядру где находится корневая файловая система. В поиске CD-драйва нам помогает <i>ISOLINUX</i>, но не решает проблемы с поиском корневой файловой системы. Многие загрузочные диски используют так называемый <i>initrd</i> (initial ram disk), который является диском в оперативной памяти с минимальной корневой файловой системой. Идея заключается в том, что ядро загружает минимальную файловую систему, на которой находятся модули, которые позволяют найти и подгрузить основную корневую файловую систему. Теперь рассмотрим процесс загрузки Linux с CD:</p>
+<UL>
+  <LI><FONT size=2>Загрузка с CD с <SPAN 
+  style="FONT-STYLE: italic">ISOLINUX</SPAN>.</FONT>
+  <LI><FONT size=2><SPAN style="FONT-STYLE: italic">ISOLINUX</SPAN> загружает 
+  ядро из каталога <SPAN style="FONT-WEIGHT: bold">/isolinux</SPAN> на 
+  CD-диске.</FONT> 
+  <LI><FONT size=2>Затем <SPAN style="FONT-STYLE: italic">ISOLINUX</SPAN> 
+  загружает <SPAN style="FONT-WEIGHT: bold">initrd.gz</SPAN>, сжатую ext2 
+  файловую систему.<BR>Важно понимать, что <SPAN 
+  style="FONT-WEIGHT: bold">initrd.gz</SPAN> загружается не ядром!</FONT> 
+  <LI><FONT size=2>Ядро запускается и разжимает <SPAN 
+  style="FONT-WEIGHT: bold">initrd.gz</SPAN> в память (обычно в <SPAN 
+  style="FONT-WEIGHT: bold">/dev/ram0</SPAN>) и монтирует его в корень.<BR>Ядро 
+  должно быть собрано с опциями поддержки <SPAN 
+  style="FONT-STYLE: italic">initrd</SPAN> и <SPAN 
+  style="FONT-STYLE: italic">ramdisk</SPAN>.</FONT>
+  <LI><FONT size=2>Ядро пытается запустить <SPAN 
+  style="FONT-WEIGHT: bold">linuxrc</SPAN> в новой файловой системе.</FONT> 
+  <LI><FONT size=2>Программа <SPAN style="FONT-WEIGHT: bold">linuxrc</SPAN> в 
+  свою очередь пытается примонтировать CD-диск, а затем копирует сжатую основную 
+  файловую систему в память (обычно в <SPAN 
+  style="FONT-WEIGHT: bold">/dev/ram1</SPAN>). Новая файловая система 
+  монтируется и в её каталоге <SPAN style="FONT-WEIGHT: bold">/dev</SPAN> 
+  создается символическая ссылка на CD-драйв.</FONT> 
+  <LI><FONT size=2>После завершения работы <SPAN 
+  style="FONT-WEIGHT: bold">linuxrc</SPAN>, управление возвращается ядру и оно 
+  пытается примонтировать свою сконфигурированную файловую систему. В данном 
+  случае, с помощью команды <SPAN style="FONT-WEIGHT: bold">rdev</SPAN> 
+  указываем ядру использовать <SPAN style="FONT-WEIGHT: bold">/dev/ram1</SPAN> в 
+  качестве корневой файловой системы, в которой есть <SPAN 
+  style="FONT-WEIGHT: bold">/sbin/init</SPAN> и система стартует прямо из 
+  памяти.<BR></FONT></LI></UL><FONT size=2>Но зачем надо разбивать процесс 
+загрузки на две фазы? Дело в том, что Linux не знает как грузиться с CD. 
+Преимущество наличия первой фазы загрузки состоит в том, что файловая система 
+<SPAN style="FONT-STYLE: italic">initrd</SPAN> загружается загрузчиком, а не 
+ядром. Это означает, что мы сможем загрузиться с любого устройства, с которого 
+сможет запуститься загрузчик.
+
+<h2>Создание ядра</h2>
+Теперь необходимо создать ядро, которое сможет загружать 
+<SPAN style="FONT-STYLE: italic">initrd</SPAN> файловую систему. Процесс сборки 
+ядра опищем позднее, а пока предположим, что вы умеете это делать :) Ядро должно 
+быть собрано с поддержкой <SPAN style="FONT-STYLE: italic">initrd</SPAN> и RAM 
+дисков. Будем использовать размер RAM диска по умолчанию, т.е. 4 MB. Также 
+следует подключить поддержку файловых систем ISO9660 и EXT2. После сборки ядра 
+его необходимо настроить на использование конкретного корневого 
+устройства.<BR><BR></FONT>
+<DIV style="MARGIN-LEFT: 40px"><FONT size=2><SPAN 
+style="FONT-FAMILY: verdana">Допустим, вы только что выполнили команду <SPAN 
+style="FONT-WEIGHT: bold">make bzImage</SPAN></SPAN><BR 
+style="FONT-FAMILY: verdana"><SPAN 
+style="COLOR: rgb(102,0,0); FONT-FAMILY: verdana">rdev 
+/usr/src/linux/arch/i386/boot/bzImage /dev/ram1</SPAN><BR 
+style="FONT-FAMILY: verdana"><SPAN style="FONT-FAMILY: verdana">Если у вас нет 
+устройства <SPAN style="FONT-WEIGHT: bold">/dev/ram1</SPAN>, то его следует 
+создать</SPAN><BR style="FONT-FAMILY: verdana"><SPAN 
+style="COLOR: rgb(102,0,0); FONT-FAMILY: verdana">mknod -m 640 /dev/ram1 b 1 
+1</SPAN><BR></FONT></DIV>
+
+<h2>Создание дерева каталогов</h2>
+Создадим шаблон для нашего дистрибутива.<BR><BR>Ключевые 
+каталоги:<BR></FONT>
+<UL style="FONT-FAMILY: arial cyr">
+  <LI><FONT size=2><SPAN style="FONT-WEIGHT: bold">cdimage/</SPAN> &#8212; этот 
+  каталог будет записываться на CD.</FONT> 
+  <LI><FONT size=2><SPAN style="FONT-WEIGHT: bold">initrd/</SPAN> </FONT><FONT 
+  size=2>&#8212; этот каталог содержит файловую систему <SPAN 
+  style="FONT-STYLE: italic">initrd</SPAN>.</FONT> 
+  <LI><FONT style="FONT-WEIGHT: bold" size=2>root/ </FONT><FONT size=2>&#8212; этот 
+  каталог содержит рабочую файловую систему.<BR></FONT></LI></UL>
+
+<h2>Настройка initrd</h2>
+<p>Фаза <i>INITRD</i> имеет простую цель &#8212; получить рабочую файловую систему в <b>/dev/ram1</b>. Есть несколько способов сделать это. Перечислим их попорядку:</p>
+<UL>
+  <LI><FONT size=2>Использовать небольшой shell скрипт (<SPAN 
+  style="FONT-WEIGHT: bold">ash</SPAN>) для монтирования CD, разворачивания 
+  (<SPAN style="FONT-WEIGHT: bold">gunzip</SPAN>) файла <SPAN 
+  style="FONT-WEIGHT: bold">rootfs.gz</SPAN> в <SPAN 
+  style="FONT-WEIGHT: bold">/dev/ram1</SPAN>. Такой подход требует наличия <SPAN 
+  style="FONT-STYLE: italic">libc</SPAN>, что увеличивает размер <SPAN 
+  style="FONT-WEIGHT: bold">initrd.gz</SPAN> до 600 KB. Это самый прямой подход. 
+  [<A 
+  href="http://www.geocities.com/potato.geo/linuxrc-shell.html">ссылка</A>]<BR></FONT>
+  <LI><FONT size=2>Использовать программу <SPAN 
+  style="FONT-WEIGHT: bold">linuxrc</SPAN> написанную на i386 ассемблере 
+  выполняющую аналогичные действия, за исключением использования другого 
+  алгоритма компрессии, т.к. <SPAN style="FONT-WEIGHT: bold">gunzip</SPAN> 
+  слишком сложен для его реализации на ассемблере. Программа будет "весить" 
+  всего 1 KB и не требовать наличия дополнительных библиотек. Файл <SPAN 
+  style="FONT-WEIGHT: bold">initrd.gz</SPAN> будет иметь размер около 10 KB. [<A 
+  href="http://www.geocities.com/potato.geo/linuxrc-asm.html">ссылка</A>]<BR></FONT>
+  <LI><FONT size=2>Использовать программу <SPAN 
+  style="FONT-WEIGHT: bold">linuxrc</SPAN> написанную на C и статически 
+  слинкованную, которая использует для декомпрессии <SPAN 
+  style="FONT-WEIGHT: bold">gunzip.c</SPAN>, и успешно выполняет задачи shell 
+  скрипта. Будучи статически слинкованной с библиотекой <A 
+  href="http://www.fefe.de/dietlibc">dietlibc</A>, программа будет занимать 
+  меньше места, чем в случае динамической линковки с <SPAN 
+  style="FONT-STYLE: italic">libc-2.1.3</SPAN>. Программа будет "весить" 
+  примерно 20 KB, а размер файла <SPAN 
+  style="FONT-WEIGHT: bold">initrd.gz</SPAN> будет 15 KB. [<A 
+  href="http://www.geocities.com/potato.geo/bootcd/linuxrc.c">ссылка</A>]<BR></FONT></LI></UL><FONT 
+size=2>Программа на C является оптимальным выбором, т.к. имеет небольшой размер 
+и использует "стандартный" метод декомпрессии.<BR><BR>Перечислим основные этапы 
+выполняемые программой:<BR></FONT>
+<UL>
+  <LI><FONT style="FONT-FAMILY: arial cyr" size=2>Монтирование <SPAN 
+  style="FONT-WEIGHT: bold">/proc</SPAN>.</FONT> 
+  <LI><FONT style="FONT-FAMILY: arial cyr" size=2>Открываем файл <SPAN 
+  style="FONT-WEIGHT: bold">/proc/ide/ide0/hda/media</SPAN>, если там написано 
+  "cdrom", то значит мы нашли наш CD (хм, а если у меня в машине несколько 
+  CD-драйвов???). В противном случае проверяем <SPAN 
+  style="FONT-WEIGHT: bold">/proc/ide/ide0/hdb/media</SPAN>, </FONT><FONT 
+  style="FONT-FAMILY: arial cyr" size=2><SPAN 
+  style="FONT-WEIGHT: bold">/proc/ide/ide1/hdc/media</SPAN> и </FONT><FONT 
+  style="FONT-FAMILY: arial cyr" size=2><SPAN 
+  style="FONT-WEIGHT: bold">/proc/ide/ide1/hdd/media</SPAN> пока не встретится 
+  первый CD-драйв (о как!). То есть, грузиться мы можем только с этих четырех 
+  IDE CD-драйвов!</FONT> 
+  <LI><FONT style="FONT-FAMILY: arial cyr" size=2>Переходим в каталог <SPAN 
+  style="FONT-WEIGHT: bold">/dev</SPAN> и создаём символическую ссылку <SPAN 
+  style="FONT-WEIGHT: bold">cdrom</SPAN> на найденное устройство.</FONT> 
+  <LI><FONT style="FONT-FAMILY: arial cyr" size=2>Монтируем CD-драйв в каталог 
+  <SPAN style="FONT-WEIGHT: bold">/cdrom</SPAN>.</FONT> 
+  <LI><FONT style="FONT-FAMILY: arial cyr" size=2>Открываем <SPAN 
+  style="FONT-WEIGHT: bold">/cdrom/rootfs.gz</SPAN> и разворачиваем его в <SPAN 
+  style="FONT-WEIGHT: bold">/dev/ram1</SPAN>. В <SPAN 
+  style="FONT-WEIGHT: bold">rootfs.gz</SPAN> должна находиться EXT2 файловая 
+  система размером в 4 MB.</FONT> 
+  <LI><FONT style="FONT-FAMILY: arial cyr" size=2>Монтируем <SPAN 
+  style="FONT-WEIGHT: bold">/dev/ram1</SPAN> в <SPAN 
+  style="FONT-WEIGHT: bold">/ram</SPAN>.</FONT> 
+  <LI><FONT style="FONT-FAMILY: arial cyr" size=2>Переходим в каталог <SPAN 
+  style="FONT-WEIGHT: bold">/ram/dev</SPAN> и создаём символическую ссылку на 
+  устройство с CD-диском.</FONT> 
+  <LI><FONT style="FONT-FAMILY: arial cyr" size=2>Размонтируем <SPAN 
+  style="FONT-WEIGHT: bold">/ram</SPAN>, <SPAN 
+  style="FONT-WEIGHT: bold">/cdrom</SPAN> и <SPAN 
+  style="FONT-WEIGHT: bold">/proc</SPAN>.<BR></FONT></LI></UL><FONT size=2>После 
+этого ядро должно приняться за работу и примонтировать<SPAN 
+style="FONT-WEIGHT: bold"> /dev/ram1</SPAN> как <SPAN 
+style="FONT-WEIGHT: bold">/</SPAN> и попытаться запустить <SPAN 
+style="FONT-WEIGHT: bold">/sbin/init</SPAN>.
+
+<h2>Рабочая корневая файловая система</h2>
+С одной файловой системой <SPAN 
+style="FONT-STYLE: italic">initrd</SPAN> многого не сделаешь. Необходимо создать 
+полезную корневую файловую систему. А так как мы используем RAM диск объёма 4 
+MB, он немного сжатый. Почему бы не использовать RAM диск большего размера? Да 
+просто незачем зря забивать память и надо помнить о пользователях компьютеров с 
+небольшим объёмом оперативной памяти. Возмём библиотеки:<BR></FONT>
+<DIV style="MARGIN-LEFT: 40px"><FONT style="FONT-FAMILY: verdana" 
+size=1>ld-2.1.3.so<BR>ld-linux.so.2 -&gt; ld-2.1.3.so<BR>libbz2.so.1.0 -&gt; 
+libbz2.so.1.0.0<BR>libbz2.so.1.0.0<BR>libc-2.1.3.so<BR>libc.so.6 -&gt; 
+libc-2.1.3.so<BR>libcom_err.so.2 -&gt; 
+libcom_err.so.2.0<BR>libcom_err.so.2.0<BR>libdl-2.1.3.so<BR>libdl.so.2 -&gt; 
+libdl-2.1.3.so<BR>libe2p.so.2 -&gt; 
+libe2p.so.2.3<BR>libe2p.so.2.3<BR>libext2fs.so.2 -&gt; 
+libext2fs.so.2.4<BR>libext2fs.so.2.4<BR>libm-2.1.3.so<BR>libm.so.6 -&gt; 
+libm-2.1.3.so<BR>libncurses.so.5 -&gt; 
+libncurses.so.5.0<BR>libncurses.so.5.0<BR>libtermcap.so.2 -&gt; 
+libtermcap.so.2.0.8<BR>libtermcap.so.2.0.8<BR>libuuid.so.1 -&gt; 
+libuuid.so.1.2<BR>libuuid.so.1.2</FONT><BR></DIV><BR><FONT size=2><SPAN 
+style="FONT-FAMILY: arial cyr">Не все из них нужны для старта операционной 
+системы. В католеге <SPAN style="FONT-WEIGHT: bold">/bin</SPAN> находятся 
+необходимые утилиты. Также создан скрипт <SPAN 
+style="FONT-WEIGHT: bold">/sbin/init</SPAN>. В каталоге <SPAN 
+style="FONT-WEIGHT: bold">/etc</SPAN> находятся файлы <SPAN 
+style="FONT-WEIGHT: bold">inittab</SPAN> и <SPAN 
+style="FONT-WEIGHT: bold">termcap</SPAN>, а также каталог <SPAN 
+style="FONT-WEIGHT: bold">rc.d</SPAN>, в котором находится скрипт <SPAN 
+style="FONT-WEIGHT: bold">rc.S</SPAN> используемый для запуска операционной 
+системы. Приведём ключевую часть файла <SPAN 
+style="FONT-WEIGHT: bold">inittab</SPAN>:<BR><BR></SPAN></FONT>
+<DIV style="MARGIN-LEFT: 40px"><FONT style="COLOR: rgb(102,0,0)" size=2><SPAN 
+style="FONT-FAMILY: arial cyr">id:1:initdefault:<BR>si::sysinit:/etc/rc.d/rc.S<BR>c1:1235:respawn:/bin/sulogin 
+/dev/tty1<BR></SPAN></FONT></DIV><FONT size=2><SPAN 
+style="FONT-FAMILY: arial cyr"><BR>Использование <SPAN 
+style="FONT-WEIGHT: bold">sulogin</SPAN> для консоли приводит к тому, что 
+пользователь попадает в административный режим.<BR><BR>Файл <SPAN 
+style="FONT-WEIGHT: bold">/etc/fstab</SPAN> выглядит следующим 
+образом:<BR><BR></SPAN></FONT>
+<DIV style="MARGIN-LEFT: 40px"><FONT style="COLOR: rgb(102,0,0)" size=2><SPAN 
+style="FONT-FAMILY: arial cyr">/dev/ram1&nbsp;&nbsp; &nbsp;&nbsp; /&nbsp;&nbsp; 
+&nbsp;&nbsp; &nbsp;&nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; ext2&nbsp;&nbsp; 
+&nbsp;&nbsp; &nbsp;&nbsp; &nbsp;&nbsp; defaults&nbsp;&nbsp; &nbsp;&nbsp; 
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; 
+1&nbsp;&nbsp; 1<BR>none&nbsp;&nbsp; &nbsp;&nbsp; &nbsp;&nbsp; &nbsp;&nbsp; 
+&nbsp;&nbsp; /dev/pts&nbsp;&nbsp; devpts&nbsp;&nbsp; &nbsp;&nbsp; &nbsp;&nbsp; 
+gid=5,mode=620&nbsp;&nbsp; &nbsp;&nbsp; 0&nbsp;&nbsp; 0<BR>none&nbsp;&nbsp; 
+&nbsp;&nbsp; &nbsp;&nbsp; &nbsp;&nbsp; &nbsp;&nbsp; /proc&nbsp;&nbsp; 
+&nbsp;&nbsp; &nbsp;&nbsp; proc&nbsp;&nbsp; &nbsp;&nbsp; &nbsp;&nbsp; 
+&nbsp;&nbsp; defaults&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; 
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; 0&nbsp;&nbsp; 
+0<BR></SPAN></FONT></DIV><FONT size=2><SPAN 
+style="FONT-FAMILY: arial cyr"><BR>Также присутствует пустой каталог <SPAN 
+style="FONT-WEIGHT: bold">/initrd</SPAN>, который указывает, что фаза <SPAN 
+style="FONT-STYLE: italic">INITRD</SPAN> завершена и рабочая корневая файловая 
+система на <SPAN style="FONT-WEIGHT: bold">/dev/ram1</SPAN> примонтирована, 
+файловая система <SPAN style="FONT-STYLE: italic">initrd</SPAN> (находящаяся на 
+<SPAN style="FONT-WEIGHT: bold">/dev/ram0</SPAN>) удалена из <SPAN 
+style="FONT-WEIGHT: bold">/initrd</SPAN>. Это означает, что мы можем 
+размонтировать её и освободить память используемую RAM диском.<BR><BR>Посмотрим 
+внутренности скрипта <SPAN 
+style="FONT-WEIGHT: bold">rc.S</SPAN>:<BR><BR></SPAN></FONT>
+<DIV style="MARGIN-LEFT: 40px"><FONT style="COLOR: rgb(102,0,0)" size=2><SPAN 
+style="FONT-FAMILY: arial cyr">#!/bin/sh<BR>PATH=/bin; export PATH<BR>echo 
+"System init"<BR>mount -t proc none /proc<BR>mount -o remount,rw /<BR>echo "Find 
+the extras on the CD and mount it"<BR>if [ -r /dev/cdrom ] ; 
+then<BR>&nbsp;&nbsp;&nbsp; mount -t iso9660 /dev/cdrom 
+/cdrom<BR>&nbsp;&nbsp;&nbsp; mount /dev/hda9 /a<BR>fi<BR>cd /<BR>umount 
+/initrd<BR>freeramdisk /dev/ram0<BR></SPAN></FONT></DIV><FONT size=2><SPAN 
+style="FONT-FAMILY: arial cyr"><BR>Сначала мы монтируем <SPAN 
+style="FONT-WEIGHT: bold">/proc</SPAN>, а затем перемонтируем <SPAN 
+style="FONT-WEIGHT: bold">/</SPAN> в режиме записи (мы имеем правильную запись о 
+<SPAN style="FONT-WEIGHT: bold">/</SPAN> в <SPAN 
+style="FONT-WEIGHT: bold">/etc/fstab</SPAN>). Проверяем наличие устройства <SPAN 
+style="FONT-WEIGHT: bold">/dev/cdrom</SPAN> (оно должно было быть создано в фазе 
+<SPAN style="FONT-STYLE: italic">INITRD</SPAN>) и монтируем его. В рабочей 
+файловой системе сделана символическая ссылка из <SPAN 
+style="FONT-WEIGHT: bold">/usr</SPAN> в <SPAN 
+style="FONT-WEIGHT: bold">/cdrom/usr</SPAN>. Таким образом, дополнительное 
+программное обеспечение можно хранить в этом каталоге на CD-диске. В тестовых 
+целях был примонтирован раздел жёсткого диска в каталог <SPAN 
+style="FONT-WEIGHT: bold">/a</SPAN>.<BR><BR>
+
+<h2>Создание CD</h2>
+Теперь у нас есть ядро, структуры файловых систем <SPAN 
+style="FONT-STYLE: italic">initrd</SPAN> и <SPAN 
+style="FONT-STYLE: italic">rootfs</SPAN>. Как же их записать на CD-диск? 
+Рассмотрим простейшую структуру каталогов на CD-диске:<BR><BR></SPAN></FONT>
+<DIV style="MARGIN-LEFT: 40px"><FONT style="COLOR: rgb(102,0,0)" 
+size=2>/rootfs.gz<BR>/isolinux/<BR>&nbsp;&nbsp;&nbsp; isolinux.cfg&nbsp;&nbsp; 
+&nbsp;&nbsp; &nbsp;&nbsp; &nbsp;&nbsp; &nbsp;&nbsp; &nbsp;&nbsp; - 
+конфигурационный файл<BR>&nbsp;&nbsp;&nbsp; isolinux.bin&nbsp;&nbsp; 
+&nbsp;&nbsp; &nbsp;&nbsp; &nbsp;&nbsp; &nbsp;&nbsp; &nbsp;&nbsp; - 
+загрузчик<BR>&nbsp;&nbsp;&nbsp; vmlinuz&nbsp;&nbsp; &nbsp;&nbsp; &nbsp;&nbsp; 
+&nbsp;&nbsp; &nbsp;&nbsp; &nbsp;&nbsp; &nbsp;&nbsp; &nbsp;&nbsp; - ядро с 
+поддержкой initrd<BR>&nbsp;&nbsp;&nbsp; initrd.gz&nbsp;&nbsp; &nbsp;&nbsp; 
+&nbsp;&nbsp; &nbsp;&nbsp; &nbsp;&nbsp; &nbsp;&nbsp; &nbsp;&nbsp; &nbsp;&nbsp; - 
+стартовая файловая система<BR></FONT></DIV><FONT size=2><SPAN 
+style="FONT-FAMILY: arial cyr"><BR>Рассмотрим файл <SPAN 
+style="FONT-WEIGHT: bold">isolinux.cfg</SPAN>:<BR><BR></SPAN></FONT>
+<DIV style="MARGIN-LEFT: 40px"><FONT style="COLOR: rgb(102,0,0)" size=2>label 
+linux<BR>&nbsp;&nbsp;&nbsp; kernel vmlinuz<BR>&nbsp;&nbsp;&nbsp; append 
+initrd=initrd.gz<BR></FONT></DIV><FONT size=2><SPAN 
+style="FONT-FAMILY: arial cyr"><BR>Очень похоже на конфигурационный файл LILO. 
+Важными элементами данного файла являются имя ядра и строка с именем стартовой 
+файловой системы. То, что файл со стартовой файловой системой сжат не имеет 
+значение, т.к. ядро впоследствии само распакует его.<BR><BR>А что насчёт <SPAN 
+style="FONT-STYLE: italic">initrd</SPAN> и <SPAN 
+style="FONT-STYLE: italic">rootfs</SPAN>? Обе системы EXT2 размером в 4 MB 
+являются сжатыми файлами. Ниже приведён скрипт для их 
+создания:<BR><BR></SPAN></FONT>
+<DIV style="MARGIN-LEFT: 40px"><FONT style="COLOR: rgb(102,0,0)" 
+size=2>BASE=/src/iso<BR>SRC=$BASE/initrd<BR>$DEST=$BASE/cdimage/isolinux/initrd<BR>dd 
+if=/dev/zero of=$DEST bs=1k count=4096<BR>/sbin/losetup /dev/loop1 $DEST<BR>mkfs 
+-t ext2 -m 0 /dev/loop1<BR>mount /dev/loop1 /mnt<BR>cd $SRC<BR>tar cf - . | (cd 
+/mnt ; tar xf -)<BR>umount /mnt<BR>/sbin/losetup -d /dev/loop1<BR>gzip -f 
+$DEST<BR></FONT></DIV><FONT size=2><SPAN style="FONT-FAMILY: arial cyr"><BR>Для 
+записи болванки следует показанное выше дерево каталогов в <SPAN 
+style="FONT-WEIGHT: bold">/src/iso/cdimage</SPAN> собрать в образ 
+диска:<BR><BR></SPAN></FONT>
+<DIV style="MARGIN-LEFT: 40px"><FONT style="COLOR: rgb(102,0,0)" size=2>mkisofs 
+-o /iso.img -b isolinux/isolinux.bin -c isolinux/boot.cat 
+\<BR>&nbsp;&nbsp;&nbsp; -no-emul-boot -boot-load-size 4 -boot-info-table -l 
+\<BR>&nbsp;&nbsp;&nbsp; -R -r /src/iso/cdimage<BR></FONT></DIV><FONT 
+size=2><SPAN style="FONT-FAMILY: arial cyr"><BR>Файл <SPAN 
+style="FONT-WEIGHT: bold">boot.cat</SPAN> будет создан в результате выполнения 
+этой команды. Опции <SPAN style="FONT-WEIGHT: bold">-l</SPAN>, <SPAN 
+style="FONT-WEIGHT: bold">-R</SPAN> и <SPAN style="FONT-WEIGHT: bold">-r</SPAN> 
+нужны для расширения RockRidge (см. CD-Writing HowTo), которое позволяет 
+использовать на CD-диске символические ссылки и имена со строчными и прописными 
+буквами. Полученный файл следует записать на CD-диск с помощью <SPAN 
+style="FONT-WEIGHT: bold">cdrecord</SPAN> (оставим это в качестве домашнего 
+задания :). А продвинутые пользователи могут протестить получившийся дистрибутив 
+с помощью vmWare.<BR><BR>
+
+<h2>Основа для дальнейшего усовершенствования</h2>
+Как же добавить особенную, необходимую только 
+вам, функциональность к данному дистрибутиву? Как было упомянуто выше, каталог 
+<SPAN style="FONT-WEIGHT: bold">/usr</SPAN> является символической ссылкой на на 
+каталог /usr на CD-диске. Используйте эту возможность!<BR><BR>
+
+<h2>Использование FrameBuffer</h2>Приятно иметь графическую среду 
+во время загрузки с CD. Для достижения максимальной совместимости следует 
+активировать режим <SPAN style="FONT-STYLE: italic">FrameBuffer</SPAN> для 
+консоли и использовать X-сервер XF86_FBDev. Следует отметить, что <SPAN 
+style="FONT-STYLE: italic">FrameBuffer</SPAN> работает на видеокартах, которые 
+имеют поддержку VESA 2.0, для более старых следует использовать простую консоль. 
+Ниже приведены настройки ядра для активации <SPAN 
+style="FONT-STYLE: italic">FrameBuffer</SPAN>.<BR><BR></SPAN></FONT>
+<DIV style="MARGIN-LEFT: 40px"><FONT style="COLOR: rgb(102,0,0)" size=2>[*] VGA 
+text console<BR>[*] Video mode selection support<BR>[*] Support for frame buffer 
+devices (EXPERIMENTAL)<BR>[*] VESA VGA graphics console<BR>[*] Advanced low 
+level driver options<BR>&nbsp;&nbsp;&nbsp; &lt;*&gt; 8 bpp packet pixels 
+support<BR></FONT><FONT style="COLOR: rgb(102,0,0)" size=2>&nbsp;&nbsp;&nbsp; 
+&lt;*&gt; 16 bpp packet pixels support<BR></FONT><FONT 
+style="COLOR: rgb(102,0,0)" size=2>&nbsp;&nbsp;&nbsp; &lt;*&gt; 24 bpp packet 
+pixels support<BR></FONT><FONT style="COLOR: rgb(102,0,0)" 
+size=2>&nbsp;&nbsp;&nbsp; &lt;*&gt; 32 bpp packet pixels 
+support<BR>&nbsp;&nbsp;&nbsp; &lt;*&gt; VGA character/attributes support<BR>[*] 
+Select compiled-in fonts<BR>&nbsp;&nbsp;&nbsp; [*] VGA 8x8 
+font<BR>&nbsp;&nbsp;&nbsp; [*] VGA 8x16 font<BR></FONT></DIV><FONT size=2><SPAN 
+style="FONT-FAMILY: arial cyr"><BR>Теперь следует указать правильный графический 
+режим, который будет использоваться X-сервером. Для этого небходимо указать 
+специфическую опцию для ядра. Таким образом, необходимо внести изменения в файл 
+<SPAN 
+style="FONT-WEIGHT: bold">isolinux/isolinux.cfg</SPAN>:<BR><BR></SPAN></FONT>
+<DIV style="MARGIN-LEFT: 40px"><FONT style="COLOR: rgb(102,0,0)" size=2>label 
+linux<BR>&nbsp;&nbsp;&nbsp; kernel vmlinux<BR>&nbsp;&nbsp;&nbsp; append 
+initrd=initrd.gz vga=791</FONT><BR></DIV><FONT size=2><SPAN 
+style="FONT-FAMILY: arial cyr"><BR>Загадочное число "791" обозначает графический 
+режим 1024x768x16bit. Но такое жёсткое указание видеорежима не подойдет для всех 
+случаев. Надо позволить пользователю выбирать требуемый графический режим. 
+Перепишем </SPAN></FONT><FONT size=2><SPAN style="FONT-FAMILY: arial cyr"><SPAN 
+style="FONT-WEIGHT: bold">isolinux/isolinux.cfg</SPAN>:<BR><BR></SPAN></FONT>
+<DIV style="MARGIN-LEFT: 40px"><FONT style="COLOR: rgb(102,0,0)" size=2>timeout 
+30<BR>prompt 1<BR>display menu.txt<BR>default 1<BR><BR>label 
+1<BR>&nbsp;&nbsp;&nbsp; kernel vmlinuz<BR>&nbsp;&nbsp;&nbsp; append 
+initrd=initrd.gz<BR><BR></FONT><FONT style="COLOR: rgb(102,0,0)" size=2>label 
+2<BR>&nbsp;&nbsp;&nbsp; kernel vmlinuz<BR>&nbsp;&nbsp;&nbsp; append 
+initrd=initrd.gz vga=788<BR></FONT><FONT size=2><SPAN 
+style="FONT-FAMILY: arial cyr"><BR></SPAN></FONT><FONT 
+style="COLOR: rgb(102,0,0)" size=2>label 3<BR>&nbsp;&nbsp;&nbsp; kernel 
+vmlinuz<BR>&nbsp;&nbsp;&nbsp; append initrd=initrd.gz 
+vga=791</FONT><BR></DIV><FONT size=2><SPAN 
+style="FONT-FAMILY: arial cyr"><BR>Файл menu.txt содержит 
+следующее:<BR><BR></SPAN></FONT>
+<DIV style="MARGIN-LEFT: 40px"><FONT style="COLOR: rgb(102,0,0)" size=2>1) Text 
+Mode<BR>2) 800x600 x 16bit colour<BR>3) 1024x768 x 16bit 
+colour<BR></FONT></DIV><FONT size=2><SPAN 
+style="FONT-FAMILY: arial cyr"><BR>Описано вроде всё. Теперь приступаем к 
+созданию собственного дистрибутива...</p>
+
+<!--#include virtual="../template4"-->

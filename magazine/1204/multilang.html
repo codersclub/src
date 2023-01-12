@@ -1,0 +1,85 @@
+<!--#include virtual="../template1"-->Многоязыковое приложение<!--#include virtual="../template2"-->
+<!--#include virtual="./menu"-->
+<!--#include virtual="../template3"-->
+
+<h1 align=center>Многоязыковое приложение</h1>
+
+<b>Автор:</b> <a href="http://forum.sources.ru/index.php?showuser=9761" target="_blank"><i>miksayer</i></a>
+
+<p>Итак, вы написал офигенную программу и решили ее перевести на другие языки, чтобы буржуи тоже знали про вашу программу. Конечно, можно менять надписи на меню и кнопках вручную, но в этом есть несколько недостатков:</p>
+<ol>
+<li>Программа будет переведена только на те языки, на которые вы ее сами перевели
+<li>Программа будет иметь больший размер
+</ol>
+<p>В таком случае лучше сделать так, чтобы юзер сам мог добавлять и изменять языки программы. Это легко сделать загружая все надписи из INI-файлов.  Для этого нам понадобится модуль для чтения/записи INI-файлов:</p>
+<div class=code>
+Public Declare Function WritePrivateProfileString Lib "kernel32" Alias "WritePrivateProfileStringA" _<br>
+(ByVal lpApplicationName As String, ByVal lpKeyName As Any, ByVal lpString As Any, ByVal lpFileName As String) As Long<br>
+Public Declare Function GetPrivateProfileString Lib "kernel32" Alias "GetPrivateProfileStringA" (ByVal lpApplicationName As String, ByVal lpKeyName As Any, ByVal lpDefault As String, ByVal lpReturnedString As String, ByVal nSize As Long, ByVal lpFileName As String) As Long<br>
+<br>
+Function WriteINI(sSection As String, sKeyName As String, sNewString As String, sINIFileName As String) As Boolean <br>
+On Local Error Resume Next <br>
+Call WritePrivateProfileString(sSection, sKeyName, sNewString, sINIFileName) <br>
+WriteINI = (Err.Number = 0) <br>
+End Function<br>
+<br>
+Function ReadINI(sSection As String, sKeyName As String, sINIFileName As String) As String <br>
+On Local Error Resume Next <br>
+Dim sRet As String <br>
+sRet = String(255, Chr(0)) <br>
+ReadINI = Left(sRet, GetPrivateProfileString(sSection, ByVal sKeyName, "", sRet, Len(sRet), sINIFileName)) <br>
+End Function
+</div>
+
+<p>Теперь давайте напишем специальную функцию, которая читала бы INI-файлы и изменяла надписи на контролах. Киньте на форму пару кнопок. А вот и сама функция:</p>
+<div class=code>
+Public Function LoadLanguage(lang As String)<br>
+' читаем надпись для первой кнопки<br>
+Dim com1 As String<br>
+com1=ReadINI("MAIN", "Com1", lang)<br>
+Form1.Command1.Caption = com1 <br>
+' читаем надпись для второй кнопки<br>
+Dim com2 As String<br>
+com2=ReadINI("MAIN", "Com2", lang)<br>
+Form1.Command2.Caption = com2<br>
+End Function<br>
+</div>
+
+<p>И создайте в папке с нашей программой файл lang.ini с таким текстом:</p>
+<div class=code>
+[MAIN]<br>
+Com1=Sources.RU<br>
+Com2=Исходники.РУ<br>
+</div>
+
+<p>Теперь в событии Form_Load пишем:</p>
+<div class=code>
+Private Sub Form_Load()<br>
+Call LoadLanguage(App.Path & "\lang.ini")<br>
+End Sub<br>
+</div>
+
+<p>При загрузке формы надписи на кнопках должны поменяться на "Sources.RU" и "Исходники.РУ". Теперь давайте сделаем так, чтобы юзер мог выбрать языки в меню. Для этого добавьте меню mnuLanguage и mnuLang(Index=0). А теперь добавьте  FileListBox(Pattern=.ini). Далее пишем код:</p>
+<div class=code>
+Private Sub Form_Load()<br>
+On Error Resume Next<br>
+File1.Path=App.Path & "\language"<br>
+For i=0 To File.ListCount-1<br>
+Load mnuLang(i)<br>
+mnuLang(i).Caption=File1.List(i)<br>
+Next<br>
+End Sub<br>
+</div>
+
+<p>А событие нажатия на меню:</p>
+<div class=code>
+Private Sub mnuLang(Index As Integer)<br>
+Call LoadLanguage(App.Path & "\" & mnuLang(Index).Caption)<br>
+End Sub<br>
+</div>
+
+<p>Вот и все! Теперь вы можете без проблем создать многоязыковое приложение.</p>
+
+<p style="text-align:right;">С уважением, miksayer</p>
+
+<!--#include virtual="../template4"-->

@@ -1,0 +1,334 @@
+<!--#include virtual="../template1"-->Microsoft Speech API &#8212; Синтез речи<!--#include virtual="../template2"-->
+<!--#include virtual="./menu"-->
+<!--#include virtual="../template3"-->
+
+<h1 align=center>Microsoft Speech API &#8212; Синтез речи</h1>
+
+<b>Автор:</b> <a href="http://forum.sources.ru/index.php?showuser=1375" target="_blank"><i>RaD</i></a>
+
+<h2>Введение</h2>
+<p>Наверное, уже все слышали о Microsoft Speech API, многие пользовались программами написанными для данной библиотеки и совсем небольшое количество смогли написать свои программы, которые хоть как-то использовали возможности синтеза речи. Почти два года назад я начал изучение возможности библиотеки в области синтеза речи, скачал в сети синтезаторы русской речи компании Lernout&amp;Hauspie и Digalo (для последней мой друзья подогнали лекарство от жадности :). Синтезатор английской речи поставляются в MS Speech API SDK.</p>
+<p>MS Speech API предствляет собой набор COM-объектов, взаимодействуя с которыми можно научить свою программу как распознавать, так и синтезировать речь. В данном документе мы будем касаться только синтеза речи.</p>
+<p>Хоть во многих умных книжках пишут, что использование технологии COM значительно сокращает время разработки программ, я с этим не согласен. Работать просто, но вот пока разберёшься уйдёт достаточно много времени. Поэтому я решил написать класс, который всю работу с COM объектами будет делать за меня. Класс неоднократно использовался в моих программах с синтезатором русской речи компании Lernout&amp;Hauspie.</p>
+
+<h2>Заголовочный файл</h2>
+<P align=justify><FONT face="Arial Cyr" size=2>Заголовочный файл модуля синтеза 
+речи с помощью MS Speech API:</FONT></P>
+<P align=left><FONT face="Arial CYR"><pre class=code><FONT color=darkred>// 
+voicetext.h<BR>//---------------------------------------------------------------------------<BR>// 
+2001 Ruslan Popov aka RaD / </FONT><A href="mailto:rad@kmc.ru"><FONT 
+color=darkred>rad@kmc.ru</FONT></A><BR><FONT color=darkred>//&nbsp;&nbsp;&nbsp; 
+Модуль синтеза речи с помощью MS Speech API.<BR></FONT></pre></FONT><FONT 
+face="Arial CYR" color=darkred><pre class=code>//&nbsp;&nbsp;&nbsp; Использование модуля 
+разрешено только в некоммерческих проектах<BR>//&nbsp;&nbsp;&nbsp;&nbsp;при 
+сохранении данного комментария.<BR>//&nbsp;&nbsp;&nbsp;&nbsp;Если вы что-то 
+добавите в этот класс, пришлите изменения мне.</pre></FONT><FONT 
+face="Arial CYR"><pre class=code><BR><FONT 
+color=darkred>//---------------------------------------------------------------------------<BR>#ifndef 
+VoiceTextH<BR>#define 
+VoiceTextH<BR>//---------------------------------------------------------------------------<BR>#include 
+&lt;mmsystem.h&gt;<BR>#include &lt;initguid.h&gt;<BR>#include 
+&lt;objbase.h&gt;<BR>#include &lt;objerror.h&gt;<BR>#include 
+&lt;ole2ver.h&gt;<BR>#include &lt;speech.h&gt;<BR></FONT></pre></FONT><FONT 
+face="Arial CYR"><pre class=code><FONT 
+color=darkred>//---------------------------------------------------------------------------<BR>#include 
+&lt;Registry.hpp&gt;<REGISTRY.HPP>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+// To work with system registry<BR>#include 
+&lt;shellapi.h&gt;<SHELLAPI.H>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+// To work with system 
+shell<BR>//---------------------------------------------------------------------------<BR>typedef 
+void __fastcall (__closure *VoiceTextOnBookMark)<BR>&nbsp;&nbsp;&nbsp; 
+(System::TObject* Sender, QWORD qTimeStamp, DWORD dwMarkNum);<BR>typedef void 
+__fastcall (__closure *VoiceTextOnTextDone)<BR>&nbsp;&nbsp;&nbsp; 
+(System::TObject* Sender, QWORD qTimeStamp, DWORD dwFlags);<BR>typedef void 
+__fastcall (__closure *VoiceTextOnTextStart)<BR>&nbsp;&nbsp;&nbsp; 
+(System::TObject* Sender, QWORD qTimeStamp);<BR>typedef void __fastcall 
+(__closure *VoiceTextOnWordPosition)<BR>&nbsp;&nbsp;&nbsp; (System::TObject* 
+Sender, QWORD qTimeStamp, DWORD 
+dwByteOffset);<BR>//---------------------------------------------------------------------------<BR>class 
+CBufNotify;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+// Forward 
+declaration<BR>//---------------------------------------------------------------------------<BR>class 
+VoiceText<BR>{<BR>private:<BR>&nbsp;&nbsp;&nbsp; 
+bool&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; IsPaused;<BR>&nbsp;&nbsp;&nbsp; 
+TRegistry* 
+Reg;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+// Pointer to system registry<BR>&nbsp;&nbsp;&nbsp; AnsiString 
+AppKey;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+// Name of the key in system registry<BR>protected:<BR>&nbsp;&nbsp;&nbsp; 
+PITTSCENTRAL 
+TTS_Central;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // 
+ISRCentral interface to TTS engine<BR>&nbsp;&nbsp;&nbsp; PITTSDIALOGS 
+TTS_Dialog;<BR>&nbsp;&nbsp;&nbsp; TTSMODEINFO&nbsp; 
+ModeInfo;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+// Desired mode<BR>&nbsp;&nbsp;&nbsp; CBufNotify*&nbsp; 
+MyNotify;<BR>//---------------------------------------------------------------------------<BR>&nbsp;&nbsp;&nbsp; 
+PITTSCENTRAL __fastcall FindAndSelect(PTTSMODEINFO 
+pTTSInfo);<BR>&nbsp;&nbsp;&nbsp; 
+bool&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__fastcall 
+BeginOLE(void);<BR>&nbsp;&nbsp;&nbsp; 
+bool&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__fastcall 
+EndOLE(void);<BR>//---------------------------------------------------------------------------<BR>&nbsp;&nbsp;&nbsp; 
+// Notification functions<BR>&nbsp;&nbsp;&nbsp; 
+VoiceTextOnBookMark&nbsp;&nbsp;&nbsp;&nbsp; FOnBookMark;<BR>&nbsp;&nbsp;&nbsp; 
+VoiceTextOnTextDone&nbsp;&nbsp;&nbsp;&nbsp; FOnTextDone;<BR>&nbsp;&nbsp;&nbsp; 
+VoiceTextOnTextStart&nbsp;&nbsp;&nbsp; FOnTextStart;<BR>&nbsp;&nbsp;&nbsp; 
+VoiceTextOnWordPosition 
+FOnWordPosition;<BR>//---------------------------------------------------------------------------<BR>&nbsp;&nbsp;&nbsp; 
+void __fastcall EngineInit(LANGID Language, WORD Gender);<BR>&nbsp;&nbsp;&nbsp; 
+void __fastcall EngineTerm(void);<BR>public:<BR>&nbsp;&nbsp;&nbsp; __fastcall 
+VoiceText(void);<BR>&nbsp;&nbsp;&nbsp; __fastcall VoiceText(AnsiString Key, 
+LANGID Language, WORD Gender);<BR>&nbsp;&nbsp;&nbsp; __fastcall 
+~VoiceText(void);<BR>&nbsp;&nbsp;&nbsp; void __fastcall Speak(AnsiString 
+Text);<BR>&nbsp;&nbsp;&nbsp; void __fastcall Pause(void);<BR>&nbsp;&nbsp;&nbsp; 
+void __fastcall Resume(void);<BR>&nbsp;&nbsp;&nbsp; void __fastcall 
+Reset(void);<BR>&nbsp;&nbsp;&nbsp; void __fastcall 
+GeneralDlg(void);<BR>&nbsp;&nbsp;&nbsp; void __fastcall 
+AboutDlg(void);<BR>&nbsp;&nbsp;&nbsp; void __fastcall 
+LexiconDlg(void);<BR>&nbsp;&nbsp;&nbsp; void __fastcall 
+TranslateDlg(void);<BR>&nbsp;&nbsp;&nbsp; void __fastcall ChangeEngine(LANGID 
+Language, WORD Gender);<BR>&nbsp;&nbsp;&nbsp; TTSMODEINFO __fastcall 
+LoadState(void);<BR>&nbsp;&nbsp;&nbsp; void __fastcall 
+SaveState(void);<BR>&nbsp;&nbsp;&nbsp; bool __fastcall GetIsPause(void) { return 
+IsPaused; };<BR>//__published:<BR>&nbsp;&nbsp;&nbsp; __property 
+VoiceTextOnBookMark OnBookMark =<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; { 
+read = FOnBookMark, write = FOnBookMark };<BR>&nbsp;&nbsp;&nbsp; __property 
+VoiceTextOnTextDone OnTextDone =<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; { 
+read = FOnTextDone, write = FOnTextDone };<BR>&nbsp;&nbsp;&nbsp; __property 
+VoiceTextOnTextStart OnTextStart =<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+{ read = FOnTextStart, write = FOnTextStart };<BR>&nbsp;&nbsp;&nbsp; __property 
+VoiceTextOnWordPosition OnWordPosition 
+=<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; { read = FOnWordPosition, write 
+= FOnWordPosition 
+};<BR>};<BR>//---------------------------------------------------------------------------<BR>class 
+CBufNotify : public ITTSBufNotifySink<BR>{<BR>private:<BR>// TSapiTTSOnTextDone 
+MyOnTextDone;<BR>public:<BR>&nbsp;&nbsp;&nbsp; 
+CBufNotify(void);<BR>&nbsp;&nbsp;&nbsp; ~CBufNotify(void);<BR>&nbsp;&nbsp;&nbsp; 
+// IUnknown members<BR>&nbsp;&nbsp;&nbsp; 
+STDMETHODIMP&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; QueryInterface 
+(REFIID, LPVOID FAR *);<BR>&nbsp;&nbsp;&nbsp; STDMETHODIMP_(ULONG) 
+AddRef(void);<BR>&nbsp;&nbsp;&nbsp; STDMETHODIMP_(ULONG) 
+Release(void);<BR>&nbsp;&nbsp;&nbsp; // ITTSNotifySink<BR>&nbsp;&nbsp;&nbsp; 
+STDMETHOD (BookMark)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (QWORD, 
+DWORD);<BR>&nbsp;&nbsp;&nbsp; STDMETHOD (TextDataDone)&nbsp;&nbsp;&nbsp; (QWORD, 
+DWORD);<BR>&nbsp;&nbsp;&nbsp; STDMETHOD (TextDataStarted) 
+(QWORD);<BR>&nbsp;&nbsp;&nbsp; STDMETHOD (WordPosition)&nbsp;&nbsp;&nbsp; 
+(QWORD, DWORD);<BR>&nbsp;&nbsp;&nbsp; // Main class<BR>&nbsp;&nbsp;&nbsp; 
+VoiceText* 
+VoiceText;<BR>};<BR>//---------------------------------------------------------------------------<BR>#endif<BR>//---------------------------------------------------------------------------</FONT></pre></FONT></P>
+
+<h2>Исходный код</h2>
+<P align=justify><FONT face="Arial CYR" size=2>Исходный код модуля сопряжения 
+синтеза речи с помощью MS Speech API:</FONT></P>
+<P align=left><FONT face="Courier New CYR"><pre class=code><FONT color=darkred size=2>// 
+voicetext.cpp<BR>//---------------------------------------------------------------------------<BR></FONT><FONT 
+face="Arial CYR"><pre class=code><FONT color=darkred>// 2001 Ruslan Popov aka RaD / 
+</FONT><A href="mailto:rad@kmc.ru"><FONT 
+color=darkred>rad@kmc.ru</FONT></A><BR><FONT color=darkred>//&nbsp;&nbsp;&nbsp; 
+Модуль синтеза речи с помощью MS Speech API.<BR>//&nbsp;&nbsp;&nbsp; 
+Использование модуля разрешено только в некоммерческих 
+проектах<BR>//&nbsp;&nbsp;&nbsp;&nbsp;при сохранении данного 
+комментария.<BR>//&nbsp;&nbsp;&nbsp;&nbsp;Если вы что-то добавите в этот класс, 
+пришлите изменения мне.<BR></FONT></pre></FONT><FONT color=darkred 
+size=2>//---------------------------------------------------------------------------<BR>#include 
+<VCL.H><VCL.H><BR>#pragma hdrstop<BR>#include 
+"VoiceText.h"<BR>//---------------------------------------------------------------------------<BR>#pragma 
+package(smart_init)<BR>//---------------------------------------------------------------------------<BR>__fastcall 
+VoiceText::VoiceText(void)<BR>{<BR>&nbsp;&nbsp;&nbsp; // Work with system 
+registry<BR>&nbsp;&nbsp;&nbsp; AppKey = "</FONT><A 
+href="file://SOFTWARE//RaD//VoiceText"><FONT color=darkred 
+size=2>\\SOFTWARE\\RaD\\VoiceText</FONT></A><FONT color=darkred 
+size=2>";<BR>&nbsp;&nbsp;&nbsp; EngineInit(LANG_RUSSIAN, 
+GENDER_MALE);<BR>}<BR>//---------------------------------------------------------------------------<BR>__fastcall 
+VoiceText::VoiceText(AnsiString Key, LANGID Language, WORD 
+Gender)<BR>{<BR>&nbsp;&nbsp;&nbsp; // Work with system 
+registry<BR>&nbsp;&nbsp;&nbsp; AppKey = "</FONT><A 
+href="file://SOFTWARE//RaD//"><FONT color=darkred 
+size=2>\\SOFTWARE\\RaD\\</FONT></A><FONT color=darkred size=2>" + 
+Key;<BR>&nbsp;&nbsp;&nbsp; EngineInit(Language, 
+Gender);<BR>}<BR>//---------------------------------------------------------------------------<BR>__fastcall 
+VoiceText::~VoiceText(void)<BR>{<BR>&nbsp;&nbsp;&nbsp; 
+SaveState();<BR>&nbsp;&nbsp;&nbsp; 
+EngineTerm();<BR>}<BR>//---------------------------------------------------------------------------<BR>void 
+__fastcall VoiceText::EngineInit(LANGID Language, WORD 
+Gender)<BR>{<BR>&nbsp;&nbsp;&nbsp; IsPaused = false;<BR>&nbsp;&nbsp;&nbsp; Reg = 
+new TRegistry();<BR>&nbsp;&nbsp;&nbsp; Reg-&gt;RootKey = 
+HKEY_CURRENT_USER;<BR>&nbsp;&nbsp;&nbsp; Reg-&gt;LazyWrite = 
+false;<BR>&nbsp;&nbsp;&nbsp; if (!BeginOLE())<BR>&nbsp;&nbsp;&nbsp;&nbsp;{ 
+MessageBox(NULL, "Can not open OLE.", NULL, MB_OK); return; 
+}<BR>&nbsp;&nbsp;&nbsp; // Initialize TTS engine<BR>&nbsp;&nbsp;&nbsp; 
+memset(&amp;ModeInfo, 0, sizeof(ModeInfo));<BR>&nbsp;&nbsp;&nbsp; 
+ModeInfo.wGender = Gender;<BR>&nbsp;&nbsp;&nbsp; ModeInfo.language.LanguageID = 
+Language;<BR>&nbsp;&nbsp;&nbsp; TTS_Central = 
+FindAndSelect(&amp;ModeInfo);<BR>&nbsp;&nbsp;&nbsp; char* AuthorWebSite = 
+"</FONT><A href="http://ts.kmc.ru/"><FONT color=darkred 
+size=2>http://ts.kmc.ru</FONT></A><FONT color=darkred 
+size=2>";<BR>&nbsp;&nbsp;&nbsp; if (!TTS_Central)<BR>&nbsp;&nbsp;&nbsp; 
+{<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if (MessageBox(NULL, "During 
+program's initialization no useful speech 
+"<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+"synthesis engine has 
+found!\n"<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+"Do you want to visit the program's site to download 
+"<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+"needed 
+components?",<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+"Synthesizer error", MB_YESNO | 
+MB_ICONWARNING)<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+== IDYES)<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ShellExecute(Application-&gt;Handle, NULL, 
+AuthorWebSite,<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+NULL, NULL, SW_SHOWNORMAL);<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+Application-&gt;Terminate();<BR>&nbsp;&nbsp;&nbsp; }<BR>&nbsp;&nbsp;&nbsp; // 
+Create notification object and fill necessary items.<BR>//&nbsp;&nbsp;MyNotify = 
+new CBufNotify();<BR>//&nbsp;&nbsp;MyNotify-&gt;VoiceText = 
+this;<BR>&nbsp;&nbsp;&nbsp; // Create dialog object<BR>&nbsp;&nbsp;&nbsp; 
+TTS_Central-&gt;QueryInterface(IID_ITTSDialogsW, 
+(void**)&amp;TTS_Dialog);<BR>}<BR>//---------------------------------------------------------------------------<BR>void 
+__fastcall VoiceText::EngineTerm(void)<BR>{<BR>&nbsp;&nbsp;&nbsp; if (Reg) 
+delete Reg;<BR>&nbsp;&nbsp;&nbsp; if (TTS_Dialog) 
+TTS_Dialog-&gt;Release();<BR>&nbsp;&nbsp;&nbsp; if (MyNotify) delete 
+MyNotify;<BR>&nbsp;&nbsp;&nbsp; if 
+(!EndOLE())<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; { 
+Application-&gt;MessageBox("Can not close OLE.", NULL, MB_OK); return; 
+}<BR>}<BR>//---------------------------------------------------------------------------<BR>void 
+__fastcall VoiceText::Speak(AnsiString MyText)<BR>{<BR>&nbsp;&nbsp;&nbsp; SDATA 
+data;<BR>&nbsp;&nbsp;&nbsp; char* Text = MyText.c_str();<BR>&nbsp;&nbsp;&nbsp; 
+data.dwSize = lstrlen(Text);<BR>&nbsp;&nbsp;&nbsp; data.pData = 
+Text;<BR>&nbsp;&nbsp;&nbsp; // Put the text buffer into the engine's speaking 
+queue, and give<BR>&nbsp;&nbsp;&nbsp; // the engine the address of the 
+ITTSBufNotifySink interface for<BR>&nbsp;&nbsp;&nbsp; // buffer-related 
+notifications.<BR>&nbsp;&nbsp;&nbsp; TTS_Central-&gt;TextData(CHARSET_TEXT, 0, 
+data, NULL, IID_ITTSBufNotifySink);<BR>//&nbsp;&nbsp;&nbsp; 
+TTS_Central-&gt;TextData(CHARSET_TEXT, 0, data, MyNotify, 
+IID_ITTSBufNotifySink);<BR>}<BR>//---------------------------------------------------------------------------<BR>TTSMODEINFO 
+__fastcall VoiceText::LoadState(void)<BR>{<BR>&nbsp;&nbsp;&nbsp; TTSMODEINFO 
+ttsInfo;<BR>&nbsp;&nbsp;&nbsp; if (Reg-&gt;KeyExists(AppKey) == false) return 
+ttsInfo;<BR>&nbsp;&nbsp;&nbsp; Reg-&gt;OpenKey(AppKey, 
+true);<BR>&nbsp;&nbsp;&nbsp; if (Reg-&gt;ValueExists("TTSModeInfo") == false) 
+return ttsInfo;<BR>&nbsp;&nbsp;&nbsp; Reg-&gt;ReadBinaryData("TTSModeInfo" , 
+&amp;ttsInfo, sizeof(ttsInfo));<BR>&nbsp;&nbsp;&nbsp; 
+Reg-&gt;CloseKey();<BR>&nbsp;&nbsp;&nbsp; return 
+ttsInfo;<BR>}<BR>//---------------------------------------------------------------------------<BR>void 
+__fastcall VoiceText::SaveState(void)<BR>{<BR>&nbsp;&nbsp;&nbsp; TTSMODEINFO 
+ttsInfo;<BR>&nbsp;&nbsp;&nbsp; 
+TTS_Central-&gt;ModeGet(&amp;ttsInfo);<BR>&nbsp;&nbsp;&nbsp; 
+Reg-&gt;OpenKey(AppKey, true);<BR>&nbsp;&nbsp;&nbsp; 
+Reg-&gt;WriteBinaryData("TTSModeInfo" , &amp;ttsInfo, 
+sizeof(ttsInfo));<BR>&nbsp;&nbsp;&nbsp; 
+Reg-&gt;CloseKey();<BR>}<BR>//---------------------------------------------------------------------------<BR>void 
+__fastcall VoiceText::ChangeEngine(LANGID Language, WORD 
+Gender)<BR>{<BR>&nbsp;&nbsp;&nbsp; EngineTerm();<BR>&nbsp;&nbsp;&nbsp; 
+EngineInit(Language, 
+Gender);<BR>}<BR>//---------------------------------------------------------------------------<BR>void 
+__fastcall VoiceText::Pause(void)<BR>{<BR>&nbsp;&nbsp;&nbsp; IsPaused = 
+true;<BR>&nbsp;&nbsp;&nbsp; 
+TTS_Central-&gt;AudioPause();<BR>}<BR>//---------------------------------------------------------------------------<BR>void 
+__fastcall VoiceText::Resume(void)<BR>{<BR>&nbsp;&nbsp;&nbsp; IsPaused = 
+false;<BR>&nbsp;&nbsp;&nbsp; 
+TTS_Central-&gt;AudioResume();<BR>}<BR>//---------------------------------------------------------------------------<BR>void 
+__fastcall VoiceText::Reset(void)<BR>{<BR>&nbsp;&nbsp;&nbsp; IsPaused = 
+false;<BR>&nbsp;&nbsp;&nbsp; 
+TTS_Central-&gt;AudioReset();<BR>}<BR>//---------------------------------------------------------------------------<BR>void 
+__fastcall VoiceText::GeneralDlg(void)<BR>{<BR>&nbsp;&nbsp;&nbsp; 
+TTS_Dialog-&gt;GeneralDlg(Application-&gt;Handle, 
+NULL);<BR>}<BR>//---------------------------------------------------------------------------<BR>void 
+__fastcall VoiceText::AboutDlg(void)<BR>{<BR>&nbsp;&nbsp;&nbsp; 
+TTS_Dialog-&gt;AboutDlg(Application-&gt;Handle, 
+NULL);<BR>}<BR>//---------------------------------------------------------------------------<BR>void 
+__fastcall VoiceText::LexiconDlg(void)<BR>{<BR>&nbsp;&nbsp;&nbsp; 
+TTS_Dialog-&gt;LexiconDlg(Application-&gt;Handle, 
+NULL);<BR>}<BR>//---------------------------------------------------------------------------<BR>void 
+__fastcall VoiceText::TranslateDlg(void)<BR>{<BR>&nbsp;&nbsp;&nbsp; 
+TTS_Dialog-&gt;TranslateDlg(Application-&gt;Handle, 
+NULL);<BR>}<BR>//---------------------------------------------------------------------------<BR>PITTSCENTRAL 
+__fastcall VoiceText::FindAndSelect(PTTSMODEINFO 
+pTTSInfo)<BR>{<BR>&nbsp;&nbsp;&nbsp; 
+HRESULT&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+hRes;<BR>&nbsp;&nbsp;&nbsp; 
+TTSMODEINFO&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ttsResult;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // final 
+result<BR>&nbsp;&nbsp;&nbsp; 
+PITTSFIND&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+pITTSFind;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // find 
+interface<BR>&nbsp;&nbsp;&nbsp; PIAUDIOMULTIMEDIADEVICE pIAMM; // multimedia 
+device interface for audio-dest<BR>&nbsp;&nbsp;&nbsp; 
+PITTSCENTRAL&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+pITTSCentral;&nbsp;&nbsp;&nbsp;&nbsp; // central interface<BR>//&nbsp; 
+PITTSBUFNOTIFYSINK&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+pBufNotify;<BR>&nbsp;&nbsp;&nbsp; hRes = CoCreateInstance(CLSID_TTSEnumerator, 
+NULL, CLSCTX_ALL, <BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+</FONT></pre></FONT><FONT face="Courier New CYR"><pre class=code><FONT color=darkred 
+size=2>IID_ITTSFind, (void**)&amp;pITTSFind);<BR>&nbsp;&nbsp;&nbsp; if 
+(FAILED(hRes)) return NULL;<BR>&nbsp;&nbsp;&nbsp; hRes = 
+pITTSFind-&gt;Find(pTTSInfo, NULL, &amp;ttsResult);<BR>&nbsp;&nbsp;&nbsp; if 
+(hRes) { pITTSFind-&gt;Release(); return NULL; }&nbsp;&nbsp;&nbsp;&nbsp; // 
+error<BR>&nbsp;&nbsp;&nbsp; // Get the audio dest<BR>&nbsp;&nbsp;&nbsp; hRes = 
+CoCreateInstance(CLSID_MMAudioDest, NULL, CLSCTX_ALL, 
+IID_IAudioMultiMediaDevice, (void**)&amp;pIAMM);<BR>&nbsp;&nbsp;&nbsp; if (hRes) 
+{ pITTSFind-&gt;Release(); return NULL; }&nbsp;&nbsp;&nbsp;&nbsp; // 
+error<BR>&nbsp;&nbsp;&nbsp; 
+pIAMM-&gt;DeviceNumSet(WAVE_MAPPER);<BR>&nbsp;&nbsp;&nbsp; // Pass off the 
+multi-media-device interface as an IUnknown (since it is 
+one)<BR>&nbsp;&nbsp;&nbsp; // Should do select now<BR>&nbsp;&nbsp;&nbsp; hRes = 
+pITTSFind-&gt;Select(ttsResult.gModeID, &amp;pITTSCentral, (LPUNKNOWN) 
+pIAMM);<BR>&nbsp;&nbsp;&nbsp; if (hRes) { pITTSFind-&gt;Release(); return NULL; 
+}<BR>&nbsp;&nbsp;&nbsp; // free random stuff up<BR>&nbsp;&nbsp;&nbsp; 
+pITTSFind-&gt;Release();<BR>&nbsp;&nbsp;&nbsp; return 
+pITTSCentral;<BR>}<BR>//---------------------------------------------------------------------------<BR>bool 
+__fastcall VoiceText::BeginOLE(void)<BR>{<BR>&nbsp;&nbsp;&nbsp; DWORD 
+dwVer;<BR>&nbsp;&nbsp;&nbsp; // Initialize OLE<BR>&nbsp;&nbsp;&nbsp; 
+SetMessageQueue(96);<BR>&nbsp;&nbsp;&nbsp; dwVer = 
+CoBuildVersion();<BR>&nbsp;&nbsp;&nbsp; if (rmm != HIWORD(dwVer)) return false; 
+// error<BR>&nbsp;&nbsp;&nbsp; if (FAILED(CoInitialize(NULL))) return 
+false;<BR>&nbsp;&nbsp;&nbsp; return 
+true;<BR>}<BR>//---------------------------------------------------------------------------<BR>bool 
+__fastcall VoiceText::EndOLE(void)<BR>{<BR>&nbsp;&nbsp;&nbsp; // Free up all of 
+OLE<BR>&nbsp;&nbsp;&nbsp; CoUninitialize();<BR>&nbsp;&nbsp;&nbsp; return 
+true;<BR>}<BR>//---------------------------------------------------------------------------<BR>// 
+Notification class 
+constructor.<BR>//---------------------------------------------------------------------------<BR>CBufNotify::CBufNotify(void)<BR>{<BR>}<BR>//---------------------------------------------------------------------------<BR>// 
+Notification class 
+destructor.<BR>//---------------------------------------------------------------------------<BR>CBufNotify::~CBufNotify(void)<BR>{<BR>}<BR>//---------------------------------------------------------------------------<BR>STDMETHODIMP 
+CBufNotify::QueryInterface (REFIID riid, LPVOID 
+*ppObj)<BR>{<BR>&nbsp;&nbsp;&nbsp; *ppObj = NULL;<BR>&nbsp;&nbsp;&nbsp; // 
+always return our IUnkown for IID_IUnknown<BR>&nbsp;&nbsp;&nbsp; if (IsEqualIID 
+(riid, IID_IUnknown) || 
+IsEqualIID(riid,IID_ITTSBufNotifySinkW))<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+{ *ppObj = (LPVOID) this; return NOERROR; }<BR>&nbsp;&nbsp;&nbsp; // otherwise, 
+cant find<BR>&nbsp;&nbsp;&nbsp; return 
+ResultFromScode(E_NOINTERFACE);<BR>}<BR>//---------------------------------------------------------------------------<BR>STDMETHODIMP_ 
+(ULONG) CBufNotify::AddRef(void) { return 1; 
+}<BR>//---------------------------------------------------------------------------<BR>STDMETHODIMP_ 
+(ULONG) CBufNotify::Release(void) { return 1; 
+}<BR>//---------------------------------------------------------------------------<BR>STDMETHODIMP 
+CBufNotify::BookMark (QWORD qwTime, DWORD dwMark)<BR>{<BR>&nbsp;&nbsp;&nbsp; if 
+(VoiceText-&gt;OnBookMark) VoiceText-&gt;OnBookMark(NULL, qwTime, 
+dwMark);<BR>&nbsp;&nbsp;&nbsp; return 
+NOERROR;<BR>}<BR>//---------------------------------------------------------------------------<BR>STDMETHODIMP 
+CBufNotify::TextDataDone (QWORD qwTime, DWORD 
+dwFlags)<BR>{<BR>&nbsp;&nbsp;&nbsp; if (VoiceText-&gt;OnTextDone) 
+VoiceText-&gt;OnTextDone(NULL, qwTime, dwFlags);<BR>&nbsp;&nbsp;&nbsp; return 
+NOERROR;<BR>}<BR>//---------------------------------------------------------------------------<BR>STDMETHODIMP 
+CBufNotify::TextDataStarted (QWORD qwTime)<BR>{<BR>&nbsp;&nbsp;&nbsp; if 
+(VoiceText-&gt;OnTextStart) VoiceText-&gt;OnTextStart(NULL, 
+qwTime);<BR>&nbsp;&nbsp;&nbsp; return 
+NOERROR;<BR>}<BR>//---------------------------------------------------------------------------<BR>STDMETHODIMP 
+CBufNotify::WordPosition (QWORD qwTime, DWORD dwVal)<BR>{<BR>&nbsp;&nbsp;&nbsp; 
+if (VoiceText-&gt;OnWordPosition) VoiceText-&gt;OnWordPosition(NULL, qwTime, 
+dwVal);<BR>&nbsp;&nbsp;&nbsp; return 
+NOERROR;<BR>}<BR>//---------------------------------------------------------------------------</FONT><BR></P></pre></FONT>
+
+<h2>Пример использования</h2>
+<P align=justify><FONT face="Arial CYR" size=2>Пример использования модуля в 
+своём приложении:</FONT></P>
+<pre class=code>
+VoiceText* TTS;
+TTS = new VoiceText(Version->ProductName, LANG_RUSSIAN, GENDER_MALE);
+TTS->Speak("Привет, вот у вас и заработал мой класс.");
+TTS->Speak("Внимательно изучите класс, он много чего ещё может!");
+if (TTS) delete TTS;
+</pre>
+<p>Удачи!</p>
+
+<!--#include virtual="../template4"-->

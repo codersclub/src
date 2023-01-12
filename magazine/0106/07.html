@@ -1,0 +1,497 @@
+<!--#include virtual="../template1"-->Векторный редактор<!--#include virtual="../template2"-->
+<!--#include virtual="./menu"-->
+<!--#include virtual="../template3"-->
+
+<h1 align=center>Векторный редактор</h1>
+
+<b>Автор:</b> <a href="http://forum.sources.ru/index.php?showuser=9930"><i>orb</i></a>
+
+<br>
+<h2>Работа с векторной графикой</h2>
+<p>В предыдущем номере описывалось создание растрового редактора, теперь рассмотрим самый простой векторный редактор.</p>
+<p>Если при работе с растровой графикой используются уже готовые изображения, а сам редактор необходим только для улучшения цветопередачи, корректировки контраста или яркости, совмещения нескольких фотографий в одну композицию, то векторные редакторы в преобладающем большинстве случаев используют для создания новых рисунков "с нуля".</p>
+
+<br>
+<h2>Оболочка</h2>
+<p>Будем использовать VisualC++ и библиотеку Microsoft Foundation Class Library (MFC).</p>
+<p>Создаем новый проект со следующими параметрами:</p>
+
+<div class=outpp>
+Имя проекта Vector;<br>
+Single document;<br>
+Document/View architecture support;<br>
+Класс вида CScrollView.<br>
+</div>
+
+<p>Остальные параметры проекта установите по своему усмотрению.</p>
+<p>Заходим в класс документа CVectorDoc и забиваем переменные, которые будем использовать для управления программой.</p>
+
+<div class=outpp>
+int iPaperWidth;	- ширина листа бумаги, на котором мы рисуем<br>
+int iPaperHeight;	- высота<br>
+</div>
+
+<p>Используем бумагу формата А4 (210х297 мм), офисную бумагу для принтеров (программа будет уметь печатать).</p>
+<div class=outpp>
+int iMapMode;	- режим отображения.<br>
+</div>
+
+<p>Для того, чтобы рисунки выводились в размере, соответствующем изображению на экране, используем режим MM_HIMETRIC. В этом режиме будет соблюдаться следующее условие:</p>
+<div class=outpp>
+1 логическая единица = 0,01 мм<br>
+</div>
+
+<p>то есть, чтобы нарисовать линию длинной 10 мм, необходимо нарисовать прямую длинной 1000 единиц.</p>
+<p>В конструкторе прописываем:</p>
+<div class=outpp>
+iMapMode=MM_HIMETRIC;<br>
+iPaperWidth=21000;<br>
+iPaperHeight=29700;<br>
+</div>
+
+<p>Для установки режима отображения переопределим функцию CScroolView::OnUpdate:</p>
+<pre class=code>
+void CVectorView::OnUpdate(CView * pSender, LPARAM lHint, CObject* pHint)
+{
+	CVectorDoc *pDoc=GetDocument();
+	CSize sizePaper;
+	sizePaper.cx=pDoc->iPaperWidth;
+	sizePaper.cy=pDoc->iPaperHeight;
+	SetScrollSizes(pDoc->iMapMode, sizePaper);
+	CScrollView::OnUpdate(pSender, lHint, pHint);
+}
+</pre>
+<p>Чтобы пользователю была видна область для рисования, переопределим метод CScrollView::OnPrepareDC, который будет ограничивать область рисования:</p>
+
+<pre class=code>
+void CVectorView::OnPrepareDC(CDC* pDC, CPrintInfo * pInfo)
+{
+	CScrollView::OnPrepareDC(pDC, pInfo);
+	CVectorDoc *pDoc=GetDocument();
+	CPoint oPt(0, -pDoc->iPaperHeight);	//создаем точку в левом нижнем углу
+	pDC->LPtoDP(&oPt);	//переводим точку из логических координат в координаты физического устройства
+	pDC->SetViewportOrg(oPt);	//устанавливаем начало координат
+	pDC->IntersectClipRect(0, 0, pDoc->iPaperWidth, pDoc->iPaperHeight);  //ограничиваем область рисования
+}
+</pre>
+
+<p>Теперь выделим область рисования, залив недоступную область серым фоном. Для этого используем сообщение WM_ERASEBKGND. Создадим обработчик этого сообщения:</p>
+<pre class=code>
+BOOL CVectorView::OnEraseBkgnd(CDC *pDC)
+{
+	BOOL bResult=CScrollView::OnEraseBkgnd(pDC);
+	CBrush oBrushGray(GetSysColor(COLOR_GRAYTEXT));	//кисть для заливки
+	FillOutsideRect(pDC, &oBrushGray);	//заливка неиспользуемой области
+	return(bResult);
+}
+</pre>
+
+<p>Для изменения пользователем размеров бумаги создадим диалоговое окно. В шаблон диалогового окна нужно поместить два поля ввода (Edit box) "Ширина" и "Высота" и подписать, используя Static text. Рядом с каждым полем ввода разместим элемент Spin, включив в его параметрах свойства Auto buddy и Set buddy integer. Кнопки OK и Cancel уже присутствуют. Для работы с диалоговым окном создадим отдельный класс CPaperSizeDlg. Для полей ввода создадим переменные UINT m_uHeight, UINT m_uWidth и привяжем их к соответствующим идентификаторам. Также можно ограничить диапазон вводимых пользователем значений: 0...210 для ширины и 0...297 для высоты листа бумаги. Для управления Spin-элементами создадим переменные CSpinButtonCtrl m_ctrlSpinHeigh и CSpinButtonCtrl m_ctrlSpinWidth.</p>
+<p>Создадим функцию-обработчик сообщения WM_INITDIALOG, которое будет поступать перед созданием диалогового окна:</p>
+
+<pre class=code>
+BOOL CPaperSizeDlg::OnInitDialog()
+{
+	CDHtmlDialog::OnInitDialog();
+	m_ctrlSpinWidth.SetRange(0, 210);	// диапазон для значений элементов Spin
+	m_ctrlSpinHeight.SetRange(0, 297);
+	return(TRUE);
+}
+</pre>
+
+<p>Перейдем на вкладку Resource View ->Menu ->IDR_MAINFRAME. Откроется шаблон меню программы. Здесь добавим пункт меню для вызова диалогового окна и назначим функцию-обработчик:</p>
+
+<pre class=code>
+void CVectorDoc::OnFilePapersize()
+{
+	CPaperSizeDlg oPaperSize;
+	oPaperSize.m_uHeight=iPaperHeight/100;	//передаем в окно текущие размеры бумаги в миллиметрах 
+	oPaperSize.m_uWidth=iPaperWidth/100;
+	if(oPaperSize.DoModal()==IDOK)
+	{	//если пользователь нажал ОК, принимаем новые параметры размера бумаги
+		iPaperHeight=oPaperSize.m_uHeight*100;
+		iPaperWidth=oPaperSize.m_uWidth*100;
+		UpdateAllViews(NULL);
+	
+}
+}
+</pre>
+
+<br>
+<h2>Рисование примитивов</h2>
+
+<h3>Линии:</h3>
+<p>Создадим в классе документа следующие переменные:</p>
+
+<pre class=code>
+#define MAXPOINTS 1000	//максимальное количество точек
+int iNumPoint;	//количество уже поставленных точек
+CPoint aPoints[MAXPOINTS];	//массив координат точек
+</pre>
+<p>При каждом щелчке левой кнопкой мыши (OnLButtonDown) будем добавлять новую координату:</p>
+
+<pre class=code>
+if(pDoc->iNumPoint==MAXPOINTS)
+	AfxMessageBox("Слишком много точек");
+else
+{
+	pDoc->aPoints[pDoc->iNumPoint++]= point;
+}
+</pre>
+
+<h3>Примитивы:</h3>
+<p>Добавим в программу возможность рисования примитивов: точка, круг, квадрат.</p>
+<p>Начнем с создания базового класса, в который будут входить такие общие характеристики объекта, как: положение на экране; размер; цвет и толщина линии контура; цвет и стиль заливки. Также в базовый класс включим методы для вывода на экран (принтер) и вычисление области, занимаемой фигурой.</p>
+<pre class=code>
+class CBasePoint : public CObject, public CPoint
+{
+	DECLARE_SERIAL(CBasePoint)	//макрос необходим для сериализации класса
+protected:
+	CPen oPen;	//контур фигуры
+	CBrush oBrush;	//заливка фигуры
+public:
+	int iSize;	//размер
+	int iPenStyle;	//стиль контура
+	int iPenWidth;	//толщина контура
+	COLORREF rgbPenColor;	//цвет контура
+	COLORREF rgbBrushColor;	//цвет кисти
+	int iBrushStyle;	//стиль кисти
+	DWORD dwPattern_ID;	//идентификатор шаблона заливки
+public:
+	CBasePoint();	//конструктор без параметров
+	CBasePoint(int x, int y, int size);	//конструктор с начальной инициализацией
+	virtual ~CBasePoint();
+	virtual void Show(CDC *pDC);	//метод вывода на контекст устройства (монитор, принтер)
+	virtual void GetRegion(CRgn &Rgn);	//метод, определяющий занимаемую фигурой площадь
+	virtual BOOL SetPen(COLORREF rgbColor, int iWidth=1, int iStyle=PS_SOLID);	//задание параметров контура
+	virtual BOOL SetBrush(COLORREF rgbColor, DWORD dwPattern=0, int iStyle=-1);	//задание параметров кисти
+protected:
+	virtual void Serialize(CArchive &ar);	//сохранение/восстановления картинки в/из файла
+	virtual BOOL PrepareDC(CDC *pDC);	//подготовка контекста устройства
+	virtual BOOL RestoreDC(CDC *pDC);	//восстанавление контекста устройства
+};
+</pre>
+
+<p>Конструкторы инициализируют свойства и параметры фигуры:</p>
+<pre class=code>
+CBasePoint::CBasePoint(int x, int y, int size) : CPoint(x, y)
+{
+	iSize=size;
+	iPenWidth=1;
+	iPenStyle=PS_SOLID;
+	rgbPenColor=RGB(0, 0, 0);
+	iBrushStyle=-1;
+	rgbBrushColor=RGB(0, 0 ,0);
+    dwPattern_ID=0;
+}
+</pre>
+
+<p>Установка параметров для контура и заливки фигуры:</p>
+<pre class=code>
+BOOL CBasePoint::SetPen(COLORREF rgbColor, int iWidth, int iStyle)
+{
+	iPenStyle=iStyle;
+	iPenWidth=iWidth;
+	rgbPenColor=rgbColor;
+	if(HPEN(oPen)!=NULL)
+		if(!oPen.DeleteObject())
+			return(FALSE);
+	return(oPen.CreatePen(iPenStyle, iPenWidth, rgbPenColor));
+}
+BOOL CBasePoint::SetBrush(COLORREF rgbColor, DWORD dwPattern, int iStyle)
+{
+	iBrushStyle=iStyle;
+	dwPattern_ID=dwPattern;
+	rgbBrushColor=rgbColor;
+	if(HBRUSH(oBrush)!=NULL)
+		if(!oBrush.DeleteObject())
+			return(FALSE);
+	if(dwPattern_ID>0)
+	{
+		CBitmap oPattern;
+		if(!oPattern.LoadBitmap(dwPattern_ID))
+			return(FALSE);
+		return(oBrush.CreatePatternBrush(&oPattern));
+	}
+	if(iBrushStyle>=0)
+		return(oBrush.CreateHatchBrush(iBrushStyle, rgbBrushColor));
+	return(oBrush.CreateSolidBrush(rgbBrushColor));
+}
+</pre>
+
+<p>Сохранение/восстановление рисунка в/из файла:</p>
+<pre class=code>
+IMPLEMENT_SERIAL(CBasePoint, CObject, VERSIONABLE_SCHEMA|1)	//в паре с макросом DECLARE_SERIAL(CBasePoint)
+void CBasePoint::Serialize(CArchive &ar)
+{
+	if(ar.IsStoring())
+	{	//сохранение фигуры
+		ar<<x;
+		ar<<y;
+		ar<<iSize;
+		ar<<iPenStyle;
+		ar<<iPenWidth;
+		ar<<rgbPenColor;
+		ar<<iBrushStyle;
+		ar<<rgbBrushColor;
+		ar<<dwPattern_ID;
+	}else
+	{	//чтение фигуры из файла
+		int iVersion=ar.GetObjectSchema();	//чтение схемы записи данных (VERSIONABLE_SCHEMA), сюда можно включить обработку разных форматов данных
+		ar>>x;
+		ar>>y;
+		ar>>iSize;
+		ar>>iPenStyle;
+		ar>>iPenWidth;
+		ar>>rgbPenColor;
+		ar>>iBrushStyle;
+		ar>>rgbBrushColor;
+		ar>>dwPattern_ID;
+		SetPen(rgbPenColor, iPenWidth, iPenStyle);	//задание параметров для фигуры
+		SetBrush(rgbBrushColor, dwPattern_ID, iBrushStyle);
+	}
+}
+</pre>
+
+<p>Подготовка контекста устройства и сброс параметров в значения по умолчанию:</p>
+<pre class=code>
+BOOL CBasePoint::PrepareDC(CDC *pDC)
+{
+	if(!pDC->SaveDC())	return(FALSE);
+	if(HPEN(oPen)!=NULL)	pDC->SelectObject(&oPen);
+	if(HBRUSH(oBrush)!=NULL)	pDC->SelectObject(&oBrush);
+	return(TRUE);
+}
+BOOL CBasePoint::RestoreDC(CDC *pDC)
+{
+	return(pDC->RestoreDC(-1));
+}
+</pre>
+
+<p>Вывод на контекст устройства:</p>
+<pre class=code>
+void CBasePoint::Show(CDC *pDC)
+{
+	PrepareDC(pDC);
+	pDC->Ellipse(x-iSize, y-iSize, x+iSize, y+iSize);
+	RestoreDC(pDC);
+}
+</pre>
+
+<p>Метод, возвращающий область, занимаемую фигурой:</p>
+<pre class=code>
+void CBasePoint::GetRegion(CRgn &Rgn)
+{
+	Rgn.CreateEllipticRgn(x-iSize, y-iSize, x+iSize, y+iSize);
+}
+</pre>
+
+<p>После определения базового класса, создадим производные от него для квадрата и круга:</p>
+
+<br>
+<h3>Квадрат:</h3>
+<pre class=code>
+class CSquare : public CBasePoint
+{
+	DECLARE_SERIAL(CSquare)
+protected:
+	void Serialize(CArchive &ar);
+public:
+	CSquare(int x, int y, int size);
+	CSquare();
+	~CSquare()
+		{};
+	void Show(CDC *pDC);
+	void GetRegion(CRgn &Rgn);
+};
+</pre>
+
+<p>Переопределим конструкторы и методы вывода и расчета занимаемой области:</p>
+<pre class=code>
+CSquare::CSquare(int x, int y, int size):CBasePoint(x, y, size)
+{
+	iSize=size;
+}
+CSquare::CSquare():CBasePoint()
+{
+	iSize=40;
+}
+void CSquare::Show(CDC *pDC)
+{
+	int t=iSize/2;
+	PrepareDC(pDC);
+	pDC->Rectangle(x-t, y-t, x+t, y+t);
+	RestoreDC(pDC);
+}
+void CSquare::GetRegion(CRgn &Rgn)
+{
+	int t=iSize/2;
+	Rgn.CreateRectRgn(x-t, y-t, x+t, y+t);
+}
+</pre>
+
+<p>В отличии от количества точек в линии, количество фигур, которые нарисует пользователь, невозможно оценить зарание, а создание слишком большого массива для хранения фигур приведет к перерасходу памяти компьютера. Поэтому организуем динамическое создание объектов, а указатели на фигуры будем сохранять в списке CTypedPtrList. Для поддержки работы с шаблонными классами требуется подключить заголовок:</p>
+<pre class=code>
+#include &lt;afxtempl.h&gt;
+</pre>
+<p>в файле stdafx.h</p>
+
+<p>Определим список в классе документа:</p>
+<pre class=code>
+CTypedPtrList<CObList, CBasePoint*> oShapeList;
+</pre>
+
+<p>Также создадим функцию для очистки памяти при удалении объектов:</p>
+<pre class=code>
+void CVectorDoc::ClearShapesList()
+{
+	POSITION pos=NULL;
+	while(oShapeList.GetCount() > 0)
+		delete oShapeList.RemoveHead();
+}
+</pre>
+
+<p>Нужно уметь определять, какую именно фигуру рисует пользователь в данный момент. Создадим идентификаторы операций и определим переменную, которая будет хранить код текущей операции int iCurrentShape:</p>
+<pre class=code>
+#define CURRENT_NONE 0
+#define CURRENT_LINE 1
+#define CURRENT_POINT 2
+#define CURRENT_CIRCLE 3
+#define CURRENT_SQUARE 4
+</pre>
+
+<p>Зайдем опять на вкладку ресурсов меню и создадим меню для выбора фигуры. К каждому пункту меню привяжем обработчик, в теле которого переменной iCurrentShape будет присваиваться новый код операции. Например, для линии:</p>
+<pre class=code>
+void CVectorView::OnShapeLine()
+{
+	iCurrentShape=CURRENT_LINE;
+}
+</pre>
+
+<p>аналогично - для остальных фигур.</p>
+<p>Теперь необходимо в коде обработчика щелчка левой кнопки мыши проанализировать, какую фигуру нужно создавать:</p>
+<pre class=code>
+afx_msg void CVectorView::OnLButtonDown(UINT nFlags, CPoint point)
+{
+	CVectorDoc *pDoc=GetDocument();
+	CPoint oLogPoint=point;
+	CDC *pDC=GetDC();
+	OnPrepareDC(pDC, NULL);
+	pDC->DPtoLP(&oLogPoint);	//преобразование физических координат в логические единицы
+	ReleaseDC(pDC);
+	switch(iCurrentShape)	//проверка кода текущей операции
+	{
+	case CURRENT_LINE:	//создание точки для построения линии
+		if(pDoc->iNumPoint==MAXPOINTS)
+			AfxMessageBox("Слишком много точек");
+		else
+		{
+			pDoc->aPoints[pDoc->iNumPoint++]=oLogPoint;
+			Invalidate();
+			pDoc->SetModifiedFlag();
+		}
+		break;
+	case CURRENT_POINT:	//создаем точку
+	case CURRENT_CIRCLE:	//создаем круг
+	case CURRENT_SQUARE:	//создаем квадрат
+		AddShape(iCurrentShape, oLogPoint);
+		break;
+	}
+	CScrollView::OnLButtonDown(nFlags, point);
+}
+</pre>
+
+<p>Т.к. точка, круг и квадрат происходят от одного базового класса и отличаются только параметрами, можно вынести создание фигуры в отдельный метод:</p>
+<pre class=code>
+void CVectorView::AddShape(int shape, CPoint point)
+{
+	CVectorDoc *pDoc=GetDocument();
+	CBasePoint *pShape=NULL;	//указатель на фигуру
+	switch(shape)
+	{
+	case CURRENT_POINT:	//создание точки
+		pShape=new CBasePoint(point.x, point.y, 100);
+		pShape->SetPen(RGB(0, 0, 0), 3, PS_GEOMETRIC);
+		pShape->SetBrush(RGB(255, 0, 255));
+		break;
+	case CURRENT_CIRCLE:	//создание круга
+		pShape=new CBasePoint(point.x, point.y, 1000);
+		pShape->SetPen(RGB(10, 10, 10), 50, PS_GEOMETRIC);
+		pShape->SetBrush(RGB(74, 180, 20));
+		break;
+	case CURRENT_SQUARE:	//создание квадрата
+		pShape=new CSquare(point.x, point.y, 2000);
+		pShape->SetPen(RGB(0, 0, 255), 80, PS_GEOMETRIC);
+		pShape->SetBrush(RGB(255, 255, 0));
+		break;
+	}
+	if(pShape!=NULL)
+	{
+		pDoc->oShapeList.AddTail(pShape);	//добавление новой фигуры в список
+		Invalidate();
+		pDoc->SetModifiedFlag();
+	}
+}
+</pre>
+
+<br>
+<h3>Сохранение рисунка в файл</h3>
+<p>Сразу скажу, что в дальнейшем этот редактор предполагается усовершенствовать, поэтому необходимо различать версии редактора и загружать данные только в том случае, если версия файла с данными не "младше" текущей версии редактора:</p>
+<pre class=code>
+void CVectorDoc::Serialize(CArchive& ar)
+{
+	CString sVersion;
+	int iVersion;
+	int i;
+	if (ar.IsStoring())
+	{
+		iVersion=1;	//номер текущей версии
+		sVersion.Format("vc%d", iVersion);
+		ar<<sVersion;	//сохраняем версию в формате vc1
+		ar << iNumPoint;	//сохраняем количество точек
+		for(i=0; i<iNumPoint; i++)
+			ar<<aPoints[i];	//сохраняем массив точек
+		ar<<iMapMode;	//сохраняем параметры рабочей области
+		ar<<iPaperWidth;
+		ar<<iPaperHeight;
+	}
+	else
+	{	//загрузка рисунка из файла
+		ar>>sVersion;	//загрузка номера версии
+		iVersion=atoi((LPCTSTR)sVersion.Right(1));
+		switch(iVersion)	//проверка версии
+		{
+		case 1:	//первая версия! Наша, можно загружать рисунок
+			ar >> iNumPoint;
+			for(int i=0; i<iNumPoint; i++)
+				ar >> aPoints[i];
+			ar>>iMapMode;
+			ar>>iPaperWidth;
+			ar>>iPaperHeight;
+			break;
+		default:	//более новая версия,
+//т.к. мы не знаем формата, в котором файл сохранялся, предупредим пользователя и остановим загрузку
+			AfxMessageBox("Неизвестный формат файла", MB_OK);
+			return;
+		}
+	}
+	oShapeList.Serialize(ar);	//сохраним все фигуры в списке
+}
+</pre>
+
+<p>На этом все. Компилируем, запускаем и .... совершенствуем. Хотя это уже совсем другая история.</p>
+<p>PS: данный текст не описывает 100% создания графического редактора, при его создании я предполагал, что читающий знает наизусть книгу "Visual C++ за 21 урок" или что-то из разряда "Освой Visual C++ за 2 дня". Если у Вас возникают трудности, можете обратиться на наш форум: forum.sources.ru, где Вам с радостью помогут. Можно также просмотреть исходники, прилагающиеся в конце, или запустить готовый файл для просмотра результата.</p>
+
+<hr>
+<table border=0 cellspacing=1 cellpadding=1>
+ <tr>
+  <td width=125><b>Скачать исходник:</b></td>
+  <td><a href="./07/VectorSource.rar">VectorSource.rar</a> (62 КБ)</td>
+ </tr>
+ <tr>
+  <td width=125>&nbsp;</td>
+  <td><a href="./07/VectorEXE.zip">VectorEXE.zip</a> (199 КБ)</td>
+ </tr>
+</table>
+
+<!--#include virtual="../template4"-->

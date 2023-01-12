@@ -1,0 +1,725 @@
+<!--#include virtual="../template1"-->Использование атрибутов для нормализации и валидации бизнес-сущностей<!--#include virtual="../template2"-->
+<!--#include virtual="./menu"-->
+<!--#include virtual="../template3"-->
+
+<h1 align=center>Использование атрибутов для нормализации и валидации бизнес-сущностей</h1>
+
+<b>Автор:</b> <a href="http://forum.sources.ru/index.php?showuser=8931"><i>Max404</i></a>
+
+<p>В корпоративном программировании при проектировании уровня доступа к данным часто возникают проблемы в работе с бизнес-объектами (бизнес-сущностями), связанные с их загрузкой, изменением, сохранением и перемещением между уровнями. Существует два основных подхода  к решению этой задачи: использование собственных бизнес-сущностей и использование стандартных средств (ADO.NET предоставляет достаточно удобные средства, например, DataSet). Как пишет Дино Эспозито:</p>
+
+<div class=outpp>
+В объекты DataSet встроена поддержка параллельного доступа с нежесткой блокировкой. Они позволяют определять и использовать сложные отношения между таблицами. Кроме того, объекты DataSet поддерживают сериализацию, а при изменении схемы базы данных, как правило, не требуется вносить соответствующие изменения в API уровня доступа к данным.<br>
+</div>
+
+<p>Но манипулировать DataSet-ами не всегда удобно, особенно в случае высокой детерминированности структуры данных. Достаточно сложно привязывать (bind) таблицы, связанные ключами с другими таблицами(справочниками), к спискам (Repeater, DataGrid) в ASP.NET страницах. Кроме того, при всем удобстве передачи между процессами, DataSet относительно громоздок по размеру и может достаточно долго сериализоваться/десериализоваться, занимая при этом циклы процессора и оперативную память. Основная альтернатива использованию DataSet (<a href="http://gzip.rsdn.ru/article/dotnet/DotNetSerial.xml">не считая возможности шамании над процессом его сериализации</a>) - создание собственных бизнес-сущностей, более подходящих в случае основного упора на работу с данными экземпляров и скалярными значениями.</p>
+<p>Бизнес-сущностью называется класс, инкапсулирующий свойства какой-либо отдельной сущности (например, пользователь, заказ, товар). Бизнес-сущность может иметь различные методы для работы с хранимыми данными, может использовать методы "фабрик данных" для управления своим жизненным циклом. Одной из основных операций над БС является отображение хранимых данных пользователю (я имею в виду в первую очередь WinForms, но это относится также к ASP.NET) и сохранение внесенных пользователем изменений в БД или других хранилищах. Здесь возникает дополнительная задача: необходимо запретить пользователю вводить некорректные данные.</p>
+<p>В книге "Analyzing Requirements and Defining Microsoft(r) .NET Solution Architectures" (далее 70-300) написано:</p>
+
+<div class=outpp>
+In addition to the performance of the database, you need to ensure the quality of the data stored by the database. This means that the database implements data integrity and stores valid data that conforms to the business rules.<br>
+</div>
+
+<p>То есть, необходимо обеспечивать не только производительность работы с БД, но и качество хранящихся в ней данных. Одна из задач обеспечения целостности данных - их валидация (Data validation). В отличие от остальных задач, определяющих наличие данных, валидация определяет годность, адекватность данных установленным бизнес-правилам. Вот основные методы проверки (70-300):</p>
+
+<div class=outpp>
+- Range checking involves making sure that the data's value is within a set of limits determined by the functional specification.<br>
+<br>
+- Data format checking involves making sure that the data conforms to a set of format specifications, such as currency formatting, telephone number formatting, or length-of-character strings.<br>
+<br>
+- Data type checking involves making sure that the data belongs to the proper data type and that an invalid data type is not used to represent the data when it is written to the database.<br>
+</div>
+
+<p>Необходимо проверять границы, формат и тип данных. Проверка может осуществляться:</p>
+
+<ul>
+<li>При вводе (невозможно ввести некорректные данные). Код валидации и нормализации обычно привязан к UI-компоненту. Эта тема часто обсуждается (например, см. "<a href="http://gzip.rsdn.ru/Forum/Message.aspx?mid=1249701">ненавязчивая валидация</a>") и количество предлагаемых вариантов достаточно велико.</li>
+<li>При сохранении. Код проверки может находиться на любом уровне. В зависимости от архитектуры приложения он может находиться в самой сущности, в отдельном компоненте (например в фабрике), в DAL-компоненте. Проверка может производиться с использованием XML-файлов правил и т.п.</li>
+</ul>
+
+<p>В 70-300 классификация методов проверки немного другая (по месту расположения):</p>
+
+<div class=outpp>
+- Client-side checks can ensure that invalid data is not posted to a database. These checks can be coded in many ways, including in scripts, in the user interface controls, as part of an executable program, or as part of a Web page. For example, if a field on a Web page denotes a monetary value, validation controls on the page can ensure that the information in that field is the proper data type and format.<br>
+<br>
+- Server-side checks, which are executed by the DBMS engine, can be implemented with field data types, default values, and constraints. These checks can also ensure that invalid data is not stored in the database.<br>
+</div>
+
+<p>Майкрософт не рекомендует перегружать БД-сервер server-side проверками, поскольку это увеличивает нагрузку и может привести к возникновению узкого места (bottleneck), если сервер обслуживает большое количество клиентских запросов.</p>
+
+<p>Мы не будем рассматривать методы валидации на сервере БД, рассмотрим клиентские.</p>
+
+<div class=outpp>
+You can enforce data integrity through logic that is encapsulated in a component and is called or invoked as needed. The criteria for the logic are determined by the business rules, including any additional data integrity requirements that have been identified for the solution.<br>
+</div>
+
+<p>Посвятив некоторое количество времени написанию кода-по-книжкам (подавляющее большинство примеров используют методы с DataSet), я решил для себя, что лично мне ближе "точная" работа с объектами - ручная загрузка и сохранение. Валидация на UI, конечно, более гибкая и мощная (например, можно менять содержимое, доступность и видимость одних контролов в зависимости от содержания других), но гораздо более трудоемкая с точки зрения создания и поддержки в случае относительно сложного UI (например 50-100 контролов, разбитых по вкладкам). Кроме того, такой код очень сложно использовать повторно, разве что отдельными кусочками.</p>
+<p>Создав многочисленные методы проверки отдельных полей(свойств) или их групп, написав большое количество повторяющегося кода, обычно хочется придумать собственный "движок", который универсальным образом обрабатывает все возможные ситуации.</p>
+<p>Такое желание возникло и у меня, и свой "движок" я решил написать с использованием атрибутов. Это решает сразу несколько задач. Во-первых, достигается простота создания и изменения. Чтобы добавить проверку свойства, достаточно приписать к нему нужный атрибут и указать дополнительные параметры (если требуется). Во-вторых, непрограммистам становится проще понимать и создавать правила, так как атрибуты можно описать в доступной форме(формализовать) и на основании этого описания составлять ТЗ.</p>
+<p>Минусы такого подхода в том, что использование механизма отражения (Reflection) снижает быстродействие кода, а правила невозможно изменить без перекомпиляции. И если вторую проблему можно смягчить, вынеся сущность в отдельную сборку (тогда будет достаточно перекомпилировать только её), то с первой проблемой, по-видимому, ничего сделать нельзя :( Вообще, механизм валидации не критичен по времени, в крупных приложениях гораздо большее значение имеет его обслуживаемость. Например, при изменении любого правила необходимо применить это изменение к клиентским приложениям (эта проблема решается определенными архитектурами приложения). Существует и ещё одна проблема: поскольку атрибут применяется только для одного поля, невозможно создавать проверки взаимосвязанных полей (на самом деле можно, но только hardcoded проверки, т.е. зашитые в программном коде).</p>
+
+<p>В качестве примера будем использовать такую сущность:</p>
+<pre class=code>
+/// <summary>
+
+/// Person Entity 
+
+/// <para>1.15</para>
+
+/// </summary>
+
+public class Person
+{
+public Person(int id)
+{
+m_ID = id;
+}
+
+#region Properties
+#region Members
+
+int m_ID = -1;
+string m_Resume = string.Empty;
+string m_Communication = string.Empty;
+string m_ExtraInfo = string.Empty;
+string m_Email = string.Empty;
+string m_Name = string.Empty;
+
+DateTime m_Birthday = DateTime.Today;
+
+int m_Sex = -1;
+
+ArrayList m_languages = new ArrayList();
+
+#endregion
+
+public int ID
+{
+get { return m_ID;}
+}
+
+public string Name
+{
+get { return m_Name;}
+set { m_Name = value;}
+}
+
+
+public string Resume
+{
+get { return m_Resume;}
+set { m_Resume = value;}
+}
+
+public string ExtraInfo
+{
+get { return m_ExtraInfo;}
+set { m_ExtraInfo = value;}
+}
+
+public string Email
+{
+get { return m_Email;}
+set { m_Email = value;}
+}
+
+public DateTime Birthday
+{
+get { return m_Birthday;}
+set { m_Birthday = value;}
+}
+
+public int Sex
+{
+get { return m_Sex;}
+set { m_Sex = value;}
+}
+
+public ArrayList Language
+{
+get { return m_languages;}
+set { m_languages = value;}
+}
+
+#endregion
+
+
+}
+</pre>
+
+<p>Думаю, с семантикой полей все понятно. В списке Language будем хранить идентификаторы иностранных языков (первичный ключ в справочнике). Создадим атрибут, который будет определять отображаемое имя поля как псевдоним. Для этого отнаследуемся от стандартного класса Attribute (в VS2005 это делается просто: Insert snippet->attribute). Определим строковое поле и конструктор, принимающий значение этого поля:</p>
+
+<pre class=code>
+/// <summary>
+
+/// Базовый класс-атрибут для определения отображаемого имени поля
+
+/// </summary>
+
+[AttributeUsage(AttributeTargets.Property)]
+public class DisplayNameAttribute : Attribute
+{
+string m_name = ""; 
+/// <summary>
+
+/// Отображаемое имя
+
+/// </summary>
+
+public virtual string Name
+{
+get {return m_name;}
+}
+
+public DisplayNameAttribute(string displayName)
+{
+m_name = displayName;
+}
+}
+</pre>
+
+<p>Обратите внимание, что мы добавили перед классом атрибутов AttributeUsageAttribute, определяющий ряд важных параметров. Вот что написано об AttributeUsageAttribute в MSDN (<a href="http://msdn.microsoft.com/library/rus/default.asp?url=/library/rus/cpref/html/frlrfsystemattributeusageattributeclasstopic.asp">http://msdn.microsoft.com/library/rus/default.asp?url=/library/rus/cpref/html/frlrfsystemattributeusageattributeclasstopic.asp</a>):</p>
+
+<div class=outpp>
+При определении своего собственного класса атрибутов можно управлять способом его использования путем размещения в нем AttributeUsageAttribute. Класс атрибутов должен прямым или косвенным образом наследоваться от класса Attribute. Классы атрибутов имеют позиционные и именованные параметры. Любой доступный конструктор класса атрибутов определяет допустимую последовательность позиционных параметров для этого класса. Именованные параметры определяются нестатическими, открытыми, доступными для чтения и записи полями или свойствами класса атрибутов. Три свойства AttributeUsageAttribute устанавливаются путем определения следующих параметров:<br>
+- ValidOn - позиционный параметр, определяющий элементы программы, в которых может быть размещен рассматриваемый атрибут. Набор всех возможных элементов, в которых можно разместить атрибут, приведен в перечислении AttributeTargets. Для получения нужного сочетания допустимых элементов программы можно объединить значения AttributeTargets при помощи битовой операции "OR" <br>
+- AllowMultiple - именованный параметр. Указывает, может ли атрибут определяться более одного раза для некоторого элемента программы<br>
+- Inherited - именованный параметр, определяющий возможность наследования атрибута производными классами и переопределенными членами.<br>
+</div>
+
+<p>В примере я указал AttributeTargets.Property, следовательно, данный атрибут может применяться только к свойствам. Остальные параметры были оставлены по умолчанию: AllowMultiple=false (атрибут может быть применен к свойству только один раз) и Inherited=true (атрибут будет наследоваться).</p>
+
+<p>Что можно сделать с этим атрибутом? Применить к свойству! Давайте добавим псевдонимы к нескольким свойствам и напишем метод, который с помощью отражения будет получать список всех свойств объекта this и выводить на консоль их имена (если у свойства есть DisplayNameAttribute, то вместо имени свойства будет выводиться псевдоним):</p>
+
+<pre class=code>
+public int ID
+...
+
+[DisplayName("ФИО")]
+public string Name
+...
+
+public string Resume
+...
+
+[DisplayName("Дополнительная информация")]
+public string ExtraInfo
+...
+
+public string Email
+...
+
+[DisplayName("Дата Рождения")]
+public DateTime Birthday
+...
+
+public int Sex
+...
+
+public ArrayList Language
+...
+
+
+/// <summary>
+
+/// Отображает список имен свойств
+
+/// </summary>
+
+public void ShowNames()
+{
+IDictionary result = new Hashtable();
+
+// Получить атрибуты уровня свойств.
+
+// Получить все свойства класса и поместить их в массив 
+
+PropertyInfo[] pInfo = this.GetType().GetProperties();
+
+for (int j=0; jstring _fieldName = pInfo[j].Name;
+Attribute dna = Attribute.GetCustomAttribute(pInfo[j], typeof(DisplayNameAttribute));
+if (dna != null)
+_fieldName = ((DisplayNameAttribute)dna).Name;
+
+Console.WriteLine("- " + _fieldName);
+}
+}
+}
+
+/// <summary>
+
+/// The main entry point for the application.
+
+/// </summary>
+
+[STAThread]
+static void Main(string[] args)
+{
+Person p = new Person(-1);
+p.ShowNames();
+Console.ReadLine();
+...
+</pre>
+
+<p>Вот результаты вывода на экран:</p>
+
+<div align=center>
+<img border=0 width=668 height=331 src="./03/my1article_1.png">
+</div>
+
+<p>Мы получили то, что было нужно: понятные пользователю названия полей сущности.</p>
+<p>А что будет, если применить атрибут к одному свойству несколько раз?</p>
+
+<pre class=code>
+[DisplayName("ФИО")]
+[DisplayName("Имя")]
+public string Name
+{
+get { return m_Name;}
+set { m_Name = value;}
+}
+</pre>
+
+<p>Из-за того, что нет явного разрешения нескольких экземпляров атрибута для одного элемента (AllowMultiple=true), получим ошибку при компиляции:</p>
+
+<div class=info>
+c:\csharp\consoleapplication1\consoleapplication1\class1.cs(56,3): error CS0579: Duplicate 'DisplayName' attribute<br>
+</div>
+
+<p>Теперь создадим базовый класс, определяющий общие свойства и методы для всех атрибутов нормализации. Под нормализацией я понимаю приведение значения свойства к одному из возможных валидных (корректных) значений. Свойство NormalizationOrder будет объяснено чуть позже, а виртуальный метод Normalize - это тот метод атрибута, который и будет выполнять основную работу. Он должен быть переопределен в дочерних классах.</p>
+
+<pre class=code>
+/// <summary>
+
+/// Базовый класс-атрибут для создания атрибутов нормализации
+
+/// </summary>
+
+[AttributeUsage(AttributeTargets.Property)]
+public abstract class NormalizationBaseAttribute : Attribute
+{
+int m_normalizationOrder = 0; 
+/// <summary>
+
+/// Порядковый номер при нормализации
+
+/// </summary>
+
+public virtual int NormalizationOrder
+{
+get {return m_normalizationOrder;}
+}
+
+public NormalizationBaseAttribute(int normalizationOrder)
+{
+m_normalizationOrder = normalizationOrder;
+}
+
+/// <summary>
+
+/// Нормализовать указанное значение
+
+/// </summary>
+
+/// <param name="value">Значение для нормализации</param>
+
+/// <returns>Нормализованный объект</returns>
+
+public virtual object Normalize(object value)
+{
+return "#NormalizationBase - Normalize method not overrided!";
+}
+}
+</pre>
+
+<p>Определим несколько атрибутов, которые будем использовать на практике. Вот атрибут, выполняющий отсечение определенных символов с начала и/или конца строки. Отсекаемый символ по умолчанию - пробел.</p>
+
+<pre class=code>
+/// <summary>
+
+/// Атрибут нормализации для отсечения символов строки слева и/или справа
+
+/// </summary>
+
+public class NormalizationStringTrimAttribute : NormalizationBaseAttribute
+{
+
+#region members 
+
+char m_trimChar = ' ';
+/// <summary>
+
+/// Отсекаемый символ
+
+/// </summary>
+
+public virtual char TrimChar
+{
+get {return m_trimChar;}
+set {m_trimChar = value;}
+}
+
+bool m_trimLeft = true;
+/// <summary>
+
+/// Отсекать слева (с начала строки)
+
+/// </summary>
+
+public virtual bool TrimLeft
+{
+get {return m_trimLeft;}
+set {m_trimLeft = value;}
+}
+
+bool m_trimRight = true;
+/// <summary>
+
+/// Отсекать справа (с конца строки)
+
+/// </summary>
+
+public virtual bool TrimRight
+{
+get {return m_trimRight;}
+set {m_trimRight = value;}
+}
+
+#endregion
+
+public NormalizationStringTrimAttribute(int normalizationOrder) : base(normalizationOrder)
+{}
+
+public override object Normalize(object value)
+{
+if (m_trimChar == ' ')
+{
+if (m_trimLeft & m_trimRight)
+return value.ToString().Trim();
+else if (m_trimLeft)
+return value.ToString().TrimStart();
+else if (m_trimRight)
+return value.ToString().TrimEnd();
+else
+return value;
+}
+else
+{
+if (m_trimLeft & m_trimRight)
+return value.ToString().Trim(m_trimChar);
+else if (m_trimLeft)
+return value.ToString().TrimStart(m_trimChar);
+else if (m_trimRight)
+return value.ToString().TrimEnd(m_trimChar);
+else
+return value;
+}
+}
+}
+</pre>
+
+<p>Определим ещё один атрибут для замены нескольких пробелов одним:</p>
+
+<pre class=code>
+/// <summary>
+
+/// Атрибут нормализации строки для замены нескольких пробелов (до 24) подряд одним 
+
+/// </summary>
+
+public class NormalizationStringWhiteSpaceReduceAttribute : NormalizationBaseAttribute
+{
+
+public NormalizationStringWhiteSpaceReduceAttribute(int normalizationOrder):base(normalizationOrder)
+{}
+
+public override object Normalize(object value)
+{
+return value.ToString().Replace("    ", " ").Replace("   ", " ").Replace("  ", " ");
+}
+}
+</pre>
+
+<p>Теперь у нас есть два атрибута, которые уже можно как-то использовать. Можно, например, написать такой код:</p>
+
+<pre class=code>
+[DisplayName("ФИО")]
+[NormalizationStringTrim()]
+[NormalizationStringWhiteSpaceReduce()]
+public string Name
+{
+get { return m_Name;}
+set { m_Name = value;}
+}
+</pre>
+
+<p>Мы предполагаем, что функция получит все атрибуты нормализации и, последовательно перебирая их, обработает свойство. Но возникает вопрос: в какой последовательности атрибуты будут возвращены отражением? Это может быть очень важно. Будет ли последовательность совпадать с порядком объявления атрибутов в коде? К сожалению, ответ "Нет". Майкрософт не определяет правила хранение я возвращения массива атрибутов, а в спецификациях языков можно найти только строчки наподобие "несколько атрибутов указываются в списке с разделителями-запятыми. Порядок указания атрибутов не имеет значения." Придется добавить параметр, который будет определять порядок (последовательность) применения атрибутов. Для этого и предназначено виртуальное свойство NormalizationOrder. Сценарий действий будет таков:</p>
+<ol>
+<li>Получаем для свойства массив атрибутов, основанных на NormalizationBaseAttribute, с помощью метода Attribute.GetCustomAttributes.</li>
+<li>Сортируем массив, получая нужный порядок.</li>
+<li>Последовательно применяем к объекту нормализацию.</li>
+</ol>
+
+<p>Для реализации второго пункта понадобится класс NormalizationComparer, предназначенный для сравнения двух атрибутов, наследующихся от NormalizationBaseAttribute. Сравнение производится по свойству NormalizationOrder:</p>
+
+<pre class=code>
+/// <summary>
+
+/// Класс-сравнитель для NormalizationBaseAttribute
+
+/// (сравнивает по NormalizationOrder)
+
+/// </summary>
+
+public class NormalizationComparer : IComparer
+{
+
+#region IComparer Members
+
+public int Compare(object x, object y)
+{
+return ((NormalizationBaseAttribute)x).NormalizationOrder.CompareTo(
+ ((NormalizationBaseAttribute)y).NormalizationOrder );
+}
+
+#endregion
+
+}
+</pre>
+
+<p>Основная функция нормализации:</p>
+
+<pre class=code>
+/// <summary>
+
+/// Нормализует поля объекта согласно установленным правилам
+
+/// </summary>
+
+public void Normalize()
+{
+// Получить атрибуты уровня свойств.
+
+// Получить все свойства данного класса и поместить их в массив 
+
+PropertyInfo[] pInfo = this.GetType().GetProperties();
+
+// атрибуты всех свойств класса 
+
+for (int j=0; jnew NormalizationComparer());
+for (int k=0; kif (att != null)
+pInfo[j].SetValue(this, att.Normalize(pInfo[j].GetValue(this, null)), null);
+}
+}
+}
+</pre>
+
+<p>Вот небольшой тестовый код:</p>
+
+<pre class=code>
+/// <summary>
+
+/// The main entry point for the application.
+
+/// </summary>
+
+[STAThread]
+static void Main(string[] args)
+{
+Person p = new Person(-1);
+p.ShowNames();
+Console.ReadLine();
+
+p.Name = "  Иванов   Иван   Иванович   ";
+Console.WriteLine("'{0}'", p.Name);
+p.Normalize();
+Console.WriteLine("'{0}'", p.Name);
+Console.ReadLine();
+...
+</pre>
+
+<p>В процессе работы он выдаст следующий результат:</p>
+
+<div align=center>
+<img border=0 width=668 height=175 src="./03/my1article_2.png">
+</div>
+
+<p>Как видите, оба атрибута отработали и привели свойство к требуемому виду.</p>
+<p>Отлично! Но нормализацией следует пользоваться с осторожностью, ведь пользователь уверен, что ввел одно значение, а перед записью в БД произошла нормализация, и значение могло измениться... Возможны 3 варианта:</p>
+<ul>
+<li>проверять введенные пользователем данные и, если они не соответствуют правильным, предупреждать пользователя и не позволять ему продолжать, пока данные не будут исправлены</li>
+<li>проверять введенные пользователем данные и, если они не соответствуют правильным, нормализовывать и извещать пользователя об этом;</li>
+<li>нормализовывать данные, а пользователю ничего не сообщать :)</li>
+</ul>
+
+<p>Я предпочитаю второй вариант. Если ошибок нет, данные сохраняются, и актуальные значения отображаются пользователю.</p>
+
+<p>Теперь напишем аналогичный базовый класс для атрибутов валидации:</p>
+
+<pre class=code>
+/// <summary>
+
+/// Базовый класс-атрибут для создания атрибутов валидации
+
+/// </summary>
+
+[AttributeUsage(AttributeTargets.Property)]
+public abstract class ValidationBaseAttribute : Attribute
+{
+
+int m_validationOrder = 0;
+/// <summary>
+
+/// Порядок проведения валидации
+
+/// </summary>
+
+public virtual int ValidationOrder
+{
+get {return m_validationOrder;}
+}
+
+WarningLevel m_level = WarningLevel.Warning; 
+/// <summary>
+
+/// Уровень предупреждения
+
+/// </summary>
+
+public virtual WarningLevel Level
+{
+get {return m_level;}
+set {m_level = value;}
+}
+
+/// <summary>
+
+/// Базовый атрибут валидации
+
+/// </summary>
+
+/// <param name="validationOrder">Порядковый номер в процессе валидации</param>
+
+public ValidationBaseAttribute(int validationOrder)
+{
+m_validationOrder = validationOrder;
+}
+
+/// <summary>
+
+/// Произвести валидацию
+
+/// </summary>
+
+/// <param name="value">значение для проверки</param>
+
+/// <returns>Строку с предупреждением, либо пустую строку если всё в порядке</returns>
+
+public virtual string Validate(object value)
+{
+return "#ValidationBase - Validate method not overrided!";
+}
+}
+</pre>
+
+<p>Напишем также сортировщик (по аналогии с нормализацией) и несколько атрибутов валидации (их код можно найти в прилагаемом архиве):</p>
+<ul>
+<li>ValidationEmptyAttribute. Атрибут проверки свойства на пустоту (null, DBNull, string.empty, (int)0)</li>
+<li>ValidationStringLengthAttribute. Атрибут проверки свойства на длину строки (может применяться несколько раз)</li>
+<li>ValidationIntValueAttribute. Атрибут проверки свойства на значение целочисленного типа (может применяться несколько раз)</li>
+<li>ValidationCollectionEmptyAttribute. Атрибут проверки свойства на пустоту коллекции (списка)</li>
+<li>ValidationDateYearRangeAttribute. Атрибут проверки свойства на нахождение года даты в указанных пределах (может применяться несколько раз)</li>
+</ul>
+
+<p>Напишем несложный код проверки. Получим список всех свойств объекта, для каждого из которых запросим список унаследованных от ValidationBaseAttribute атрибутов. Затем вызовем виртуальный (переопределенный в дочерних классах) метод Validate, который в случае отсутствия предупреждений возвратит пустую строку, а в противном случае - строку сообщения. Эти строки сообщений будем добавлять в словарь (Hashtable)</p>
+
+<pre class=code>
+/// <summary>
+
+/// Проверить объект на соответствие установленным ограничениям
+
+/// </summary>
+
+/// <returns>Словарь найденных несоответствий</returns>
+
+public IDictionary Validate()
+{
+IDictionary result = new Hashtable();
+
+// Получить атрибуты уровня свойств.
+
+// Получить все свойства данного класса и поместить их в массив 
+
+PropertyInfo[] pInfo = this.GetType().GetProperties();
+
+// атрибуты всех свойств класса 
+
+for (int j=0; jif (atts.Length == 0)
+continue;
+
+Array.Sort(atts, new ValidationComparer());
+string _fieldName = pInfo[j].Name;
+Attribute dna = Attribute.GetCustomAttribute(pInfo[j], typeof(DisplayNameAttribute));
+if (dna != null)
+_fieldName = ((DisplayNameAttribute)dna).Name;
+
+for (int k=0; kif (att != null)
+{
+string vr = att.Validate(pInfo[j].GetValue(this, null));
+if (vr != "")
+{
+result.Add(_fieldName +": "+ vr, att.Level);
+//если ошибка - прекратить проверку данного поля
+
+if (att.Level == WarningLevel.Error)
+break;
+}
+}      
+}
+}
+
+//additional :(
+
+
+return result;
+}
+</pre>
+
+<p>После строчки //additional можно вызвать собственные, комплексные функций проверки введенных данных, определенные в этом же классе. Словарь возвращенных предупреждений выведем в диалоговом окне в виде списка, чтобы пользователь мог с ними ознакомиться (в примере осуществляется вывод в консоль).</p>
+<p>И результаты выполнения следующего кода:</p>
+
+<pre class=code>
+/// <summary>
+
+/// The main entry point for the application.
+
+/// </summary>
+
+[STAThread]
+static void Main(string[] args)
+{
+Person p = new Person(-1);
+p.ShowNames();
+Console.ReadLine();
+
+p.Name = "  Иванов   Иван   Иванович   ";
+Console.WriteLine("'{0}'", p.Name);
+p.Normalize();
+Console.WriteLine("'{0}'", p.Name);
+Console.ReadLine();
+
+p.Validate();
+Console.ReadLine();
+}
+</pre>
+
+<p>Теперь будут такими:</p>
+
+<div align=center>
+<img border=0 width=668 height=247 src="./03/my1article_3.png">
+</div>
+
+<p>Итак, несмотря на некоторые недостатки, данный подход имеет право на существование, что доказано на практике (я использую его в достаточно крупном проекте).</p>
+<p>Тестовый проект (для VisualStudio.NET 2003), рассмотренный в статье, можно загрузить здесь.</p>
+
+<!--#include virtual="../template4"-->

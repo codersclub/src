@@ -1,0 +1,202 @@
+<!--#include virtual="../template1"-->Функции DLL<!--#include virtual="../template2"-->
+<!--#include virtual="./menu"-->
+<!--#include virtual="../template3"-->
+
+<h1 align=center>Функции DLL</h1>
+
+<b>Автор:</b> <a href="http://forum.sources.ru/index.php?showuser=3352"><i>x2er0</i></a>
+
+<p>Часто появляется необходимость выяснить - какие функции экспортирует та или иная DLL. Вы скажете, что легко это сделать с помощью различных утилит, например: DumpBin или Dependency Walker ... Верно, но давайте попробуем сделать что-нибудь свое! Для этого нам необходимы кое-какие знания о PE-файлах. Но об этом в данной статье речь не пойдет, возможно, я напишу это как-нибудь в другой раз, а сейчас просто покажу пример того, как это можно сделать.</p>
+<pre class="code">
+{$A+,B-,C+,D+,E-,F-,G+,H+,I+,J-,K-,L+,M-,N+,O+,P+,Q-,R-,S-,T-,U-,V+,W-,X+,Y+,Z1}
+{$MINSTACKSIZE $00004000}
+{$MAXSTACKSIZE $00100000}
+{$IMAGEBASE $00400000}
+{$APPTYPE CONSOLE}
+program pr;
+  uses
+  Windows,
+  Dialogs,
+  SysUtils;
+
+Var
+  ImageBase : DWord;
+  DosHeader : PImageDosHeader;
+  PeHeader  : PImageNtHeaders;
+  PExport   : PImageExportDirectory;
+  cmdline   : String;
+  pname     : PDWord;
+  name      : PChar;
+  i         : Integer;
+
+Procedure FatalOsError;
+begin
+  ShowMessage(SysErrorMessage(GetLastError( )));
+  Abort;
+end;
+
+
+begin
+  try
+    If (ParamCount( ) < 1) Then
+      Abort
+    Else
+      cmdline := ParamStr(1);
+
+    ImageBase := GetModuleHandle(PChar(cmdline));
+    If (ImageBase = 0) Then
+    Begin
+       ImageBase := LoadLibrary(PChar(cmdline));
+       If (ImageBase = 0) Then FatalOsError;
+    End;
+
+    try
+      DosHeader := PImageDosHeader(ImageBase);
+      If (DosHeader^.e_magic <> IMAGE_DOS_SIGNATURE) Then
+          FatalOsError;
+
+      PEHeader := PImageNtHeaders(DWord(ImageBase) + DWord(DosHeader^._lfanew));
+      If (PEHeader^.Signature <> IMAGE_NT_SIGNATURE) Then
+          FatalOsError;
+
+      PExport := PImageExportDirectory(ImageBase +
+ DWord(PEHeader^.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress));
+      pname   := PDWord(ImageBase + DWord(PExport^.AddressOfNames));
+
+      For i := 0 To PExport^.NumberOfNames - 1 Do begin
+        name := PChar(PDWord(DWord(ImageBase)  + PDword(pname)^));
+        WriteLn(name);
+        inc(pname);
+      end;
+    finally
+      FreeLibrary(ImageBase);
+    end;
+  except
+    Abort;
+  end;
+end.
+</pre>
+
+<p>Чтобы запустить программу, надо в качестве первого параметра командной строки передать имя DLL файла. В итоге в консоль выведутся имена функций.</p>
+<p>Дополнения:</p>
+<p>Таблицу экспорта можно найти с помощью функции function ImageDirectoryEntryToData(Base: Pointer; MappedAsImage: ByteBool; DirectoryEntry: Word; var Size: ULONG): Pointer; stdcall; external 'imagehlp.dll';</p>
+<p>Для примера давайте рассмотрим результат работы данной программы  на примере библиотеки - imagehlp.dll.</p>
+<p>Запускаем с перенаправлением в файл:</p>
+<p>pr imagehlp.dll > log_imagehlp.txt</p>
+<p>В итоге получаем файл следующего содержания:</p>
+
+<pre>
+BindImage
+BindImageEx
+CheckSumMappedFile
+EnumerateLoadedModules
+EnumerateLoadedModules64
+FindDebugInfoFile
+FindDebugInfoFileEx
+FindExecutableImage
+FindExecutableImageEx
+FindFileInPath
+FindFileInSearchPath
+GetImageConfigInformation
+GetImageUnusedHeaderBytes
+GetTimestampForLoadedLibrary
+ImageAddCertificate
+ImageDirectoryEntryToData
+ImageDirectoryEntryToDataEx
+ImageEnumerateCertificates
+ImageGetCertificateData
+ImageGetCertificateHeader
+ImageGetDigestStream
+ImageLoad
+ImageNtHeader
+ImageRemoveCertificate
+ImageRvaToSection
+ImageRvaToVa
+ImageUnload
+ImagehlpApiVersion
+ImagehlpApiVersionEx
+MakeSureDirectoryPathExists
+MapAndLoad
+MapDebugInformation
+MapFileAndCheckSumA
+MapFileAndCheckSumW
+ReBaseImage
+ReBaseImage64
+RemovePrivateCvSymbolic
+RemovePrivateCvSymbolicEx
+RemoveRelocations
+SearchTreeForFile
+SetImageConfigInformation
+SplitSymbols
+StackWalk
+StackWalk64
+SymCleanup
+SymEnumSourceFiles
+SymEnumSym
+SymEnumSymbols
+SymEnumTypes
+SymEnumerateModules
+SymEnumerateModules64
+SymEnumerateSymbols
+SymEnumerateSymbols64
+SymEnumerateSymbolsW
+SymEnumerateSymbolsW64
+SymFindFileInPath
+SymFromAddr
+SymFromName
+SymFunctionTableAccess
+SymFunctionTableAccess64
+SymGetLineFromAddr
+SymGetLineFromAddr64
+SymGetLineFromName
+SymGetLineFromName64
+SymGetLineNext
+SymGetLineNext64
+SymGetLinePrev
+SymGetLinePrev64
+SymGetModuleBase
+SymGetModuleBase64
+SymGetModuleInfo
+SymGetModuleInfo64
+SymGetModuleInfoW
+SymGetModuleInfoW64
+SymGetOptions
+SymGetSearchPath
+SymGetSymFromAddr
+SymGetSymFromAddr64
+SymGetSymFromName
+SymGetSymFromName64
+SymGetSymNext
+SymGetSymNext64
+SymGetSymPrev
+SymGetSymPrev64
+SymGetTypeFromName
+SymGetTypeInfo
+SymInitialize
+SymLoadModule
+SymLoadModule64
+SymMatchFileName
+SymMatchString
+SymRegisterCallback
+SymRegisterCallback64
+SymRegisterFunctionEntryCallback
+SymRegisterFunctionEntryCallback64
+SymSetContext
+SymSetOptions
+SymSetSearchPath
+SymUnDName
+SymUnDName64
+SymUnloadModule
+SymUnloadModule64
+TouchFileTimes
+UnDecorateSymbolName
+UnMapAndLoad
+UnmapDebugInformation
+UpdateDebugInfoFile
+UpdateDebugInfoFileEx
+</pre>
+
+<p>На этом все.</p>
+<p>Удачи!</p>
+
+<!--#include virtual="../template4"-->

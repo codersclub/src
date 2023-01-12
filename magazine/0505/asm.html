@@ -1,0 +1,165 @@
+<!--#include virtual="../template1"-->Ассемблер для начинающих<!--#include virtual="../template2"-->
+<!--#include virtual="./menu"-->
+<!--#include virtual="../template3"-->
+
+<h1 align=center>Ассемблер для начинающих</h1>
+
+<b>Автор:</b> <a href="http://forum.sources.ru/index.php?showuser=9761"><i>miksayer</i></a>
+
+<h2>Предисловие</h2>
+<p>С этой статьи я начинаю цикл статей «Изучаем Ассемблер». Основная идея состоит в том, что я знаю ассемблер не лучше вас и я как бы изучаю ассемблер вместе с вами. Предполагается, что вы уже хотя бы немного знакомы с любым языком программирования. Итак, начнем!</p>
+
+<h2>Основы</h2>
+<p>Какой компилятор выбрать? Компиляторов ассемблера существует очень много. Самые популярные из них: MASM, TASM, FASM, NASM. Большинство примеров будет на MASM’е, но большинство компиляторов мало чем отличаются по синтаксису. Скачать MASM можно на http://www.masm32.cjb.net/. Вместе с MASM поставляется редактор для него. Перед тем, как компилировать программу нужно ее сохранить(File->Save). Теперь можно откомпилировать(Project->Build All). Чтобы запустить вашу программу нажмите Project->Run Program.</p>
+<p>Теперь о структуре программы. Вот «скелет» стандартной программы:</p>
+
+<pre class="code">
+<font color="#ff0000">.386</font>
+
+.model flat, stdcall 
+option casemap :none 
+
+<font color="#0000ff">;подключение библиотек,необходимых нам</font>
+include \MASM32\INCLUDE\windows.inc
+include \MASM32\INCLUDE\masm32.inc
+include \MASM32\INCLUDE\gdi32.inc
+include \MASM32\INCLUDE\user32.inc
+include \MASM32\INCLUDE\kernel32.inc
+includelib \MASM32\LIB\masm32.lib
+includelib \MASM32\LIB\gdi32.lib
+includelib \MASM32\LIB\user32.lib
+includelib \MASM32\LIB\kernel32.lib
+
+<font color="#0000ff">;раздел, где объявляются все константы</font>
+<font color="#ff0000">.const</font>
+
+<font color="#0000ff">;раздел, где объявляются переменные, уже имеющие какое-то значение</font>
+<font color="#ff0000">.data</font>
+
+<font color="#0000ff">;раздел, где объявляются переменные, еще не имеющие значения</font>
+<font color="#ff0000">.data?</font>
+
+<font color="#ff0000">.code</font>
+start: <font color="#0000ff">;с этого слова начинается код программы</font>
+<b>invoke</b> ExitProcess,0
+end start <font color="#0000ff">;с этого слова заканчивается код программы</font>
+</pre>
+
+<p>Советую сохранить этот «скелет» в отдельном файле для удобства. В большинстве наших программ мы будем использовать функции WinAPI. Давайте напишем программу, которая будет выводить всплывающее окно с каким-либо сообщением. Для вывода этого окна мы будем пользоваться функцией MessageBox:</p>
+<pre class="code">
+<font color="#ff0000">.386</font>
+
+.model flat, stdcall 
+option casemap :none 
+
+include \MASM32\INCLUDE\windows.inc
+include \MASM32\INCLUDE\masm32.inc
+include \MASM32\INCLUDE\gdi32.inc
+include \MASM32\INCLUDE\user32.inc
+include \MASM32\INCLUDE\kernel32.inc
+includelib \MASM32\LIB\masm32.lib
+includelib \MASM32\LIB\gdi32.lib
+includelib \MASM32\LIB\user32.lib
+includelib \MASM32\LIB\kernel32.lib
+
+<font color="#ff0000">.data</font>
+message db "Sources.RU Magazine",0 <font color="#0000ff">;переменная с сообщением</font>
+mestitle db " Sources.RU Magazine ",0 <font color="#0000ff">;переменная с заголовком</font>
+
+<font color="#ff0000">.code</font>
+start:
+<b>invoke</b> MessageBox,0,ADDR message,ADDR mestitle,MB_OK <font color="#0000ff">;выводим сообщение</font>
+<b>invoke</b> ExitProcess,0 <font color="#0000ff">;завершаем программу</font>
+end start
+</pre>
+
+<p>Как можно увидеть в примере, все API-функции вызываются с помощью команды invoke. Сначала нужно написать имя функции, а потом все ее параметры, то есть:</p>
+<pre class="code">
+<b>invoke</b> имя_функции, [параметр1, параметр2, параметр3, … …]
+</pre>
+
+<p>У многих сразу возникнет вопрос: где взять справочник по API? Я отвечу: а искать не пробовали? Но если все-таки не нашли, то я пользуюсь API-Guide (<a href="http://www.allapi.net/" target="_blank">http://www.allapi.net/</a>). Это справочник по API для VB, но он подходит и для ассемблера. А вообще сети их полно, просто нужно хорошо поискать.</p>
+
+<h2>Математика</h2>
+<p>На любом языке программирования высокого уровня, чтобы сложить два числа нужно сделать что-то вроде этого:</p>
+<p>переменная=число1 + число2</p>
+<p>В ассемблере все по-другому. Чтобы сложить, вычесть, умножить или разделить два числа он использует не переменные, а регистры процессора. Регистр процессора – это как бы переменные, которые находятся в процессоре. Вот таблица с основными регистрами:</p>
+<br>
+<div class="info">
+EAX	используется для сохранения числа и для счета<br>
+ECX	используется для счета<br>
+EDX	сохраняет остаток от деления <br>
+EBX	может быть использован для всего<br>
+ESI	используется для управления строками<br>
+EDI	также используется для управления строками<br>
+</div>
+<p>И таблица с основными операторами, которые используются для счета:</p>
+<br>
+<div class="info">
+MOV EAX,число1	копирует число1 в регистр EAX<br>
+ADD EAX,число1	прибавляет к содержимому EAX число1<br>
+SUB EAX,число1	отнимает от содержимого EAX число1<br>
+MUL регистр1	используется для умножения, умножает содержимое регистр1 на число, которое всегда хранится в EAX и сохраняет результат в EAX<br>
+DIV регистр1	Делит содержимое EAX на содержимое регистр1 и сохраняет результат в EAX<br>
+</div>
+<p>Вообще все арифметические операции в ассемблере производятся между регистром и аккумулятором, то есть регистром EAX. В операторах MUL и DIV только один параметр, потому что ассемблер сразу знает, что второе число хранится в EAX. Но почему же в операторах SUB и ADD два параметра, а не один? Об этом мы поговорим позже после того, как рассмотрим пример в конце статьи.</p>
+<p>Теперь немного подробнее об арифметике. В регистре EDX всегда хранится остаток от деления и вы должны запомнить, что перед делением нужно обязательно очистить этот регистр. Это можно сделать так:</p>
+
+<pre class="code">
+MOV EDX,0
+</pre>
+
+<p>или так:</p>
+
+<pre class="code">
+XOR EDX,EDX
+</pre>
+
+<p>Между этими двумя способами нет никакой разницы, но второй способ быстрее. Привожу пример программы, вычисляющей число 7*30-40*2:</p>
+<pre class="code">
+<font color="#0000ff">; в программе есть то, о чего я еще не объяснял, но я объясню вам это позже</font>
+<font color="#ff0000">.386</font>
+
+.model flat, stdcall 
+option casemap :none 
+
+include \MASM32\INCLUDE\windows.inc
+include \MASM32\INCLUDE\masm32.inc
+include \MASM32\INCLUDE\gdi32.inc
+include \MASM32\INCLUDE\user32.inc
+include \MASM32\INCLUDE\kernel32.inc
+includelib \MASM32\LIB\masm32.lib
+includelib \MASM32\LIB\gdi32.lib
+includelib \MASM32\LIB\user32.lib
+includelib \MASM32\LIB\kernel32.lib
+wsprintfA PROTO C :DWORD,:VARARG
+wsprintf equ <wsprintfA>
+
+<font color="#ff0000">.data</font>
+bufferforstring db 10 dup(0)
+titlestring db "Результат",0
+szformat db "%u",0
+
+<font color="#ff0000">.code</font>
+
+start:
+mov eax,7 <font color="#0000ff">;заносим в EAX 5</font>
+mov ecx,30 <font color="#0000ff">;заносим в ECX 25</font>
+mul ecx <font color="#0000ff">;умножаем EAX на ECX</font>
+mov ebx,eax <font color="#0000ff">;заносим содержимое EAX в EBX</font>
+mov eax,40 <font color="#0000ff">;заносим в EAX 40</font>
+mov ecx, 2 <font color="#0000ff">;заносим в ECX 2</font>
+mul ecx <font color="#0000ff">;заносим в ECX 2</font>
+sub ebx,eax <font color="#0000ff">;отнимаем от EBX EAX</font>
+<b>invoke</b> wsprintf,addr bufferforstring,addr szformat,eax
+<b>invoke</b> MessageBox,0,ADDR bufferforstring,ADDR titlestring,MB_OK <font color="#0000ff">;выводим резульат</font>
+<b>invoke</b> ExitProcess,0
+end start
+</pre>
+
+<p>Помните, как я обещал объяснить, почему в mul и div один параметр, а в sub и add их два? На самом деле ответ прост. Вспомните правила арифметики. Ведь умножение и деление должно производится раньше, чем сложение и вычитание! То есть, чтобы решить наше выражение(7*30-40*2), нужно где-то хранить результат 7*30 и 40*2, EAX мы использовать не можем, так как он используется в арифметических операциях. Поэтому приходится хранить результат 7*30 в EBX. Конечно, в нашем случае в операторе sub  все равно используется EAX. Но подумайте, что было бы, если бы у нас было в выражении не одна операция вычитания или сложения, а несколько?</p>
+<p>Вот и конец статьи! Надеюсь, что вы все поняли, если нет, то пишите письма miksayer@mail.ru. Удачи!</p>
+                                                                                           
+<p style="text-align: right;"><i>С уважением, <a href="http://forum.sources.ru/index.php?showuser=976" target="_blank">Miksayer</a>!</i></p>
+
+<!--#include virtual="../template4"-->
