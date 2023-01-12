@@ -1,0 +1,179 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Создание Аккаунта в Windows, используя ADSI
+    (Активные директории)</h3>
+    <p>Автор: <a href="mailto:philip@jespersen.ch">Philip Jespersen</a></p>
+    <p>Чтобы создавать пользовательские аккаунты в
+    Windows на Delphi можно использовать ADSI (Active Directory Services
+    Interface) от Microsoft. Вы думаете, что ADSI это новая
+    примочка для Windows 2000 (судя по названию) , но
+    оказывается ADSI доступна для всех платформ Win32.
+    Для этого Вам потребуется всего навсего скачать
+    ADSI для Windows (более полная информация на <a
+    href="http://www.microsoft.com/adsi">http://www.microsoft.com/adsi</a> ). Ну и
+    конечно же ADSI входит в поставку Windows 2000. <br>
+    <br>
+    ADSI довольно большой предмет для изучения. В
+    данном примере я затрону этот предмет
+    поверхностно. ADSI - это своего рода основа для
+    различных сервисов (обычно основанных на
+    директориях) оперционной системы. Например,
+    стандартными ADSI сервисами можно назвать (COM
+    интерфейсы, которые можно использовать в
+    программах)&nbsp; WinNT, IIS, LDAP и NDS. WinNT сервис может тем
+    самым использоваться для создания
+    пользовательских аккаунтов, модификации их или
+    модификации групп. <br>
+    <br>
+    Следующий небольшой пример показывает
+    необходимые шаги для создания пользовательского
+    аккаунта в NT/2000, используя ADSI: <br>
+    <br>
+    Во первых Вам прийдётся импортировать
+    Библиотеку Типов ADSI (Menu Project/Import Type Library).
+    Библиотеку Типов можно найти в поддирректории
+    system32 (Например C:\WINNT\system32\activeds.tlb). Требуемый файл
+    называется 'activeds.tlb'. Если такого файла нет, то
+    проверьте, правильно ли вы установили ADSI. После
+    успешного импортирования Библиотеки Типов Вы
+    найдёте новый файл в дирректории ипортов Delphi,
+    файл будет называться &quot;activeds_tlb.pas&quot;
+    (..\Delphi5\Imports\activeds_tlb.pas). Чтобы приступить к
+    программированию ADSI в Delphi, необходимо включить
+    этот файл в Ваш проект. <br>
+    <br>
+    Далее в примере, необходимо заменить [computername] на
+    фактическое имя компьютера, с которым Вы
+    работаете. То же надо проделать с [accountname]. Пример
+    тестировался на WindowsNT 4.0 и Windows 2000. <br>
+    <br>
+    ... <br>
+    <br>
+    uses ActiveX,&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// используется
+    для COM Moniker stuff... <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; ActiveDs_TLB,&nbsp;&nbsp; // созданная
+    библиотека типов <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; ComObj;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; //
+    используется для OleCheck и других функций COM <br>
+    <br>
+    implementation <br>
+    <br>
+    procedure TForm1.BtnCreateUserClick(Sender: TObject); <br>
+    var <br>
+    &nbsp;&nbsp;Usr:&nbsp;&nbsp;IADsUser; <br>
+    &nbsp;&nbsp;Comp: IADsContainer; <br>
+    begin <br>
+    &nbsp;&nbsp;try <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Comp := GetObject('WinNT://[computername],computer') as <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;IADsContainer; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Usr := Comp.Create('user', '[accountname]') as IADsUser; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Usr.SetInfo; <br>
+    &nbsp;&nbsp;except <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;on E: EOleException do begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ShowMessage(E.Message); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;end; <br>
+    end; <br>
+    <br>
+    <br>
+    procedure TForm1.BtnSetPasswordClick(Sender: TObject); <br>
+    var <br>
+    &nbsp;&nbsp;Usr: IADsUser; <br>
+    begin <br>
+    &nbsp;&nbsp;try <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Usr := GetObject('WinNT://[computername]/[accountname],user') <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;as IADsUser; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Usr.SetPassword('thenewpassword'); <br>
+    &nbsp;&nbsp;except <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;on E: EOleException do begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ShowMessage(E.Message); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;end; <br>
+    end; <br>
+    <br>
+    <br>
+    // GetObject использует вызов VB GetObject <br>
+    // Данный код (GetObject) был найден в Usenet.&nbsp;&nbsp; <br>
+    // <br>
+    // GetObject позволяет связаться с существующим ADSI
+    сервисом <br>
+    // используя 'ADSIPath' (например WinNT://.... или <br>
+    // IIS://localhost). <br>
+    <br>
+    function TForm1.GetObject(const Name: string): IDispatch; <br>
+    var <br>
+    &nbsp;&nbsp;Moniker: IMoniker; <br>
+    &nbsp;&nbsp;Eaten: integer; <br>
+    &nbsp;&nbsp;BindContext: IBindCtx; <br>
+    &nbsp;&nbsp;Dispatch: IDispatch; <br>
+    begin <br>
+    &nbsp;&nbsp;OleCheck(CreateBindCtx(0, BindContext)); <br>
+    &nbsp;&nbsp;OleCheck(MkParseDisplayName(BindContext, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;PWideChar(WideString(Name)),
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Eaten,
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Moniker));
+    <br>
+    &nbsp;&nbsp;OleCheck(Moniker.BindToObject(BindContext, NIL, IDispatch, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Dispatch)); <br>
+    <br>
+    &nbsp;&nbsp;Result := Dispatch; <br>
+    end; <br>
+    <br>
+    end. <br>
+    <br>
+    <br>
+    Через ADSI Вы так же можете изменять параметры
+    пользовательских аккаунтов. Следующий код
+    изменяет флаг 'Password never expires' нужного аккаунта: <br>
+    <br>
+    procedure TFormMain.ButtonNeverExpiresClick(Sender: TObject); <br>
+    var <br>
+    &nbsp;&nbsp;Usr: IADsUser; <br>
+    begin <br>
+    &nbsp;&nbsp;try <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Usr := GetObject('WinNT://[computername]/[acccoutname],user') as <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;IADsUser; <br>
+    <br>
+    &nbsp;&nbsp;// Проверяем состояние чекбоксов... <br>
+    &nbsp;&nbsp;if CheckBoxPasswordNeverExpires.Checked then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Usr.Put('UserFlags', Usr.Get('UserFlags') OR 65536) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// 65536 объявлено как UF_DONT_EXPIRE_PASSWORD в
+    iads.h&nbsp;&nbsp; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// в ADSI SDK от Microsoft <br>
+    &nbsp;&nbsp;else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Usr.Put('UserFlags', Usr.Get('UserFlags') XOR 65536);&nbsp;&nbsp; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Usr.SetInfo; <br>
+    <br>
+    &nbsp;&nbsp;except <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;on E: EOleException do begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ShowMessage(E.Message); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;end; <br>
+    end; <br>
+    <br>
+    <br>
+    В завершении... <br>
+    <br>
+    Чтобы использовать большие возможности ADSI ,
+    необходимо проверить, поддерживаются ли такие
+    сервисы как IADsUser или IADsContainer. <br>
+    Я рекомендую поработать с ADSI SDK от Microsoft и более
+    детально изучить Библиотеку Типов. <br>
+    <br>
+    Некоторые ADSI компоненты я постараюсь выложить на
+    своей домашней страничке (http://www.jespersen.ch). Так что,
+    если интересно, то заходите и мыльте на
+    philip@jespersen.ch <br>
+    <br>
+    <br>
+    </td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

@@ -1,0 +1,190 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как показать округлённое окошко подсказки в
+    трее в Windows2000.</h3>
+    <p>Компилятор: Delphi 3.x (или выше)</p>
+    <p>В Windows 2000, формат структуры NotifyIconData, которая
+    используется для работы с иконками в Трее (которая,
+    кстати, называется &quot;The Taskbar Notification Area&quot; :)
+    значительно отличается от предыдущий версий
+    Windows. Однако, эти изменения НЕ отражены в юните
+    ShellAPI.pas в Delphi 5.</p>
+    <p>Итак, нам понадобится преобразованный SHELLAPI.H, в
+    котором присутствуют все необходимые объявления:<br>
+    <br>
+    uses Windows;<br>
+    <br>
+    type<br>
+    &nbsp;&nbsp;NotifyIconData_50 = record // определённая в shellapi.h<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;cbSize: DWORD;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Wnd: HWND;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;uID: UINT;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;uFlags: UINT;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;uCallbackMessage: UINT;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;hIcon: HICON;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;szTip: array[0..MAXCHAR] of AnsiChar;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;dwState: DWORD;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;dwStateMask: DWORD;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;szInfo: array[0..MAXBYTE] of AnsiChar;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;uTimeout: UINT; // union with uVersion: UINT;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;szInfoTitle: array[0..63] of AnsiChar;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;dwInfoFlags: DWORD;<br>
+    &nbsp;&nbsp;end{record};<br>
+    <br>
+    const<br>
+    &nbsp;&nbsp;NIF_INFO&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; $00000010;<br>
+    <br>
+    &nbsp;&nbsp;NIIF_NONE&nbsp;&nbsp;&nbsp;&nbsp; =
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; $00000000;<br>
+    &nbsp;&nbsp;NIIF_INFO&nbsp;&nbsp;&nbsp;&nbsp; =
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; $00000001;<br>
+    &nbsp;&nbsp;NIIF_WARNING&nbsp;&nbsp;=&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; $00000002;<br>
+    &nbsp;&nbsp;NIIF_ERROR&nbsp;&nbsp;&nbsp;&nbsp;=
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; $00000003;<br>
+    <br>
+    А это набор вспомогательных типов:<br>
+    <br>
+    type<br>
+    &nbsp;&nbsp;TBalloonTimeout = 10..30{seconds};<br>
+    &nbsp;&nbsp;TBalloonIconType = (bitNone,&nbsp;&nbsp;&nbsp;&nbsp;// нет иконки<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;bitInfo,&nbsp;&nbsp;&nbsp;&nbsp;//
+    информационная иконка (синяя)<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;bitWarning,
+    // иконка восклицания (жёлтая)<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;bitError);&nbsp;&nbsp;//
+    иконка ошибки (краснаа)<br>
+    <br>
+    Теперь мы готовы приступить к созданию
+    округлённых подсказок!<br>
+    <br>
+    Для этого воспользуемся следующей функцией:<br>
+    <br>
+    uses SysUtils, Windows, ShellAPI;<br>
+    <br>
+    function DZBalloonTrayIcon(const Window: HWND; const IconID: Byte; const Timeout:
+    TBalloonTimeout; const BalloonText, BalloonTitle: String; const BalloonIconType:
+    TBalloonIconType): Boolean; <br>
+    const<br>
+    &nbsp;&nbsp;aBalloonIconTypes : array[TBalloonIconType] of Byte = (NIIF_NONE, NIIF_INFO,
+    NIIF_WARNING, NIIF_ERROR);<br>
+    var<br>
+    &nbsp;&nbsp;NID_50 : NotifyIconData_50;<br>
+    begin<br>
+    &nbsp;&nbsp;FillChar(NID_50, SizeOf(NotifyIconData_50), 0);<br>
+    &nbsp;&nbsp;with NID_50 do begin<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;cbSize := SizeOf(NotifyIconData_50);<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Wnd := Window;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;uID := IconID;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;uFlags := NIF_INFO;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;StrPCopy(szInfo, BalloonText);<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;uTimeout := Timeout * 1000;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;StrPCopy(szInfoTitle, BalloonTitle);<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;dwInfoFlags := aBalloonIconTypes[BalloonIconType];<br>
+    &nbsp;&nbsp;end{with};<br>
+    &nbsp;&nbsp;Result := Shell_NotifyIcon(NIM_MODIFY, @NID_50);<br>
+    end;<br>
+    <br>
+    Вызывается она следующим образом:<br>
+    <br>
+    DZBalloonTrayIcon(Form1.Handle, 1, 10, 'this is the balloon text', 'title', bitWarning);<br>
+    <br>
+    Иконка, должна быть предварительно добавлена с
+    темже дескриптором окна и IconID (в данном примере
+    Form1.Handle и 1).<br>
+    <br>
+    Можете попробовать все три типа иконок внутри
+    всплывающей подсказки.<br>
+    <br>
+    <br>
+    <br>
+    P.S. На всякий случай, ниже представлены функции
+    для добавление/удаления иконок в трее:<br>
+    <br>
+    uses SysUtils, Windows, ShellAPI;<br>
+    <br>
+    {добавление иконки}<br>
+    function DZAddTrayIcon(const Window: HWND; const IconID: Byte; const Icon: HICON; const
+    Hint: String = ''): Boolean;<br>
+    var <br>
+    &nbsp;&nbsp;NID : NotifyIconData;<br>
+    begin<br>
+    &nbsp;&nbsp;FillChar(NID, SizeOf(NotifyIconData), 0);<br>
+    &nbsp;&nbsp;with NID do begin<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;cbSize := SizeOf(NotifyIconData);<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Wnd := Window;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;uID := IconID;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if Hint = '' then begin<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;uFlags := NIF_ICON;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end{if} else begin<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;uFlags := NIF_ICON or NIF_TIP;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;StrPCopy(szTip, Hint);<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end{else};<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;hIcon := Icon;<br>
+    &nbsp;&nbsp;end{with};<br>
+    &nbsp;&nbsp;Result := Shell_NotifyIcon(NIM_ADD, @NID);<br>
+    end;<br>
+    <br>
+    {добавляет иконку с call-back сообщением}<br>
+    function DZAddTrayIconMsg(const Window: HWND; const IconID: Byte; const Icon: HICON; const
+    Msg: Cardinal; const Hint: String = ''): Boolean;<br>
+    var<br>
+    &nbsp;&nbsp;NID : NotifyIconData;<br>
+    begin<br>
+    &nbsp;&nbsp;FillChar(NID, SizeOf(NotifyIconData), 0);<br>
+    &nbsp;&nbsp;with NID do begin<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;cbSize := SizeOf(NotifyIconData);<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Wnd := Window;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;uID := IconID;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if Hint = '' then begin<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;uFlags := NIF_ICON or NIF_MESSAGE;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end{if} else begin<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;uFlags := NIF_ICON or NIF_MESSAGE or NIF_TIP;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;StrPCopy(szTip, Hint);<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end{else};<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;uCallbackMessage := Msg;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;hIcon := Icon;<br>
+    &nbsp;&nbsp;end{with};<br>
+    &nbsp;&nbsp;Result := Shell_NotifyIcon(NIM_ADD, @NID);<br>
+    end;<br>
+    <br>
+    {удаляет иконку}<br>
+    function DZRemoveTrayIcon(const Window: HWND; const IconID: Byte): Boolean;<br>
+    var<br>
+    &nbsp;&nbsp;NID : NotifyIconData;<br>
+    begin<br>
+    &nbsp;&nbsp;FillChar(NID, SizeOf(NotifyIconData), 0);<br>
+    &nbsp;&nbsp;with NID do begin<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;cbSize := SizeOf(NotifyIconData);<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Wnd := Window;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;uID := IconID;<br>
+    &nbsp;&nbsp;end{with};<br>
+    &nbsp;&nbsp;Result := Shell_NotifyIcon(NIM_DELETE, @NID);<br>
+    end;<br>
+    <br>
+    Несколько заключительных замечаний:<br>
+    &nbsp;&nbsp;1. Нет необходимости использовать большую
+    структуру NotifyIconData_50 для добавления или удаления
+    иконок, старая добрая структура NotifyIconData
+    прекрасно подойдёт для этого. <br>
+    &nbsp;&nbsp;2. Для callback сообщения можно использовать
+    WM_APP + что-нибудь. <br>
+    &nbsp;&nbsp;3. Используя различные IconID, легко можно
+    добавить несколько различных иконок из одного
+    родительского окна и работать с ними по их IconID.</p>
+    <p><br>
+    </p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div></TBODY>
+
+
+<p align="center"><br>
+<br>
+</p>
+<!--#include virtual="/ssi/bottom.html"-->

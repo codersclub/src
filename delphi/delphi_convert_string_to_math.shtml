@@ -1,0 +1,297 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Преобразование строки в математическое
+    выражение и получение результата.</h3>
+    <p>Автор: <a href="mailto:vava@bplnet.com">Vimil Saju</a></p>
+    <p>Представляю Вашему вниманию сомпонент, на вход
+    которого подаётся строка, содержащая
+    математическое выражение, а на выходе результат
+    вычисления этого выражения. При необходимости
+    Вам не составит труда добавить в компонент такие
+    функции как sin,cos,log,tan и т.д. Единственная
+    неприятность, это присутствие глюка. Если ввести
+    строку типа '5* -3', то мы получим ошибку. Я
+    обязательно в ближайшее время постараюсь
+    исправить данный баг.</p>
+    <p>Совместимость: Delphi 4.x (или выше)</p>
+    <table border="0" cellpadding="0" cellspacing="0">
+      <tr>
+        <td width="750" bgcolor="#A5E4A7"><font face="Tahoma" style="font-size: 10pt" size="-1"><b>&nbsp;
+        Собственно сам исходничек:</b></font></td>
+      </tr>
+    </table>
+    <p>unit MathComponent; <br>
+    <br>
+    interface <br>
+    <br>
+    uses <br>
+    &nbsp;&nbsp;Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,math;
+    <br>
+    <br>
+    <br>
+    type <br>
+    TMathtype=(mtnil,mtoperator,mtlbracket,mtrbracket,mtoperand); <br>
+    <br>
+    type <br>
+    TMathOperatortype=(monone,moadd,mosub,modiv,momul,mopow); <br>
+    <br>
+    type <br>
+    pmathchar = ^Tmathchar; <br>
+    TMathChar = record <br>
+    &nbsp;&nbsp;case mathtype: Tmathtype of <br>
+    &nbsp;&nbsp; mtoperand:(data:extended); <br>
+    &nbsp;&nbsp; mtoperator:(op:TMathOperatortype); <br>
+    end; <br>
+    <br>
+    type <br>
+    &nbsp;&nbsp;TMathControl = class(TComponent) <br>
+    &nbsp;&nbsp;private <br>
+    &nbsp;&nbsp; input,output,stack:array of tmathchar; <br>
+    &nbsp;&nbsp; fmathstring:string; <br>
+    &nbsp;&nbsp; function getresult:extended; <br>
+    &nbsp;&nbsp; function calculate(operand1,operand2,operator:Tmathchar):extended; <br>
+    &nbsp;&nbsp; function getoperator(c:char):TMathOperatortype; <br>
+    &nbsp;&nbsp; function getoperand(mid:integer;var len:integer):extended; <br>
+    &nbsp;&nbsp; procedure processstring; <br>
+    &nbsp;&nbsp; procedure convertinfixtopostfix; <br>
+    &nbsp;&nbsp; function isdigit(c:char):boolean; <br>
+    &nbsp;&nbsp; function isoperator(c:char):boolean; <br>
+    &nbsp;&nbsp; function getprecedence(mop:TMathOperatortype):integer; <br>
+    &nbsp;&nbsp;protected <br>
+    &nbsp;&nbsp;published <br>
+    &nbsp;&nbsp; property MathExpression:string read fmathstring write fmathstring; <br>
+    &nbsp;&nbsp; property MathResult:extended read getresult; <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    procedure Register; <br>
+    <br>
+    implementation <br>
+    <br>
+    function Tmathcontrol.calculate(operand1,operand2,operator:Tmathchar):extended; <br>
+    begin <br>
+    result:=0; <br>
+    case operator.op of <br>
+    &nbsp;&nbsp;moadd: <br>
+    &nbsp;&nbsp; result:=operand1.data + operand2.data; <br>
+    &nbsp;&nbsp;mosub: <br>
+    &nbsp;&nbsp; result:=operand1.data - operand2.data; <br>
+    &nbsp;&nbsp;momul: <br>
+    &nbsp;&nbsp; result:=operand1.data * operand2.data; <br>
+    &nbsp;&nbsp;modiv: <br>
+    &nbsp;&nbsp; if (operand1.data&lt;&gt;0) and (operand2.data&lt;&gt;0) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;result:=operand1.data / operand2.data <br>
+    &nbsp;&nbsp; else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;result:=0; <br>
+    &nbsp;&nbsp;mopow: result:=power(operand1.data,operand2.data); <br>
+    end; <br>
+    end; <br>
+    <br>
+    function Tmathcontrol.getresult:extended; <br>
+    var <br>
+    i:integer; <br>
+    tmp1,tmp2,tmp3:tmathchar; <br>
+    begin <br>
+    convertinfixtopostfix; <br>
+    setlength(stack,0); <br>
+    for i:=0 to length(output)-1 do <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp; if output[i].mathtype=mtoperand then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; setlength(stack,length(stack)+1); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; stack[length(stack)-1]:=output[i]; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end <br>
+    &nbsp;&nbsp; else if output[i].mathtype=mtoperator then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;tmp1:=stack[length(stack)-1]; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;tmp2:=stack[length(stack)-2]; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;setlength(stack,length(stack)-2); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;tmp3.mathtype:=mtoperand; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;tmp3.data:=calculate(tmp2,tmp1,output[i]); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;setlength(stack,length(stack)+1); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;stack[length(stack)-1]:=tmp3; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;end; <br>
+    result:=stack[0].data; <br>
+    setlength(stack,0); <br>
+    setlength(input,0); <br>
+    setlength(output,0); <br>
+    end; <br>
+    <br>
+    function Tmathcontrol.getoperator(c:char):TMathOperatortype; <br>
+    begin <br>
+    result:=monone; <br>
+    if c='+' then <br>
+    &nbsp;&nbsp;result:=moadd <br>
+    else if c='*' then <br>
+    &nbsp;&nbsp;result:=momul <br>
+    else if c='/' then <br>
+    &nbsp;&nbsp;result:=modiv <br>
+    else if c='-' then <br>
+    &nbsp;&nbsp;result:=mosub <br>
+    else if c='^' then <br>
+    &nbsp;&nbsp;result:=mopow; <br>
+    end; <br>
+    <br>
+    function Tmathcontrol.getoperand(mid:integer;var len:integer):extended; <br>
+    var <br>
+    i,j:integer; <br>
+    tmpnum:string; <br>
+    begin <br>
+    j:=1; <br>
+    for i:=mid to length(fmathstring)-1 do <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp; if isdigit(fmathstring[i]) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; if j&lt;=20 then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;tmpnum:=tmpnum+fmathstring[i]; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; j:=j+1; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end <br>
+    &nbsp;&nbsp; else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;break; <br>
+    &nbsp;&nbsp;end; <br>
+    result:=strtofloat(tmpnum); <br>
+    len:=length(tmpnum); <br>
+    end; <br>
+    <br>
+    procedure Tmathcontrol.processstring; <br>
+    var <br>
+    i:integer; <br>
+    numlen:integer; <br>
+    begin <br>
+    i:=0; <br>
+    numlen:=0; <br>
+    setlength(output,0); <br>
+    setlength(input,0); <br>
+    setlength(stack,0); <br>
+    fmathstring:='('+fmathstring+')'; <br>
+    setlength(input,length(fmathstring)); <br>
+    while i&lt;=length(fmathstring)-1 do <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp; if fmathstring[i+1]='(' then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; input[i].mathtype:=mtlbracket; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; i:=i+1; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end <br>
+    &nbsp;&nbsp; else if fmathstring[i+1]=')' then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; input[i].mathtype:=mtrbracket; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; i:=i+1; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end <br>
+    &nbsp;&nbsp; else if isoperator(fmathstring[i+1]) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; input[i].mathtype:=mtoperator; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; input[i].op:=getoperator(fmathstring[i+1]); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; i:=i+1; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end <br>
+    &nbsp;&nbsp; else if isdigit(fmathstring[i+1]) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; input[i].mathtype:=mtoperand; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; input[i].data:=getoperand(i+1,numlen); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; i:=i+numlen; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;end; <br>
+    end; <br>
+    <br>
+    <br>
+    function Tmathcontrol.isoperator(c:char):boolean; <br>
+    begin <br>
+    result:=false; <br>
+    if (c='+') or (c='-') or (c='*') or (c='/') or (c='^') then <br>
+    &nbsp;&nbsp;result:=true; <br>
+    end; <br>
+    <br>
+    function Tmathcontrol.isdigit(c:char):boolean; <br>
+    begin <br>
+    result:=false; <br>
+    if ((integer(c)&gt; 47) and (integer(c)&lt; 58)) or (c='.') then <br>
+    &nbsp;&nbsp;result:=true; <br>
+    end; <br>
+    <br>
+    function Tmathcontrol.getprecedence(mop:TMathOperatortype):integer; <br>
+    begin <br>
+    result:=-1; <br>
+    case mop of <br>
+    &nbsp;&nbsp;moadd:result:=1; <br>
+    &nbsp;&nbsp;mosub:result:=1; <br>
+    &nbsp;&nbsp;momul:result:=2; <br>
+    &nbsp;&nbsp;modiv:result:=2; <br>
+    &nbsp;&nbsp;mopow:result:=3; <br>
+    end; <br>
+    end; <br>
+    <br>
+    procedure Tmathcontrol.convertinfixtopostfix; <br>
+    var <br>
+    i,j,prec:integer; <br>
+    begin <br>
+    processstring; <br>
+    for i:=0 to length(input)-1 do <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp; if input[i].mathtype=mtoperand then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; setlength(output,length(output)+1); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; output[length(output)-1]:=input[i]; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end <br>
+    &nbsp;&nbsp; else if input[i].mathtype=mtlbracket then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; setlength(stack,length(stack)+1); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; stack[length(stack)-1]:=input[i]; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end <br>
+    &nbsp;&nbsp; else if input[i].mathtype=mtoperator then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; prec:=getprecedence(input[i].op); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; j:=length(stack)-1; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; if j&gt;=0 then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; while(getprecedence(stack[j].op)&gt;=prec) and
+    (j&gt;=0) do <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; setlength(output,length(output)+1); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; output[length(output)-1]:=stack[j]; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; setlength(stack,length(stack)-1); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; j:=j-1; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; setlength(stack,length(stack)+1); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; stack[length(stack)-1]:=input[i]; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end <br>
+    &nbsp;&nbsp; else if input[i].mathtype=mtrbracket then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; j:=length(stack)-1; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; if j&gt;=0 then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; while(stack[j].mathtype&lt;&gt;mtlbracket) and
+    (j&gt;=0) do <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; setlength(output,length(output)+1); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; output[length(output)-1]:=stack[j]; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; setlength(stack,length(stack)-1); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; j:=j-1; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if j&gt;=0 then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;setlength(stack,length(stack)-1); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;end; <br>
+    end; <br>
+    <br>
+    <br>
+    procedure Register; <br>
+    begin <br>
+    &nbsp;&nbsp;RegisterComponents('Samples', [TMathControl]); <br>
+    end; <br>
+    <br>
+    end. </p>
+    <p><br>
+    </td>
+  </tr>
+</table>
+</center></div></TBODY>
+
+
+<p align="center"><br>
+<br>
+<!--#include virtual="/ssi/bottom.html"--></p>

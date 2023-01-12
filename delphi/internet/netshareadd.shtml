@@ -1,0 +1,117 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как расшарить диск</h3>
+    <p>Автор: <a href="mailto:repairman@uzel.ru">Repairman</a></p>
+    <p>Это модуль для Share любого диска или папки как на
+    локальном, так и на удаленном компьютере (если,
+    конечно у Вас права администратора и на компе
+    разрешено удаленное администрирование, для
+    локальной машины это не обязательно... ;-))</p>
+    <p>Следует отметить, что под NT некоторые процедуры
+    находятся в других DLL...<br>
+    Функция SetShareOnDisk - ставит шару, RemoveShareFromDisk -
+    снимает ее.<br>
+    ------------------cut------------------------<br>
+    unit Share;<br>
+    //(c)2002 &lt;Repairman&gt; repairman@uzel.ru<br>
+    interface<br>
+    type<br>
+    TPassw=string[8];<br>
+    TNetName=string[12]; </p>
+    <p>function SetShareOnDisk(HostName:string; //имя компьютера<br>
+    LocalPath:string; //папка которую надо открыть для
+    доступа<br>
+    NetName:TNetName; //имя расшаренной папки в сети<br>
+    Remark:string; //комментарий, видимый в сети<br>
+    Access:word; //доступ<br>
+    RO_Passw:TPassw; //пароль на чтение<br>
+    RW_Passw:TPassw //пароль на полный доступ<br>
+    ):boolean; </p>
+    <p>function RemoveShareFromDisk(HostName:string; //имя компьютера<br>
+    NetName:string; //сетевое имя папки которую надо закрыть<br>
+    LocalPath:string //локальный путь папки<br>
+    ):boolean;<br>
+    var<br>
+    ShareResult:word;<br>
+    //-------------------------------------------------------------------------------------------<br>
+    implementation<br>
+    uses SysUtils,Windows,ShlObj; </p>
+    <p>function NetShareAdd(ServerName:PChar; //указатель на имя
+    компьютера, например '\\Server'#0, если свой, то можно
+    nil<br>
+    Level:Word; //уровень структуры Share_info, здесь 50<br>
+    PShareInfo:PChar; //указатель на структуру Share_Info<br>
+    ParmErr:DWord) //указатель на ???<br>
+    :dword;stdcall;external 'svrapi.dll';//svrapi для Win9X, NetApi32 для NT </p>
+    <p>function NetShareDel(ServerName:PChar;<br>
+    NetName:PChar;<br>
+    Reserved:DWord):dword;stdcall;external 'svrapi.dll'; </p>
+    <p>type<br>
+    _share_info_50=record //структура Share уровня 50<br>
+    NetName:array[1..13] of char; //Как будет называться диск в
+    сети<br>
+    SType:byte; //тип =0 (STYPE_DISKTREE) - шарить диски<br>
+    Flags:word; //флаги $0191,$0192,$0193....(доступ из сети)<br>
+    Remark:PChar; //указатель на комментарий, видимый из
+    сети<br>
+    Path:PChar; //указатель на имя ресурса, например 'c:\'#0<br>
+    RW_Password:array [1..9] of char; //пароль для полного доступа,
+    если не нужен =#0<br>
+    RO_Password:array [1..9] of char; //пароль для доступа на чтение,
+    если не нужен =#0<br>
+    end;<br>
+    //----------------------------<br>
+    function SetShareOnDisk(HostName,LocalPath:string;NetName:TNetName;Remark:string;<br>
+    Access:word;RO_Passw,RW_Passw:TPassw):boolean;<br>
+    var ShareInfo:_Share_Info_50;<br>
+    begin<br>
+    Result:=false;<br>
+    StrPCopy(@ShareInfo.NetName,NetName);<br>
+    ShareInfo.SType:=0;<br>
+    ShareInfo.Flags:=Access;<br>
+    ShareInfo.Remark:=PChar(Remark);<br>
+    ShareInfo.Path:=PChar(LocalPath);<br>
+    StrPCopy(@ShareInfo.RO_Password,RO_Passw);<br>
+    StrPCopy(@ShareInfo.RW_Password,RW_Passw);<br>
+    ShareResult:=NetShareAdd(PChar(HostName),50,@ShareInfo,$0000002a); //вызываем
+    Share<br>
+    if ShareResult&lt;&gt;0 then Exit; //расшарить неудалось<br>
+    SHChangeNotify(SHCNE_NETSHARE,SHCNF_PATH,PChar(LocalPath),nil); //сказать
+    шеллу об изменениях<br>
+    Result:=true;<br>
+    end;<br>
+    //----------------------------<br>
+    function RemoveShareFromDisk(HostName,NetName,LocalPath:string):boolean;<br>
+    begin<br>
+    Result:=false;<br>
+    ShareResult:=NetShareDel(PChar(HostName),PChar(NetName),0); //удалить шару<br>
+    if ShareResult&lt;&gt;0 then Exit;<br>
+    SHChangeNotify(SHCNE_NETUNSHARE,SHCNF_PATH,PChar(LocalPath),nil); //сказать
+    шеллу об изменениях<br>
+    Result:=true;<br>
+    end;<br>
+    //----------------------------<br>
+    end.</p>
+    <p><br>
+    <br>
+    </p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+
+<p align="center"><br>
+</p>
+
+<p align="center">&nbsp;</p>
+
+<p align="center">&nbsp; </TBODY> </p>
+
+<p align="center"><br>
+<br>
+</p>
+<!--#include virtual="/ssi/bottom.html"-->

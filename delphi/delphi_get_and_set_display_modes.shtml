@@ -1,0 +1,156 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Получаем и устанавливаем различные режимы
+    видео адаптера</h3>
+    <p>(Перевод одноимённой статьи с сайта <a
+    href="http://delphi.about.com">delphi.about.com</a> )</p>
+    <p>&nbsp;&nbsp;&nbsp;<b><font color="#000080">Display Device Modes</font></b><br>
+    При разработке Windows приложения, иногда
+    приходится учитывать тот факт, что оно в будущем
+    будет работать на компьютерах с абсолютно
+    разными мониторами и рабочими разрешениями,
+    установленными на видео адаптере. Поэтому не
+    лишне было бы включить в приложение такую
+    возможность как <b>установка различных
+    разрешений видео адаптера</b>.</p>
+    <p>В данной статье мы рассмотрим принципы работы с
+    API функцией <i>EnumDisplaySettings</i>, которая позволяет
+    получить список доступных разрешений дисплея, а
+    так же с функцией <i>ChangeDisplaySettings</i> для смены
+    текущего видео-режима. </p>
+    <p>&nbsp;&nbsp;&nbsp;<b><font color="#000080">Полечение возможных
+    видео-режимов</font></b><br>
+    Итак, для того, чтобы получить информацию о всех
+    возможных режимах адаптера, нам необходимо
+    сделать серию вызовов функции <i>EnumDisplaySettings</i>.
+    Вызывая эту функцию в цикле мы будем каждый раз
+    получать доступный режим, до тех пор пока
+    результат функции не станет отличным от True. </p>
+    <p>Данная функция имеет на входе переменную типа <i>TDevMode</i>,
+    в которой помещаются параметры. Сам тип <i>TDevMode</i>
+    имеет множество переменных, относящихся к видео
+    адаптеру. А именно, он включает в себя разрешение
+    видео адаптера в пикселях (<i>dmPelsWidth, dmPelsHeight</i>),
+    разрядность цвета (в битах на пиксель),
+    поддерживаемая при данном разрешении (<i>dmBitsPerPel</i>),
+    частота обновления (<i>dmDisplayFrequency</i>) и другие. </p>
+    <p>&nbsp;</p>
+    <table bgColor="#ffffcc" border="1" width="100%">
+<TBODY>
+      <tr>
+        <td><pre><b>procedure</b> TForm1.FormCreate(Sender: TObject);
+<b>var</b>
+ i       : Integer;
+ DevMode : TDevMode;
+<b>begin</b>
+ i:=0;
+ <b>while</b> EnumDisplaySettings(<b>nil</b>,i,DevMode) <b>do</b> <b>begin</b>
+   <b>with</b> Devmode <b>do</b>
+    ListBox1.Items.Add
+     (Format('%dx%d %d Colors',
+     [dmPelsWidth,dmPelsHeight,1 <b>shl</b> dmBitsperPel]));
+   Inc(i);
+ <b>end</b>;
+<b>end</b>;
+</pre>
+        </td>
+      </tr>
+</TBODY>
+    </table>
+    <p>&nbsp;&nbsp;&nbsp;<b><font color="#000080">Установка видео-режима</font></b><br>
+    После того как мы получим все доступные режимы,
+    то установить желательный не составляет особого
+    труда. Для этого мы воспользуемся функцией <i>ChangeDisplaySettings</i>.
+    Так же данная функция при необходимости обновит
+    реестр Windows. </p>
+    <p>&nbsp;</p>
+    <table bgColor="#ffffcc" border="1" width="100%">
+<TBODY>
+      <tr>
+        <td><pre><b>procedure</b> TForm1.Button1Click(Sender: TObject);
+<b>var</b>
+  DevMode    : TDeviceMode;
+  liRetValue : Longint;
+<b>begin</b>
+ <b>if</b> EnumDisplaySettings
+    (<b>nil</b>,Listbox1.ItemIndex,Devmode) <b>then</b>
+  liRetValue := ChangeDisplaySettings
+                  (DevMode, CDS_UPDATEREGISTRY);
+
+  SendMessage(HWND_BROADCAST,
+              WM_DISPLAYCHANGE,
+              SPI_SETNONCLIENTMETRICS,
+              0); 
+<b>end</b>;
+</pre>
+        </td>
+      </tr>
+</TBODY>
+    </table>
+    <p>Функция <i>ChangeDisplaySettings</i> возвращает значение long
+    integer. Это значение можно использовать для
+    определения успешности выполнения функции,
+    сравнив со значениями из списка констант.<br>
+    </p>
+    <p align="justify"><font size="-1">Внимание: Не рекомендуется
+    устанавливать значение видео-режима, который не
+    присутствует в списке доступных. Это может
+    привести к мерцанию экрана либо вообще к
+    исчезновению изображения.<br>
+    <br>
+    Внимание: Многие адаптеры (особенно старые) могут
+    не поддерживать смену разрешения без
+    перезагрузки компьютера.<br>
+    <br>
+    Внимание: SendMessage используется для того, чтобы
+    информировать все окна о смене видео-режима. </font></p>
+    <p>&nbsp;&nbsp;&nbsp;<b><font color="#000080">Отслеживание изменений
+    дисплея</font></b><br>
+    Для отслеживания изменений необходимо создать
+    обработчик <i>для перехвата сообщения WM_DISPLAYCHANGE</i>.
+    Обычно данный приём используется в случае, если
+    приложения использует в своей работе графику, и
+    его необходимо перезагрузить для смены
+    разрешения, разрядности цвета и т.д. </p>
+    <p>&nbsp;</p>
+    <table bgColor="#ffffcc" border="1" width="100%">
+<TBODY>
+      <tr>
+        <td><pre>...
+<b>type</b>
+  TForm1 = <b>class</b>(TForm)
+  ListBox1: TListBox;
+    ...
+  <b>private</b>
+    <b>procedure</b> WMDisplayChange(<b>var Message</b>:TMessage);
+      <b>message</b> WM_DISPLAYCHANGE;
+...
+<b>procedure</b>
+  TForm1.WMDisplayChange(<b>var Message</b>: TMessage);
+<b>begin</b>
+  ShowMessage('Changes in display detected!');
+  <b>inherited</b>;
+<b>end</b>;
+</pre>
+        </td>
+      </tr>
+</TBODY>
+    </table>
+    <p align="center"><a href="changedisplay.zip"><b>Скачать
+    демонстрационный проект</b><br>
+    <img border="0" height="255" src="getsetdisplay.gif" width="224"></a></p>
+    <p><br>
+    </td>
+  </tr>
+</table>
+</center></div></TBODY>
+
+
+<p align="center"><br>
+<br>
+</p>
+<!--#include virtual="/ssi/bottom.html"-->

@@ -1,0 +1,195 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как поместить данные в RichEdit контрол</h3>
+    <p>&nbsp;</p>
+    <p>unit dbrich; <br>
+    interface <br>
+    <br>
+    uses <br>
+    &nbsp;&nbsp;Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs, <br>
+    &nbsp;&nbsp;StdCtrls, ComCtrls, DB, DBTables, Menus, ExtCtrls, Mask, Buttons, DBCtrls; <br>
+    <br>
+    //Замечание: вызывать Tablex.Edit необходимо перед
+    изменением свойства paragraph<br>
+    <br>
+    type <br>
+    &nbsp;&nbsp;TDBRichEdit = class(TRichEdit) <br>
+    &nbsp;&nbsp;private <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FDataLink: TFieldDataLink; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FAutoDisplay: Boolean; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FFocused: Boolean; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FMemoLoaded: Boolean; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FPaintControl: TPaintControl; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure DataChange(Sender: TObject); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure EditingChange(Sender: TObject); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;function&nbsp;&nbsp;GetDataField: string; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;function&nbsp;&nbsp;GetDataSource: TDataSource; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;function&nbsp;&nbsp;GetField: TField; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;function&nbsp;&nbsp;GetReadOnly: Boolean; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure SetDataField(const Value: string); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure SetDataSource(Value: TDataSource); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure SetReadOnly(Value: Boolean); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure SetAutoDisplay(Value: Boolean); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure SetFocused(Value: Boolean); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure UpdateData(Sender: TObject); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure WMCut(var Message: TMessage); message WM_CUT; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure WMPaste(var Message: TMessage); message WM_PASTE; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure CMEnter(var Message: TCMEnter); message CM_ENTER; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure CMExit(var Message: TCMExit); message CM_EXIT; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure WMLButtonDblClk(var Message: TWMLButtonDblClk); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;message WM_LBUTTONDBLCLK; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure WMPaint(var Message: TWMPaint); message WM_PAINT; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure CMGetDataLink(var Message: TMessage); message
+    CM_GETDATALINK; <br>
+    &nbsp;&nbsp;protected <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure Change; override; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure KeyDown(var Key: Word; Shift: TShiftState); override; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure KeyPress(var Key: Char); override; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure Notification(AComponent: TComponent; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Operation: TOperation); override; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure WndProc(var Message: TMessage); override; <br>
+    &nbsp;&nbsp;public <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;constructor Create(AOwner: TComponent); override; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;destructor Destroy; override; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure&nbsp;&nbsp;LoadMemo; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property&nbsp;&nbsp; Field: TField read GetField; <br>
+    &nbsp;&nbsp;published <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property AutoDisplay: Boolean read FAutoDisplay write
+    SetAutoDisplay <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;default True; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property DataField: string read GetDataField write SetDataField; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property DataSource: TDataSource read GetDataSource write
+    SetDataSource; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property ReadOnly: Boolean read GetReadOnly write SetReadOnly <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;default False; <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    procedure Register; <br>
+    <br>
+    implementation <br>
+    <br>
+    procedure Register; <br>
+    begin <br>
+    &nbsp;&nbsp;RegisterComponents('Data Controls', [TDBRichEdit]); <br>
+    end; <br>
+    <br>
+    {Mostly copied from DBMemo} <br>
+    <br>
+    constructor TDBRichEdit.Create(AOwner: TComponent); <br>
+    begin <br>
+    &nbsp;&nbsp;inherited Create(AOwner); <br>
+    &nbsp;&nbsp;inherited ReadOnly := True; <br>
+    &nbsp;&nbsp;FAutoDisplay := True; <br>
+    &nbsp;&nbsp;FDataLink := TFieldDataLink.Create; <br>
+    &nbsp;&nbsp;FDataLink.Control := Self; <br>
+    &nbsp;&nbsp;FDataLink.OnDataChange := DataChange; <br>
+    &nbsp;&nbsp;FDataLink.OnEditingChange := EditingChange; <br>
+    &nbsp;&nbsp;FDataLink.OnUpdateData := UpdateData; <br>
+    &nbsp;&nbsp;FPaintControl := TPaintControl.Create(Self, 'EDIT'); <br>
+    end; <br>
+    <br>
+    destructor TDBRichEdit.Destroy; <br>
+    begin <br>
+    &nbsp;&nbsp;FPaintControl.Free; <br>
+    &nbsp;&nbsp;FDataLink.Free; <br>
+    &nbsp;&nbsp;FDataLink := nil; <br>
+    &nbsp;&nbsp;inherited Destroy; <br>
+    end; <br>
+    <br>
+    procedure TDBRichEdit.Notification(AComponent: TComponent; <br>
+    &nbsp;&nbsp;Operation: TOperation); <br>
+    begin <br>
+    &nbsp;&nbsp;inherited Notification(AComponent, Operation); <br>
+    &nbsp;&nbsp;if (Operation = opRemove) and (FDataLink &lt;&gt; nil) and <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;(AComponent = DataSource) then DataSource := nil; <br>
+    end; <br>
+    <br>
+    procedure TDBRichEdit.KeyDown(var Key: Word; Shift: TShiftState); <br>
+    begin <br>
+    &nbsp;&nbsp;inherited KeyDown(Key, Shift); <br>
+    &nbsp;&nbsp;if FMemoLoaded then <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if (Key = VK_DELETE) or ((Key = VK_INSERT) and (ssShift in Shift))
+    then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FDataLink.Edit; <br>
+    &nbsp;&nbsp;end else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Key := 0; <br>
+    end; <br>
+    <br>
+    procedure TDBRichEdit.KeyPress(var Key: Char); <br>
+    begin <br>
+    &nbsp;&nbsp;inherited KeyPress(Key); <br>
+    &nbsp;&nbsp;if FMemoLoaded then <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if (Key in [#32..#255]) and (FDataLink.Field &lt;&gt; nil) and <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;not FDataLink.Field.IsValidChar(Key) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MessageBeep(0); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Key := #0; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;case Key of <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;^H, ^I, ^J, ^M, ^V, ^X, #32..#255: <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FDataLink.Edit; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#27: <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FDataLink.Reset; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;end else <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if Key = #13 then LoadMemo; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Key := #0; <br>
+    &nbsp;&nbsp;end; <br>
+    end; <br>
+    <br>
+    procedure TDBRichEdit.Change; <br>
+    begin <br>
+    &nbsp;&nbsp;with FdataLink do <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{if Assigned(FdataLink) and (Assigned(DataSource))and <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; (DataSource.State = dsBrowse) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Edit; } {make sure edits on Attributes change} <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if FMemoLoaded then Modified; <br>
+    &nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;FMemoLoaded := True; <br>
+    &nbsp;&nbsp;inherited Change; <br>
+    end; <br>
+    <br>
+    function TDBRichEdit.GetDataSource: TDataSource; <br>
+    begin <br>
+    &nbsp;&nbsp;Result := FDataLink.DataSource; <br>
+    end; <br>
+    <br>
+    procedure TDBRichEdit.SetDataSource(Value: TDataSource); <br>
+    begin <br>
+    &nbsp;&nbsp;FDataLink.DataSource := Value; <br>
+    &nbsp;&nbsp;if Value &lt;&gt; nil then Value.FreeNotification(Self); <br>
+    end; <br>
+    <br>
+    function TDBRichEdit.GetDataField: string; <br>
+    begin <br>
+    &nbsp;&nbsp;Result := FDataLink.FieldName; <br>
+    end; <br>
+    <br>
+    procedure TDBRichEdit.SetDataField(const Value: string); <br>
+    begin <br>
+    &nbsp;&nbsp;FDataLink.FieldName := Value; <br>
+    end; <br>
+    <br>
+    function TDBRichEdit.GetReadOnly: Boolean; <br>
+    begin <br>
+    &nbsp;&nbsp;Result := FDataLink.ReadOnly; <br>
+    end; <br>
+    <br>
+    procedure TDBRichEdit.SetReadOnly(Value: Boolean); <br>
+    begin <br>
+    &nbsp;&nbsp;FD</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

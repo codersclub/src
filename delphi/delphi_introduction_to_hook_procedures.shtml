@@ -1,0 +1,216 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Создание &quot;ловушек&quot; в Delphi</h3>
+    <p>Автор: <a href="mailto:wibble82@hotmail.com">Chris Cummings</a> (<a
+    href="http://wibblovia.topcities.com">http://wibblovia.topcities.com</a>)</p>
+    <p>К статье прилагается <a href="hook.zip">исходник</a> (~36Kb)</p>
+    <p>Рано или поздно каждый программист
+    сталкивается с таким понятим как ловушки. Чтобы
+    приступить к ипользованию ловушек необходимо
+    обзавестись windows SDK, который можно так же скачать
+    с сайта Microsoft. В прилагаемом к статье архиве
+    содержатся два проекта: hooks.dpr - это пример
+    приложения работающего с ловушками, а hookdll.dpr -
+    собственно сама DLL. </p>
+    <p>&nbsp;&nbsp;&nbsp;<b><font color="#000080">Что такое ловушки (Hooks)?</font></b><br>
+    Проще говоря, ловушка - это функция, которая
+    является частью DLL или часть Вашего приложения,
+    при помощи которой можно контролировать 'происходящее'
+    внутри окошек операционной системы. Идея состоит
+    в том, чтобы написать функцию, которая будет
+    вызываться каждый раз, когда будет возникать
+    определённое событие - например, когда
+    пользователь нажмёт клавишу или переместит
+    мышку. Ловушки были задуманы Microsoft в первую
+    очередь, чтобы облегчить программистам отладку
+    приложений. Однако существует множество
+    способов использования ловушек - например, чаще
+    всего при помощи ловушек пишутся клавиатурные
+    шпионы. </p>
+    <p>Итак, существует два типа ловушек - глобальные и
+    локальные. <b>Локальная ловушка</b> отслеживает
+    только те события, которые происходят только в
+    одной программе (или потоке). <b>Глобальная
+    ловушка</b> отслеживает события во всей системе (во
+    всех потоках). Оба типа ловушек устанавливаются
+    одинаково, однако единственно отличие
+    заключается в том, что локальная ловушка
+    вызывается в пределах Вашего приложения, в то
+    время как глобальную ловушку необходимо хранить
+    и вызывать из отдельной DLL.</p>
+    <p align="center"><img border="0" height="103" src="hook.gif" width="169"> </p>
+    <p>&nbsp;&nbsp;&nbsp;<b><font color="#000080">Процедуры ловушки</font></b><br>
+    Далее следует краткое описание каждой процедуры
+    и структуры, необходимой для ловушки. </p>
+    <p><b><i>функция The SetWindowsHookEx</i></b><br>
+    Функция SetWindowsHookEx необходима для установки
+    ловушки. Давайте посмотрим на аргументы данной
+    функции: </p>
+    <p align="center">&nbsp;</p>
+    <div align="center"><center><table bgColor="#808080" border="0" cellPadding="2"
+    cellSpacing="1">
+<TBODY>
+      <tr>
+        <th align="left" bgColor="#cccccc"><font face="verdana, geneva, helvetica" size="1"><strong>Name</strong>
+        </font></th>
+        <th align="left" bgColor="#cccccc"><font face="verdana, geneva, helvetica" size="1"><strong>Type</strong>
+        </font></th>
+        <th align="left" bgColor="#cccccc"><font face="verdana, geneva, helvetica" size="1"><strong>Description</strong>
+        </font></th>
+      </tr>
+      <tr>
+        <td bgColor="#ffffff"><font face="verdana, geneva, helvetica" size="1">idHook </font></td>
+        <td bgColor="#ffffff"><font face="verdana, geneva, helvetica" size="1">Integer </font></td>
+        <td bgColor="#ffffff"><font face="verdana, geneva, helvetica" size="1">Число,
+        представляющее тип ловушки - например WH_KEYBOARD </font></td>
+      </tr>
+      <tr>
+        <td bgColor="#ffffff"><font face="verdana, geneva, helvetica" size="1">lpfn </font></td>
+        <td bgColor="#ffffff"><font face="verdana, geneva, helvetica" size="1">TFNHookProc </font></td>
+        <td bgColor="#ffffff"><font face="verdana, geneva, helvetica" size="1">Адрес в
+        памяти функции ловушки </font></td>
+      </tr>
+      <tr>
+        <td bgColor="#ffffff"><font face="verdana, geneva, helvetica" size="1">hMod </font></td>
+        <td bgColor="#ffffff"><font face="verdana, geneva, helvetica" size="1">Hinst </font></td>
+        <td bgColor="#ffffff"><font face="verdana, geneva, helvetica" size="1">Дескриптор
+        dll в которой находится функция. Если это
+        локальная ловушка, то этот параметр 0. </font></td>
+      </tr>
+      <tr>
+        <td bgColor="#ffffff"><font face="verdana, geneva, helvetica" size="1">dwThreadID </font></td>
+        <td bgColor="#ffffff"><font face="verdana, geneva, helvetica" size="1">Cardinal </font></td>
+        <td bgColor="#ffffff"><font face="verdana, geneva, helvetica" size="1">'id потока',
+        который Ваша программа будет контролировать.
+        Если это глобальная ловушка, то параметр должен
+        быть 0. </font></td>
+      </tr>
+</TBODY>
+    </table>
+    </center></div><p>SetWindowsHookEx возвращает дескриптор (т.е.
+    идентификатор) текущей ловушки, который можно
+    использовать в функции UnhookWindowsHookEx для
+    последующего удаления ловушки. </p>
+    <p><b><i>Функция hook</i></b><br>
+    Функция hook это процедура, которая вызывает в
+    случае, если необходимое нам событие происходит.
+    Например, если установлена ловушка типа WH_KEYBOARD,
+    то окно будет передавать в ловушку информацию о
+    том, какая клавища была нажата. Для Вашей
+    процедуры hook необходимы следующие аргументы: </p>
+    <p align="center">&nbsp;</p>
+    <div align="center"><center><table bgColor="#808080" border="0" cellPadding="2"
+    cellSpacing="1">
+<TBODY>
+      <tr>
+        <th align="left" bgColor="#cccccc"><font face="verdana, geneva, helvetica" size="1"><strong>Name</strong>
+        </font></th>
+        <th align="left" bgColor="#cccccc"><font face="verdana, geneva, helvetica" size="1"><strong>Type</strong>
+        </font></th>
+        <th align="left" bgColor="#cccccc"><font face="verdana, geneva, helvetica" size="1"><strong>Description</strong>
+        </font></th>
+      </tr>
+      <tr>
+        <td bgColor="#ffffff"><font face="verdana, geneva, helvetica" size="1">Code </font></td>
+        <td bgColor="#ffffff"><font face="verdana, geneva, helvetica" size="1">Integer </font></td>
+        <td bgColor="#ffffff"><font face="verdana, geneva, helvetica" size="1">Указывает
+        на то, что означают следующие два параметра </font></td>
+      </tr>
+      <tr>
+        <td bgColor="#ffffff"><font face="verdana, geneva, helvetica" size="1">wParam </font></td>
+        <td bgColor="#ffffff"><font face="verdana, geneva, helvetica" size="1">word </font></td>
+        <td bgColor="#ffffff"><font face="verdana, geneva, helvetica" size="1">Параметр
+        размером в 1 слово (word) </font></td>
+      </tr>
+      <tr>
+        <td bgColor="#ffffff"><font face="verdana, geneva, helvetica" size="1">lParam </font></td>
+        <td bgColor="#ffffff"><font face="verdana, geneva, helvetica" size="1">longword </font></td>
+        <td bgColor="#ffffff"><font face="verdana, geneva, helvetica" size="1">Параметр
+        размером в 2 слова</font></td>
+      </tr>
+</TBODY>
+    </table>
+    </center></div><p>Функция hook возвращает значение типа
+    longword.</p>
+    <p><b><i>Функция CallNextHookEx</i></b><br>
+    Данная функция предназначена для работы с
+    цепочкой функций ловушек. Когда ловушка
+    установлена на определённое событие, то может
+    возникнуть такая ситуация, когда кто-нибудь тоже
+    захочет установить ловушку на это же событие.
+    Когда Вы устанавливаете ловушку при помощи
+    SetWindowsHookEx, то Ваша процедура ловушки добавляется
+    в начало списка процедур ловушек. Поэтому
+    основная задача функции CallNextHookEx заключается в
+    том, чтобы вызвать следующий в списке обработчик
+    ловушки. Когда Ваша процедура ловушки завершится,
+    то она должна вызовать CallNextHookEx, а затем вернуть
+    заданное значение, в зависимости от типа ловушки.</p>
+    <p><b><i>Функция UnhookWindowsHookEx</i></b><br>
+    Данная функция просто напросто удаляет Вашу
+    ловушку. Единственный аргумент этой функции - это
+    дескриптор ловушки, возвращаемы функцией
+    SetWindowsHookEx. </p>
+    <p>&nbsp;&nbsp;&nbsp;<b><font color="#000080">Локальная ловушка</font></b><br>
+    Сперва давайте создадим локальную ловушку.
+    Необходимый для неё код содержится в 'local.pas'. При
+    запуске Hooks.exe будет отображена небольшая форма.
+    Для использования локальной ловушки достаточно
+    нажать кнопку Add/Remove Local Hook на этой форме. После
+    установки локальной ловушки, Вы заметите, что при
+    нажатии и отпускании любой клавиши будет
+    раздаваться звуковой сигнал (естевственно, когда
+    hooks.exe будет иметь фокус. Ведь это локальная
+    ловушка). </p>
+    <p>Самая первая функция в local.pas - SetupLocalHook, которая
+    соственно и создаёт локальную ловушку, указывая
+    на процедуру ловушки KeyboardHook. В данном случае это
+    простой вызов SetWindowsHookEx, и, если возвращённый
+    дескриптор &gt; 0, указывающий на то, что процедура
+    работает, то сохраняет этот дескриптор в CurrentHook и
+    возвращает true, иначе будет возвращено значение
+    false. Далее идёт функция RemoveLocalHook, которая получает
+    в качестве параметра сохранённый дескриптор в
+    CurrentHook и использует его в UnhookWindowsHookEx для удаления
+    ловушки. Последняя идёт процедура hook, которая
+    всего навсего проверяет - была ли отпущена
+    клавиша и если надо, то выдаёт звуковой сигнал. </p>
+    <p>&nbsp;&nbsp;&nbsp;<b><font color="#000080">Глобальная ловушка</font></b><br>
+    Глобальная ловушка выглядит немного сложнее. Для
+    создания глобальной ловушки нам понадобится два
+    проекта - певый для создания исполняемого файла и
+    второй для создания DLL, содержащей процедуру
+    ловушки. Глобальная ловушка, которая
+    представлена в примере, сохраняет в файле log.txt
+    каждые 20 нажатий клавиш. Чтобы использовать
+    глобальную ловушку, достаточно на форме hook.exe
+    нажать кнопку add/remove global hook. Затем, например, в
+    записной книжке (notepad) достаточно набрать какой-нибудь
+    текст, и Вы увидите, что в log.txt этот текст
+    сохранится.</p>
+    <p>Наша Dll содержит две процедуры. Первая - это
+    процедура hook, которая идентична для той, которую
+    мы рассмотрели для локальной ловушки. Вторая
+    процедура необходима инициализации dlls, и
+    содержит текущий номер клавиши, которая была
+    нажата, а также дескриптор ловушки, которая была
+    создана. </p>
+    <p>Исполняемый файл сперва должен загрузить
+    процедуры из DLL, а затем использовать SetWindowsHookEx,
+    чтобы создать глобальную ловушку. </p>
+    <p>&nbsp;&nbsp;&nbsp;<b><font color="#000080">В заключении...</font></b><br>
+    Представленный пример объясняет - как
+    перехватывать события клавиатуры. Чтобы узнать,
+    как использовать ловушки других типов, таких как
+    WH_MOUSE, необходимо разобраться с windows SDK. </p>
+    <p><br>
+    <br>
+    </td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

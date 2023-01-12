@@ -1,0 +1,647 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Компонент DirectoryTree.</h3>
+    <p><b>Автор:</b> <a href="mailto:M.deHaan@inn.nl">Maarten de Haan</a></p>
+    <p>Данный компонент действует и выглядит
+    аналогично левой части окна Проводника в Windows.
+    Компонент позволяет выбирать диск (дисковод) и /
+    или директорию и реагировать на событие <br>
+    OnChange. Компонент правильно работает даже во время
+    прорисовки, то есть не даст открыть диск во время
+    прорисовки.</p>
+    <p><a href="DirectoryTree.zip">Скачать компонент - 14 Kb</a></p>
+    <p>Совместимость: Delphi 5.x (или выше) <br>
+    <br>
+    Компонент тестировался под Windows 95A (SP1) и Windows NT (4.0
+    SP5).</p>
+    <p>Компонент будет зарегистрирован как 'Samples'. <br>
+    ---------------------------------------------------------------------} <br>
+    <br>
+    Unit DirectoryTree; <br>
+    <br>
+    {$R-,T-,H+,X+} <br>
+    <br>
+    Interface <br>
+    <br>
+    Uses <br>
+    &nbsp;&nbsp; Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, <br>
+    &nbsp;&nbsp; Dialogs, ComCtrls, ImgList, StdCtrls, FileCtrl; <br>
+    <br>
+    Const <br>
+    &nbsp;&nbsp; Rootname : String = 'My Computer'; <br>
+    <br>
+    Type <br>
+    &nbsp;&nbsp; TDirectoryTree = class(TCustomTreeView) <br>
+    &nbsp;&nbsp; private <br>
+    &nbsp;&nbsp; { Private declarations } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fImageList&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    : TCustomImageList; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fDirectory&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    : String; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fOnChange&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:
+    TNotifyEvent; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fDirLabel&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:
+    TLabel; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fDirLabelSet&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    : Boolean; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fFileList&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:
+    TFileListbox; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fDirList&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    : TDirectoryTree; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fTreenodes&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    : TTreenodes; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fCurDrive&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:
+    String; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Procedure SetDirLabel(Value : TLabel); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Procedure SetDirLabelCaption; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Procedure FindDirs(S : String; T : TTreenode); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Procedure GetNodeInfo(T : TTreenode); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Procedure fChanges; dynamic; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Procedure SetFileListBox(Value : TFileListBox); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Function MinimizeName(const Filename : TFileName; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;&nbsp; Canvas : TCanvas; MaxLen : Integer):
+    TFileName; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//procedure CutFirstDirectory(var S : TFileName); <br>
+    <br>
+    &nbsp;&nbsp; Protected <br>
+    &nbsp;&nbsp; { Protected declarations } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Procedure MouseDown(Button: TMouseButton; Shift:
+    TShiftState; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; X, Y: Integer); override; <br>
+    <br>
+    &nbsp;&nbsp; Public <br>
+    &nbsp;&nbsp; { Public declarations } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Constructor Create(AOwner : TComponent); override; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Destructor Destroy; override; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Procedure UpDate; reintroduce; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Procedure FindDrives; dynamic; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Procedure CreateWnd; override; <br>
+    <br>
+    &nbsp;&nbsp; Published <br>
+    &nbsp;&nbsp; { Published declarations } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{--- свойства ---} <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property Align; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property Anchors; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property AutoExpand; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property BiDiMode; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property BorderStyle; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property BorderWidth; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property ChangeDelay; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property Color; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property Constraints; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property Cursor; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property DirLabel : TLabel <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;&nbsp; read fDirLabel write SetDirLabel; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property Directory : String <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; read fDirectory write fDirectory; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property DragCursor; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property DragKind; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property DragMode; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property Enabled; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property FileList : TFileListbox <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;&nbsp; read fFileList write SetFileListbox; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property Font; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property Height; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property HelpContext; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property HideSelection; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property Hint; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property HotTrack; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property Images; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property Indent; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property Items; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property Left; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property Name; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property ParentBiDiMode; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property ParentColor; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property ParentFont; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property ParentShowHint; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property PopupMenu; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property ReadOnly; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property RightClickSelect; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property RowSelect; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property ShowButtons; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property ShowHint; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property ShowLines; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property ShowRoot; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property SortType; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property StateImages; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property TabOrder; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property TabStop; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property Tag; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property ToolTips; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property Top; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property Visible; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property Width; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{--- События ---} <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property OnAdvancedCustomDraw; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property OnAdvancedCustomDrawItem; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property OnChange : TNotifyEvent <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; read fOnChange write fOnChange; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property OnChanging; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property OnClick; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property OnCollapsed; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property OnCollapsing; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property OnCompare; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property OnContextPopup; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property OnCustomDraw; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property OnCustomDrawItem; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property OnDblClick; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property OnDeletion; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property OnDragDrop; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property OnDragOver; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property OnEdited; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property OnEditing; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property OnEndDock; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property OnEndDrag; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property OnEnter; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property OnExit; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property OnExpanded; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property OnExpanding; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property OnGetImageIndex; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property OnGetSelectedIndex; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property OnKeyDown; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property OnKeyPress; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property OnKeyUp; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property OnMouseDown; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property OnMouseMove; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property OnMouseUp; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Property OnStartDock; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Property OnStartDrag; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;End; <br>
+    <br>
+    Procedure Register; <br>
+    <br>
+    // Загружаем bitmap-ы, 16 x 16 бит, 256 цветов <br>
+    {$R IMAGES.RES} <br>
+    <br>
+    Implementation <br>
+    <br>
+    {--------------------------------------------------------------------} <br>
+    (* Из исходников Delphi 5: <br>
+    &nbsp;&nbsp; c:\program files\borland\delphi5\source\vcl\filectrl.pas <br>
+    <br>
+    Procedure TDirectoryTree.SetFileListBox(Value: TFileListBox); <br>
+    <br>
+    Begin <br>
+    If fFileList &lt;&gt; nil then <br>
+    &nbsp;&nbsp; fFileList.DirList := nil; <br>
+    fFileList := Value; <br>
+    If fFileList &lt;&gt; nil then <br>
+    &nbsp;&nbsp; Begin <br>
+    &nbsp;&nbsp; fFileList.DirList := Self; <br>
+    &nbsp;&nbsp; fFileList.FreeNotification(Self); <br>
+    &nbsp;&nbsp; End; <br>
+    End; *) <br>
+    {--------------------------------------------------------------------} <br>
+    (* Из исходников Delphi 5: <br>
+    &nbsp;&nbsp; c:\program files\borland\delphi5\source\vcl\filectrl.pas <br>
+    <br>
+    Procedure CutFirstDirectory(var S: TFileName); <br>
+    <br>
+    Var <br>
+    &nbsp;&nbsp;Root&nbsp;&nbsp;: Boolean; <br>
+    &nbsp;&nbsp;P&nbsp;&nbsp;&nbsp;&nbsp; : Integer; <br>
+    <br>
+    Begin <br>
+    If S = '\' then <br>
+    &nbsp;&nbsp; S := '' <br>
+    else <br>
+    &nbsp;&nbsp; Begin <br>
+    &nbsp;&nbsp; If S[1] = '\' then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Root := True; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Delete(S, 1, 1); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;End <br>
+    &nbsp;&nbsp; else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Root := False; <br>
+    &nbsp;&nbsp; If S[1] = '.' then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Delete(S, 1, 4); <br>
+    &nbsp;&nbsp; P := AnsiPos('\',S); <br>
+    &nbsp;&nbsp; If P &lt;&gt; 0 then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Delete(S, 1, P); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;S := '...\' + S; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;End <br>
+    &nbsp;&nbsp; else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;S := ''; <br>
+    &nbsp;&nbsp; If Root then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;S := '\' + S; <br>
+    &nbsp;&nbsp; End; <br>
+    End; *) <br>
+    {--------------------------------------------------------------------} <br>
+    (* Из исходников Delphi 5: <br>
+    &nbsp;&nbsp; c:\program files\borland\delphi5\source\vcl\filectrl.pas <br>
+    <br>
+    Function MinimizeName(const Filename: TFileName; Canvas: TCanvas; <br>
+    &nbsp;&nbsp;MaxLen: Integer): TFileName; <br>
+    <br>
+    Var <br>
+    &nbsp;&nbsp; Drive&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: TFileName; <br>
+    &nbsp;&nbsp; Dir&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: TFileName; <br>
+    &nbsp;&nbsp; Name&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : TFileName; <br>
+    <br>
+    Begin <br>
+    Result := FileName; <br>
+    Dir := ExtractFilePath(Result); <br>
+    Name := ExtractFileName(Result); <br>
+    <br>
+    If (Length(Dir) &gt;= 2) and (Dir[2] = ':') then <br>
+    &nbsp;&nbsp; begin <br>
+    &nbsp;&nbsp; Drive := Copy(Dir, 1, 2); <br>
+    &nbsp;&nbsp; Delete(Dir, 1, 2); <br>
+    &nbsp;&nbsp; end <br>
+    else <br>
+    &nbsp;&nbsp; Drive := ''; <br>
+    While ((Dir &lt;&gt; '') or (Drive &lt;&gt; '')) and <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; (Canvas.TextWidth(Result) &gt; MaxLen) do <br>
+    &nbsp;&nbsp; Begin <br>
+    &nbsp;&nbsp; If Dir = '\...\' then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Drive := ''; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Dir := '...\'; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;End <br>
+    &nbsp;&nbsp; else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If Dir = '' then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Drive := '' <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; CutFirstDirectory(Dir); <br>
+    &nbsp;&nbsp; Result := Drive + Dir + Name; <br>
+    &nbsp;&nbsp; End; <br>
+    End; *) <br>
+    {--------------------------------------------------------------------} <br>
+    (* Из исходников Delphi 5: <br>
+    &nbsp;&nbsp; c:\program files\borland\delphi5\source\vcl\filectrl.pas <br>
+    <br>
+    Procedure TDirectoryTree.SetDirLabel (Value: TLabel); <br>
+    <br>
+    Begin <br>
+    fDirLabel := Value; <br>
+    if Value &lt;&gt; nil then <br>
+    &nbsp;&nbsp; Value.FreeNotification(Self); <br>
+    SetDirLabelCaption; <br>
+    End; <br>
+    *) <br>
+    {--------------------------------------------------------------------} <br>
+    (* Из Delphi: <br>
+    &nbsp;&nbsp; c:\program files\borland\delphi5\source\vcl\filectrl.pas <br>
+    <br>
+    Procedure TDirectoryTree.SetDirLabelCaption; <br>
+    <br>
+    Var <br>
+    &nbsp;&nbsp; DirWidth: Integer; <br>
+    <br>
+    Begin <br>
+    If fDirLabel &lt;&gt; nil then <br>
+    &nbsp;&nbsp; Begin <br>
+    &nbsp;&nbsp; DirWidth := Width; <br>
+    &nbsp;&nbsp; If not fDirLabel.AutoSize then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DirWidth := fDirLabel.Width; <br>
+    &nbsp;&nbsp; fDirLabel.Caption := MinimizeName(Directory, fDirLabel.Canvas, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DirWidth); <br>
+    &nbsp;&nbsp; End; <br>
+    End; *) <br>
+    {--------------------------------------------------------------------} <br>
+    Procedure TDirectoryTree.fChanges; <br>
+    <br>
+    Begin <br>
+    If Assigned(fOnChange) then <br>
+    &nbsp;&nbsp; fOnChange(Self); <br>
+    End; <br>
+    {--------------------------------------------------------------------} <br>
+    Procedure TDirectoryTree.FindDirs(S : String; T : TTreenode); <br>
+    <br>
+    Var <br>
+    &nbsp;&nbsp; Res&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : Integer; <br>
+    &nbsp;&nbsp; SR&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: TSearchRec; <br>
+    &nbsp;&nbsp; T1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: TTreenode; <br>
+    &nbsp;&nbsp; S1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: String; <br>
+    <br>
+    Begin <br>
+    S1 := S; <br>
+    If S[Length(S)] &lt;&gt; '\' then <br>
+    &nbsp;&nbsp; S1 := S1 + '\'; <br>
+    Res := FindFirst(S1 + '*.*',faAnyFile,SR); <br>
+    <br>
+    If Res = 0 then <br>
+    &nbsp;&nbsp; Repeat <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If ((SR.Attr and faDirectory) = faDirectory) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; If (SR.Name &lt;&gt; '.') and (SR.Name
+    &lt;&gt; '..') then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;T1 :=
+    Items.AddChild(T,SR.Name); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;T1.SelectedIndex
+    := 1;&nbsp;&nbsp;// Diropen.bmp when selected <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;T1.HasChildren :=
+    True; // Creates a '+' sign <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;End; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Res := FindNext(SR); <br>
+    &nbsp;&nbsp; Until Res &lt;&gt; 0; <br>
+    <br>
+    FindClose(SR); <br>
+    End; <br>
+    {--------------------------------------------------------------------} <br>
+    Procedure TDirectoryTree.GetNodeInfo(T : TTreenode); <br>
+    <br>
+    Var <br>
+    &nbsp;&nbsp; S&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: String; <br>
+    &nbsp;&nbsp; T1&nbsp;&nbsp;&nbsp;&nbsp; : TTreenode; <br>
+    <br>
+    Begin <br>
+    S := T.Text; <br>
+    If S = Rootname then <br>
+    &nbsp;&nbsp; Exit; <br>
+    T1 := T; <br>
+    Repeat <br>
+    &nbsp;&nbsp; T1 := T1.Parent; <br>
+    &nbsp;&nbsp; If S[2] &lt;&gt; ':' then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;S := T1.Text + '\' + S; <br>
+    Until S[2] = ':'; <br>
+    <br>
+    If T.Count = 0 then <br>
+    &nbsp;&nbsp; FindDirs(S,T); <br>
+    <br>
+    fDirectory := S; <br>
+    fChanges; <br>
+    End; <br>
+    {--------------------------------------------------------------------} <br>
+    Procedure TDirectoryTree.FindDrives; <br>
+    <br>
+    Var <br>
+    &nbsp;&nbsp;
+    Tr,T1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:
+    TTreenode; <br>
+    &nbsp;&nbsp;
+    ld&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    : DWord; <br>
+    &nbsp;&nbsp;
+    I&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:
+    Integer; <br>
+    &nbsp;&nbsp;
+    Drive&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:
+    String; <br>
+    <br>
+    Begin <br>
+    Items.Clear; <br>
+    ld := GetLogicalDrives; <br>
+    Tr := Items.Add(nil,Rootname); <br>
+    Tr.ImageIndex := 2; <br>
+    Tr.SelectedIndex := 2; <br>
+    For I := 0 to 25 do <br>
+    &nbsp;&nbsp; Begin <br>
+    &nbsp;&nbsp; If (ld and (1 shl I)) &gt; 0 then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Drive := Chr(65 + I) + ':'; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;T1 := Items.AddChild(Tr,Drive); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;T1.HasChildren := True; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Корректируем иконку диска <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Case GetDriveType(PChar(Drive[1] + ':\')) of <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;0,DRIVE_FIXED
+    :&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    T1.ImageIndex := 3; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    T1.SelectedIndex := 3; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    End; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DRIVE_CDROM
+    :&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    T1.ImageIndex := 4; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    T1.SelectedIndex := 4; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    End; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DRIVE_REMOVABLE
+    :&nbsp;&nbsp;&nbsp;&nbsp;Begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    T1.ImageIndex := 5; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    T1.SelectedIndex := 5; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    End; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DRIVE_RAMDISK:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    Begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    T1.ImageIndex := 6; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    T1.SelectedIndex := 6; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    End; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DRIVE_REMOTE
+    :&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    T1.ImageIndex := 7; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    T1.SelectedIndex := 7; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    End; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; End; // конец Case <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If fCurDrive = Drive then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; T1.Selected := True; // Выбираем
+    текущий диск <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;End; <br>
+    &nbsp;&nbsp; End; <br>
+    <br>
+    End; <br>
+    {--------------------------------------------------------------------} <br>
+    Constructor TDirectoryTree.Create(AOwner : TComponent); <br>
+    <br>
+    Var <br>
+    &nbsp;&nbsp; bDirClose,bDirOpen&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : TBitmap;
+    <br>
+    &nbsp;&nbsp;
+    bFloppy,bComputer&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: TBitmap; <br>
+    &nbsp;&nbsp; bHardDisk,bCDRom&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    : TBitmap; <br>
+    &nbsp;&nbsp; bRemoteDrive,bRamdisk&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: TBitmap; <br>
+    <br>
+    Begin <br>
+    inherited Create(AOwner); <br>
+    ShowRoot := True; <br>
+    ReadOnly := True; <br>
+    SortType := stBoth; <br>
+    fDirLabelSet := False; <br>
+    fDirectory := ''; <br>
+    fImageList := TCustomImageList.Create(Self); <br>
+    fImageList.Clear; <br>
+    fImageList.BkColor := clWhite; <br>
+    fImageList.BlendColor := clWhite; <br>
+    fImageList.Masked := True; <br>
+    fImageList.Height := 16; <br>
+    fImageList.Width := 16; <br>
+    fImageList.AllocBy := 7; <br>
+    <br>
+    // Загружаем картинку DIRCLOSE <br>
+    bDirClose := TBitmap.Create; <br>
+    bDirClose.Handle := LoadBitmap(hInstance,'DIRCLOSE'); <br>
+    // Добавляем в ImageList <br>
+    fImageList.Add(bDirClose,nil);&nbsp;&nbsp;&nbsp;&nbsp; // 0 <br>
+    bDirClose.Free; <br>
+    <br>
+    // Загружаем картинку DIROPEN <br>
+    bDirOpen := TBitmap.Create; <br>
+    bDirOpen.Handle := LoadBitmap(hInstance,'DIROPEN'); <br>
+    // Добавляем в ImageList <br>
+    fImageList.Add(bDirOpen,nil);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// 1 <br>
+    bDirOpen.Free; <br>
+    <br>
+    // Загружаем картинку COMPUTER <br>
+    bComputer := TBitmap.Create; <br>
+    bComputer.Handle := LoadBitmap(hInstance,'COMPUTER'); <br>
+    // Добавляем в ImageList <br>
+    fImageList.Add(bComputer,nil);&nbsp;&nbsp;&nbsp;&nbsp; // 2 <br>
+    bComputer.Free; <br>
+    <br>
+    // Загружаем картинку HARDDISK <br>
+    bHardDisk := TBitmap.Create; <br>
+    bHardDisk.Handle := LoadBitmap(hInstance,'HARDDISK'); <br>
+    // Добавляем в ImageList <br>
+    fImageList.Add(bHardDisk,nil);&nbsp;&nbsp;&nbsp;&nbsp; // 3 <br>
+    bHardDisk.Free; <br>
+    <br>
+    // Загружаем картинку CDROMDISK <br>
+    bCDRom := TBitmap.Create; <br>
+    bCDRom.Handle := LoadBitmap(hInstance,'CDROMDISK'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    // Со словом 'CDROM' возникают проблемы <br>
+    // Добавляем в ImageList <br>
+    fImageList.Add(bCDRom,nil);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// 4 <br>
+    bCDRom.Free; <br>
+    <br>
+    // Загружаем картинку FLOPPYDISK <br>
+    bFloppy := TBitmap.Create; <br>
+    bFloppy.Handle := LoadBitmap(hInstance,'FLOPPYDISK'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    // bitmap с именем 'FLOPPY' <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    // уже существует <br>
+    // Добавляем в ImageList <br>
+    fImageList.Add(bFloppy,nil);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // 5 <br>
+    bFloppy.Free; <br>
+    <br>
+    // Загружаем картинку RAMDISK <br>
+    bRamDisk := TBitmap.Create; <br>
+    bRamDisk.Handle := LoadBitmap(hInstance,'RAMDISK'); <br>
+    // Добавляем в ImageList <br>
+    fImageList.Add(bRamDisk,nil);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// 6 <br>
+    bRamDisk.Free; <br>
+    <br>
+    // Загружаем картинку REMOTEDISK <br>
+    bRemoteDrive := TBitmap.Create; <br>
+    bRemoteDrive.Handle := LoadBitmap(hInstance,'REMOTEDISK'); <br>
+    // Добавляем в ImageList <br>
+    fImageList.Add(bRemoteDrive,nil);&nbsp;&nbsp;// 7 <br>
+    bRemoteDrive.Free; <br>
+    <br>
+    Images := fImageList; // Assign the imagelist to TreeView.Images <br>
+    // CustomTreeView не имеет никаких treenodes, поэтому мы
+    должны создать их.. <br>
+    fTreenodes := TTreenodes.Create(Self); <br>
+    End; <br>
+    {--------------------------------------------------------------------} <br>
+    Procedure TDirectoryTree.CreateWnd; <br>
+    <br>
+    Var <br>
+    &nbsp;&nbsp; P : String; <br>
+    <br>
+    Begin <br>
+    inherited CreateWnd; <br>
+    GetDir(0,P); <br>
+    fCurDrive := UpCase(P[1]) + ':'; <br>
+    FindDrives; //Является динамическим!! <br>
+    End; <br>
+    {--------------------------------------------------------------------} <br>
+    Procedure TDirectoryTree.MouseDown(Button: TMouseButton; <br>
+    &nbsp;&nbsp; Shift : TShiftState; X, Y: Integer); <br>
+    <br>
+    Var <br>
+    &nbsp;&nbsp; T,T1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : TTreenode;
+    <br>
+    &nbsp;&nbsp;
+    S&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:
+    String; <br>
+    &nbsp;&nbsp; HT&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; :
+    THitTests; <br>
+    &nbsp;&nbsp;
+    I&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:
+    Integer; <br>
+    <br>
+    Begin <br>
+    inherited MouseDown(Button,Shift,X,Y); <br>
+    HT := GetHitTestInfoAt(X,Y); <br>
+    If (htOnItem in HT) or (htOnIcon in HT) or (htOnButton in HT) then <br>
+    &nbsp;&nbsp; Begin <br>
+    &nbsp;&nbsp; T := GetNodeAt(X,Y); <br>
+    &nbsp;&nbsp; S := T.Text; <br>
+    &nbsp;&nbsp; If S = Rootname then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Exit; <br>
+    &nbsp;&nbsp; T1 := T; <br>
+    &nbsp;&nbsp; Repeat <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;T1 := T1.Parent; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If S[2] &lt;&gt; ':' then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; S := T1.Text + '\' + S; <br>
+    &nbsp;&nbsp; Until S[2] = ':'; <br>
+    &nbsp;&nbsp; fDirectory := S; <br>
+    &nbsp;&nbsp; fChanges; <br>
+    &nbsp;&nbsp; I := T.Count; <br>
+    &nbsp;&nbsp; GetNodeInfo(T); <br>
+    &nbsp;&nbsp; T.Selected := True; <br>
+    &nbsp;&nbsp; If T.Count &gt; 0 then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If I = 0 then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; T.Expanded := True; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;End <br>
+    &nbsp;&nbsp; else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;T.HasChildren := False; // удаляем знаки
+    '-' или '+' <br>
+    &nbsp;&nbsp; End; <br>
+    End; <br>
+    {--------------------------------------------------------------------} <br>
+    Procedure TDirectoryTree.Update; <br>
+    <br>
+    Var <br>
+    &nbsp;&nbsp; P : String; <br>
+    <br>
+    Begin <br>
+    GetDir(0,P); <br>
+    fCurDrive := UpCase(P[1]) + ':'; <br>
+    ChDir(fCurDrive); <br>
+    FindDrives; <br>
+    fChanges; <br>
+    End; <br>
+    {--------------------------------------------------------------------} <br>
+    Destructor TDirectoryTree.Destroy; <br>
+    <br>
+    Begin <br>
+    fImageList.Free; // Удаляем ImageList <br>
+    fTreenodes.Free; // Удаляем Treenodes <br>
+    inherited Destroy; <br>
+    End; <br>
+    {--------------------------------------------------------------------} <br>
+    Procedure Register; <br>
+    <br>
+    Begin <br>
+    RegisterComponents('Samples', [TDirectoryTree]); <br>
+    End; <br>
+    {--------------------------------------------------------------------} <br>
+    End. <br>
+    {====================================================================} <br>
+    <br>
+    </p>
+    <p><br>
+    </td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

@@ -1,0 +1,468 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как завершить задачу в Windows NT (а заодно получить
+    PID задачи)</h3>
+    <p>Ниже приведён unit, который позволяет убить
+    задачу в Windows NT.<br>
+    <br>
+    Entry : <br>
+    function Kill_By_Pid(pid : longint) : integer; <br>
+    &nbsp;&nbsp;где pid, это число, представляющее pid задачи<br>
+    <br>
+    function EnumProcessWithPid(list : TStrings) : integer; <br>
+    &nbsp;&nbsp;где список, это объект TStrings, который будет
+    содержать имя задачи и pid в полях Object.<br>
+    &nbsp;&nbsp;( list.Items[i] для имени, integer(list.Object[i]) для PID) <br>
+    <br>
+    <br>
+    Дальше следует сам код:</p>
+    <p>procedure GenerateBlueScreen; <br>
+    var <br>
+    &nbsp;&nbsp;Task : TStringList; <br>
+    &nbsp;&nbsp;i : integer; <br>
+    begin <br>
+    &nbsp;&nbsp;Task := TStringList.Create; <br>
+    &nbsp;&nbsp;Try <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;EnumProcessWithPid(Task); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;for i := 0 to Task.Count - 1 do <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TaskName := UpperCase(Task[i]); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (TaskName = 'WINLOGON.EXE') then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;begin // Generate a nice BlueScreenOfDeath <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Kill_By_Pid(integer(Task.Objects[i])); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Beep; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;Finally <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Task.Free; <br>
+    &nbsp;&nbsp;end; <br>
+    end; <br>
+    <br>
+    <br>
+    <br>
+    unit U_Kill; <br>
+    {** JF 15/02/2000 - U_Kill.pas <br>
+    ** This unit allow you to list and to kill runnign process. (Work only on NT) <br>
+    ** Entry point : EnumProcessWithPid and Kill_By_Pid. <br>
+    ** v1.2 JF correct a bug in Kill_By_Pid <br>
+    ** v1.3 JF change a thing for D5 05/09/2000 <br>
+    **} <br>
+    interface <br>
+    <br>
+    uses <br>
+    Classes; <br>
+    <br>
+    //** Error code **// <br>
+    const <br>
+    KILL_NOERR = 0; <br>
+    KILL_NOTSUPPORTED = -1; <br>
+    KILL_ERR_OPENPROCESS = -2; <br>
+    KILL_ERR_TERMINATEPROCESS = -3; <br>
+    <br>
+    ENUM_NOERR = 0; <br>
+    ENUM_NOTSUPPORTED = -1; <br>
+    ENUM_ERR_OPENPROCESSTOKEN = -2; <br>
+    ENUM_ERR_LookupPrivilegeValue = -3; <br>
+    ENUM_ERR_AdjustTokenPrivileges = -4; <br>
+    <br>
+    GETTASKLIST_ERR_RegOpenKeyEx = -1; <br>
+    GETTASKLIST_ERR_RegQueryValueEx = -2; <br>
+    <br>
+    function Kill_By_Pid(pid : longint) : integer; <br>
+    function EnumProcessWithPid(list : TStrings) : integer; <br>
+    <br>
+    implementation <br>
+    uses <br>
+    &nbsp;&nbsp;Windows, <br>
+    &nbsp;&nbsp;Registry, <br>
+    &nbsp;&nbsp;SysUtils; <br>
+    var <br>
+    &nbsp;&nbsp;VerInfo : TOSVersionInfo; <br>
+    const <br>
+    &nbsp;&nbsp;SE_DEBUG_NAME = 'SeDebugPrivilege'; <br>
+    &nbsp;&nbsp;INITIAL_SIZE&nbsp;&nbsp;=&nbsp;&nbsp;&nbsp;&nbsp; 51200; <br>
+    &nbsp;&nbsp;EXTEND_SIZE&nbsp;&nbsp; =&nbsp;&nbsp;&nbsp;&nbsp; 25600; <br>
+    &nbsp;&nbsp;REGKEY_PERF&nbsp;&nbsp; =&nbsp;&nbsp;&nbsp;&nbsp; 'software\microsoft\windows
+    nt\currentversion\perflib'; <br>
+    &nbsp;&nbsp;REGSUBKEY_COUNTERS ='Counters'; <br>
+    &nbsp;&nbsp;PROCESS_COUNTER&nbsp;&nbsp;&nbsp;&nbsp;='process'; <br>
+    &nbsp;&nbsp;PROCESSID_COUNTER&nbsp;&nbsp;='id process'; <br>
+    &nbsp;&nbsp;UNKNOWN_TASK&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ='unknown'; <br>
+    type <br>
+    &nbsp;&nbsp;ArrayOfChar = array[0..1024] of char; <br>
+    &nbsp;&nbsp;pArrayOfChar = ^pArrayOfChar; <br>
+    type <br>
+    &nbsp;&nbsp;TPerfDataBlock = record <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Signature&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : array[0..3] of
+    WCHAR; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;LittleEndian&nbsp;&nbsp;&nbsp;&nbsp;: DWORD; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Version&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : DWORD; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Revision&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: DWORD; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;TotalByteLength : DWORD; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;HeaderLength&nbsp;&nbsp;&nbsp;&nbsp;: DWORD; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;NumObjectTypes&nbsp;&nbsp;: DWORD; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;DefaultObject&nbsp;&nbsp; : integer; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;SystemTime&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: TSystemTime; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;PerfTime&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:
+    TLargeInteger; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;PerfFreq&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:
+    TLargeInteger; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;PerfTime100nSec : TLargeInteger; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;SystemNameLength: DWORD; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;SystemNameOffset: DWORD; <br>
+    &nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;pTPerfDataBlock = ^TPerfDataBlock; <br>
+    &nbsp;&nbsp;TPerfObjectType = record <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;TotalByteLength&nbsp;&nbsp;&nbsp;&nbsp;: DWORD; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;DefinitionLength&nbsp;&nbsp; : DWORD; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;HeaderLength&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : DWORD; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ObjectNameTitleIndex : DWORD; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ObjectNameTitle&nbsp;&nbsp;&nbsp;&nbsp;: LPWSTR; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ObjectHelpTitleIndex : DWORD; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ObjectHelpTitle&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: LPWSTR; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;DetailLevel&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:
+    DWORD; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;NumCounters&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:
+    DWORD; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;DefaultCounter&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : integer; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;NumInstances&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; :
+    integer; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CodePage&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    : DWORD; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;PerfTime&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    : TLargeInteger; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;PerfFreq&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    : TLargeInteger; <br>
+    &nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;pTPerfObjectType&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; = ^TPerfObjectType; <br>
+    &nbsp;&nbsp;TPerfInstanceDefinition = record <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;
+    ByteLength&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : DWORD; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; ParentObjectTitleIndex : DWORD; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; ParentObjectInstance&nbsp;&nbsp; : DWORD; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;
+    UniqueID&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    : integer; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;
+    NameOffset&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; :
+    DWORD; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;
+    NameLength&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; :
+    DWORD; <br>
+    &nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;pTPerfInstanceDefinition = ^TPerfInstanceDefinition; <br>
+    <br>
+    &nbsp;&nbsp;TPerfCounterBlock = record <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ByteLength&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: DWORD; <br>
+    &nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;pTPerfCounterBlock = ^TPerfCounterBlock; <br>
+    <br>
+    &nbsp;&nbsp;TPerfCounterDefinition = record <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ByteLength&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    : DWORD; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CounterNameTitleIndex&nbsp;&nbsp;&nbsp;&nbsp;: DWORD; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CounterNameTitle&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; :
+    LPWSTR; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CounterHelpTitleIndex&nbsp;&nbsp;&nbsp;&nbsp;: DWORD; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CounterHelpTitle&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; :
+    LPWSTR; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;DefaultScale&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    : integer; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;DetailLevel&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:
+    DWORD; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CounterType&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:
+    DWORD; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CounterSize&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:
+    DWORD; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CounterOffset&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:
+    DWORD; <br>
+    &nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;pTPerfCounterDefinition = ^TPerfCounterDefinition; <br>
+    <br>
+    procedure InitKill; <br>
+    begin <br>
+    &nbsp;&nbsp;VerInfo.dwOSVersionInfoSize := SizeOf(TOSVersionInfo); <br>
+    &nbsp;&nbsp;GetVersionEx(VerInfo); <br>
+    end; <br>
+    <br>
+    (* <br>
+    #define MAKELANGID(p, s)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ((((WORD&nbsp;&nbsp;)(s))
+    &lt;&lt; 10) | (WORD&nbsp;&nbsp;)(p)) <br>
+    *) <br>
+    function MAKELANGID(p : DWORD ; s : DWORD) : word; <br>
+    begin <br>
+    &nbsp;&nbsp;result := (s shl 10) or (p); <br>
+    end; <br>
+    <br>
+    function Kill_By_Pid(pid : longint) : integer; <br>
+    var <br>
+    &nbsp;&nbsp;hProcess : THANDLE; <br>
+    &nbsp;&nbsp;TermSucc : BOOL; <br>
+    begin <br>
+    &nbsp;&nbsp;if (verInfo.dwPlatformId = VER_PLATFORM_WIN32_NT) then <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;hProcess := OpenProcess(PROCESS_ALL_ACCESS, true, pid); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if (hProcess = 0) then // v 1.2 : was =-1 <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;result := KILL_ERR_OPENPROCESS; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TermSucc := TerminateProcess(hProcess, 0); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (TermSucc = false) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;result := KILL_ERR_TERMINATEPROCESS <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;result := KILL_NOERR; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;end <br>
+    &nbsp;&nbsp;else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;result := KILL_NOTSUPPORTED; <br>
+    end; <br>
+    <br>
+    function&nbsp;&nbsp;EnableDebugPrivilegeNT : integer; <br>
+    var <br>
+    &nbsp;&nbsp;hToken : THANDLE; <br>
+    &nbsp;&nbsp;DebugValue : TLargeInteger; <br>
+    &nbsp;&nbsp;tkp : TTokenPrivileges ; <br>
+    &nbsp;&nbsp;ReturnLength : DWORD; <br>
+    &nbsp;&nbsp;PreviousState: TTokenPrivileges; <br>
+    begin <br>
+    &nbsp;&nbsp;if (OpenProcessToken(GetCurrentProcess, TOKEN_ADJUST_PRIVILEGES or
+    TOKEN_QUERY, hToken) = false) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;result := ENUM_ERR_OPENPROCESSTOKEN <br>
+    &nbsp;&nbsp;else <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if (LookupPrivilegeValue(nil, SE_DEBUG_NAME, DebugValue) = false)
+    then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;result := ENUM_ERR_LookupPrivilegeValue <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ReturnLength := 0; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;tkp.PrivilegeCount := 1; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;tkp.Privileges[0].Luid := DebugValue; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;tkp.Privileges[0].Attributes := SE_PRIVILEGE_ENABLED; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;AdjustTokenPrivileges(hToken, false, tkp,
+    SizeOf(TTokenPrivileges),PreviousState , ReturnLength); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (GetLastError &lt;&gt; ERROR_SUCCESS) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;result := ENUM_ERR_AdjustTokenPrivileges <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;result := ENUM_NOERR; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;end; <br>
+    end; <br>
+    <br>
+    function&nbsp;&nbsp;IsDigit(c : char) : boolean; <br>
+    begin <br>
+    &nbsp;&nbsp;result := (c&gt;='0') and (c&lt;='9'); <br>
+    end; <br>
+    <br>
+    function&nbsp;&nbsp;min(a,b : integer) : integer; <br>
+    begin <br>
+    &nbsp;&nbsp;if (a &lt; b) then result := a <br>
+    &nbsp;&nbsp;else result := b; <br>
+    end; <br>
+    <br>
+    function&nbsp;&nbsp;GetTaskListNT(pTask : TStrings) : integer; <br>
+    var <br>
+    &nbsp;&nbsp;rc&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: DWORD; <br>
+    &nbsp;&nbsp;hKeyNames : HKEY; <br>
+    &nbsp;&nbsp;dwType&nbsp;&nbsp;&nbsp;&nbsp;: DWORD; <br>
+    &nbsp;&nbsp;dwSize&nbsp;&nbsp;&nbsp;&nbsp;: DWORd; <br>
+    &nbsp;&nbsp;buf&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : PBYTE; <br>
+    &nbsp;&nbsp;szSubkey&nbsp;&nbsp;: array[0..1024] of char; <br>
+    &nbsp;&nbsp;lid&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : LANGID; <br>
+    &nbsp;&nbsp;p&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : PCHAR; <br>
+    &nbsp;&nbsp;p2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: PCHAR; <br>
+    &nbsp;&nbsp;pPerf&nbsp;&nbsp;&nbsp;&nbsp; : pTPerfDataBlock; <br>
+    &nbsp;&nbsp;pObj&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: pTPerfObjectType; <br>
+    &nbsp;&nbsp;pInst&nbsp;&nbsp;&nbsp;&nbsp; : pTPerfInstanceDefinition; <br>
+    &nbsp;&nbsp;pCounter&nbsp;&nbsp;: pTPerfCounterBlock; <br>
+    &nbsp;&nbsp;pCounterDef : pTPerfCounterDefinition; <br>
+    &nbsp;&nbsp;i&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : DWORD; <br>
+    &nbsp;&nbsp;dwProcessIdTitle : DWORD; <br>
+    &nbsp;&nbsp;dwProcessIdCounter : DWORD; <br>
+    &nbsp;&nbsp;szProcessName : array[0..MAX_PATH] of char; <br>
+    &nbsp;&nbsp;dwLimit&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : DWORD; <br>
+    &nbsp;&nbsp;dwNumTasks&nbsp;&nbsp;&nbsp;&nbsp;: dword; <br>
+    <br>
+    &nbsp;&nbsp;ProcessName&nbsp;&nbsp; : array[0..MAX_PATH] of char; <br>
+    &nbsp;&nbsp;dwProcessID&nbsp;&nbsp; : DWORD; <br>
+    label <br>
+    &nbsp;&nbsp;EndOfProc; <br>
+    begin <br>
+    &nbsp;&nbsp;dwNumTasks := 255; <br>
+    &nbsp;&nbsp;dwLimit := dwNumTasks - 1; <br>
+    &nbsp;&nbsp;StrCopy(ProcessName, ''); <br>
+    &nbsp;&nbsp;lid := MAKELANGID(LANG_ENGLISH, SUBLANG_NEUTRAL); <br>
+    &nbsp;&nbsp;StrFmt(szSubKey, '%s\%.3X', [REGKEY_PERF, lid]); <br>
+    &nbsp;&nbsp;rc := RegOpenKeyEx(HKEY_LOCAL_MACHINE, szSubKey, 0, KEY_READ, hKeyNames); <br>
+    &nbsp;&nbsp;if (rc &lt;&gt; ERROR_SUCCESS) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;result := GETTASKLIST_ERR_RegOpenKeyEx <br>
+    &nbsp;&nbsp;else <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;result := 0; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;rc := RegQueryValueEx(hKeyNames, REGSUBKEY_COUNTERS, nil, @dwType,
+    nil, @dwSize); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if (rc &lt;&gt; ERROR_SUCCESS) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;result := GETTASKLIST_ERR_RegQueryValueEx <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;GetMem(buf, dwSize); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FillChar(buf^, dwSize, 0); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;RegQueryValueEx(hKeyNames, REGSUBKEY_COUNTERS, nil,
+    @dwType, buf, @dwSize); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;p := PCHAR(buf); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dwProcessIdTitle := 0; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;while (p^&lt;&gt;#0) do <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (p &gt; buf) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;p2 := p - 2; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;while(isDigit(p2^)) do <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dec(p2); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (StrIComp(p, PROCESS_COUNTER) = 0) then
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;p2 := p -2; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;while(isDigit(p2^)) do <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dec(p2); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;strCopy(szSubKey, p2+1); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (StrIComp(p, PROCESSID_COUNTER) = 0)
+    then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;p2 := p - 2; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;while(isDigit(p2^)) do <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dec(p2); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; dwProcessIdTitle :=
+    StrToIntDef(p2+1, -1); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;p := p + (Length(p) + 1); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FreeMem(buf); buf := nil; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dwSize := INITIAL_SIZE; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;GetMem(buf, dwSize); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FillChar(buf^, dwSize, 0); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pPerf := nil; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;while (true) do <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rc :=
+    RegQueryValueEx(HKEY_PERFORMANCE_DATA, szSubKey, nil, @dwType, buf, @dwSize); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pPerf := pTPerfDataBlock(buf); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ((rc = ERROR_SUCCESS) and (dwSize &gt;
+    0) and <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(pPerf^.Signature[0]
+    = WCHAR('P')) and <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(pPerf^.Signature[1]
+    = WCHAR('E')) and <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(pPerf^.Signature[2]
+    = WCHAR('R')) and <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(pPerf^.Signature[3]
+    = WCHAR('F')) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (rc = ERROR_MORE_DATA) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dwSize := dwSize +
+    EXTEND_SIZE; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FreeMem(buf); buf := nil; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;GetMem(buf, dwSize); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FillChar(buf^, dwSize, 0);<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;goto EndOfProc; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pObj := pTPerfObjectType( DWORD(pPerf) +
+    pPerf^.HeaderLength); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pCounterDef := pTPerfCounterDefinition( DWORD(pObj) +
+    pObj^.HeaderLength); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dwProcessIdCounter := 0; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;i := 0; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;while (i &lt; pObj^.NumCounters) do <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (pCounterDef^.CounterNameTitleIndex =
+    dwProcessIdTitle) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dwProcessIdCounter :=
+    pCounterDEf^.CounterOffset; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;inc(pCounterDef); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;inc(i); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dwNumTasks := min(dwLimit, pObj^.NumInstances); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pInst := PTPerfInstanceDefinition(DWORD(pObj) +
+    pObj^.DefinitionLength); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;i := 0; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;while ( i &lt; dwNumTasks) do <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;p :=
+    PCHAR(DWORD(pInst)+pInst^.NameOffset); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rc := WideCharToMultiByte(CP_ACP, 0,
+    LPCWSTR(p), -1, szProcessName, SizeOf(szProcessName), nil, nil); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{** This is changed for working with D3
+    and D5 05/09/2000 **} <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (rc = 0) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;StrCopy(ProcessName,
+    UNKNOWN_TASK) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;StrCopy(ProcessName,
+    szProcessName); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Получаем ID процесса<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pCounter := pTPerfCounterBlock(
+    DWORD(pInst) + pInst^.ByteLength); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dwProcessId := LPDWORD(DWORD(pCounter) +
+    dwProcessIdCounter)^; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (dwProcessId = 0) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dwProcessId := DWORD(0); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pTask.AddObject(ProcessName,
+    TObject(dwProcessID)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pInst := pTPerfInstanceDefinition(
+    DWORD(pCounter) + pCounter^.ByteLength); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;inc(i); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;result := dwNumTasks; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;end; <br>
+    EndOfProc: <br>
+    &nbsp;&nbsp;if (buf &lt;&gt; nil) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FreeMem(buf); <br>
+    &nbsp;&nbsp;RegCloseKey(hKeyNames); <br>
+    &nbsp;&nbsp;RegCloseKey(HKEY_PERFORMANCE_DATA); <br>
+    &nbsp;&nbsp;RegCloseKey(hKeyNames); <br>
+    &nbsp;&nbsp;RegCloseKey(HKEY_PERFORMANCE_DATA); <br>
+    end; <br>
+    <br>
+    function EnumProcessWithPid(list : TStrings) : integer; <br>
+    begin <br>
+    &nbsp;&nbsp;if (verInfo.dwPlatformId = VER_PLATFORM_WIN32_NT) then <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;EnableDebugPrivilegeNT; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;result := GetTaskListNT(list); <br>
+    &nbsp;&nbsp;end <br>
+    &nbsp;&nbsp;else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;result := ENUM_NOTSUPPORTED; <br>
+    end; <br>
+    <br>
+    initialization <br>
+    &nbsp;&nbsp;InitKill; <br>
+    end.</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

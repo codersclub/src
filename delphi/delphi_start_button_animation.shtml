@@ -1,0 +1,239 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Анимированная кнопка &quot;Пуск&quot;.</h3>
+    <p>Автор: <a href="mailto:kadekcipta@hotmail.com">I MD.CIPTAYASA</a></p>
+    <p>Итак, если Вам надоело привычное статическое
+    изображение кнопки &quot;Пуск&quot;, то предлагаю
+    немного оживить её :) Надеюсь, что это доставит
+    Вам удовольствие. <br>
+    <br>
+    Совместимость: Все версии Delphi</p>
+    <table border="0" cellpadding="0" cellspacing="0">
+      <tr>
+        <td width="750" bgcolor="#A5E4A7"><font face="Tahoma" style="font-size: 10pt" size="-1"><b>&nbsp;
+        Пример:</b></font></td>
+      </tr>
+    </table>
+    <font color="#000000" face="Verdana" size="2"><p>unit Main; <br>
+    <br>
+    interface <br>
+    <br>
+    uses <br>
+    &nbsp;&nbsp;Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs, <br>
+    &nbsp;&nbsp;StdCtrls, ExtCtrls,ShellAPI; <br>
+    <br>
+    const <br>
+    &nbsp;&nbsp;MAX_BUFFER = 6; <br>
+    <br>
+    type <br>
+    &nbsp;&nbsp;TForm1 = class(TForm) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Button1: TButton; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Timer1: TTimer; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Button2: TButton; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Image1: TImage; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Edit1: TEdit; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Label1: TLabel; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Label2: TLabel; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Label3: TLabel; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Button3: TButton; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure FormCreate(Sender: TObject); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure Button1Click(Sender: TObject); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure FormDestroy(Sender: TObject); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure Timer1Timer(Sender: TObject); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure Button2Click(Sender: TObject); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure Edit1KeyPress(Sender: TObject; var Key: Char); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure FormClose(Sender: TObject; var Action: TCloseAction); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure Button3Click(Sender: TObject); <br>
+    &nbsp;&nbsp;private <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;HW : HWND; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;DC : HDC; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;R&nbsp;&nbsp;: TRect; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FNumber : integer; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Buffer : array[1..MAX_BUFFER] of TBitmap; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;TrayIcon : TNotifyIconData; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure CreateFrames; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure DestroyFrames; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure BuildFrames; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure NotifyIcon(var Msg : TMessage);message WM_USER + 100; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure OnMinimizeEvt(Sender : TObject); <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    var <br>
+    &nbsp;&nbsp;Form1: TForm1; <br>
+    <br>
+    implementation <br>
+    <br>
+    uses Math; <br>
+    {$R *.DFM} <br>
+    <br>
+    // Создаём буфер для спрайтов <br>
+    procedure TForm1.CreateFrames; <br>
+    var <br>
+    i : integer; <br>
+    begin <br>
+    &nbsp;&nbsp;for i:=1 to MAX_BUFFER do <br>
+    &nbsp;&nbsp; begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; Buffer[i] := TBitmap.Create; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; Buffer[i].Height := R.Bottom-R.Top; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; Buffer[i].Width&nbsp;&nbsp;:= R.Right-R.Left; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; Buffer[i].Canvas.Brush.Color := clBtnFace; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; Buffer[i].Canvas.Pen.Color := clBtnFace; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; Buffer[i].Canvas.Rectangle(0,0,Buffer[i].Width,Buffer[i].Height);
+    <br>
+    &nbsp;&nbsp; end; <br>
+    end; <br>
+    <br>
+    procedure TForm1.DestroyFrames; <br>
+    var <br>
+    i : integer; <br>
+    begin <br>
+    &nbsp;&nbsp;for i:=1 to MAX_BUFFER do <br>
+    &nbsp;&nbsp; begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; Buffer[i].Destroy; <br>
+    &nbsp;&nbsp; end; <br>
+    end; <br>
+    <br>
+    // Подготавливает сегменты/спрайты для анимации <br>
+    procedure TForm1.BuildFrames; <br>
+    var <br>
+    i,j,k,H,W : integer; <br>
+    Y : double; <br>
+    begin <br>
+    H := R.Bottom-R.Top; <br>
+    W := R.Right-R.Left; <br>
+    Image1.Width := W; <br>
+    Image1.Height:= H; <br>
+    for i := 1 to MAX_BUFFER-1 do //Буфер[MAX_BUFFER] используется для
+    хранения оригинального битмапа <br>
+    &nbsp;&nbsp;for j:= 1 to W do <br>
+    &nbsp;&nbsp; for k:=1 to H do <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; Y := 2*Sin((j*360/W)*(pi/180)-20*i); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; Buffer[i].Canvas.Pixels[j,k-Round(Y)]:=
+    Buffer[6].Canvas.Pixels[j,k]; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    end; <br>
+    <br>
+    procedure TForm1.OnMinimizeEvt(Sender : TObject); <br>
+    begin <br>
+    &nbsp;&nbsp;ShowWindow(Application.Handle,SW_HIDE); <br>
+    end; <br>
+    <br>
+    procedure TForm1.FormCreate(Sender: TObject); <br>
+    begin <br>
+    &nbsp;&nbsp;HW := FindWindowEx(FindWindow('Shell_TrayWnd',nil),0,'Button',nil); <br>
+    &nbsp;&nbsp;GetWindowRect(HW,R); <br>
+    &nbsp;&nbsp;DC := GetWindowDC(HW); <br>
+    &nbsp;&nbsp;CreateFrames; <br>
+    &nbsp;&nbsp;FNumber :=1; <br>
+    &nbsp;&nbsp;TrayIcon.cbSize := SizeOf(TrayIcon); <br>
+    &nbsp;&nbsp;TrayIcon.Wnd := Form1.Handle; <br>
+    &nbsp;&nbsp;TrayIcon.uID := 100; <br>
+    &nbsp;&nbsp;TrayIcon.uFlags := NIF_MESSAGE + NIF_ICON + NIF_TIP; <br>
+    &nbsp;&nbsp;TrayIcon.uCallbackMessage := WM_USER + 100; <br>
+    &nbsp;&nbsp;TrayIcon.hIcon := Application.Icon.Handle; <br>
+    &nbsp;&nbsp;Shell_NotifyIcon(NIM_ADD,@TrayIcon); <br>
+    &nbsp;&nbsp;Application.OnMinimize := OnMinimizeEvt; <br>
+    end; <br>
+    <br>
+    // Уведомляем обработчик <br>
+    procedure TForm1.NotifyIcon(var Msg : TMessage); <br>
+    begin <br>
+    &nbsp;&nbsp;case Msg.LParam of <br>
+    &nbsp;&nbsp; WM_LBUTTONDBLCLK : <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ShowWindow(Application.Handle,SW_SHOW); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Application.Restore; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;end; <br>
+    end; <br>
+    <br>
+    procedure TForm1.Button1Click(Sender: TObject); <br>
+    begin <br>
+    //Получаем изображение оригинальной кнопки,
+    чтобы потом использовать его<br>
+    //когда анимация завершится<br>
+    &nbsp;&nbsp;BitBlt(Buffer[MAX_BUFFER].Canvas.Handle,0,0,R.Right-R.Left,R.Bottom-R.Top, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; DC,0,0,SRCCOPY); <br>
+    &nbsp;&nbsp;BuildFrames; <br>
+    &nbsp;&nbsp;Image1.Canvas.Draw(0,0,Buffer[MAX_BUFFER]); <br>
+    &nbsp;&nbsp;Button2.Enabled := true; <br>
+    &nbsp;&nbsp;if Edit1.Text &lt;&gt; '' then <br>
+    &nbsp;&nbsp; Timer1.Interval := StrToInt(Edit1.Text) <br>
+    &nbsp;&nbsp;else <br>
+    &nbsp;&nbsp; begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Timer1.Interval := 100; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Edit1.Text := '100'; <br>
+    &nbsp;&nbsp; end; <br>
+    end; <br>
+    <br>
+    // Освобождение ресурсов <br>
+    procedure TForm1.FormDestroy(Sender: TObject); <br>
+    begin <br>
+    &nbsp;&nbsp;Timer1.Enabled := false; <br>
+    &nbsp;&nbsp;BitBlt(DC,0,0,R.Right-R.Left,R.Bottom-R.Top, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    Buffer[MAX_BUFFER].Canvas.Handle,0,0,SRCCOPY); <br>
+    &nbsp;&nbsp;ReleaseDC(HW,DC); <br>
+    &nbsp;&nbsp;DestroyFrames; // не забудьте сделать это !!!<br>
+    &nbsp;&nbsp;Shell_NotifyIcon(NIM_DELETE,@TrayIcon); <br>
+    end; <br>
+    <br>
+    // Анимация начинается здесь<br>
+    procedure TForm1.Timer1Timer(Sender: TObject); <br>
+    begin <br>
+    &nbsp;&nbsp;BitBlt(DC,0,0,R.Right-R.Left,R.Bottom-R.Top, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    Buffer[FNumber].Canvas.Handle,0,0,SRCCOPY); <br>
+    &nbsp;&nbsp;Inc(FNumber); <br>
+    &nbsp;&nbsp;if (FNumber &gt; MAX_BUFFER-1) then FNumber := 1; <br>
+    end; <br>
+    <br>
+    procedure TForm1.Button2Click(Sender: TObject); <br>
+    begin <br>
+    &nbsp;&nbsp;Timer1.Enabled := not Timer1.Enabled; <br>
+    &nbsp;&nbsp;if not Timer1.Enabled then <br>
+    &nbsp;&nbsp; begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; BitBlt(DC,0,0,R.Right-R.Left,R.Bottom-R.Top, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    Buffer[MAX_BUFFER].Canvas.Handle,0,0,SRCCOPY); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; Button2.Caption := '&amp;Animate'; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; Button1.Enabled := true; <br>
+    &nbsp;&nbsp; end <br>
+    &nbsp;&nbsp;else <br>
+    &nbsp;&nbsp; begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; Button2.Caption := '&amp;Stop'; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; Button1.Enabled := false; <br>
+    &nbsp;&nbsp; end; <br>
+    end; <br>
+    <br>
+    // Обеспечиваем ввод числовых значений<br>
+    procedure TForm1.Edit1KeyPress(Sender: TObject; var Key: Char); <br>
+    begin <br>
+    &nbsp;&nbsp;if not (Key in ['0'..'9']) and (Key &lt;&gt; Chr(VK_BACK)) then <br>
+    &nbsp;&nbsp; Key := #0; <br>
+    end; <br>
+    <br>
+    procedure TForm1.FormClose(Sender: TObject; var Action: TCloseAction); <br>
+    begin <br>
+    &nbsp;&nbsp;Action := caNone; <br>
+    &nbsp;&nbsp;Application.Minimize; <br>
+    end; <br>
+    <br>
+    procedure TForm1.Button3Click(Sender: TObject); <br>
+    begin <br>
+    &nbsp;&nbsp;PostMessage(Form1.Handle,WM_DESTROY,0,0); <br>
+    &nbsp;&nbsp;Application.Terminate; <br>
+    end; <br>
+    <br>
+    end.</p>
+    </font><p><font color="#000000" face="Verdana" size="2"><br>
+    </font></td>
+  </tr>
+</table>
+</center></div></TBODY>
+<!--#include virtual="/ssi/bottom.html"-->

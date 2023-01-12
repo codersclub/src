@@ -1,0 +1,163 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как отправить вебформу на сервер при помощи
+    TClientSocket (напрямую и через прокси)</h3>
+    <p>{ <br>
+    Copyright (c) 1999 by E.J.Molendijk <br>
+    <br>
+    Присоедините следующие события к Вашему ClientSocket: <br>
+    procedure T...Form.ClientSocket1Write; <br>
+    procedure T...Form.ClientSocket1Read; <br>
+    procedure T...Form.ClientSocket1Disconnect; <br>
+    procedure T...Form.ClientSocket1Error; <br>
+    <br>
+    Так же пример показывает, как направлять
+    передачу через прокси-сервер.<br>
+    <br>
+    <br>
+    Для отправки на вебсервер используется
+    следующий формат:<br>
+    Напрямую: 'POST ' + PostAddr + 'HTTP/1.0' + HTTP_Data + Content <br>
+    Через проксю:&nbsp;&nbsp;'POST http://' Webserver + PostAddr + 'HTTP/1.0' +
+    HTTP_Data + Content <br>
+    } <br>
+    <br>
+    <br>
+    Const <br>
+    &nbsp;&nbsp;WebServer = 'www.somehost.com'; <br>
+    &nbsp;&nbsp;WebPort&nbsp;&nbsp; = 80; <br>
+    &nbsp;&nbsp;PostAddr&nbsp;&nbsp;= '/cgi-bin/form'; <br>
+    <br>
+    &nbsp;&nbsp;{ Следующие переменные используются
+    только для вебсервера: } <br>
+    &nbsp;&nbsp;ProxyServer ='proxy.somewhere.com'; <br>
+    &nbsp;&nbsp;ProxyPort&nbsp;&nbsp; = 3128; <br>
+    <br>
+    &nbsp;&nbsp;// В заголовке post необходимы некоторые
+    данные<br>
+    &nbsp;&nbsp;HTTP_Data = <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;'Content-Type: application/x-www-form-urlencoded'#10+ <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;'User-Agent: Delphi/5.0 ()'#10+&nbsp;&nbsp;&nbsp;&nbsp;{
+    Отрекламируем Delphi 5! } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;'Host: somewhere.com'#10+ <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;'Connection: Keep-Alive'#10; <br>
+    <br>
+    type <br>
+    &nbsp;&nbsp;T...Form = class(TForm) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;... <br>
+    &nbsp;&nbsp;private <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{ Private declarations } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;HTTP_POST&nbsp;&nbsp; : String; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FContent&nbsp;&nbsp;&nbsp;&nbsp;: String; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FResult&nbsp;&nbsp;&nbsp;&nbsp; : String; // Эта
+    переменная будет содержать ответ сервера<br>
+    &nbsp;&nbsp;public <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{ Public declarations } <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    <br>
+    { Эти функции сделают некоторое url-кодирование } <br>
+    { Например.&nbsp;&nbsp; 'John Smith' =&gt; 'John+Smith'&nbsp;&nbsp;} <br>
+    function HTTPTran(St : String) : String; <br>
+    var i : Integer; <br>
+    begin <br>
+    &nbsp;&nbsp;Result:=''; <br>
+    &nbsp;&nbsp;for i:=1 to length(St) do <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if St[i] in ['a'..'z','A'..'Z','0','1'..'9'] then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Result:=Result+St[i] <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;else if St[i]=' ' then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Result:=Result+'+' <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Result:=Result+'%'+IntToHex(Byte(St[i]),2); <br>
+    end; <br>
+    <br>
+    procedure T...Form.ClientSocket1Write(Sender: TObject; <br>
+    &nbsp;&nbsp;Socket: TCustomWinSocket); <br>
+    begin <br>
+    &nbsp;&nbsp;// Постим данные<br>
+    &nbsp;&nbsp;Socket.SendText(HTTP_POST+FContent); <br>
+    end; <br>
+    <br>
+    procedure T...Form.ClientSocket1Read(Sender: TObject; <br>
+    &nbsp;&nbsp;Socket: TCustomWinSocket); <br>
+    begin <br>
+    &nbsp;&nbsp;// Получаем результат<br>
+    &nbsp;&nbsp;FResult:=FResult+Socket.ReceiveText; <br>
+    end; <br>
+    <br>
+    procedure T...Form.ClientSocket1Disconnect(Sender: TObject; <br>
+    &nbsp;&nbsp;Socket: TCustomWinSocket); <br>
+    begin <br>
+    &nbsp;&nbsp;// ЗДЕСЬ МОЖНО ОБРАБОТАТЬ FResult // <br>
+    end; <br>
+    <br>
+    procedure T...Form.ClientSocket1Error(Sender: TObject; <br>
+    &nbsp;&nbsp;Socket: TCustomWinSocket; ErrorEvent: TErrorEvent; <br>
+    &nbsp;&nbsp;var ErrorCode: Integer); <br>
+    begin <br>
+    &nbsp;&nbsp;ErrorCode := 0; // Игнорируем ошибки<br>
+    end; <br>
+    <br>
+    <br>
+    { <br>
+    А эта подпрограмма, которую можно использовать
+    для постинга данных формы.<br>
+    } <br>
+    procedure T...Form.PostTheForm; <br>
+    begin <br>
+    &nbsp;&nbsp;// Очищаем результаты<br>
+    &nbsp;&nbsp;FResult:=''; <br>
+    <br>
+    &nbsp;&nbsp;// Вы можете ввести поля формы, которые
+    необходимы<br>
+    &nbsp;&nbsp;// Вот некоторые примеры:<br>
+    &nbsp;&nbsp;FContent:= <br>
+    &nbsp;&nbsp; 'Name='+&nbsp;&nbsp;&nbsp;&nbsp;HTTPTran('John Smith')
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; +'&amp;'+ <br>
+    &nbsp;&nbsp; 'Address='+ HTTPTran('1
+    Waystreet')&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+'&amp;'+ <br>
+    &nbsp;&nbsp; 'Email='+&nbsp;&nbsp; HTTPTran('jsmith@somewhere.com') +'&amp;'+ <br>
+    &nbsp;&nbsp; 'B1=Submit'+ <br>
+    &nbsp;&nbsp; #10; <br>
+    <br>
+    &nbsp;&nbsp;// Вычисляем длину содержимого<br>
+    &nbsp;&nbsp;FContent:= <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;'Content-Length: '+IntToStr(Length(FContent))+#10+#10+FContent; <br>
+    <br>
+    &nbsp;&nbsp;{-- Начало прокси ---} <br>
+    &nbsp;&nbsp;{ если Вы используете прокси, то
+    раскоментируйте этот код<br>
+    &nbsp;&nbsp;ClientSocket1.Host := ProxyServer; <br>
+    &nbsp;&nbsp;ClientSocket1.Port := ProxyPort; <br>
+    &nbsp;&nbsp;HTTP_POST := 'POST http://'+WebServer+PostAddr+' HTTP/1.0'#10; <br>
+    &nbsp;&nbsp;{--- Конец прокси ---} <br>
+    <br>
+    &nbsp;&nbsp;{--- Начало соединения напрямую --- } <br>
+    &nbsp;&nbsp;{ удалите этот код, еслы Вы будете
+    использовать прокси }<br>
+    &nbsp;&nbsp;ClientSocket1.Host := WebServer; <br>
+    &nbsp;&nbsp;ClientSocket1.Port := WebPort; <br>
+    &nbsp;&nbsp;HTTP_POST := 'POST '+PostAddr+' HTTP/1.0'#10; <br>
+    &nbsp;&nbsp;{--- Конец соединения напрямую ---} <br>
+    <br>
+    &nbsp;&nbsp;// Соединяем заголовок<br>
+    &nbsp;&nbsp;HTTP_Post := HTTP_Post + HTTP_Data; <br>
+    <br>
+    &nbsp;&nbsp;// Пытаемся открыть соединение<br>
+    &nbsp;&nbsp;ClientSocket1.Open; <br>
+    end;</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div></TBODY>
+
+
+<p align="center"><br>
+<br>
+</p>
+<!--#include virtual="/ssi/bottom.html"-->

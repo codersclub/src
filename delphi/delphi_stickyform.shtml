@@ -1,0 +1,231 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>&quot;Липкие окошки&quot;</h3>
+    <p>Перевод одноимённой статьи с сайта <a
+    href="http://delphi.about.com">delphi.about.com</a></p>
+    <p>В статье рассматривается приём создания
+    обработчиков сообщений, которые позволяют форме
+    при перетаскивании &quot;прилипать&quot; к краям
+    экранной области. </p>
+    <p>Конечно же в Win API такой возможности не
+    предусмотрено, поэтому мы воспользуемся
+    сообщениями Windows. Как нам извесно, Delphi
+    обрабатывает сообщения через события, генерируя
+    его в тот момент, когда Windows посылает сообщений
+    приложению. Однако некоторые сообщения не
+    доходят до нас. Например, при изменении размеров
+    формы, генерируется событие OnResize, соотвествующее
+    сообщению WM_SIZE, но при перетаскивании формы
+    никакой реакции не происходит. Конечно же форма
+    может получить это сообщение, но изначально
+    никаких действий для данного сообщения не
+    предусмотрено. </p>
+    <p>Итак, при перемещении, окну посылается
+    сообщение WM_MOVING. Обрабатывая данной сообщение,
+    приложение может отслеживать размер и
+    расположение перетаскиваемого квадрата и, при
+    необходимости, изменять их. </p>
+    <p>Так же существует сообщение WM_WINDOWPOSCHANGING,
+    которое посылается окну, в случае, если его
+    размер, расположение или место в Z порядке
+    собираются измениться, как результат вызова
+    функции SetWindowPos либо другой функции управления
+    окном. </p>
+    <p>Чаще всего с сообщением передаются
+    дополнительные параметры, которые сообщают нам
+    необходимую информацию. Например, сообщение WM_MOVE,
+    указывающее на то, что форма изменила своё
+    местоположение, так же передаёт в параметре LPARAM
+    новые координаты X и Y. </p>
+    <p>Сообщение WM_WINDOWPOSCHANGING передаёт нам ТОЛЬКО один
+    параметр - указатель на структуру WindowPos, которая
+    содержит информацию о новом размере и
+    местоположении окна. Вот как выглядит структура
+    WindowPos: </p>
+    <p>&nbsp;</p>
+    <table bgColor="#ffffcc" border="1" width="100%">
+<TBODY>
+      <tr>
+        <td><pre>TWindowPos = <b>packed record</b>
+  hwnd: HWND; <font color="#000080"><i>{Identifies the window.}</i></font>
+  hwndInsertAfter: HWND; <font
+color="#000080"><i>{Window above this one}</i></font>
+  x: Integer; <font color="#000080"><i>{Left edge of the window}</i></font>
+  y: Integer; <font
+color="#000080"><i>{Right edge of the window}</i></font>
+  cx: Integer; <font color="#000080"><i>{Window width}</i></font>
+  cy: Integer; <font
+color="#000080"><i>{Window height}</i></font>
+  flags: UINT; <font color="#000080"><i>{Window-positioning options.}</i></font>
+<b>end</b>;
+</pre>
+        </td>
+      </tr>
+</TBODY>
+    </table>
+    <p>Наша задача проста: <i>нам необходима, чтобы
+    форма прилипла к краю экрана, если она находится
+    на определённом расстоянии от окна (допустим 20
+    пикселей). </i></p>
+    <p>&nbsp;&nbsp;&nbsp;<b><font color="#000080">Пример</font></b><br>
+    К новой форме добавьте Label, один контрол Edit и
+    четыре Check boxes. Измените имя контрола Edit на edStickAt.
+    Измените имена чекбоксов на chkLeft, chkTop, и т.д... Для
+    установки количества пикселей используем edStickAt,
+    который будет использоваться для определения
+    необходимого расстояния до края экрана
+    достаточного для приклеивания формы.<br>
+    Форма будет выглядеть примерно так: </p>
+    <p align="center"><img border="0" height="118" src="stickywindow.gif" width="232"> </p>
+    <p>Нас интересует только одно сообщение <font size="-2">WM_WINDOWPOSCHANGING</font>.
+    Обработчик для данного сообщения будет объявлен
+    в секции private. Ниже приведён полный код этого
+    процедуры &quot;прилипания&quot; вместе с
+    комментариями. Обратите внимание, что Вы можете
+    предотвратить &quot;прилипание&quot; формы к
+    определённому краю, путё снятия нужной галочки. </p>
+    <p>Для получения рабочей области декстопа (минус
+    панель задач, панель Microsoft и т.д.), используем
+    SystemParametersInfo, первый параметр которой SPI_GETWORKAREA. </p>
+    <p>&nbsp;</p>
+    <table bgColor="#ffffcc" border="1" width="100%">
+<TBODY>
+      <tr>
+        <td><pre>...
+
+  <b>private</b>
+   <b>procedure</b> WMWINDOWPOSCHANGING
+            (<b>Var</b> Msg: TWMWINDOWPOSCHANGING);
+             <b>message</b> WM_WINDOWPOSCHANGING;
+
+...
+
+<b>procedure</b> TfrMain.WMWINDOWPOSCHANGING
+          (<b>var</b> Msg: TWMWINDOWPOSCHANGING);
+<b>const</b>
+  Docked: Boolean = FALSE;
+<b>var</b>
+  rWorkArea: TRect;
+  StickAt : Word;
+<b>begin</b>
+  StickAt := StrToInt(edStickAt.Text);
+  
+  SystemParametersInfo
+     (SPI_GETWORKAREA, 0, @rWorkArea, 0);
+
+  <b>with</b> Msg.WindowPos^ <b>do</b> <b>begin</b>
+    <b>if</b> chkLeft.Checked <b>then</b>
+     <b>if</b> x &lt;= rWorkArea.Left + StickAt <b>then</b> <b>begin</b>
+      x := rWorkArea.Left;
+      Docked := TRUE;
+     <b>end</b>;
+
+    <b>if</b> chkRight.Checked <b>then</b>
+     <b>if</b> x + cx &gt;= rWorkArea.Right - StickAt <b>then</b> <b>begin</b>
+      x := rWorkArea.Right - cx;
+      Docked := TRUE;
+     <b>end</b>;
+
+    <b>if</b> chkTop.Checked <b>then</b>
+     <b>if</b> y &lt;= rWorkArea.Top + StickAt <b>then</b> <b>begin</b>
+      y := rWorkArea.Top;
+      Docked := TRUE;
+     <b>end</b>;
+
+    <b>if</b> chkBottom.Checked <b>then</b>
+     <b>if</b> y + cy &gt;= rWorkArea.Bottom - StickAt <b>then</b> <b>begin</b>
+      y := rWorkArea.Bottom - cy;
+      Docked := TRUE;
+     <b>end</b>;
+
+    <b>if</b> Docked <b>then</b> <b>begin</b>
+      <b>with</b> rWorkArea <b>do</b> <b>begin</b>
+      <i><font
+color="navy">// не должна вылезать за пределы экрана</font></i>
+      <b>if</b> x &lt; Left <b>then</b> x := Left;
+      <b>if</b> x + cx &gt; Right <b>then</b> x := Right - cx;
+      <b>if</b> y &lt; Top <b>then</b> y := Top;
+      <b>if</b> y + cy &gt; Bottom <b>then</b> y := Bottom - cy;
+      <b>end</b>; <i><font
+color="navy">{ширина rWorkArea}</font></i>
+    <b>end</b>; <i><font color="navy">{}</font></i>
+  <b>end</b>; <i><font
+color="navy">{с Msg.WindowPos^}</font></i>
+
+  <b>inherited</b>;
+<b>end</b>;
+<b>end</b>.
+</pre>
+        </td>
+      </tr>
+</TBODY>
+    </table>
+    <p>Теперь достаточно запустить проект и
+    перетащить форму к любому краю экрана.</p>
+    <p>А также можно взять готовый <a href="stickyform.zip">пример</a>
+    (~6Kb)</p>
+    <p>Вот собственно и всё.<br>
+    </p>
+    <table border="0" width="100%" cellpadding="2" cellspacing="0">
+      <tr>
+        <td width="100%" bgcolor="#C0C0C0"><em><strong>Комментарии:</strong></em></td>
+      </tr>
+    </table>
+    <p>Автор: <a href="mailto:nashev@mail.ru">Nashev</a></p>
+    <p>а так короче... И, ИМХО, лучше:<br>
+    <br>
+    procedure TCustomGlueForm.WMWindowPosChanging1(var Msg: TWMWindowPosChanging);<br>
+    var<br>
+    WorkArea: TRect;<br>
+    StickAt : Word;<br>
+    begin<br>
+    StickAt := 10;<br>
+    SystemParametersInfo(SPI_GETWORKAREA, 0, @WorkArea, 0);<br>
+    with WorkArea, Msg.WindowPos^ do begin<br>
+    // Сдвигаем границы для сравнения с левой и
+    верхней сторонами<br>
+    Right:=Right-cx;<br>
+    Bottom:=Bottom-cy;<br>
+    if abs(Left - x) &lt;= StickAt then x := Left;<br>
+    if abs(Right - x) &lt;= StickAt then x := Right;<br>
+    if abs(Top - y) &lt;= StickAt then y := Top;<br>
+    if abs(Bottom - y) &lt;= StickAt then y := Bottom;<br>
+    end;<br>
+    inherited;<br>
+    end;</p>
+    <p><a href="nashev.zip">Скачать демонстрационный проект с
+    исходниками - 167Kb</a></p>
+    <p>В проекте осталось 2 глюка: </p>
+    <p>1) Если у формы, к которой прицепили другую форму
+    за правую/нижнюю границы попробовать
+    переместить эти границы, прицепленная форма
+    останется на месте но все равно будет
+    прикрепленной. </p>
+    <p>2) Иногда 3 формы прикрепляются друг к другу, и
+    иначе, как воспользовавшись 1-ым глюком, их не
+    расцепить. </p>
+    <p>Состав проекта:<br>
+    сам проект, uCustomGlueForm - форма с добавленной
+    липкостью 3 формы - пустышки, наследники TCustomGlueForm </p>
+    <p>Для использования сделанного в своих проектах
+    надо добавить в проект, и свои формы создавать,
+    наследуя от него, например, через мастер
+    &quot;File/New...&quot; <br>
+    В принципе, если липкость нужна без прилипания (а
+    это уже работает без глюков) можно выкинуть все
+    методы, кроме <br>
+    procedure WMWindowPosChanging(var Msg: TWMWindowPosChanging);message WM_WINDOWPOSCHANGING;<br>
+    и все переменные, а в самом WMWindowPosChanging удалить все
+    упоминания этих переменных.</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+
+<p>&nbsp;</p>
+<!--#include virtual="/ssi/bottom.html"-->

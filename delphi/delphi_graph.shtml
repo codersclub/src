@@ -1,0 +1,651 @@
+<!--#include virtual="/ssi/top.html"-->
+
+<p align="center"><font SIZE="4" COLOR="#0000ff"><b>Маленькие хитрости с
+большой пользой</b></font> </p>
+
+<p ALIGN="RIGHT"><a href="mailto:zaitsev@smolen.elektra.ru">Зайцев О.В.</a> и <a
+href="mailto:merlintwi@chat.ru">Владимиров А.М.</a><br>
+Дата последней редакции 1 августа 1999г.</p>
+
+<p><br>
+<b><font COLOR="#ff0000">Вопросы - ответы - советы<br>
+</font>
+
+<ul>
+  <li><a HREF="#tip0">От авторов ...</a><br>
+  </li>
+</ul>
+<font SIZE="+3" COLOR="#ff0000"><a name="top">
+
+<p align="center">Графика</a></font> </b></p>
+
+<ul>
+  <li><a HREF="#tip1">Работа с палитрой</a><br>
+  </li>
+  <li><a HREF="#tip2">Заполнить Canvas рисунком с рабочего
+    стола</a> </li>
+  <li><a HREF="#tip3">Список графических файлов с их
+    изображениями</a> </li>
+  <li><a HREF="#tip4">Как из Delphi рисовать в любой части
+    экрана или в чужом окне</a> </li>
+  <li><a HREF="#tip5">Написание текста под углом</a> </li>
+  <li><a HREF="#tip6">Преобразование цвета RGB<font FACE="Wingdings"> у </font>HLS
+    (яркость,насыщенность,оттенок)</a> </li>
+  <li><a HREF="#tip7">Число цветов у данного компьютера</a> </li>
+  <li><a HREF="#tip8">Копирование экрана</a> </li>
+  <li><a HREF="#tip9">Нарисовать &quot;неактивный&quot;(disable)
+    текст</a> </li>
+  <li><a HREF="#tip10">Как менять разрешение экрана по ходу
+    выполнения программы</a> </li>
+  <li><a href="#tip11">Как поместить картинку из базы данных,
+    например MsSQL, в компонент TIMAGE ?</a> </li>
+</ul>
+
+<p><br>
+</p>
+
+<hr>
+<a name="tip0"><font SIZE="+1">
+
+<p align="center">От авторов ... </font><br>
+</a>Данный файл содержит обобщенную и
+апробированную авторами информацию по решению
+некоторых задач, возникающих при
+программировании на Delphi. Мы не претендуем на
+авторство, вся эта информация собрана из
+различных источников, но все примеры и советы,
+приведенные здесь были предварительно проверены
+под разными версиями Delphi, поэтому особое
+внимание следует обратить на примечания
+относительно версии, для которой это разработано
+или проверено. <i></p>
+
+<p ALIGN="RIGHT">Зайцев О.В.<br>
+Владимиров А.М.</p>
+</i>
+
+<hr>
+<a name="tip1"><font SIZE="+1">
+
+<p align="center">Как работать с палитрой в Delphi? На форме
+установлен TImage и видна картинка (*.BMP файл), как
+изменить у него палитру цветов ?</font><br>
+</a><br>
+</p>
+
+<p>Палитра в TBitmap и TMetaFile доступна через property Palette.
+Если палитра имеется (что совсем необязательно),
+то Palette&lt;&gt;0: </p>
+
+<pre>
+procedure TMain.BitBtnClick(Sender: TObject);
+var
+  Palette : HPalette;
+  PaletteSize : Integer;
+  LogSize: Integer;
+  LogPalette: PLogPalette;
+  Red : Byte;
+begin
+  Palette := Image.Picture.Bitmap.ReleasePalette;
+  // здесь можно использовать просто Image.Picture.Bitmap.Palette, но  я не
+  // знаю, удаляются ли ненужные палитры автоматически
+
+  if Palette=0 then exit; //Палитра отсутствует
+  PaletteSize := 0;
+  if GetObject(Palette, SizeOf(PaletteSize), @PaletteSize) = 0 then Exit;
+  // Количество элементов в палитре = paletteSize
+  if PaletteSize = 0 then Exit; // палитра пустая
+  // определение размера палитры
+  LogSize := SizeOf(TLogPalette) + (PaletteSize - 1) * SizeOf(TPaletteEntry);
+  GetMem(LogPalette, LogSize);
+  try
+    // заполнение полей логической палитры
+    with LogPalette^ do begin
+      palVersion := $0300;    palNumEntries := PaletteSize;
+      GetPaletteEntries(Palette, 0, PaletteSize, palPalEntry);
+      // делаете что нужно с палитрой, например:
+      Red := palPalEntry[PaletteSize-1].peRed;
+      Edit1.Text := 'Красная составляющего последнего элемента  палитры ='+IntToStr(Red);
+      palPalEntry[PaletteSize-1].peRed := 0;
+      //.......................................
+    end;
+    // завершение работы
+    Image.Picture.Bitmap.Palette := CreatePalette(LogPalette^);
+  finally
+    FreeMem(LogPalette, LogSize);
+    // я должен позаботиться сам об удалении Released Palette
+    DeleteObject(Palette);
+  end;
+end;
+
+<font
+COLOR="#0000ff">
+{ Этот модуль заполняет фон формы рисунком bor6.bmp (256 цветов) 
+  и меняет его палитру при нажатии кнопки }</font>
+unit bmpformu;
+interface
+uses
+  Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs, StdCtrls;
+
+type
+  TBmpForm = class(TForm)
+    Button1: TButton;
+    procedure FormDestroy(Sender: TObject);
+    procedure FormPaint(Sender: TObject);
+    procedure Button1Click(Sender: TObject);
+    procedure FormCreate(Sender: TObject);
+  private
+    Bitmap: TBitmap;
+    procedure ScrambleBitmap;
+    procedure WMEraseBkgnd(var m: TWMEraseBkgnd); message WM_ERASEBKGND;
+end;
+
+var
+  BmpForm: TBmpForm;
+
+implementation
+{$R *.DFM}
+procedure TBmpForm.FormCreate(Sender: TObject);
+begin
+  Bitmap := TBitmap.Create;
+  Bitmap.LoadFromFile('bor6.bmp');
+end;
+
+procedure TBmpForm.FormDestroy(Sender: TObject);
+begin
+  Bitmap.Free;
+end;
+
+// since we're going to be painting the whole form, handling this
+// message will suppress the uneccessary repainting of the background
+// which can result in flicker.
+procedure TBmpform.WMEraseBkgnd(var m : TWMEraseBkgnd);
+begin
+  m.Result := LRESULT(False);
+end;
+
+procedure TBmpForm.FormPaint(Sender: TObject);
+var x, y: Integer;
+begin
+  y := 0;
+  while y &lt; Height do begin
+    x := 0;
+    while x &lt; Width do begin
+      Canvas.Draw(x, y, Bitmap);
+      x := x + Bitmap.Width;
+    end;
+    y := y + Bitmap.Height;
+  end;
+end;
+
+procedure TBmpForm.Button1Click(Sender: TObject);
+begin
+  ScrambleBitmap; Invalidate;
+end;
+
+// scrambling the bitmap is easy when it's has 256 colors:
+// we just need to change each of the color in the palette
+// to some other value.
+procedure TBmpForm.ScrambleBitmap;
+var
+  pal: PLogPalette;
+  hpal: HPALETTE;
+  i: Integer;
+begin
+  pal := nil;
+  try
+    GetMem(pal, sizeof(TLogPalette) + sizeof(TPaletteEntry) * 255);
+    pal.palVersion := $300;
+    pal.palNumEntries := 256;
+    for i := 0 to 255 do
+    begin
+      pal.palPalEntry[i].peRed := Random(255);
+      pal.palPalEntry[i].peGreen := Random(255);
+      pal.palPalEntry[i].peBlue := Random(255);
+    end;
+    hpal := CreatePalette(pal^);
+    if hpal &lt;&gt; 0 then
+      Bitmap.Palette := hpal;
+  finally
+    FreeMem(pal);
+  end;
+end;
+
+end.</pre>
+
+<p>&nbsp; </p>
+
+<p align="right"><a href="#top">Наверх</a></p>
+
+<hr>
+<a name="tip2"><font SIZE="+1">
+
+<p align="center">Заполняет Canvas рисунком с рабочего
+стола, учитывая координаты. </font><br>
+</a><br>
+Function PaintDesktop(HDC) : boolean;<br>
+Например: PaintDesktop(form1.Canvas.Handle); <br>
+</p>
+
+<p align="right"><a href="#top">Наверх</a></p>
+
+<hr>
+<a name="tip3"><font SIZE="+1">
+
+<p align="center">Как вставить растровое изображение в
+компонент ListBox? </font><br>
+</a><br>
+Для этого необходимо установить в инспекторе
+объектов поле Style в lbOwnerDrawFixed, при фиксированной
+высоте строки, или в lbOwnerDrawVariable, при переменной, и
+установить собственный обработчик события для
+OnDrawItem. В этом обработчике и надо рисовать
+растровое изображение.<br>
+Пример:<br>
+Рисуются изображения размером 32*16 (размер
+стандартного глифа для Delphi). Очень полезно при
+поиске нужного изображения для кнопок!<br>
+Установить в инспекторе объектов для ListBox поле
+ItemHeight = 19, а поле Color = clBtnFace.<br>
+</p>
+
+<pre>
+{ Загрузить список файлов в ListBox1 при нажатии на кнопку Load (например)}
+procedure TForm1.bLoadClick(Sender: TObject);
+VAR S : String; 
+begin 
+  ListBox1.Clear; {чистим список}
+  S := '*.bmp'#0; {задаем шаблон}
+  ListBox1.Perform(LB_DIR, DDL_ReadWrite, Longint(@S[1])); {заполняем список} 
+end; 
+          ............ 
+
+{Отобразить изображения и имена файлов в ListBox}
+procedure TForm1.ListBox1DrawItem(Control: TWinControl; Index: Integer; 
+           Rect: TRect; State: DrawState); 
+VAR 
+  Bitmap : TBitmap;
+  Offset : Integer; 
+  BMPRect: TRect; 
+begin 
+  WITH (Control AS TListBox).Canvas DO BEGIN 
+    FillRect(Rect); 
+    Bitmap := TBitmap.Create;
+    Bitmap.LoadFromFile(ListBox1.Items[Index]); 
+    Offset := 0; 
+    IF Bitmap &lt;&gt; NIL THEN BEGIN 
+      BMPRect := Bounds(Rect.Left+2, Rect.Top+2, 
+                        (Rect.Bottom-Rect.Top-2)*2, Rect.Bottom-Rect.Top-2); 
+      {StretchDraw(BMPRect, Bitmap); Можно просто нарисовать, но лучше сначала убрать фон} 
+      BrushCopy(BMPRect,Bitmap, Bounds(0, 0, Bitmap.Width, Bitmap.Height),
+                Bitmap.Canvas.Pixels[0, Bitmap.Height-1]); 
+      Offset := (Rect.Bottom-Rect.Top+1)*2; 
+    END; 
+    TextOut(Rect.Left+Offset, Rect.Top, ListBox1.Items[Index]); 
+    Bitmap.Free; 
+   END; 
+end; 
+</pre>
+
+<p>Данный пример работает медленно, но
+оптимизация, для ускорения, вызвала бы трудность
+в понимании общего принципа его работы. <br>
+</p>
+
+<p align="right"><a href="#top">Наверх</a></p>
+
+<hr>
+<a name="tip4"><font SIZE="+1">
+
+<p align="center">Можно ли из Delphi рисовать в любой части
+экрана или в чужом окне? </font><br>
+</a><br>
+Для этого надо воспользоваться функциями API.
+Получить контекст чужого окна, либо всего экрана:<br>
+function GetDC(Wnd: HWnd): HDC;<br>
+где Wnd - указатель на нужное окно, или 0 для
+получения контекста всего экрана.<br>
+И далее, пользуясь функциями API, нарисовать все
+что надо.<br>
+Пример:<br>
+</p>
+
+<pre>
+PROCEDURE DrawOnScreen; 
+VAR ScreenDC: hDC; 
+BEGIN 
+  ScreenDC := GetDC(0); {получить контекст экрана} 
+  Ellipse(ScreenDC, 0, 0, 200, 200); {нарисовать} 
+  ReleaseDC(0,ScreenDC); {освободить контекст} 
+END; 
+</pre>
+
+<p>Не забывайте после своих манипуляций посылать
+пострадавшим (или всем) окнам сообщение о
+необходимости перерисовки, для восстановления
+их первоначального вида. <br>
+</p>
+
+<p align="right"><a href="#top">Наверх</a></p>
+
+<hr>
+<a name="tip5"><font SIZE="+1">
+
+<p align="center">Написание текста под углом </font><br>
+</a><br>
+</p>
+
+<pre>{ Эта процедура устанавливает угол вывода текста для указанного Canvas, угол в градусах }
+{ Шрифт должен быть TrueType ! }
+procedure CanvasSetTextAngle(c: TCanvas; d: single);
+var   LogRec: TLOGFONT;     { Информация о шрифте }
+begin
+ {Читаем текущюю инф. о шрифте }
+ GetObject(c.Font.Handle,SizeOf(LogRec) ,Addr(LogRec) );
+ { Изменяем угол }
+ LogRec.lfEscapement := round(d*10);
+ { Устанавливаем новые параметры }
+ c.Font.Handle := CreateFontIndirect(LogRec);
+end;
+</pre>
+
+<p align="right"><a href="#top">Наверх</a></p>
+
+<hr>
+<a name="tip6"><font SIZE="+1">
+
+<p align="center">Преобразование цвета RGB<font FACE="Wingdings">у</font>HLS
+</font><br>
+</a><br>
+</p>
+
+<pre>
+{ Максимальные значения }
+Const
+ HLSMAX = 240;
+ RGBMAX = 255;
+ UNDEFINED = (HLSMAX*2) div 3;
+Var
+ H, L, S  : integer; { H-оттенок, L-яркость, S-насыщенность }
+ R, G, B  : integer; { цвета }
+
+procedure RGBtoHLS;
+Var
+ cMax,cMin  : integer;
+ Rdelta,Gdelta,Bdelta : single;
+Begin
+   cMax := max( max(R,G), B);
+   cMin := min( min(R,G), B);
+   L := round( ( ((cMax+cMin)*HLSMAX) + RGBMAX )/(2*RGBMAX) );
+
+   if (cMax = cMin) then begin
+      S := 0; H := UNDEFINED;
+   end else begin
+      if (L &lt;= (HLSMAX/2)) then
+         S := round( ( ((cMax-cMin)*HLSMAX) + ((cMax+cMin)/2) ) / (cMax+cMin) )
+      else
+         S := round( ( ((cMax-cMin)*HLSMAX) + ((2*RGBMAX-cMax-cMin)/2) )
+            / (2*RGBMAX-cMax-cMin) );
+      Rdelta := ( ((cMax-R)*(HLSMAX/6)) + ((cMax-cMin)/2) ) / (cMax-cMin);
+      Gdelta := ( ((cMax-G)*(HLSMAX/6)) + ((cMax-cMin)/2) ) / (cMax-cMin);
+      Bdelta := ( ((cMax-B)*(HLSMAX/6)) + ((cMax-cMin)/2) ) / (cMax-cMin);
+      if (R = cMax) then H := round(Bdelta - Gdelta)
+      else if (G = cMax) then H := round( (HLSMAX/3) + Rdelta - Bdelta)
+      else H := round( ((2*HLSMAX)/3) + Gdelta - Rdelta );
+      if (H &lt; 0) then H:=H + HLSMAX;
+      if (H &gt; HLSMAX) then H:= H - HLSMAX;
+   end;
+   if S&lt;0 then S:=0; if S&gt;HLSMAX then S:=HLSMAX;
+   if L&lt;0 then L:=0; if L&gt;HLSMAX then L:=HLSMAX;
+end;
+
+
+procedure HLStoRGB;
+Var
+ Magic1,Magic2 : single;
+
+  function HueToRGB(n1,n2,hue : single) : single;
+  begin
+     if (hue &lt; 0) then hue := hue+HLSMAX;
+     if (hue &gt; HLSMAX) then hue:=hue -HLSMAX;
+     if (hue &lt; (HLSMAX/6)) then
+        result:= ( n1 + (((n2-n1)*hue+(HLSMAX/12))/(HLSMAX/6)) )
+     else
+     if (hue &lt; (HLSMAX/2)) then result:=n2 else
+     if (hue &lt; ((HLSMAX*2)/3)) then
+        result:= ( n1 + (((n2-n1)*(((HLSMAX*2)/3)-hue)+(HLSMAX/12))/(HLSMAX/6)))
+     else result:= ( n1 );
+  end;
+
+begin
+   if (S = 0) then begin
+      B:=round( (L*RGBMAX)/HLSMAX ); R:=B; G:=B;
+   end else begin
+      if (L &lt;= (HLSMAX/2)) then Magic2 := (L*(HLSMAX + S) + (HLSMAX/2))/HLSMAX
+      else Magic2 := L + S - ((L*S) + (HLSMAX/2))/HLSMAX;
+      Magic1 := 2*L-Magic2;
+      R := round( (HueToRGB(Magic1,Magic2,H+(HLSMAX/3))*RGBMAX + (HLSMAX/2))/HLSMAX );
+      G := round( (HueToRGB(Magic1,Magic2,H)*RGBMAX + (HLSMAX/2)) / HLSMAX );
+      B := round( (HueToRGB(Magic1,Magic2,H-(HLSMAX/3))*RGBMAX + (HLSMAX/2))/HLSMAX );
+   end;
+   if R&lt;0 then R:=0; if R&gt;RGBMAX then R:=RGBMAX;
+   if G&lt;0 then G:=0; if G&gt;RGBMAX then G:=RGBMAX;
+   if B&lt;0 then B:=0; if B&gt;RGBMAX then B:=RGBMAX;
+end;
+</pre>
+
+<p align="right"><a href="#top">Наверх</a></p>
+
+<hr>
+<a name="tip7"><font SIZE="+1">
+
+<p align="center">Число цветов (цветовая палитра) у
+данного компьютера </font><br>
+</a><br>
+Эта функция возвращает число бит на точку у
+данного компьютера. Так, например, 8 - 256 цветов, 4 -
+16 цветов ...<br>
+</p>
+
+<pre>
+function GetDisplayColors : integer;
+var tHDC  : hdc;
+begin
+ tHDC:=GetDC(0);
+ result:=GetDeviceCaps(tHDC, 12)* GetDeviceCaps(tHDC, 14);
+ ReleaseDC(0, tHDC);
+end;
+</pre>
+
+<p align="right"><a href="#top">Наверх</a></p>
+
+<hr>
+<a name="tip8"><font SIZE="+1">
+
+<p align="center">Копирование экрана </font><br>
+</a><br>
+</p>
+
+<pre>unit ScrnCap;
+interface
+uses WinTypes, WinProcs, Forms, Classes, Graphics, Controls;
+
+ { Копирует прямоугольную область экрана }
+function CaptureScreenRect(ARect : TRect) : TBitmap;
+ { Копирование всего экрана }
+function CaptureScreen : TBitmap;
+ { Копирование клиентской области формы или элемента }
+function CaptureClientImage(Control : TControl) : TBitmap;
+ { Копирование всей формы элемента }
+function CaptureControlImage(Control : TControl) : TBitmap;
+
+{===============================================================}
+implementation
+function GetSystemPalette : HPalette;
+var
+ PaletteSize  : integer;
+ LogSize      : integer;
+ LogPalette   : PLogPalette;
+ DC           : HDC;
+ Focus        : HWND;
+begin
+ result:=0;
+ Focus:=GetFocus;
+ DC:=GetDC(Focus);
+ try
+   PaletteSize:=GetDeviceCaps(DC, SIZEPALETTE);
+   LogSize:=SizeOf(TLogPalette)+(PaletteSize-1)*SizeOf(TPaletteEntry);
+   GetMem(LogPalette, LogSize);
+   try
+     with LogPalette^ do
+     begin
+       palVersion:=$0300;
+       palNumEntries:=PaletteSize;
+       GetSystemPaletteEntries(DC, 0, PaletteSize, palPalEntry);
+     end;
+     result:=CreatePalette(LogPalette^);
+   finally
+     FreeMem(LogPalette, LogSize);
+   end;
+ finally
+   ReleaseDC(Focus, DC);
+ end;
+end;
+
+
+function CaptureScreenRect(ARect : TRect) : TBitmap;
+var
+ ScreenDC : HDC;
+begin
+ Result:=TBitmap.Create;
+ with result, ARect do begin
+  Width:=Right-Left;
+  Height:=Bottom-Top;
+  ScreenDC:=GetDC(0);
+  try
+    BitBlt(Canvas.Handle, 0,0,Width,Height,ScreenDC, Left, Top, SRCCOPY	);
+  finally
+    ReleaseDC(0, ScreenDC);
+  end;
+  Palette:=GetSystemPalette;
+ end;
+end;
+
+function CaptureScreen : TBitmap;
+begin
+ with Screen do
+  Result:=CaptureScreenRect(Rect(0,0,Width,Height));
+end;
+
+function CaptureClientImage(Control : TControl) : TBitmap;
+begin
+ with Control, Control.ClientOrigin do
+  result:=CaptureScreenRect(Bounds(X,Y,ClientWidth,ClientHeight));
+end;
+
+function CaptureControlImage(Control : TControl) : TBitmap;
+begin
+ with Control do
+  if Parent=Nil then
+    result:=CaptureScreenRect(Bounds(Left,Top,Width,Height))
+  else
+   with Parent.ClientToScreen(Point(Left, Top)) do
+    result:=CaptureScreenRect(Bounds(X,Y,Width,Height));
+end;
+end.
+
+</pre>
+
+<p align="right"><a href="#top">Наверх</a></p>
+
+<hr>
+<a name="tip9"><font SIZE="+1">
+
+<p align="center">Draw disable text </font><br>
+</a><br>
+</p>
+
+<pre>
+{************************ Draw Disabled Text **************
+ ***** This function draws text in &quot;disabled&quot; style.  *****
+ ***** i.e. the text is grayed .                      *****
+ **********************************************************}
+function DrawDisabledText (Canvas : tCanvas; Str: PChar; Count: Integer;
+                           var Rect: TRect;  Format: Word): Integer;
+begin
+  SetBkMode(Canvas.Handle, TRANSPARENT);
+
+  OffsetRect(Rect, 1, 1);
+  Canvas.Font.color:= ClbtnHighlight;
+  DrawText (Canvas.Handle, Str, Count, Rect,Format);
+
+  Canvas.Font.Color:= ClbtnShadow;
+  OffsetRect(Rect, -1, -1);
+  DrawText (Canvas.Handle, Str, Count, Rect, Format);
+end;
+
+</pre>
+
+<p align="right"><a href="#top">Наверх</a></p>
+
+<hr>
+<a name="tip10"><font SIZE="+1">
+
+<p align="center">Как менять разрешение экрана по ходу
+выполнения программы </font><br>
+</a><br>
+</p>
+
+<pre>function SetFullscreenMode:Boolean;
+var DeviceMode : TDevMode;
+begin
+ with DeviceMode do begin
+  dmSize:=SizeOf(DeviceMode);
+  dmBitsPerPel:=16;
+  dmPelsWidth:=640;
+  dmPelsHeight:=480;
+  dmFields:=DM_BITSPERPEL or DM_PELSWIDTH or DM_PELSHEIGHT;
+  result:=False;
+  if ChangeDisplaySettings(DeviceMode,CDS_TEST or CDS_FULLSCREEN) &lt;&gt; DISP_CHANGE_SUCCESSFUL 
+   then Exit;
+  Result:=ChangeDisplaySettings(DeviceMode,CDS_FULLSCREEN) = DISP_CHANGE_SUCCESSFUL;
+ end;
+end;
+
+procedure RestoreDefaultMode;
+var T : TDevMode absolute 0;
+begin
+ ChangeDisplaySettings(T,CDS_FULLSCREEN);
+end;
+
+procedure TForm1.Button1Click(Sender: TObject);
+begin
+ if setFullScreenMode then begin
+  sleep(7000);
+  RestoreDefaultMode;
+ end;
+end;</pre>
+
+<p align="right"><a href="#top">Наверх</a></p>
+
+<hr>
+
+<h4 align="center"><a name="tip11">Как поместить картинку из
+базы данных, например MsSQL, в компонент TIMAGE ?</a></h4>
+
+<p><br>
+<br>
+1) Предполагается, что поле BLOB (например, Pict)<br>
+2) в запросе Query.SQL пишется что-то вроде<br>
+'select Pict from sometable where somefield=somevalue'<br>
+3) запрос открывается<br>
+4) делается &quot;присваивание&quot;:<br>
+Image1.Picture.Assing(TBlobField(Query.FieldByName('Pict'))<br>
+или, если известно, что эта картинка - Bitmap, то
+можно<br>
+Image1.Picture.Bitmap.Assing(TBlobField(Query.FieldByName('Pict'))<br>
+<br>
+А можно воспользоваться компонентом TDBImage.</p>
+
+<p align="right"><a href="#top">Наверх</a></p>
+<!--#include virtual="/ssi/bottom.html"-->

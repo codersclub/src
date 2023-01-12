@@ -1,0 +1,96 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как перетаскивать (Drag'n'Drop) выделенный текст
+    между компонентами Memo.</h3>
+    <p>Компилятор: Delphi</p>
+    <p>Данный способ позволяет не погружаясь глубоко в создание
+    компонент осуществить операцию &quot;drag and drop&quot;
+    выделенного текста.</p>
+    <p>Создайте новый компонент (TMyMemo), наследовав его
+    от TMemo. И объявите его следующим образом:</p>
+    <pre>
+type
+  TMyMemo = class(TMemo)
+  private
+    FLastSelStart  : Integer;
+    FLastSelLength : Integer;
+    procedure WMLButtonDown(var Message: TWMLButtonDown);
+      message WM_LBUTTONDOWN;
+  published
+    property LastSelStart : Integer read FLastSelStart
+      write FLastSelStart;
+    property LastSelLength : Integer read FLastSelLength
+      write FLastSelLength;
+  end;
+</pre>
+    <p>Добавьте обработчик WMLButtonDown:</p>
+    <pre>
+procedure TMyMemo.WMLButtonDown(var Message: TWMLButtonDown);
+var
+  Ch : Integer;
+begin
+  if SelLength &gt; 0 then begin
+    Ch := LoWord(Perform(EM_CHARFROMPOS,0,
+                         MakeLParam(Message.XPos,Message.YPos)));
+    LastSelStart := SelStart;
+    LastSelLength := SelLength;
+    if (Ch &gt;= SelStart) and (Ch &lt;= SelStart+SelLength-1) then
+      BeginDrag(True)
+    else
+      inherited;
+  end
+  else
+    inherited;
+end;
+</pre>
+    <p>Теперь установите этот компонент в package,
+    создайте новый проект в Delphi и поместите на форму
+    два TMyMemo. Для обоих компонент необходимо создать
+    обработчики событий OnDragOver, которые должны
+    выглядеть следующим образом:</p>
+    <pre>
+procedure TForm1.MyMemo1DragOver(Sender, Source: TObject; X, Y: Integer;
+  State: TDragState; var Accept: Boolean);
+begin
+  Accept := Source is TMyMemo;
+end;
+</pre>
+    <p>Так же для них необходимо сделать обработчики
+    событий OnDragDrop:</p>
+    <pre>
+procedure TForm1.MyMemo1DragDrop(Sender, Source: TObject;
+                                 X, Y: Integer);
+var
+  Dst, Src : TMyMemo;
+  Ch       : Integer;
+  Temp     : String;
+begin
+  Dst := Sender as TMyMemo;
+  Src := Source as TMyMemo;
+  Ch := LoWord(Dst.Perform(EM_CHARFROMPOS,0,MakeLParam(X,Y)));
+
+  if (Src = Dst) and (Ch &gt;= Src.LastSelStart) and
+     (Ch &lt;= Src.LastSelStart+Src.LastSelLength-1) then
+    Exit;
+
+  Dst.Text := Copy(Dst.Text,1,Ch)+Src.SelText+
+              Copy(Dst.Text,Ch+1,Length(Dst.Text)-Ch);
+  Temp := Src.Text;
+  Delete(Temp,Src.LastSelStart+1,Src.LastSelLength);
+  Src.Text := Temp;
+end;
+</pre>
+    <p>Запустите приложение, поместите в поля memo какой-нибудь
+    текст, и посмотрите что произойдёт, если
+    перетащить текст между полями.</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

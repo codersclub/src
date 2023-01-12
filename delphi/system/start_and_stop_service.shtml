@@ -1,0 +1,185 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как запустить и остановить сервис (или
+    получить его статус)</h3>
+    <p>Здесь представлены две функции ServiceStart и ServiceStop,
+    которые показывают, как пользоваться API
+    функциями OpenSCManager, OpenService и т.д.:<br>
+    <br>
+    <br>
+    function ServiceStart(aMachine, aServiceName : string ) : boolean; <br>
+    // aMachine это UNC путь, либо локальный компьютер если
+    пусто<br>
+    var <br>
+    &nbsp;&nbsp;h_manager,h_svc: SC_Handle; <br>
+    &nbsp;&nbsp;svc_status: TServiceStatus; <br>
+    &nbsp;&nbsp;Temp: PChar; <br>
+    &nbsp;&nbsp;dwCheckPoint: DWord; <br>
+    begin <br>
+    &nbsp;&nbsp;svc_status.dwCurrentState := 1; <br>
+    &nbsp;&nbsp;h_manager := OpenSCManager(PChar(aMachine), Nil, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    SC_MANAGER_CONNECT); <br>
+    &nbsp;&nbsp;if h_manager &gt; 0 then <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;h_svc := OpenService(h_manager, PChar(aServiceName), <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    SERVICE_START or SERVICE_QUERY_STATUS); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if h_svc &gt; 0 then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;temp := nil; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (StartService(h_svc,0,temp)) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (QueryServiceStatus(h_svc,svc_status))
+    then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;while (SERVICE_RUNNING
+    &lt;&gt; svc_status.dwCurrentState) do <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dwCheckPoint :=
+    svc_status.dwCheckPoint; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Sleep(svc_status.dwWaitHint);
+    <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (not
+    QueryServiceStatus(h_svc,svc_status)) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;
+    <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if
+    (svc_status.dwCheckPoint &lt; dwCheckPoint) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//
+    QueryServiceStatus не увеличивает dwCheckPoint <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CloseServiceHandle(h_svc); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CloseServiceHandle(h_manager); <br>
+    &nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;Result := SERVICE_RUNNING = svc_status.dwCurrentState; <br>
+    end; <br>
+    <br>
+    <br>
+    function ServiceStop(aMachine,aServiceName : string ) : boolean; <br>
+    // aMachine это UNC путь, либо локальный компьютер если
+    пусто<br>
+    var <br>
+    &nbsp;&nbsp;h_manager,h_svc&nbsp;&nbsp; : SC_Handle; <br>
+    &nbsp;&nbsp;svc_status&nbsp;&nbsp;&nbsp;&nbsp; : TServiceStatus; <br>
+    &nbsp;&nbsp;dwCheckPoint : DWord; <br>
+    begin <br>
+    &nbsp;&nbsp;h_manager:=OpenSCManager(PChar(aMachine),nil, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    SC_MANAGER_CONNECT); <br>
+    &nbsp;&nbsp;if h_manager &gt; 0 then <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;h_svc := OpenService(h_manager,PChar(aServiceName), <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    SERVICE_STOP or SERVICE_QUERY_STATUS); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if h_svc &gt; 0 then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(ControlService(h_svc,SERVICE_CONTROL_STOP, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;svc_status))then
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(QueryServiceStatus(h_svc,svc_status))then
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;while(SERVICE_STOPPED &lt;&gt;
+    svc_status.dwCurrentState)do <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dwCheckPoint :=
+    svc_status.dwCheckPoint; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Sleep(svc_status.dwWaitHint);
+    <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(not
+    QueryServiceStatus(h_svc,svc_status))then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//
+    couldn't check status <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(svc_status.dwCheckPoint
+    &lt; dwCheckPoint)then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;
+    <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CloseServiceHandle(h_svc); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CloseServiceHandle(h_manager); <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    &nbsp;&nbsp;Result := SERVICE_STOPPED = svc_status.dwCurrentState; <br>
+    end; <br>
+    <br>
+    <br>
+    <br>
+    <br>
+    Чтобы узнать состояние сервиса, используйте
+    следующую функцию:<br>
+    <br>
+    function ServiceGetStatus(sMachine, sService: string ): DWord; <br>
+    var <br>
+    &nbsp;&nbsp;h_manager,h_service: SC_Handle; <br>
+    &nbsp;&nbsp;service_status&nbsp;&nbsp;&nbsp;&nbsp; : TServiceStatus; <br>
+    &nbsp;&nbsp;hStat : DWord; <br>
+    begin <br>
+    &nbsp;&nbsp;hStat := 1; <br>
+    &nbsp;&nbsp;h_manager := OpenSCManager(PChar(sMachine) ,Nil, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    SC_MANAGER_CONNECT); <br>
+    <br>
+    &nbsp;&nbsp;if h_manager &gt; 0 then <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;h_svc := OpenService(h_manager,PChar(sService), <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SERVICE_QUERY_STATUS);
+    <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if h_svc &gt; 0 then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(QueryServiceStatus(h_svc, service_status)) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;hStat := service_status.dwCurrentState; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CloseServiceHandle(h_svc); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CloseServiceHandle(h_manager); <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    &nbsp;&nbsp;Result := hStat; <br>
+    end; <br>
+    <br>
+    Она возвращает одну из следующих констант:<br>
+    <br>
+    SERVICE_STOPPED <br>
+    SERVICE_RUNNING <br>
+    SERVICE_PAUSED <br>
+    SERVICE_START_PENDING <br>
+    SERVICE_STOP_PENDING <br>
+    SERVICE_CONTINUE_PENDING <br>
+    или<br>
+    SERVICE_PAUSE_PENDING <br>
+    <br>
+    Всё что, что Вам нужно, это unit WinSvc !<br>
+    <br>
+    </p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

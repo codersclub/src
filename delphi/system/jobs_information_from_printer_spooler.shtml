@@ -1,0 +1,172 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как получить информацию о заданиях на
+    принтере.</h3>
+    <p>Компилятор: Delphi 5.x</p>
+    <p>В Windows существуют встроенные средства для
+    мониторинга заданий на принтере.&nbsp;Однако,
+    давайте разберёмся, как отслеживать задания на
+    принтере программно.&nbsp;Для существует API функция
+    &quot;EnumJobs&quot;, которая позволяет получить давольно
+    много информации о текущем состоянии принтера
+    (Имя задания, Состояние, дату, время и т.д.).</p>
+    <p>Ниже представлена функция, которая использует
+    EnumJobs и возвращает массив структуры, в котором
+    представлена вся необходимая информация:<br>
+    <br>
+    uses WinSpool;<br>
+    …………………..<br>
+    type JOB_INFO_1_ARRAY = Array of JOB_INFO_1;<br>
+    …………………..<br>
+    Function GetSpoolerJobs(sPrinterName : String) : JOB_INFO_1_ARRAY;<br>
+    var<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; i : Integer;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; hPrinter&nbsp;&nbsp; : THandle;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; bResult&nbsp;&nbsp;&nbsp;&nbsp;: Boolean;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    cbBuf&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: DWORD;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; pcbNeeded&nbsp;&nbsp;: DWORD;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; pcReturned : DWORD;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    aJobs&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: Array[0..99] of JOB_INFO_1;<br>
+    begin<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; cbBuf := 1000;<br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; bResult :=
+    OpenPrinter(PChar(sPrinterName), hPrinter, Nil);<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if NOT bResult then begin<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ShowMessage('Error
+    opening the printer');<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exit;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; end;<br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; bResult :=
+    EnumJobs(hPrinter,0,Length(aJobs),1,@aJobs,cbBuf,pcbNeeded,pcReturned);<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if NOT bResult then begin<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ShowMessage('Error
+    Getting Jobs information');<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exit;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; end;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ClosePrinter(hPrinter);<br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; for i:=0 to pcReturned-1 do begin<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if
+    aJobs[i].pDocument &lt;&gt; Nil then begin<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SetLength(Result,
+    Length(Result)+1);<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Result[Length(Result)-1]
+    := aJobs[i];<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; end; <br>
+    end;<br>
+    <br>
+    Пример использования:<br>
+    1- Создайте новый проект со StringGrid и Timer.<br>
+    2- В StringGrid установите свойства “ColCount” и “RowCount” в
+    20.<br>
+    3- У таймера (Timer) установите свойство “Interval” в 500.<br>
+    4- В обработчик события “OnTime” таймера добавьте
+    следующий код:<br>
+    <br>
+    procedure TForm1.Timer1Timer(Sender: TObject); <br>
+    var <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;i, ii : Integer; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;aJobs : JOB_INFO_1_ARRAY; <br>
+    begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for i:=0 to
+    StringGrid1.ColCount-1 do <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for
+    ii:=0 to StringGrid1.RowCount-1 do StringGrid1.Cells[i,ii] := ''; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;aJobs := GetSpoolerJobs('HP
+    LaserJet 6L PCL'); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for i:=0 to Length(aJobs)-1 do
+    begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;StringGrid1.Cells[i,0]
+    := aJobs[i].pPrinterName; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;StringGrid1.Cells[i,1]
+    := aJobs[i].pMachineName; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;StringGrid1.Cells[i,2]
+    := aJobs[i].pUserName; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;StringGrid1.Cells[i,3]
+    := aJobs[i].pDocument; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;StringGrid1.Cells[i,4]
+    := aJobs[i].pDatatype; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;StringGrid1.Cells[i,5]
+    := aJobs[i].pStatus; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;StringGrid1.Cells[i,6]
+    := IntToStr(aJobs[i].Status); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case
+    aJobs[i].Status of <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    JOB_STATUS_PAUSED: StringGrid1.Cells[i,6] := 'JOB_STATUS_PAUSED'; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    JOB_STATUS_ERROR: StringGrid1.Cells[i,6] := 'JOB_STATUS_ERROR'; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    JOB_STATUS_DELETING: StringGrid1.Cells[i,6] := 'JOB_STATUS_DELETING'; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    JOB_STATUS_SPOOLING: StringGrid1.Cells[i,6] := 'JOB_STATUS_SPOOLING'; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    JOB_STATUS_PRINTING: StringGrid1.Cells[i,6] := 'JOB_STATUS_PRINTING'; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    JOB_STATUS_OFFLINE: StringGrid1.Cells[i,6] := 'JOB_STATUS_OFFLINE'; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    JOB_STATUS_PAPEROUT: StringGrid1.Cells[i,6] := 'JOB_STATUS_PAPEROUT'; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    JOB_STATUS_PRINTED: StringGrid1.Cells[i,6] := 'JOB_STATUS_PRINTED'; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    JOB_STATUS_DELETED: StringGrid1.Cells[i,6] := 'JOB_STATUS_DELETED'; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    JOB_STATUS_BLOCKED_DEVQ: StringGrid1.Cells[i,6] := 'JOB_STATUS_BLOCKED_DEVQ'; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    JOB_STATUS_USER_INTERVENTION: StringGrid1.Cells[i,6] := 'JOB_STATUS_USER_INTERVENTION'; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    JOB_STATUS_RESTART: StringGrid1.Cells[i,6] := 'JOB_STATUS_RESTART'; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    JOB_POSITION_UNSPECIFIED: StringGrid1.Cells[i,6] := 'JOB_POSITION_UNSPECIFIED'; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;else
+    StringGrid1.Cells[i,6] := 'Unknown status...'; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;StringGrid1.Refresh; <br>
+    end; <br>
+    <br>
+    5- Запустите проект и попробуйте что-нибудь
+    отправить на печать из MSWord или другого
+    приложения и посмотрите в stringgrid.</p>
+    <p><strong>Некоторые замечания и дополнения:</strong></p>
+    <p>Структура JOB_INFO_1 объявлена в юните WinSpool
+    следующим образом:</p>
+    <p>JOB_INFO_1 = record <br>
+    &nbsp;&nbsp; JobId: DWORD; <br>
+    &nbsp;&nbsp; pPrinterName: PAnsiChar; <br>
+    &nbsp;&nbsp; pMachineName: PAnsiChar; <br>
+    &nbsp;&nbsp; pUserName: PAnsiChar; <br>
+    &nbsp;&nbsp; pDocument: PAnsiChar; <br>
+    &nbsp;&nbsp; pDatatype: PAnsiChar; <br>
+    &nbsp;&nbsp; pStatus: PAnsiChar; <br>
+    &nbsp;&nbsp; Status: DWORD; <br>
+    &nbsp;&nbsp; Priority: DWORD; <br>
+    &nbsp;&nbsp; Position: DWORD; <br>
+    &nbsp;&nbsp; TotalPages: DWORD; <br>
+    &nbsp;&nbsp; PagesPrinted: DWORD; <br>
+    &nbsp;&nbsp; Submitted: TSystemTime; <br>
+    end;</p>
+    <p>И массив так же можно объявить следующим
+    образом:</p>
+    <p>aJobs : Array[0..99] of JOB_INFO_1;</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

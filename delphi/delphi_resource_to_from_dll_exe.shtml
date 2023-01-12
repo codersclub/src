@@ -1,0 +1,193 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Сохранение и выдёргивание ресурсов в DLL или EXE.</h3>
+    <p>Иногда возникает необходимость вшить ресурсы в
+    исполняемый файл Вашего приложения (например
+    чтобы предотвратить их случайное удаление
+    пользователем, либо, чтобы защитить их от
+    изменений). Данный пример показывает как вшить
+    любой файл как ресурс в EXE-шнике. </p>
+    <p>Совместимость: Delphi 3.x (или выше)</p>
+    <p>Далее рассмотрим, как создать файл ресурсов,
+    содержащий корию какого-либо файла. После
+    создания такого файла его можно легко прицепить
+    к Вашему проекту директивой {$R}. Файл ресурсов,
+    который мы будем создавать имеет следующий
+    формат:</p>
+    <p><font color="#000000" face="Verdana" size="2">+ заголовок <br>
+    + заголовок для нашего RCDATA ресурса <br>
+    + собственно данные - RCDATA ресурс </font></p>
+    <p><font color="#000000" face="Verdana" size="2">В данном примере будет
+    показано, как сохранить в файле ресурсов только
+    один файл, но думаю, что так же легко Вы сможете
+    сохранить и несколько файлов.</font></p>
+    <p><font color="#000000" face="Verdana" size="2">Заголовок ресурса
+    выглядит следующим образом: <br>
+    <br>
+    TResHeader = record <br>
+    &nbsp;&nbsp;DataSize: DWORD;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//
+    размер данных&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <br>
+    &nbsp;&nbsp;HeaderSize: DWORD;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// размер этой
+    записи <br>
+    &nbsp;&nbsp;ResType: DWORD;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; //
+    нижнее слово = $FFFF =&gt; ordinal <br>
+    &nbsp;&nbsp;ResId: DWORD;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; //
+    нижнее слово = $FFFF =&gt; ordinal <br>
+    &nbsp;&nbsp;DataVersion: DWORD;&nbsp;&nbsp;&nbsp;&nbsp; // * <br>
+    &nbsp;&nbsp;MemoryFlags: WORD; <br>
+    &nbsp;&nbsp;LanguageId: WORD;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // * <br>
+    &nbsp;&nbsp;Version: DWORD;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // * <br>
+    &nbsp;&nbsp;Characteristics: DWORD; // * <br>
+    end; <br>
+    <br>
+    Поля помеченны звёздочкой Мы не будем
+    использовать. </font></p>
+    <p><font color="#000000" face="Verdana" size="2">Приведённый код
+    создаёт файл ресурсов и копирует его в данный
+    файл: </font></p>
+    <table border="0" cellpadding="0" cellspacing="0">
+      <tr>
+        <td width="750" bgcolor="#A5E4A7"><font face="Tahoma" style="font-size: 10pt" size="-1"><b>&nbsp;
+        Листинг 1:</b></font></td>
+      </tr>
+    </table>
+    <font color="#000000" face="Verdana" size="2"><p>procedure CreateResourceFile( <br>
+    &nbsp;&nbsp;DataFile, ResFile: string;&nbsp;&nbsp;// имена файлов <br>
+    &nbsp;&nbsp;ResID:
+    Integer&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//
+    id ресурсов <br>
+    ); <br>
+    var <br>
+    &nbsp;&nbsp;FS, RS: TFileStream; <br>
+    &nbsp;&nbsp;FileHeader, ResHeader: TResHeader; <br>
+    &nbsp;&nbsp;Padding: array[0..SizeOf(DWORD)-1] of Byte; <br>
+    begin <br>
+    <br>
+    &nbsp;&nbsp;{ Open input file and create resource file } <br>
+    &nbsp;&nbsp;FS := TFileStream.Create(&nbsp;&nbsp;// для чтения данных из
+    файла<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;DataFile, fmOpenRead); <br>
+    &nbsp;&nbsp;RS := TFileStream.Create(&nbsp;&nbsp;// для записи файла
+    ресурсов <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ResFile, fmCreate); <br>
+    <br>
+    &nbsp;&nbsp;{ Создаём заголовок файла ресурсов - все
+    нули, за исключением <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;HeaderSize, ResType и ResID } <br>
+    &nbsp;&nbsp;FillChar(FileHeader, SizeOf(FileHeader), #0); <br>
+    &nbsp;&nbsp;FileHeader.HeaderSize := SizeOf(FileHeader); <br>
+    &nbsp;&nbsp;FileHeader.ResId := $0000FFFF; <br>
+    &nbsp;&nbsp;FileHeader.ResType := $0000FFFF; <br>
+    <br>
+    &nbsp;&nbsp;{ Создаём заголовок данных для RC_DATA файла <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Внимание: для создания более одного
+    ресурса необходимо <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;повторить следующий процесс,
+    используя каждый раз различные <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ID ресурсов } <br>
+    &nbsp;&nbsp;FillChar(ResHeader, SizeOf(ResHeader), #0); <br>
+    &nbsp;&nbsp;ResHeader.HeaderSize := SizeOf(ResHeader); <br>
+    &nbsp;&nbsp;// id ресурса - FFFF означает &quot;не строка!&quot; <br>
+    &nbsp;&nbsp;ResHeader.ResId := $0000FFFF or (ResId shl 16); <br>
+    &nbsp;&nbsp;// тип ресурса - RT_RCDATA (from Windows unit) <br>
+    &nbsp;&nbsp;ResHeader.ResType := $0000FFFF <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;or (WORD(RT_RCDATA) shl 16); <br>
+    &nbsp;&nbsp;// размер данных - есть размер файла <br>
+    &nbsp;&nbsp;ResHeader.DataSize := FS.Size; <br>
+    &nbsp;&nbsp;// Устанавливаем необходимые флаги памяти <br>
+    &nbsp;&nbsp;ResHeader.MemoryFlags := $0030; <br>
+    <br>
+    &nbsp;&nbsp;{ Записываем заголовки в файл ресурсов } <br>
+    &nbsp;&nbsp;RS.WriteBuffer(FileHeader, sizeof(FileHeader)); <br>
+    &nbsp;&nbsp;RS.WriteBuffer(ResHeader, sizeof(ResHeader)); <br>
+    <br>
+    &nbsp;&nbsp;{ Копируем файл в ресурс } <br>
+    &nbsp;&nbsp;RS.CopyFrom(FS, FS.Size); <br>
+    <br>
+    &nbsp;&nbsp;{ Pad data out to DWORD boundary - any old <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;rubbish will do!} <br>
+    &nbsp;&nbsp;if FS.Size mod SizeOf(DWORD) &lt;&gt; 0 then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;RS.WriteBuffer(Padding, SizeOf(DWORD) - <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FS.Size mod SizeOf(DWORD)); <br>
+    <br>
+    &nbsp;&nbsp;{ закрываем файлы } <br>
+    &nbsp;&nbsp;FS.Free; <br>
+    &nbsp;&nbsp;RS.Free; <br>
+    end; <br>
+    <br>
+    Данный код не совсем красив, и отсутствует
+    обработка ошибок. Правильнее будет создать
+    класс, включающий в себя данный пример.<br>
+    <br>
+    </p>
+    <h3>Извлечение ресурсов из EXE</font> </h3>
+    <p>теперь рассмотрим пример, показывающий, как
+    извлекать ресурсы из исполняемого модуля.</p>
+    <p>Вся процедура заключается в создании потока
+    ресурса, создании файлового потока и копировании
+    из потока ресурса в поток файла.</p>
+    <table border="0" cellpadding="0" cellspacing="0">
+      <tr>
+        <td width="750" bgcolor="#A5E4A7"><font face="Tahoma" style="font-size: 10pt" size="-1"><b>&nbsp;
+        Листинг 2:</b></font></td>
+      </tr>
+    </table>
+    <p>procedure ExtractToFile(Instance:THandle; ResID:Integer; ResType, FileName:String); <br>
+    var <br>
+    &nbsp;&nbsp;ResStream: TResourceStream; <br>
+    &nbsp;&nbsp;FileStream: TFileStream; <br>
+    begin <br>
+    &nbsp;&nbsp;try <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ResStream := TResourceStream.CreateFromID(Instance, ResID,
+    pChar(ResType)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;try <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//if FileExists(FileName) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//DeleteFile(pChar(FileName)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FileStream := TFileStream.Create(FileName, fmCreate); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FileStream.CopyFrom(ResStream, 0); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;finally <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FileStream.Free; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;finally <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ResStream.Free; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;except <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;on E:Exception do <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DeleteFile(FileName); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;raise; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;end; <br>
+    end; <br>
+    <br>
+    Всё, что требуется, это получить Instance exe-шника или
+    dll (у Вашего приложения это Application.Instance или
+    Application.Handle, для dll Вам прийдётся получить его
+    самостоятельно :) <br>
+    <br>
+    ResID тот же самый ID , который был присвоен ресурсу <br>
+    <br>
+    ResType WAVEFILE, BITMAP, CURSOR, CUSTOM - это типы ресурсов, с
+    которыми возможно работать, но у меня получилось
+    успешно проделать процедуру только с CUSTOM <br>
+    <br>
+    FileName - это имя файла, который мы хотим создать из
+    ресурса <br>
+    <br>
+    </p>
+    <p>&nbsp;<br>
+    </td>
+  </tr>
+</table>
+</center></div></TBODY>
+
+
+<p align="center"><br>
+<br>
+</p>
+<!--#include virtual="/ssi/bottom.html"-->

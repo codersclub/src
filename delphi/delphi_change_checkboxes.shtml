@@ -1,0 +1,675 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Видоизменяем чекбоксы в Delphi.</h3>
+    <p>Автор: <a href="mailto:M.deHaan@inn.nl">Maarten de Haan</a></p>
+    <p>В WIN3.1 чекбоксы заполняются символом &quot;X&quot;. В
+    WIN95 и WINNT - символом &quot;V&quot;. В тандартной палитре
+    Delphi чекбоксы заполняются символом &quot;X&quot;.
+    Спрашивается - почему фирма Borland/Inprise не исправила
+    значёк чекбокса для W95/W98 ?. Данный пример
+    позволяет заполнять чекбокс такими значками как:
+    &quot;X&quot;, &quot;V&quot;, &quot;o&quot;, &quot;закрашенным
+    прямоугольником&quot;, или бриллиантиком.</p>
+    <p>Пример тестировался под WIN95 и WINNT.</p>
+    <p>Совместимость: Delphi 5.x (или выше)</p>
+    <table border="0" cellpadding="0" cellspacing="0">
+      <tr>
+        <td width="750" bgcolor="#A5E4A7"><font face="Tahoma" style="font-size: 10pt" size="-1"><b>&nbsp;
+        Собственно сам исходничек:</b></font></td>
+      </tr>
+    </table>
+    <p>{ <br>
+    ==================================================================== <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Обозначения<br>
+    ==================================================================== <br>
+    X = крестик<br>
+    V = галочка <br>
+    o = кружок <br>
+    <br>
+    +-+ <br>
+    |W| = заполненный прямоугольник <br>
+    +-+ <br>
+    <br>
+    /\ <br>
+<WW>    = бриллиантик <br>
+    \/ <br>
+    <br>
+    ==================================================================== <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Преимущества
+    этого чекбокса <br>
+    ==================================================================== <br>
+    Вы можете найти множество чекбоксов в интернете.
+    Но у них есть недостаток, они не обрабатывают
+    сообщение WM_KILLFOCUS. Приведённый ниже пример делает
+    это. <br>
+    ==================================================================== <br>
+    } <br>
+    Unit CheckBoxX; <br>
+    <br>
+    Interface <br>
+    <br>
+    Uses <br>
+    &nbsp;&nbsp;Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, <br>
+    &nbsp;&nbsp;Dialogs, StdCtrls; <br>
+    <br>
+    Const <br>
+    &nbsp;&nbsp; { другие константы } <br>
+    &nbsp;&nbsp; fRBoxWidth&nbsp;&nbsp;: Integer = 13; // ширина квадрата
+    checkbox <br>
+    &nbsp;&nbsp; fRBoxHeight : Integer = 13; // высота квадрата checkbox <br>
+    <br>
+    Type <br>
+    &nbsp;&nbsp;TState = (cbUnchecked,cbChecked,cbGrayed); // такой же как в Delphi
+    <br>
+    &nbsp;&nbsp;TType = (cbCross,cbMark,cbBullet,cbDiamond,cbRect); // добавленный <br>
+    &nbsp;&nbsp;TMouseState = (msMouseUp,msMouseDown); <br>
+    &nbsp;&nbsp;TAlignment = (taRightJustify,taLeftJustify); // The same <br>
+    <br>
+    &nbsp;&nbsp;TCheckBoxX = class(TCustomControl) <br>
+    <br>
+    &nbsp;&nbsp;Private <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{ Private declarations } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;fChecked&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: Boolean;
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;fCaption&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: String; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;fColor&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:
+    TColor; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;fState&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:
+    TState; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;fFont &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    : TFont; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;fAllowGrayed&nbsp;&nbsp;&nbsp;&nbsp;: Boolean; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;fFocus&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:
+    Boolean; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;fType &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    : TType; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;fMouseState&nbsp;&nbsp;&nbsp;&nbsp; : TMouseState; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;fAlignment&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: TAlignment; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;fTextTop&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:
+    Integer;&nbsp;&nbsp;// отступ текта с верху <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;fTextLeft&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; :
+    Integer;&nbsp;&nbsp;// отступ текта с лева <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;fBoxTop&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; :
+    Integer;&nbsp;&nbsp;// координата чекбокса сверху <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;fBoxLeft&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:
+    Integer;&nbsp;&nbsp;// координата чекбокса слева <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Procedure fSetChecked(Bo : Boolean); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Procedure fSetCaption(S : String); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Procedure fSetColor(C : TColor); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Procedure fSetState(cbState : TState); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Procedure fSetFont(cbFont : TFont); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Procedure fSetAllowGrayed(Bo : Boolean); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Procedure fSetType(T : TType); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Procedure fSetAlignment(A : TAlignment); <br>
+    <br>
+    &nbsp;&nbsp;Protected <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{ Protected declarations } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Procedure Paint; override; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Procedure MouseDown(Button: TMouseButton; Shift: TShiftState; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;X, Y: Integer); override; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Procedure MouseUp(Button: TMouseButton; Shift: TShiftState; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;X, Y: Integer); override; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Procedure WMKillFocus(var Message : TWMKillFocus); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Message WM_KILLFOCUS; // это убирает
+    контур фокуса! <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Procedure WMSetFocus(var Message : TWMSetFocus); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Message WM_SETFOCUS; // Если вы
+    используете клавишу TAB или Shift-Tab <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Procedure KeyDown(var Key : Word; Shift : TShiftState); override; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// перехват KeyDown <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Procedure KeyUp(var Key : Word; Shift : TShiftState); override; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// перехват KeyUp <br>
+    <br>
+    &nbsp;&nbsp;Public <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{ Public declarations } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// Если поместить Create и Destroy в раздел
+    protected, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// то Delphi начинает ругаться. <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Constructor Create(AOwner : TComponent); override; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Destructor Destroy; override; <br>
+    <br>
+    &nbsp;&nbsp;Published <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{ Published declarations } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{ --- Свойства --- } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property Action; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property Alignment : TAlignment <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; read fAlignment write fSetAlignment; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property AllowGrayed : Boolean <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; read fAllowGrayed write fSetAllowGrayed; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property Anchors; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property BiDiMode; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property Caption : String <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; read fCaption write fSetCaption; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property CheckBoxType : TType <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; read fType write fSetType; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property Checked : Boolean <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; read fChecked write fSetChecked; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property Color : TColor <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; read fColor write fSetColor; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property Constraints; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;//Property Ctrl3D; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property Cursor; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property DragCursor; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property DragKind; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property DragMode; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property Enabled; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property Font : TFont <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; read fFont write fSetFont; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;//Property Height; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property HelpContext; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property Hint; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property Left; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property Name; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;//Property PartenBiDiMode; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property ParentColor; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;//Property ParentCtrl3D; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property ParentFont; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property ParentShowHint; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;//Property PopMenu; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property ShowHint; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property State : TState <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; read fState write fSetState; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property TabOrder; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property TabStop; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property Tag; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property Top; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property Visible; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;//Property Width; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{ --- Events --- } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property OnClick; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property OnContextPopup; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property OnDragDrop; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property OnDragOver; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property OnEndDock; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property OnEndDrag; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property OnEnter; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property OnExit; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property OnKeyDown; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property OnKeyPress; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property OnKeyUp; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property OnMouseDown; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property OnMouseMove; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property OnMouseUp; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property OnStartDock; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Property OnStartDrag; <br>
+    &nbsp;&nbsp;End; <br>
+    <br>
+    Procedure Register; //Hello! <br>
+    <br>
+    Implementation <br>
+    <br>
+    {-------------------------------------------------------------------} <br>
+    Procedure TCheckBoxX.KeyDown(var Key : Word; Shift : TShiftState); <br>
+    <br>
+    Begin <br>
+    If fFocus then <br>
+    &nbsp;&nbsp; If Shift = [] then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If Key = 0032 then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; fMouseState := msMouseDown; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; If fState &lt;&gt; cbGrayed then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SetFocus; //
+    Устанавливаем фокус на этот компонент <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//
+    всем другим компонентам Windows посылает сообщение
+    WM_KILLFOCUS. <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fFocus := True; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Invalidate; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;End; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; End; <br>
+    Inherited KeyDown(Key,Shift); <br>
+    End; <br>
+    {-------------------------------------------------------------------} <br>
+    Procedure TCheckBoxX.KeyUp(var Key : Word; Shift : TShiftState); <br>
+    <br>
+    Begin <br>
+    If fFocus then <br>
+    &nbsp;&nbsp; If Shift = [] then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If Key = 0032 then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; If fState &lt;&gt; cbGrayed then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fSetChecked(not
+    fChecked); // Изменяем состояние <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; fMouseState := msMouseUp; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; End; <br>
+    Inherited KeyUp(Key,Shift); <br>
+    End; <br>
+    {-------------------------------------------------------------------} <br>
+    Procedure TCheckBoxX.WMSetFocus(var Message : TWMSetFocus); <br>
+    <br>
+    Begin <br>
+    fFocus := True; <br>
+    Invalidate; <br>
+    End; <br>
+    {-------------------------------------------------------------------} <br>
+    Procedure TCheckBoxX.WMKillFocus(var Message : TWMKillFocus); <br>
+    <br>
+    Begin <br>
+    fFocus := False; // Удаляем фокус у всех компонент,
+    которые не имеют фокуса. <br>
+    Invalidate; <br>
+    End; <br>
+    {-------------------------------------------------------------------} <br>
+    Procedure TCheckBoxX.fSetAlignment(A : TAlignment); <br>
+    <br>
+    Begin <br>
+    If A &lt;&gt; fAlignment then <br>
+    &nbsp;&nbsp; Begin <br>
+    &nbsp;&nbsp; fAlignment := A; <br>
+    &nbsp;&nbsp; Invalidate; <br>
+    &nbsp;&nbsp; End; <br>
+    End; <br>
+    {-------------------------------------------------------------------} <br>
+    Procedure TCheckBoxX.fSetType(T : TType); <br>
+    <br>
+    Begin <br>
+    If fType &lt;&gt; T then <br>
+    &nbsp;&nbsp; Begin <br>
+    &nbsp;&nbsp; fType := T; <br>
+    &nbsp;&nbsp; Invalidate; <br>
+    &nbsp;&nbsp; End; <br>
+    End; <br>
+    {-------------------------------------------------------------------} <br>
+    Procedure TCheckBoxX.fSetFont(cbFont : TFont); <br>
+    <br>
+    Var <br>
+    &nbsp;&nbsp; FontChanged : Boolean; <br>
+    <br>
+    Begin <br>
+    FontChanged := False; <br>
+    <br>
+    If fFont.Style &lt;&gt; cbFont.Style then <br>
+    &nbsp;&nbsp; Begin <br>
+    &nbsp;&nbsp; fFont.Style := cbFont.Style; <br>
+    &nbsp;&nbsp; FontChanged := True; <br>
+    &nbsp;&nbsp; End; <br>
+    <br>
+    If fFont.CharSet &lt;&gt; cbFont.Charset then <br>
+    &nbsp;&nbsp; Begin <br>
+    &nbsp;&nbsp; fFont.Charset := cbFont.Charset; <br>
+    &nbsp;&nbsp; FontChanged := True; <br>
+    &nbsp;&nbsp; End; <br>
+    <br>
+    If fFont.Size &lt;&gt; cbFont.Size then <br>
+    &nbsp;&nbsp; Begin <br>
+    &nbsp;&nbsp; fFont.Size := cbFont.Size; <br>
+    &nbsp;&nbsp; FontChanged := True; <br>
+    &nbsp;&nbsp; End; <br>
+    <br>
+    If fFont.Name &lt;&gt; cbFont.Name then <br>
+    &nbsp;&nbsp; Begin <br>
+    &nbsp;&nbsp; fFont.Name := cbFont.Name; <br>
+    &nbsp;&nbsp; FontChanged := True; <br>
+    &nbsp;&nbsp; End; <br>
+    <br>
+    If fFont.Color &lt;&gt; cbFont.Color then <br>
+    &nbsp;&nbsp; Begin <br>
+    &nbsp;&nbsp; fFont.Color := cbFont.Color; <br>
+    &nbsp;&nbsp; FontChanged := True; <br>
+    &nbsp;&nbsp; End; <br>
+    <br>
+    If FontChanged then <br>
+    &nbsp;&nbsp; Invalidate; <br>
+    End; <br>
+    {-------------------------------------------------------------------} <br>
+    procedure TCheckBoxX.MouseDown(Button: TMouseButton; Shift: TShiftState; <br>
+    &nbsp;&nbsp;X, Y: Integer); <br>
+    <br>
+    Begin <br>
+    // Процедура MouseDown вызывается, когда кнопка мышки
+    нажимается в пределах <br>
+    // кнопки, соответственно мы не можем получить
+    значения координат X и Y. <br>
+    inherited MouseDown(Button, Shift, X, Y); <br>
+    fMouseState := msMouseDown; <br>
+    If fState &lt;&gt; cbGrayed then <br>
+    &nbsp;&nbsp; Begin <br>
+    &nbsp;&nbsp; SetFocus; // Устанавливаем фокус на этот
+    компонент <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // всем
+    другим компонентам Windows посылает сообщение
+    WM_KILLFOCUS. <br>
+    &nbsp;&nbsp; fFocus := True; <br>
+    &nbsp;&nbsp; Invalidate; <br>
+    &nbsp;&nbsp; End; <br>
+    End; <br>
+    {-------------------------------------------------------------------} <br>
+    procedure TCheckBoxX.MouseUp(Button: TMouseButton; Shift: TShiftState; <br>
+    &nbsp;&nbsp;X, Y: Integer); <br>
+    <br>
+    Begin <br>
+    // Процедура MouseUp вызывается, когда кнопка мышки
+    отпускается в пределах <br>
+    // кнопки, соответственно мы не можем получить
+    значения координат X и Y. <br>
+    inherited MouseUp(Button, Shift, X, Y); <br>
+    If fState &lt;&gt; cbGrayed then <br>
+    &nbsp;&nbsp; fSetChecked(not fChecked); // Изменяем состояние <br>
+    fMouseState := msMouseUp; <br>
+    End; <br>
+    {-------------------------------------------------------------------} <br>
+    Procedure TCheckBoxX.fSetAllowGrayed(Bo : Boolean); <br>
+    <br>
+    Begin <br>
+    If fAllowGrayed &lt;&gt; Bo then <br>
+    &nbsp;&nbsp; Begin <br>
+    &nbsp;&nbsp; fAllowGrayed := Bo; <br>
+    &nbsp;&nbsp; If not fAllowGrayed then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If fState = cbGrayed then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; If fChecked then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fState :=
+    cbChecked <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fState :=
+    cbUnChecked; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; End; <br>
+    &nbsp;&nbsp; Invalidate; <br>
+    &nbsp;&nbsp; End; <br>
+    End; <br>
+    {-------------------------------------------------------------------} <br>
+    Procedure TCheckBoxX.fSetState(cbState : TState); <br>
+    <br>
+    Begin <br>
+    If fState &lt;&gt; cbState then <br>
+    &nbsp;&nbsp; Begin <br>
+    &nbsp;&nbsp; fState := cbState; <br>
+    &nbsp;&nbsp; If (fState = cbChecked) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fChecked := True; <br>
+    <br>
+    &nbsp;&nbsp; If (fState = cbGrayed) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fAllowGrayed := True; <br>
+    <br>
+    &nbsp;&nbsp; If fState = cbUnChecked then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fChecked := False; <br>
+    <br>
+    &nbsp;&nbsp; Invalidate; <br>
+    &nbsp;&nbsp; End; <br>
+    End; <br>
+    {-------------------------------------------------------------------} <br>
+    Procedure TCheckBoxX.fSetColor(C : TColor); <br>
+    <br>
+    Begin <br>
+    If fColor &lt;&gt; C then <br>
+    &nbsp;&nbsp; Begin <br>
+    &nbsp;&nbsp; fColor := C; <br>
+    &nbsp;&nbsp; Invalidate; <br>
+    &nbsp;&nbsp; End; <br>
+    End; <br>
+    {-------------------------------------------------------------------} <br>
+    Procedure TCheckBoxX.fSetCaption(S : String); <br>
+    <br>
+    Begin <br>
+    If fCaption &lt;&gt; S then <br>
+    &nbsp;&nbsp; Begin <br>
+    &nbsp;&nbsp; fCaption := S; <br>
+    &nbsp;&nbsp; Invalidate; <br>
+    &nbsp;&nbsp; End; <br>
+    End; <br>
+    {-------------------------------------------------------------------} <br>
+    Procedure TCheckBoxX.fSetChecked(Bo : Boolean); <br>
+    <br>
+    Begin <br>
+    If fChecked &lt;&gt; Bo then <br>
+    &nbsp;&nbsp; Begin <br>
+    &nbsp;&nbsp; fChecked := Bo; <br>
+    &nbsp;&nbsp; If fState &lt;&gt; cbGrayed then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If fChecked then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; fState := cbChecked <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; fState := cbUnChecked; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;End; <br>
+    &nbsp;&nbsp; Invalidate; <br>
+    &nbsp;&nbsp; End; <br>
+    End; <br>
+    {-------------------------------------------------------------------} <br>
+    Procedure TCheckBoxX.Paint; <br>
+    <br>
+    Var <br>
+    &nbsp;&nbsp;
+    Buffer&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:
+    Array[0..127] of Char; <br>
+    &nbsp;&nbsp; I
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    : Integer; <br>
+    &nbsp;&nbsp; fTextWidth,fTextHeight&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:
+    Integer; <br>
+    <br>
+    Begin <br>
+    {Get Delphi's componentname and initially write it in the caption} <br>
+    GetTextBuf(Buffer,SizeOf(Buffer)); <br>
+    If Buffer &lt;&gt; '' then <br>
+    &nbsp;&nbsp; fCaption := Buffer; <br>
+    <br>
+    Canvas.Font.Size := Font.Size; <br>
+    Canvas.Font.Style := Font.Style; <br>
+    Canvas.Font.Color := Font.Color; <br>
+    Canvas.Font.Charset := Font.CharSet; <br>
+    <br>
+    fTextWidth := Canvas.TextWidth(fCaption); <br>
+    fTextHeight := Canvas.TextHeight('Q'); <br>
+    <br>
+    If fAlignment = taRightJustify then <br>
+    &nbsp;&nbsp; Begin <br>
+    &nbsp;&nbsp; fBoxTop := (Height - fRBoxHeight) div 2; <br>
+    &nbsp;&nbsp; fBoxLeft := 0; <br>
+    &nbsp;&nbsp; fTextTop := (Height - fTextHeight) div 2; <br>
+    &nbsp;&nbsp; fTextLeft := fBoxLeft + fRBoxWidth + 4; <br>
+    &nbsp;&nbsp; End <br>
+    else <br>
+    &nbsp;&nbsp; Begin <br>
+    &nbsp;&nbsp; fBoxTop := (Height - fRBoxHeight) div 2; <br>
+    &nbsp;&nbsp; fBoxLeft := Width - fRBoxWidth; <br>
+    &nbsp;&nbsp; fTextTop := (Height - fTextHeight) div 2; <br>
+    &nbsp;&nbsp; fTextLeft := 1; <br>
+    &nbsp;&nbsp; //If fTextWidth &gt; (Width - fBoxWidth - 4) then <br>
+    &nbsp;&nbsp; //&nbsp;&nbsp; fTextLeft := (Width - fBoxWidth - 4) -&nbsp;&nbsp;fTextWidth; <br>
+    &nbsp;&nbsp; End; <br>
+    <br>
+    // выводим текст в caption <br>
+    Canvas.Pen.Color := fFont.Color; <br>
+    Canvas.Brush.Color := fColor; <br>
+    Canvas.TextOut(fTextLeft,fTextTop,fCaption); <br>
+    <br>
+    // Рисуем контур фокуса <br>
+    If fFocus = True then <br>
+    &nbsp;&nbsp; Canvas.DrawFocusRect(Rect(fTextLeft - 1, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    fTextTop - 2, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    fTextLeft + fTextWidth + 1, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    fTextTop + fTextHeight + 2)); <br>
+    <br>
+    If (fState = cbChecked) then <br>
+    &nbsp;&nbsp; Canvas.Brush.Color := clWindow; <br>
+    <br>
+    If (fState = cbUnChecked) then <br>
+    &nbsp;&nbsp; Canvas.Brush.Color := clWindow; <br>
+    <br>
+    If (fState = cbGrayed) then <br>
+    &nbsp;&nbsp; Begin <br>
+    &nbsp;&nbsp; fAllowGrayed := True; <br>
+    &nbsp;&nbsp; Canvas.Brush.Color := clBtnFace; <br>
+    &nbsp;&nbsp; End; <br>
+    <br>
+    // Создаём бокс clBtnFace когда кнопка мыши нажимается
+    <br>
+    // наподобие &quot;стандартного&quot; CheckBox <br>
+    If fMouseState = msMouseDown then <br>
+    &nbsp;&nbsp; Canvas.Brush.Color := clBtnFace; <br>
+    <br>
+    Canvas.FillRect(Rect(fBoxLeft + 2, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    fBoxTop + 2, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    fBoxLeft + fRBoxWidth - 2, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    fBoxTop + fRBoxHeight - 2)); <br>
+    <br>
+    // Рисуем прямоугольный чекбокс <br>
+    Canvas.Brush.Color := clBtnFace; <br>
+    Canvas.Pen.Color := clGray; <br>
+    Canvas.MoveTo(fBoxLeft + fRBoxWidth - 1,fBoxTop); <br>
+    &nbsp;&nbsp; Canvas.LineTo(fBoxLeft,fBoxTop); <br>
+    &nbsp;&nbsp; Canvas.LineTo(fBoxLeft,fBoxTop + fRBoxHeight); <br>
+    <br>
+    Canvas.Pen.Color := clWhite; <br>
+    Canvas.MoveTo(fBoxLeft + fRBoxWidth - 1,fBoxTop); <br>
+    &nbsp;&nbsp; Canvas.LineTo(fBoxLeft + fRBoxWidth - 1, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fBoxTop + fRBoxHeight - 1); <br>
+    &nbsp;&nbsp; Canvas.LineTo(fBoxLeft - 1,fBoxTop + fRBoxHeight - 1); <br>
+    <br>
+    Canvas.Pen.Color := clBlack; <br>
+    Canvas.MoveTo(fBoxLeft + fRBoxWidth - 3,fBoxTop + 1); <br>
+    &nbsp;&nbsp; Canvas.LineTo(fBoxLeft + 1,fBoxTop + 1); <br>
+    &nbsp;&nbsp; Canvas.LineTo(fBoxLeft + 1,fBoxTop + fRBoxHeight - 2); <br>
+    <br>
+    Canvas.Pen.Color := clBtnFace; <br>
+    Canvas.MoveTo(fBoxLeft + fRBoxWidth - 2,fBoxTop + 1); <br>
+    &nbsp;&nbsp; Canvas.LineTo(fBoxLeft + fRBoxWidth - 2, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fBoxTop + fRBoxHeight - 2); <br>
+    &nbsp;&nbsp; Canvas.LineTo(fBoxLeft,fBoxTop + fRBoxHeight - 2); <br>
+    <br>
+    // Теперь он должен быть таким же как чекбокс в Delphi
+    <br>
+    <br>
+    If fChecked then <br>
+    &nbsp;&nbsp; Begin <br>
+    &nbsp;&nbsp; Canvas.Pen.Color := clBlack; <br>
+    &nbsp;&nbsp; Canvas.Brush.Color := clBlack; <br>
+    <br>
+    &nbsp;&nbsp; // Рисуем прямоугольник <br>
+    &nbsp;&nbsp; If fType = cbRect then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.FillRect(Rect(fBoxLeft + 4,fBoxTop + 4, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; fBoxLeft + fRBoxWidth - 4,fBoxTop +
+    fRBoxHeight - 4)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;End; <br>
+    <br>
+    &nbsp;&nbsp; // Рисуем значёк &quot;о&quot; <br>
+    &nbsp;&nbsp; If fType = cbBullet then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.Ellipse(fBoxLeft + 4,fBoxTop + 4, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; fBoxLeft + fRBoxWidth - 4,fBoxTop +
+    fRBoxHeight - 4); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;End; <br>
+    <br>
+    &nbsp;&nbsp; // Рисуем крестик <br>
+    &nbsp;&nbsp; If fType = cbCross then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{Right-top to left-bottom} <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.MoveTo(fBoxLeft + fRBoxWidth - 5,fBoxTop + 3); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Canvas.LineTo(fBoxLeft + 2,fBoxTop +
+    fRBoxHeight - 4); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.MoveTo(fBoxLeft + fRBoxWidth - 4,fBoxTop + 3); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Canvas.LineTo(fBoxLeft + 2,fBoxTop +
+    fRBoxHeight - 3); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.MoveTo(fBoxLeft + fRBoxWidth - 4,fBoxTop + 4); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Canvas.LineTo(fBoxLeft + 3,fBoxTop +
+    fRBoxHeight - 3); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{Left-top to right-bottom} <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.MoveTo(fBoxLeft + 3,fBoxTop + 4); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Canvas.LineTo(fBoxLeft + fRBoxWidth - 4, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fBoxTop +
+    fRBoxHeight - 3); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.MoveTo(fBoxLeft + 3,fBoxTop + 3); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Canvas.LineTo(fBoxLeft + fRBoxWidth - 3, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fBoxTop +
+    fRBoxHeight - 3);&nbsp;&nbsp;//mid <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.MoveTo(fBoxLeft + 4,fBoxTop + 3); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Canvas.LineTo(fBoxLeft + fRBoxWidth - 3, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fBoxTop +
+    fRBoxHeight - 4); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;End; <br>
+    <br>
+    &nbsp;&nbsp; // Рисуем галочку <br>
+    &nbsp;&nbsp; If fType = cbMark then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;For I := 0 to 2 do <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {Left-mid to left-bottom} <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Canvas.MoveTo(fBoxLeft + 3,fBoxTop + 5 +
+    I); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Canvas.LineTo(fBoxLeft + 6,fBoxTop + 8 +
+    I); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {Left-bottom to right-top} <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Canvas.MoveTo(fBoxLeft + 6,fBoxTop + 6 +
+    I); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Canvas.LineTo(fBoxLeft + 10,fBoxTop + 2 +
+    I); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; End; <br>
+    <br>
+    &nbsp;&nbsp; // Рисуем бриллиантик <br>
+    &nbsp;&nbsp; If fType = cbDiamond then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.Pixels[fBoxLeft + 06,fBoxTop + 03] := clBlack; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.Pixels[fBoxLeft + 06,fBoxTop + 09] := clBlack; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.MoveTo(fBoxLeft + 05,fBoxTop + 04); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.LineTo(fBoxLeft + 08,fBoxTop + 04); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.MoveTo(fBoxLeft + 05,fBoxTop + 08); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.LineTo(fBoxLeft + 08,fBoxTop + 08); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.MoveTo(fBoxLeft + 04,fBoxTop + 05); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.LineTo(fBoxLeft + 09,fBoxTop + 05); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.MoveTo(fBoxLeft + 04,fBoxTop + 07); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.LineTo(fBoxLeft + 09,fBoxTop + 07); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.MoveTo(fBoxLeft + 03,fBoxTop + 06); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.LineTo(fBoxLeft + 10,fBoxTop + 06); // middle
+    line <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;End; <br>
+    &nbsp;&nbsp; End; <br>
+    End; <br>
+    {-------------------------------------------------------------------} <br>
+    Procedure Register; <br>
+    <br>
+    Begin <br>
+    RegisterComponents('Samples', [TCheckBoxX]); <br>
+    End; <br>
+    {-------------------------------------------------------------------} <br>
+    Destructor TCheckBoxX.Destroy; <br>
+    <br>
+    Begin <br>
+    inherited Destroy; <br>
+    End; <br>
+    {-------------------------------------------------------------------} <br>
+    Constructor TCheckBoxX.Create(AOwner : TComponent); <br>
+    <br>
+    Begin <br>
+    inherited Create(AOwner); <br>
+    Height := 17; <br>
+    Width := 97; <br>
+    fChecked := False; <br>
+    fColor := clBtnFace; <br>
+    fState := cbUnChecked; <br>
+    fFont := inherited Font; <br>
+    fAllowGrayed := False; <br>
+    fFocus := False; <br>
+    fMouseState := msMouseUp; <br>
+    fAlignment := taRightJustify; <br>
+    TabStop := True; // Sorry <br>
+    End; <br>
+    {-------------------------------------------------------------------} <br>
+    End. <br>
+    {===================================================================}</p>
+    <p><br>
+    </td>
+  </tr>
+</table>
+</center></div></TBODY>
+
+
+<p align="center"><br>
+<br>
+</p>
+<!--#include virtual="/ssi/bottom.html"-->

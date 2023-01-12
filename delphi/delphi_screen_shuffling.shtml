@@ -1,0 +1,307 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Перетасовка экрана в Delphi</h3>
+    <p>(Перевод одноимённой статьи с сайта <a
+    href="http://delphi.about.com">delphi.about.com</a> )</p>
+    <p>В статье описывается пример, который позволяет
+    разделить экран на блоки, а затем поменять эти блоки
+    местами. Так же можно менять размеры блоков и
+    скрость их перемещения. На мой взгляд неплохое
+    начало для создания логической игрушки либо
+    экранной заставки.</p>
+    <p><b><i>Идея</i></b><br>
+    <img align="left" alt="Screen shuffling in action" border="1" height="80"
+    src="shuffler.gif" width="120"> Уверен, что каждый из Вас уже
+    хоть раз видел что-то подобное в действии. При
+    запуске, программа берёт изображение десктопа и
+    разделяет его на определённое количество
+    прямоугольных частей (одинакового размера).
+    После этого часть блоков случайным образом
+    перемещается со своего первоначального места.</p>
+    <p>&nbsp;&nbsp;&nbsp;<b><font color="#000080">Как это всё осуществить</font></b><br>
+    Создайте новый проект Delphi с чистой формой.
+    Установите свойство <i>Name</i> в 'Shuffler'. Добавьте на
+    форму компоненты Image (Image1) и Timer (Timer1). Image будет
+    содержать в себе изображение десктопа
+    (разобранное), а Timer будет вызывать процедуру
+    рисования. Свойство <i>Interval</i> компонента Timer
+    определяет, как часто будет происходить
+    перемешивание (значение 1000 эквивалентно одной
+    секунде, 2000 - двум секундам).<br>
+    Так же для проекта потребуется несколько
+    глобальных переменных. Поместите следующий код
+    перед секцией implementation в модуле формы:</p>
+    <table bgColor="#ffffcc" border="1">
+<TBODY>
+      <tr>
+        <td><pre><b>var</b>
+  Shuffler: TShuffler; <i><font color="navy">//это было добавлено самой Delphi</font></i>
+
+  DesktopBitmap   : TBitmap; 
+  gx, gy          : Integer; 
+  redRect         : TBitmap; 
+
+  rW, rH          : Integer; 
+
+<b>const</b>
+  DELTA = 8; <i><font
+color="navy">//должно быть 2^n</font></i>
+</pre>
+        </td>
+      </tr>
+</TBODY>
+    </table>
+    <p>• Значение константы (integer) <i>DELTA</i> определяет,
+    на сколько частей будет разбит экран (строк и
+    колонок). Число DELTA должно быть в виде 2^n, где n -
+    целое (integer) число со знаком. Большое значение DELTA
+    приводит к маленьким размерам блоков. Например,
+    если DELTA равна 16 и разрешение экрана 1024 x 768, то
+    экран будет поделён на 256 частей размером 64x48.<br>
+    • <i>DesktopBitmap</i> - это битмап, который хранит в себе
+    захваченное текущее изображение десктопа - мы
+    будем получать это изображение делая скриншот.<br>
+    • <i>redRect</i> это битмап картинка, которая заменяет
+    перемещённую часть картинки. redRect создаётся в
+    событии формы OnCreate.<br>
+    • <i>gx, gy</i> содержат текущие координаты x и y (Left, Top)
+    redRect внутри разобранного изображения.<br>
+    • <i>rW, rH</i> это ширина и высота прямоугольного
+    блока. Для 1024x768 и DELTA=16, rW будет равно 64 а rH = 48. </p>
+    <p>Проект начинает выполняться с обработчика
+    события OnCreate:</p>
+    <table bgColor="#ffffcc" border="1" width="100%">
+<TBODY>
+      <tr>
+        <td><pre><b>procedure</b> TShuffler.FormCreate(Sender: TObject);
+<b>begin</b>
+  rW := Screen.Width <b>div</b> DELTA;
+  rH := Screen.Height <b>div</b> DELTA;
+
+  redRect:=TBitmap.Create;
+  <b>with</b> redRect <b>do</b> <b>begin</b>
+    Width := rW;
+    Height := rH;
+    Canvas.Brush.Color := clRed;
+    Canvas.Brush.Style := bssolid;
+    Canvas.Rectangle(0,0,rW,rH);
+    Canvas.Font.Color := clNavy;
+    Canvas.Font.Style := Canvas.Font.Style + [fsBold];
+    Canvas.TextOut(2,2,<font
+color="blue">'About'</font>);
+    Canvas.Font.Style := Canvas.Font.Style - [fsBold];
+    Canvas.TextOut(2,17,<font
+color="blue">'Delphi'</font>);
+    Canvas.TextOut(2,32,<font color="blue">'Programming'</font>);
+  <b>end</b>;
+
+  Timer1.Enabled := False;
+  Image1.Align := alClient;
+  Visible := False;
+  BorderStyle := bsNone;
+  Top := 0;
+  Left := 0;
+  Width := Screen.Width;
+  Height := Screen.Height;
+  InitScreen;
+<i><font
+color="navy">//  SetWindowPos(Handle,HWND_TOPMOST,0,0,0,0,
+                 SWP_NOSIZE + SWP_NOMOVE);</font></i>
+  Visible := True;
+  Timer1.Interval := 10; <i><font
+color="navy">// меньше := быстрее</font></i>
+  Timer1.Enabled  := True; <i><font
+color="navy">// Запускаем вызов DrawScreen</font></i>
+<b>end</b>;
+</pre>
+        </td>
+      </tr>
+</TBODY>
+    </table>
+    <p>Во-первых, значения rW и rH определяются
+    значением DELTA. Как уже объяснялось, если
+    разрешение экрана 800x600 и DELTA равна 8, изображение
+    экрана будет разделено на 8x8 частей размером 100x75
+    (rW = 100, rH = 75).</p>
+    <p>Во-вторых, созданный битмап redRect, будет размещён
+    внутри картинки, с той целью, чтобы заменить
+    перемещённый блок. redRect является простым красным
+    прямоугольником с текстом (синим) внутри него.
+    Так же для этого можно использовать готовую
+    эмблему или что-то ещё.</p>
+    <p>Наконец, устанавливается ширина и высота формы
+    как у экрана. Вызов (закомментированный) API
+    функции SetWindowPos можно использовать, чтобы
+    установить форму всегда на переднем плане (OnTop),
+    не перемещаемую и не изменяемую. Вызывается
+    процедура InitScreen. Устанавливает интервал таймера
+    и начинает выполняться обработчик события OnTimer,
+    запуская процедуру DrawScreen.</p>
+    <p><b><i>InitScreen - Скриншот</i></b><br>
+    Процедура InitScreen, вызываемая из обработчика
+    события OnCreate, используется для получения
+    скриншота текущего изображения десктопа,
+    устанавливая начальную позицию redRect и рисуя
+    сетку. Код, который будет рисовать сетку
+    необязателен.</p>
+    <p>Чтобы получить скриншот десктопа, используется
+    GetDC для GetDesktopWindow. API функция BitBt используется для передачи
+    картинки десктопа в DesktopBitmap. GetDC(GetDesktopWindow)
+    получает дескриптор контекста устройства
+    дисплея для указанного окна - окна возвращённого
+    функцией GetDesktopWindow. В заключении DesktopBitmap
+    ассоциируется с компонентой Image1. Если что-то не
+    ясно, то советую заглянуть справичные файлы по
+    Delphi.</p>
+    <p>Начальная позиция redRect выбирается случайным
+    образом. Trunc(Random * DELTA) возвращает целое число от 0
+    до DELTA. Далее, redRect рисуется в точке gx, gy, используя
+    функцию CopyRect объекта Canvas. Опять же, если Вы не
+    знакомы с алгоритмом рисования Delphi, то советую
+    порыться в справке.</p>
+    <p>&nbsp;</p>
+    <p>В конце, при помощи MoveTo и LineTo рисуется сетка.
+    Сетка необязательна и используется только для
+    того, чтобы лучше различать границы блоков.</p>
+    <table bgColor="#ffffcc" border="1" width="100%">
+<TBODY>
+      <tr>
+        <td><pre><b>procedure</b> InitScreen;
+<b>var</b> i,j:integer;
+<b>begin</b>
+  //получаем битмап десктопа
+  DesktopBitmap := TBitmap.Create;
+  <b>with</b> DesktopBitmap <b>do</b> <b>begin</b>
+    Width := Screen.Width;
+    Height := Screen.Height;
+  <b>end</b>;
+  BitBlt(DesktopBitmap.Canvas.Handle,
+         0,0,Screen.Width,Screen.Height,
+         GetDC(GetDesktopWindow),0,0,SrcCopy);
+
+  Shuffler.Image1.Picture.Bitmap := DesktopBitmap;
+
+  <i><font
+color="navy">//изначальные координаты redRect</font></i>
+  Randomize;
+  gx := Trunc(Random * DELTA);
+  gy := Trunc(Random * DELTA);
+
+  Shuffler.Image1.Canvas.CopyRect(
+    Rect(rW * gx, rH * gy, rW * gx + rW, rH * gy + rH),
+    redRect.Canvas,
+    Rect(0,0,rW,rH));
+
+  <i><font
+color="navy">//рисуем сетку</font></i>
+  <b>for</b> i:=0 <b>to</b> DELTA-1 <b>do</b> <b>begin</b>
+    Shuffler.Image1.Canvas.MoveTo(rW * i,0);
+    Shuffler.Image1.Canvas.LineTo(rW * i,Screen.Height);
+
+    Shuffler.Image1.Canvas.MoveTo(0, rH * i);
+    Shuffler.Image1.Canvas.LineTo(Screen.Width, rH * i);
+  <b>end</b>;
+<b>end</b>;
+</pre>
+        </td>
+      </tr>
+</TBODY>
+    </table>
+    <p>&nbsp;</p>
+    <p><b><i>Draw Screen</i></b><br>
+    Основной код находится в процедуре DrawScreen. Эта
+    процедура вызывается внутри события OnTimer
+    компонента Timer.</p>
+    <table bgColor="#ffffcc" border="1" width="100%">
+<TBODY>
+      <tr>
+        <td><pre><b>procedure</b> DrawScreen;
+<b>var</b>
+  r1,r2:TRect;
+  Direction:integer;
+<b>begin</b>
+  r1:=Rect(rW * gx , rH * gy,  rW * gx + rW  , rH * gy + rH);
+
+  Direction := Trunc(Random*4);
+  <b>case</b> Direction <b>of</b>
+   0: gx := Abs((gx + 1) <b>MOD</b> DELTA);    <i><font
+color="navy">//право</font></i>
+   1: gx := Abs((gx - 1) <b>MOD</b> DELTA);    <i><font
+color="navy">//лево</font></i>
+   2: gy := Abs((gy + 1) <b>MOD</b> DELTA);    <i><font
+color="navy">//низ</font></i>
+   3: gy := Abs((gy - 1) <b>MOD</b> DELTA);    <i><font
+color="navy">//верх</font></i>
+  <b>end</b>; <i><font color="navy">//case</font></i>
+
+  r2 := Rect(rW * gx , rH * gy,  rW * gx + rW  , rH * gy + rH);
+
+  <b>with</b> Shuffler.Image1.Canvas <b>do</b> <b>begin</b>
+    CopyRect(r1, Shuffler.Image1.Canvas, r2);
+    CopyRect(r2, redRect.Canvas, redRect.Canvas.ClipRect);
+  <b>end</b>;
+<b>end</b>;
+</pre>
+        </td>
+      </tr>
+</TBODY>
+    </table>
+    <p>Несмотря на кажущуюся сложность кода, он очень
+    прост в использовании. Менять местами можно
+    только части смежные с redRect, поэтому доступны
+    только 4 возможных направления. Прямоугольник r1
+    содержит текущию позицию redRect, r2 указывает на
+    прямоугольник с блоком, который был перемещён.
+    CopyRect используется для перемещения выбранного
+    блока на место redRect и рисования redRect его в новом
+    месте - таким образом осуществляется обмен этих
+    двух блоков.<br>
+    Было бы приятней наблюдать анимированный обмен
+    блоков, но я оставлю эту задачу для
+    самостоятельного решения.</p>
+    <p>А так выглядит мой десктоп 640x480, после
+    нескольких событий OnTimer, с DELTA=4. Обычно у меня
+    разрешение 1024x768, но для того, чтобы картинка
+    получилась лучше, я изменил <a
+    href="delphi_get_and_set_display_modes.shtml">свойства
+    дисплея</a>. Обратите внимание, что Вы можете в
+    любой момент прервать выполнение программы
+    нажатием ALT+F4. Здесь можно посмотреть <a
+    href="delphi_screen_shuffling_src.shtml">код проекта</a>.</p>
+    <p align="center"><img alt="Screen shuffling in action" border="1" height="285"
+    src="shuffler.gif" width="380"> </p>
+    <p>&nbsp;&nbsp;&nbsp;<b><font color="#000080">В заключении</font></b><br>
+    Вероятно вы встречались с подобными эффектами в
+    виде скринсейвера. Если возникнет желание
+    создать что-то подобное, то дополнительную
+    информацию можно посмотреть в статье &quot;<a
+    href="delphi_write_screensaver.shtml">Пишем Screensaver
+    в Delphi</a>&quot;.</p>
+    <p>Так же данный код может послужить отправной
+    точкой для создания популярной игры &quot;Пятнашки&quot;
+    или &quot;Ppuzzle&quot;. Всё, что необходимо для этого
+    изменить в коде, это остановить через какое-то
+    время подпрограмму DrawScreen, чтобы получить
+    картинку паззла. Идея игры заключается в том,
+    чтобы сделать возможным перемещение блоков
+    обратно. В общих чертах, необходимо добавить код,
+    который бы получал и обрабатывал клики
+    пользователя на разобранной картинке. Клик по
+    блоку, следующему за redRect должен заменить блок на
+    redRect.</p>
+    <p>&nbsp;</p>
+    <p><br>
+    </td>
+  </tr>
+</table>
+</center></div></TBODY>
+
+
+<p align="center"><br>
+<br>
+</p>
+<!--#include virtual="/ssi/bottom.html"-->

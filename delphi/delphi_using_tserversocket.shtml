@@ -1,0 +1,177 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Использование компонента TServerSocket.</h3>
+    <p><b>Автор:</b> <a href="mailto:brian@caos.dk">Brian Pedersen</a></p>
+    <p>В Delphi документации по многопотоковому TServerSocket
+    налито довольно много воды, и начинающему
+    программисту сложно понять суть дела.
+    Давайте попытаемся пролить немного света на этот
+    раздел хелпа.<br>
+    <br>
+    Совместимость: Delphi 3.x (или выше)</p>
+    <p>Вообще-то, создать многопотоковый сервер,
+    который ожидает пришедшие сообщения на сокете
+    довольно просто. В Delphi для этой цели достаточно
+    использовать компонент TServerSocket. <br>
+    <br>
+    Давайте рассмотрим структуру работы данного
+    компонента: <br>
+    <br>
+    - Добавляем TServerSocket в Вашу основную форму. <br>
+    - Устанавливаем свойство Servertype в stThreadBlocking <br>
+    - Создаём новый &quot;unit&quot; (показанный ниже)
+    содержащий поток сервера. <br>
+    <br>
+    <br>
+    Устанавливаем следующий код на OnSocketGetThread <br>
+    <br>
+    procedure TfrmMain.fSocketGetThread(Sender: TObject; <br>
+    &nbsp;&nbsp;ClientSocket: TServerClientWinSocket; <br>
+    &nbsp;&nbsp;var SocketThread: TServerClientThread); <br>
+    begin <br>
+    &nbsp;&nbsp;// Здесь создаём объект TServerThread, который я
+    привожу ниже. <br>
+    &nbsp;&nbsp;// Новый объект создаётся каждый раз, когда
+    когда установлен канал связи.&nbsp; <br>
+    &nbsp;&nbsp;SocketThread := TServerThread.Create( FALSE, ClientSocket ); <br>
+    end; <br>
+    <br>
+    TServerThread - это объект, который я создаю
+    самостоятельно. Объект наследуется от TServerClientThread
+    и содержит код, который обычно читает и пишет
+    данные из/в сокет.<br>
+    <br>
+    Созданный &quot;unit&quot;, содержит следующий код: <br>
+    <br>
+    unit serverthread; <br>
+    <br>
+    interface <br>
+    <br>
+    uses <br>
+    &nbsp;&nbsp;windows, scktcomp, SysUtils, Classes, Forms; <br>
+    <br>
+    type <br>
+    &nbsp;&nbsp;EServerThread = class( Exception ); <br>
+    &nbsp;&nbsp;// serverthread это потомок TServerClientThread <br>
+    &nbsp;&nbsp;TServerThread = class( TServerClientThread ) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;private <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fSocketStream : TWinSocketStream; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;public <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;procedure ClientExecute; override; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// ClientExecute отменяет <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// TServerClientThread.ClientExecute <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// и содержит код, который <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// выполняется при старте
+    потока <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    implementation <br>
+    <br>
+    procedure TServerThread.ClientExecute; <br>
+    begin <br>
+    &nbsp;&nbsp;inherited FreeOnTerminate := TRUE; <br>
+    &nbsp;&nbsp;try <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;fSocketStream := TWinSocketStream.Create( ClientSocket, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;100000
+    ); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// 100000 - это таймаут в миллисекундах. <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;try <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;while ( not Terminated ) and ( ClientSocket.Connected
+    ) do <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// В это место обычно
+    помещается код, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// ожидающий входных
+    данных, читающий из сокета или пишущий в него <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Пример, приведённый
+    ниже, показывает, что можно добавить в данную <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// секцию программы. <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;except on e:exception do <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Если произошла
+    ошибка, то закрываем сокет и выходим <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ClientSocket.Close; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Terminate; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;finally <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fSocketStream.Free; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;except on e:exception do <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Если произошла ошибка, то
+    закрываем сокет и выходим <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ClientSocket.Close; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Terminate; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;end; <br>
+    end; <br>
+    <br>
+    Когда связь установлена, потоку необходимо
+    ожидать входящих данных(запроса от клиента). Для
+    этого можно использовать следующий код: <br>
+    <br>
+    if ( not Terminated ) and <br>
+    &nbsp;&nbsp; ( not fSocketStream.WaitForData( 1000000 ) ) then <br>
+    begin <br>
+    &nbsp;&nbsp;// Обработчик таймаута (т.е. если по
+    истечении 1000000 миллисекунд<br>
+    &nbsp; // от клиента не пришло запроса<br>
+    end; <br>
+    // В сокете есть входящие данные! <br>
+    <br>
+    Для чтения данных, Вам понадобится создать буфер
+    для хранения полученных данных. Обычно буфер -
+    это PByteArray или массив символов. В этом примере я
+    обозвал буфер как fRequest который является массивом
+    символов. Кроме того я ожидаю фиксированное
+    количество байт. Массив имеет постоянный размер
+    REQUESTSIZE. <br>
+    <br>
+    var <br>
+    &nbsp;&nbsp;ac, readlen : integer; <br>
+    begin <br>
+    &nbsp;&nbsp;FillChar( fRequest, REQUESTSIZE, 0 ); <br>
+    &nbsp;&nbsp;ac := 0; <br>
+    &nbsp;&nbsp;repeat <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;readlen := fSocketStream.Read( fRequest[ac], <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    1024 ); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// считываем блоки по 1024 байт, до тех
+    пор, пока буфер <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// не заполнится <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ac := ac+readlen; <br>
+    &nbsp;&nbsp;until ( readlen = 0 ) or ( ac = REQUESTSIZE ); <br>
+    end; <br>
+    <br>
+    Если readlen равно 0, значит больше нет входящих
+    данных. Функция Чтения завершается через 100000
+    миллисекунд после запуска в TWinSocketStream.Create(). Если
+    Вы не знаете сколько времени нужно ожидать
+    запроса от клиента, то чем меньше будет таймаут,
+    тем лучше. В большинстве случаев максимальный
+    таймаут не должен превышать 30 секунд.<br>
+    <br>
+    При посылке ответа, Вы должны знать, в каком
+    режиме работает клиент. Многие клиенты ожидают
+    только один пакет ответа, другие ожидают
+    несколько пакетов. В этом примере, я подразумеваю
+    клиента, который ожидает только один пакет, так
+    что я должен послать мои данные назад в одном
+    блоке:<br>
+    <br>
+    fSocketStream.WriteBuffer( fRep, fReplySize ); <br>
+    <br>
+    fRep это буфер, содержащий ответ на запрос клиента,
+    и fReplySize - это размер буфера. </p>
+    <p><br>
+    <br>
+    </td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

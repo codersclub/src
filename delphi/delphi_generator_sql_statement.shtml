@@ -1,0 +1,255 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Генератор SQL-запросов Insert/Update</h3>
+    <p>Автор: <a href="mailto:mheydon@eoh.co.za">Mike Heydon</a></p>
+    <p>Вам ещё не надоело динамически генерировать SQL
+    запросы insert и update ? Давайте посмотрим, как можно
+    раз и навсегда упростить этот процесс.</p>
+    <p>Совместимость: Delphi 3.x (или выше)</p>
+    <p>Допустим Вы создавали запрос следующим образом
+    (типы параметров Data1:string Data2: integer Data3:TdateTime) <br>
+    <br>
+    SqlCmd := 'insert into MyTable (Field1,Field2,Field2) values (' +&nbsp;&nbsp; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;QuotedStr(Data1)
+    + ',' + IntToStr(Data2) + ',' + 'to_date(' <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+
+    QuotedStr(FormatdateTime('dd/mm/yyyy',Data3)) + ',' <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+
+    QuotedStr('dd/mm/yyyy') + '))'; <br>
+    <br>
+    {Ужасно! ещё хуже, когда количество колонок
+    увеличивается} <br>
+    <br>
+    А если сделать функцию типа .. <br>
+    <br>
+    SqlCmd := SqlInsert([Data1,Data2,Variant(Data3)], <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    'MyTable', <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    ['Field1','Field2','Field3']); <br>
+    <br>
+    она эмулирует строку запроса наподобие .. <br>
+    <br>
+    insert into MyTable <br>
+    (Fields1,Field2,Field3) <br>
+    values ('Sweets',934,to_date('21/05/2001','dd/mm/yyyy')) <br>
+    <br>
+    неправда ли она более проста в использовании ? <br>
+    <br>
+    Здесь представлены функции SqlInsert и SqlUpdate. Вы
+    наверное заметили, что я передаю TDateTime
+    приведённый как Variant. Причина кроется в том, что
+    VType в array of const не имеете TDateTime типа и даты просто
+    представлены как vtExtended.<br>
+    <br>
+    Функция SqlInsert имеет 2 переопределённых вызова,
+    которые позволяют Вам включить или выполнить
+    массив имён колонок. <br>
+    </p>
+    <p><b>Посмотрим, как выглядят эти функции:</b><br>
+    <br>
+    interface <br>
+    <br>
+    const CrLf = #13#10;&nbsp;&nbsp;// Возврат и перевод каретки <br>
+    <br>
+    // Прототипы функций <br>
+    <br>
+    function SqlInsert(Values : array of const; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    TableName : string; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    ColNames : array of string) : string; overload; <br>
+    <br>
+    function SqlInsert(Values : array of const; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    TableName : string) : string; overload; <br>
+    <br>
+    function SqlUpdate(Values : array of const; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    TableName : string; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    ColNames : array of string; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    WhereClause : string) : string; <br>
+    <br>
+    // --------------------------------------------------------------------------- <br>
+    implementation <br>
+    <br>
+    // Помещаем TDateTime в Values (array of const) <br>
+    // Представлен как Variant <br>
+    <br>
+    function SqlInsert(Values : array of const; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    TableName : string; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    ColNames : array of string) : string; <br>
+    var RetVar : string; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;i : integer; <br>
+    begin <br>
+    &nbsp;&nbsp;RetVar := 'insert into ' + TableName + CrLf + <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'(' + ColNames[0];
+    <br>
+    &nbsp;&nbsp;for i := 1 to High(ColNames) do <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; RetVar := RetVar + ',' + ColNames[i]; <br>
+    &nbsp;&nbsp;RetVar := RetVar + ')' + CrLf; <br>
+    <br>
+    &nbsp;&nbsp;RetVar := RetVar + 'values ('; <br>
+    <br>
+    &nbsp;&nbsp;for i := 0 to High(Values) do begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; case Values[i].VType of <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vtInteger, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vtInt64&nbsp;&nbsp;&nbsp;&nbsp;:
+    RetVar := RetVar + IntToStr(Values[i].VInteger); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vtChar&nbsp;&nbsp;&nbsp;&nbsp;
+    : RetVar := RetVar + QuotedStr(Values[i].VChar); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vtString&nbsp;&nbsp; : RetVar
+    := RetVar + QuotedStr(Values[i].VString^); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vtPChar&nbsp;&nbsp;&nbsp;&nbsp;:
+    RetVar := RetVar + QuotedStr(Values[i].VPChar); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vtExtended : RetVar := RetVar
+    + FloatToStr(Values[i].VExtended^); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vtAnsiString : RetVar :=
+    RetVar + <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    QuotedStr(string(Values[i].VAnsiString)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// TDateTime - иначе
+    получаем как vtExtended <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vtVariant&nbsp;&nbsp;: RetVar
+    := RetVar + 'to_date(' + <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    QuotedStr(FormatdateTime('dd/mm/yyyy', <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    TDateTime(Values[i].VVariant^))) + ',' + <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    QuotedStr('dd/mm/yyyy') + ')'; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; RetVar := RetVar + '??????'; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; end; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; RetVar := RetVar + ','; <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    &nbsp;&nbsp;Delete(RetVar,length(RetVar),1); <br>
+    &nbsp;&nbsp;RetVar := RetVar + ')'; <br>
+    &nbsp;&nbsp;if High(Values) &lt; High(ColNames) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; ShowMessage('SQL Insert - Not enough values.'); <br>
+    &nbsp;&nbsp;if High(Values) &gt; High(ColNames) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; ShowMessage('SQL Insert - Too many values.'); <br>
+    <br>
+    &nbsp;&nbsp;Result := RetVar; <br>
+    end; <br>
+    <br>
+    <br>
+    function SqlInsert(Values : array of const; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    TableName : string) : string; overload; <br>
+    var RetVar : string; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;i : integer; <br>
+    begin <br>
+    &nbsp;&nbsp;RetVar := 'insert into ' + TableName + CrLf; <br>
+    &nbsp;&nbsp;RetVar := RetVar + 'values ('; <br>
+    <br>
+    &nbsp;&nbsp;for i := 0 to High(Values) do begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; case Values[i].VType of <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vtInteger, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vtInt64&nbsp;&nbsp;&nbsp;&nbsp;:
+    RetVar := RetVar + IntToStr(Values[i].VInteger); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vtChar&nbsp;&nbsp;&nbsp;&nbsp;
+    : RetVar := RetVar + QuotedStr(Values[i].VChar); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vtString&nbsp;&nbsp; : RetVar
+    := RetVar + QuotedStr(Values[i].VString^); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vtPChar&nbsp;&nbsp;&nbsp;&nbsp;:
+    RetVar := RetVar + QuotedStr(Values[i].VPChar); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vtExtended : RetVar := RetVar
+    + FloatToStr(Values[i].VExtended^); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vtAnsiString : RetVar :=
+    RetVar + <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    QuotedStr(string(Values[i].VAnsiString)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// TDateTime - иначе
+    получаем как vtExtended <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vtVariant&nbsp;&nbsp;: RetVar
+    := RetVar + 'to_date(' + <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    QuotedStr(FormatdateTime('dd/mm/yyyy', <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    TDateTime(Values[i].VVariant^))) + ',' + <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    QuotedStr('dd/mm/yyyy') + ')'; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; RetVar := RetVar + '??????'; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; end; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; RetVar := RetVar + ','; <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    &nbsp;&nbsp;Delete(RetVar,length(RetVar),1); <br>
+    &nbsp;&nbsp;RetVar := RetVar + ')'; <br>
+    <br>
+    &nbsp;&nbsp;Result := RetVar; <br>
+    end; <br>
+    <br>
+    <br>
+    function SqlUpdate(Values : array of const; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    TableName : string; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    ColNames : array of string; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    WhereClause : string) : string; <br>
+    var RetVar,Parm : string; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;i : integer; <br>
+    begin <br>
+    &nbsp;&nbsp;RetVar := 'update ' + TableName + ' set' + CrLf; <br>
+    <br>
+    &nbsp;&nbsp;for i := 0 to Min(High(Values),High(ColNames)) do begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; case Values[i].VType of <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vtInteger, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vtInt64&nbsp;&nbsp;&nbsp;&nbsp;:
+    Parm := IntToStr(Values[i].VInteger); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vtChar&nbsp;&nbsp;&nbsp;&nbsp;
+    : Parm := QuotedStr(Values[i].VChar); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vtString&nbsp;&nbsp; : Parm :=
+    QuotedStr(Values[i].VString^); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vtPChar&nbsp;&nbsp;&nbsp;&nbsp;:
+    Parm := QuotedStr(Values[i].VPChar); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vtExtended : Parm :=
+    FloatToStr(Values[i].VExtended^); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vtAnsiString : Parm :=
+    QuotedStr(string(Values[i].VAnsiString)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// TDateTime - иначе
+    получаем как vtExtended <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vtVariant&nbsp;&nbsp;: Parm :=
+    'to_date(' + <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    QuotedStr(FormatdateTime('dd/mm/yyyy', <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    TDateTime(Values[i].VVariant^))) + ',' + <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    QuotedStr('dd/mm/yyyy') + ')'; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Parm := '??????'; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; end; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; RetVar := RetVar + ColNames[i] + '=' + Parm + ','; <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    &nbsp;&nbsp;Delete(RetVar,length(RetVar),1); <br>
+    &nbsp;&nbsp;RetVar := RetVar + CrLf + 'where ' + WhereClause; <br>
+    &nbsp;&nbsp;if High(Values) &lt; High(ColNames) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; ShowMessage('SQL Update - Not enough values.'); <br>
+    &nbsp;&nbsp;if High(Values) &gt; High(ColNames) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; ShowMessage('SQL Update - Too many values.'); <br>
+    <br>
+    &nbsp;&nbsp;Result := RetVar; <br>
+    end; </p>
+    <p><br>
+    </td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

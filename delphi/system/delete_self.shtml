@@ -1,0 +1,125 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как программе удалить саму себя</h3>
+    <p><b>Первый способ:</b></p>
+    <p>uses <br>
+    &nbsp;&nbsp;Windows, SysUtils; <br>
+    <br>
+    procedure DeleteMe; <br>
+    var <br>
+    &nbsp;&nbsp;BatchFile: TextFile; <br>
+    &nbsp;&nbsp;BatchFileName: string; <br>
+    &nbsp;&nbsp;ProcessInfo: TProcessInformation; <br>
+    &nbsp;&nbsp;StartUpInfo: TStartupInfo; <br>
+    begin <br>
+    &nbsp;&nbsp;{ создаём бат-файл в директории приложения
+    }<br>
+    &nbsp;&nbsp;BatchFileName := ExtractFilePath(ParamStr(0)) + '$$336699.bat'; <br>
+    <br>
+    &nbsp;&nbsp;{ открываем и записываем в файл }<br>
+    &nbsp;&nbsp;AssignFile(BatchFile, BatchFileName); <br>
+    &nbsp;&nbsp;Rewrite(BatchFile); <br>
+    <br>
+    &nbsp;&nbsp;Writeln(BatchFile, ':try'); <br>
+    &nbsp;&nbsp;Writeln(BatchFile, 'del &quot;' + ParamStr(0) + '&quot;'); <br>
+    &nbsp;&nbsp;Writeln(BatchFile, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;'if exist &quot;' + ParamStr(0) + '&quot;' + ' goto try'); <br>
+    &nbsp;&nbsp;Writeln(BatchFile, 'del &quot;' + BatchFileName + '&quot;'); <br>
+    &nbsp;&nbsp;CloseFile(BatchFile); <br>
+    <br>
+    &nbsp;&nbsp;FillChar(StartUpInfo, SizeOf(StartUpInfo), $00); <br>
+    &nbsp;&nbsp;StartUpInfo.dwFlags := STARTF_USESHOWWINDOW; <br>
+    &nbsp;&nbsp;StartUpInfo.wShowWindow := SW_HIDE; <br>
+    <br>
+    &nbsp;&nbsp;if CreateProcess(nil, PChar(BatchFileName), nil, nil, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; False, IDLE_PRIORITY_CLASS, nil, nil, StartUpInfo, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; ProcessInfo) then <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CloseHandle(ProcessInfo.hThread); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CloseHandle(ProcessInfo.hProcess); <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    end;</p>
+    <p>&nbsp;</p>
+    <p><b>А вот тот же способ, но немного
+    модифицированный:</b></p>
+    <p>program delete2; <br>
+    <br>
+    uses <br>
+    &nbsp;&nbsp;SysUtils, <br>
+    &nbsp;&nbsp;windows; <br>
+    <br>
+    var <br>
+    &nbsp;&nbsp; BatchFile: TextFile; <br>
+    &nbsp;&nbsp; BatchFileName : string; <br>
+    &nbsp;&nbsp; TM : Cardinal; <br>
+    &nbsp;&nbsp; TempMem : PChar; <br>
+    <br>
+    begin <br>
+    &nbsp;&nbsp;&nbsp; BatchFileName:=ExtractFilePath(ParamStr(0))+ '$$336699.bat'; <br>
+    <br>
+    <br>
+    &nbsp;&nbsp; AssignFile(BatchFile, BatchFileName); <br>
+    &nbsp;&nbsp; Rewrite(BatchFile); <br>
+    <br>
+    &nbsp;&nbsp; Writeln(BatchFile,':try'); <br>
+    &nbsp;&nbsp; Writeln(BatchFile,'del &quot;' + ParamStr(0) + '&quot;'); <br>
+    &nbsp;&nbsp; Writeln(BatchFile,'if exist &quot;' + ParamStr(0) + '&quot; goto try'); <br>
+    &nbsp;&nbsp; Writeln(BatchFile,'del &quot;' + BatchFileName + '&quot;'); <br>
+    &nbsp;&nbsp; CloseFile(BatchFile); <br>
+    <br>
+    &nbsp;&nbsp; TM:=70; <br>
+    &nbsp;&nbsp; GetMem (TempMem,TM); <br>
+    &nbsp;&nbsp; GetShortPathName (pchar(BatchFileName), TempMem, TM); <br>
+    &nbsp;&nbsp; BatchFileName:=TempMem; <br>
+    &nbsp;&nbsp; FreeMem(TempMem); <br>
+    <br>
+    &nbsp;&nbsp; winexec(Pchar(BatchFileName),sw_hide); <br>
+    <br>
+    &nbsp;&nbsp; halt; <br>
+    <br>
+    end.<br>
+    </p>
+    <p>&nbsp;</p>
+    <p><b>Второй способ:</b></p>
+    <p>procedure DeleteSelf; <br>
+    var <br>
+    &nbsp;&nbsp;module: HModule; <br>
+    &nbsp;&nbsp;buf: array[0..MAX_PATH - 1] of char; <br>
+    &nbsp;&nbsp;p: ULong; <br>
+    &nbsp;&nbsp;hKrnl32: HModule; <br>
+    &nbsp;&nbsp;pExitProcess, <br>
+    &nbsp;&nbsp;pDeleteFile, <br>
+    &nbsp;&nbsp;pFreeLibrary: pointer; <br>
+    begin <br>
+    &nbsp;&nbsp;module := GetModuleHandle(nil); <br>
+    &nbsp;&nbsp;GetModuleFileName(module, buf, SizeOf(buf)); <br>
+    &nbsp;&nbsp;CloseHandle(THandle(4)); <br>
+    &nbsp;&nbsp;p := ULONG(module) + 1; <br>
+    &nbsp;&nbsp;hKrnl32 := GetModuleHandle('kernel32'); <br>
+    &nbsp;&nbsp;pExitProcess := GetProcAddress(hKrnl32, 'ExitProcess'); <br>
+    &nbsp;&nbsp;pDeleteFile := GetProcAddress(hKrnl32, 'DeleteFileA'); <br>
+    &nbsp;&nbsp;pFreeLibrary := GetProcAddress(hKrnl32, 'FreeLibrary'); <br>
+    &nbsp;&nbsp;asm <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;lea eax, buf <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;push 0 <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;push 0 <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;push eax <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;push pExitProcess <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;push p <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;push pDeleteFile <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;push pFreeLibrary <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ret <br>
+    &nbsp;&nbsp;end; <br>
+    end;<br>
+    </p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

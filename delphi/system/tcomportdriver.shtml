@@ -1,0 +1,586 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>TComportDriver - драйвер последовательного порта</h3>
+    <p><a href="Driver.rar">Скачать исходник - 10кб</a></p>
+    <p>// ---------------------------------------------------------------------- <br>
+    // | TComportDriver - A Basic Driver for the serial
+    port&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| <br>
+    // ---------------------------------------------------------------------- <br>
+    // | © 1997 by Marco
+    Cocco&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| <br>
+    // | © 1998 enhanced by Angerer
+    Bernhard&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|
+    <br>
+    // | © 2001 enhanced by Christophe
+    Geers&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|
+    <br>
+    // ---------------------------------------------------------------------- <br>
+    <br>
+    //I removed the TTimer and inserted a thread (TTimerThread) to simulate <br>
+    //the function formerly done by the TTimer.TimerEvent. <br>
+    //Further more the Readstring procedure has been adjusted. As soon as <br>
+    //some input on the input buffer from the serial port has been detected <br>
+    //the TTimerThread is supsended until all the data from the input buffer is read <br>
+    //using the ReadString procedure......well go ahead and check it out for <br>
+    //yourself.<br>
+    <br>
+    //Tested with Delphi 6 Profesionnal / Enterprise on Windows 2000. <br>
+    <br>
+    {$A+,B-,C+,D-,E-,F-,G+,H+,I+,J+,K-,L-,M-,N+,O+,P+,Q-,R-,S-,T-,U-,V+,W-,X+,Y-,Z1} <br>
+    {$MINSTACKSIZE $00004000} <br>
+    {$MAXSTACKSIZE $00100000} <br>
+    {$IMAGEBASE $51000000} <br>
+    {$APPTYPE GUI} <br>
+    unit ComportDriverThread; <br>
+    <br>
+    interface <br>
+    <br>
+    uses <br>
+    &nbsp;&nbsp;//Include &quot;ExtCtrl&quot; for the TTimer component. <br>
+    &nbsp;&nbsp;Windows, Messages, SysUtils, Classes, Forms, ExtCtrls; <br>
+    <br>
+    type <br>
+    <br>
+    &nbsp;&nbsp;TComPortNumber&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=
+    (pnCOM1,pnCOM2,pnCOM3,pnCOM4); <br>
+    &nbsp;&nbsp;TComPortBaudRate&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=
+    (br110,br300,br600,br1200,br2400,br4800,br9600, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    br14400,br19200,br38400,br56000,br57600,br115200); <br>
+    &nbsp;&nbsp;TComPortDataBits&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=
+    (db5BITS,db6BITS,db7BITS,db8BITS); <br>
+    &nbsp;&nbsp;TComPortStopBits&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=
+    (sb1BITS,sb1HALFBITS,sb2BITS); <br>
+    &nbsp;&nbsp;TComPortParity&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=
+    (ptNONE,ptODD,ptEVEN,ptMARK,ptSPACE); <br>
+    &nbsp;&nbsp;TComportHwHandshaking = (hhNONE,hhRTSCTS); <br>
+    &nbsp;&nbsp;TComPortSwHandshaking = (shNONE,shXONXOFF); <br>
+    <br>
+    &nbsp;&nbsp;TTimerThread&nbsp;&nbsp; = class(TThread) <br>
+    &nbsp;&nbsp;private <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{ Private declarations } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FOnTimer : TThreadMethod; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FEnabled: Boolean; <br>
+    &nbsp;&nbsp;protected <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{ Protected declarations } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure Execute; override; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure SupRes; <br>
+    &nbsp;&nbsp;public <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{ Public declarations } <br>
+    &nbsp;&nbsp;published <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{ Published declarations } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property Enabled: Boolean read FEnabled write FEnabled; <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    &nbsp;&nbsp;TComportDriverThread = class(TComponent) <br>
+    &nbsp;&nbsp;private <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{ Private declarations } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FTimer&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; :
+    TTimerThread; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FOnReceiveData : TNotifyEvent; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FReceiving&nbsp;&nbsp;&nbsp;&nbsp; : Boolean; <br>
+    &nbsp;&nbsp;protected <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{ Protected declarations } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FComPortActive&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    : Boolean; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FComportHandle&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    : THandle; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FComportNumber&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    : TComPortNumber; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FComportBaudRate&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; :
+    TComPortBaudRate; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FComportDataBits&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; :
+    TComPortDataBits; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FComportStopBits&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; :
+    TComPortStopBits; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FComportParity&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    : TComPortParity; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FComportHwHandshaking&nbsp;&nbsp;&nbsp;&nbsp;:
+    TComportHwHandshaking; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FComportSwHandshaking&nbsp;&nbsp;&nbsp;&nbsp;:
+    TComPortSwHandshaking; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FComportInputBufferSize&nbsp;&nbsp;: Word; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FComportOutputBufferSize : Word; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FComportPollingDelay&nbsp;&nbsp;&nbsp;&nbsp; : Word; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FTimeOut&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    : Integer; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FTempInputBuffer&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; :
+    Pointer; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure SetComPortActive(Value: Boolean); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure SetComPortNumber(Value: TComPortNumber); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure SetComPortBaudRate(Value: TComPortBaudRate); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure SetComPortDataBits(Value: TComPortDataBits); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure SetComPortStopBits(Value: TComPortStopBits); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure SetComPortParity(Value: TComPortParity); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure SetComPortHwHandshaking(Value: TComportHwHandshaking); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure SetComPortSwHandshaking(Value: TComPortSwHandshaking); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure SetComPortInputBufferSize(Value: Word); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure SetComPortOutputBufferSize(Value: Word); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure SetComPortPollingDelay(Value: Word); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure ApplyComPortSettings; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure TimerEvent; virtual; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure doDataReceived; virtual; <br>
+    &nbsp;&nbsp;public <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{ Public declarations } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;constructor Create(AOwner: TComponent); override; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;destructor Destroy; override; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;function Connect: Boolean; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;function Disconnect: Boolean; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;function Connected: Boolean; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;function Disconnected: Boolean; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;function SendData(DataPtr: Pointer; DataSize: Integer): Boolean; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;function SendString(Input: String): Boolean; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;function ReadString(var Str: string): Integer; <br>
+    &nbsp;&nbsp;published <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{ Published declarations } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property Active: Boolean read FComPortActive write
+    SetComPortActive default False; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property ComPort: TComPortNumber read FComportNumber write
+    SetComportNumber <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    default pnCOM1; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property ComPortSpeed: TComPortBaudRate read FComportBaudRate
+    write <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    SetComportBaudRate default br9600; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property ComPortDataBits: TComPortDataBits read FComportDataBits
+    write <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SetComportDataBits
+    default db8BITS; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property ComPortStopBits: TComPortStopBits read FComportStopBits
+    write <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SetComportStopBits
+    default sb1BITS; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property ComPortParity: TComPortParity read FComportParity write <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SetComportParity
+    default ptNONE; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property ComPortHwHandshaking: TComportHwHandshaking read
+    FComportHwHandshaking <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    write SetComportHwHandshaking default <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    hhNONE; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property ComPortSwHandshaking: TComPortSwHandshaking read
+    FComportSwHandshaking <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    write SetComportSwHandshaking default <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    shNONE; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property ComPortInputBufferSize: Word read FComportInputBufferSize
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    write SetComportInputBufferSize default <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    2048; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property ComPortOutputBufferSize: Word read
+    FComportOutputBufferSize <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;write
+    SetComportOutputBufferSize default <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2048;
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property ComPortPollingDelay: Word read FComportPollingDelay write
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SetComportPollingDelay
+    default 100; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property OnReceiveData: TNotifyEvent read FOnReceiveData <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;write
+    FOnReceiveData; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property TimeOut: Integer read FTimeOut write FTimeOut default 30;
+    <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    procedure Register; <br>
+    <br>
+    implementation <br>
+    <br>
+    procedure Register; <br>
+    begin <br>
+    &nbsp;&nbsp;RegisterComponents('Self-made Components', [TComportDriverThread]); <br>
+    end; <br>
+    <br>
+    { TComportDriver } <br>
+    <br>
+    constructor TComportDriverThread.Create(AOwner: TComponent); <br>
+    begin <br>
+    &nbsp;&nbsp;inherited; <br>
+    &nbsp;&nbsp;FReceiving&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    := False; <br>
+    &nbsp;&nbsp;FComportHandle&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; :=
+    0; <br>
+    &nbsp;&nbsp;FComportNumber&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; :=
+    pnCOM1; <br>
+    &nbsp;&nbsp;FComportBaudRate&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; := br9600; <br>
+    &nbsp;&nbsp;FComportDataBits&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; := db8BITS; <br>
+    &nbsp;&nbsp;FComportStopBits&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; := sb1BITS; <br>
+    &nbsp;&nbsp;FComportParity&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; :=
+    ptNONE; <br>
+    &nbsp;&nbsp;FComportHwHandshaking&nbsp;&nbsp;&nbsp;&nbsp;:= hhNONE; <br>
+    &nbsp;&nbsp;FComportSwHandshaking&nbsp;&nbsp;&nbsp;&nbsp;:= shNONE; <br>
+    &nbsp;&nbsp;FComportInputBufferSize&nbsp;&nbsp;:= 2048; <br>
+    &nbsp;&nbsp;FComportOutputBufferSize := 2048; <br>
+    &nbsp;&nbsp;FOnReceiveData&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; :=
+    nil; <br>
+    &nbsp;&nbsp;FTimeOut&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    := 30; <br>
+    &nbsp;&nbsp;FComportPollingDelay&nbsp;&nbsp;&nbsp;&nbsp; := 500; <br>
+    &nbsp;&nbsp;GetMem(FTempInputBuffer,FComportInputBufferSize); <br>
+    <br>
+    &nbsp;&nbsp;if csDesigning in ComponentState then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Exit; <br>
+    <br>
+    &nbsp;&nbsp;FTimer := TTimerThread.Create(False); <br>
+    &nbsp;&nbsp;FTimer.FOnTimer := TimerEvent; <br>
+    <br>
+    &nbsp;&nbsp;if FComPortActive then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FTimer.Enabled := True; <br>
+    &nbsp;&nbsp;FTimer.SupRes; <br>
+    end; <br>
+    <br>
+    destructor TComportDriverThread.Destroy; <br>
+    begin <br>
+    &nbsp;&nbsp;Disconnect; <br>
+    &nbsp;&nbsp;FreeMem(FTempInputBuffer,FComportInputBufferSize); <br>
+    &nbsp;&nbsp;inherited Destroy; <br>
+    end; <br>
+    <br>
+    function TComportDriverThread.Connect: Boolean; <br>
+    var <br>
+    &nbsp;&nbsp;comName: array[0..4] of Char; <br>
+    &nbsp;&nbsp;tms: TCommTimeouts; <br>
+    begin <br>
+    &nbsp;&nbsp;if Connected then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Exit; <br>
+    &nbsp;&nbsp;StrPCopy(comName,'COM'); <br>
+    &nbsp;&nbsp;comName[3] := chr(ord('1') + ord(FComportNumber)); <br>
+    &nbsp;&nbsp;comName[4] := #0; <br>
+    &nbsp;&nbsp;FComportHandle := CreateFile(comName,GENERIC_READ OR GENERIC_WRITE,0,nil, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,0); <br>
+    &nbsp;&nbsp;if not Connected then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Exit; <br>
+    &nbsp;&nbsp;ApplyComPortSettings; <br>
+    &nbsp;&nbsp;tms.ReadIntervalTimeout&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; := 1; <br>
+    &nbsp;&nbsp;tms.ReadTotalTimeoutMultiplier&nbsp;&nbsp;:= 0; <br>
+    &nbsp;&nbsp;tms.ReadTotalTimeoutConstant&nbsp;&nbsp;&nbsp;&nbsp;:= 1; <br>
+    &nbsp;&nbsp;tms.WriteTotalTimeoutMultiplier := 0; <br>
+    &nbsp;&nbsp;tms.WriteTotalTimeoutConstant&nbsp;&nbsp; := 0; <br>
+    &nbsp;&nbsp;SetCommTimeouts(FComportHandle,tms); <br>
+    &nbsp;&nbsp;Sleep(1000); <br>
+    end; <br>
+    <br>
+    function TComportDriverThread.Connected: Boolean; <br>
+    begin <br>
+    &nbsp;&nbsp;Result := FComportHandle &gt; 0; <br>
+    end; <br>
+    <br>
+    function TComportDriverThread.Disconnect: Boolean; <br>
+    begin <br>
+    &nbsp;&nbsp;Result := False; <br>
+    &nbsp;&nbsp;if Connected then <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CloseHandle(FComportHandle); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FComportHandle := 0; <br>
+    &nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;Result := True; <br>
+    end; <br>
+    <br>
+    function TComportDriverThread.Disconnected: Boolean; <br>
+    begin <br>
+    &nbsp;&nbsp;if (FComportHandle &lt;&gt; 0) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Result := False <br>
+    &nbsp;&nbsp;else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Result := True; <br>
+    end; <br>
+    <br>
+    const <br>
+    &nbsp;&nbsp;Win32BaudRates: array[br110..br115200] of DWORD = <br>
+    &nbsp;&nbsp; (CBR_110,CBR_300,CBR_600,CBR_1200,CBR_2400,CBR_4800,CBR_9600,CBR_14400, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CBR_19200,CBR_38400,CBR_56000,CBR_57600,CBR_115200); <br>
+    <br>
+    const <br>
+    &nbsp;&nbsp;dcb_Binary&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=
+    $00000001; <br>
+    &nbsp;&nbsp;dcb_ParityCheck&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; = $00000002; <br>
+    &nbsp;&nbsp;dcb_OutxCtsFlow&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; = $00000004; <br>
+    &nbsp;&nbsp;dcb_OutxDsrFlow&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; = $00000008; <br>
+    &nbsp;&nbsp;dcb_DtrControlMask&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= $00000030; <br>
+    &nbsp;&nbsp;dcb_DtrControlDisable&nbsp;&nbsp; = $00000000; <br>
+    &nbsp;&nbsp;dcb_DtrControlEnable&nbsp;&nbsp;&nbsp;&nbsp;= $00000010; <br>
+    &nbsp;&nbsp;dcb_DtrControlHandshake = $00000020; <br>
+    &nbsp;&nbsp;dcb_DsrSensitvity&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; = $00000040; <br>
+    &nbsp;&nbsp;dcb_TXContinueOnXoff&nbsp;&nbsp;&nbsp;&nbsp;= $00000080; <br>
+    &nbsp;&nbsp;dcb_OutX&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=
+    $00000100; <br>
+    &nbsp;&nbsp;dcb_InX&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    = $00000200; <br>
+    &nbsp;&nbsp;dcb_ErrorChar&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; =
+    $00000400; <br>
+    &nbsp;&nbsp;dcb_NullStrip&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; =
+    $00000800; <br>
+    &nbsp;&nbsp;dcb_RtsControlMask&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= $00003000; <br>
+    &nbsp;&nbsp;dcb_RtsControlDisable&nbsp;&nbsp; = $00000000; <br>
+    &nbsp;&nbsp;dcb_RtsControlEnable&nbsp;&nbsp;&nbsp;&nbsp;= $00001000; <br>
+    &nbsp;&nbsp;dcb_RtsControlHandshake = $00002000; <br>
+    &nbsp;&nbsp;dcb_RtsControlToggle&nbsp;&nbsp;&nbsp;&nbsp;= $00003000; <br>
+    &nbsp;&nbsp;dcb_AbortOnError&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= $00004000; <br>
+    &nbsp;&nbsp;dcb_Reserveds&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; =
+    $FFFF8000; <br>
+    <br>
+    procedure TComportDriverThread.ApplyComPortSettings; <br>
+    var <br>
+    &nbsp;&nbsp;//Device Control Block (= dcb) <br>
+    &nbsp;&nbsp;dcb: TDCB; <br>
+    begin <br>
+    &nbsp;&nbsp;if not Connected then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Exit; <br>
+    &nbsp;&nbsp;FillChar(dcb,sizeOf(dcb),0); <br>
+    &nbsp;&nbsp;dcb.DCBlength := sizeOf(dcb); <br>
+    <br>
+    &nbsp;&nbsp;dcb.Flags := dcb_Binary or dcb_RtsControlEnable; <br>
+    &nbsp;&nbsp;dcb.BaudRate := Win32BaudRates[FComPortBaudRate]; <br>
+    <br>
+    &nbsp;&nbsp;case FComportHwHandshaking&nbsp;&nbsp;of <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;hhNONE&nbsp;&nbsp;: ; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;hhRTSCTS: <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dcb.Flags := dcb.Flags or dcb_OutxCtsFlow or
+    dcb_RtsControlHandshake; <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    &nbsp;&nbsp;case FComportSwHandshaking of <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;shNONE&nbsp;&nbsp; : ; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;shXONXOFF: <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dcb.Flags := dcb.Flags or dcb_OutX or dcb_Inx; <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    &nbsp;&nbsp;dcb.XonLim&nbsp;&nbsp; := FComportInputBufferSize div 4; <br>
+    &nbsp;&nbsp;dcb.XoffLim&nbsp;&nbsp;:= 1; <br>
+    &nbsp;&nbsp;dcb.ByteSize := 5 + ord(FComportDataBits); <br>
+    &nbsp;&nbsp;dcb.Parity&nbsp;&nbsp; := ord(FComportParity); <br>
+    &nbsp;&nbsp;dcb.StopBits := ord(FComportStopBits); <br>
+    &nbsp;&nbsp;dcb.XonChar&nbsp;&nbsp;:= #17; <br>
+    &nbsp;&nbsp;dcb.XoffChar := #19; <br>
+    &nbsp;&nbsp;SetCommState(FComportHandle,dcb); <br>
+    &nbsp;&nbsp;SetupComm(FComportHandle,FComPortInputBufferSize,FComPortOutputBufferSize); <br>
+    end; <br>
+    <br>
+    function TComportDriverThread.ReadString(var Str: string): Integer; <br>
+    var <br>
+    &nbsp;&nbsp;BytesTrans, nRead: DWORD; <br>
+    &nbsp;&nbsp;Buffer&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : String; <br>
+    &nbsp;&nbsp;i&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:
+    Integer; <br>
+    &nbsp;&nbsp;temp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; :
+    string; <br>
+    begin <br>
+    &nbsp;&nbsp;BytesTrans := 0; <br>
+    &nbsp;&nbsp;Str := ''; <br>
+    &nbsp;&nbsp;SetLength(Buffer,1); <br>
+    &nbsp;&nbsp;ReadFile(FComportHandle,PChar(Buffer)^, 1, nRead, nil); <br>
+    &nbsp;&nbsp;while nRead &gt; 0 do <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;temp := temp + PChar(Buffer); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ReadFile(FComportHandle,PChar(Buffer)^, 1, nRead, nil); <br>
+    &nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;//Remove the end token. <br>
+    &nbsp;&nbsp;BytesTrans := Length(temp); <br>
+    &nbsp;&nbsp;SetLength(str,BytesTrans-2); <br>
+    &nbsp;&nbsp;for i:=0 to BytesTrans-2 do <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;str[i] := temp[i]; <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    &nbsp;&nbsp;Result := BytesTrans; <br>
+    end; <br>
+    <br>
+    function TComportDriverThread.SendData(DataPtr: Pointer; <br>
+    &nbsp;&nbsp;DataSize: Integer): Boolean; <br>
+    var <br>
+    &nbsp;&nbsp;nsent : DWORD; <br>
+    begin <br>
+    &nbsp;&nbsp;Result := WriteFile(FComportHandle,DataPtr^,DataSize,nsent,nil); <br>
+    &nbsp;&nbsp;Result := Result and (nsent = DataSize); <br>
+    end; <br>
+    <br>
+    function TComportDriverThread.SendString(Input: String): Boolean; <br>
+    begin <br>
+    &nbsp;&nbsp;if not Connected then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if not Connect then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;raise Exception.CreateHelp('Could not connect to
+    COM-port !',101); <br>
+    &nbsp;&nbsp;Result := SendData(PChar(Input),Length(Input)); <br>
+    &nbsp;&nbsp;if not Result then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;raise Exception.CreateHelp('Could not send to COM-port !',102); <br>
+    end; <br>
+    <br>
+    procedure TComportDriverThread.TimerEvent; <br>
+    var <br>
+    &nbsp;&nbsp;InQueue, OutQueue: Integer; <br>
+    &nbsp;&nbsp;Buffer : String; <br>
+    &nbsp;&nbsp;nRead : DWORD; <br>
+    <br>
+    &nbsp;&nbsp;procedure DataInBuffer(Handle: THandle; var aInQueue, aOutQueue: Integer); <br>
+    &nbsp;&nbsp;var <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ComStat : TComStat; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;e&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : Cardinal; <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;aInQueue&nbsp;&nbsp;:= 0; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;aOutQueue := 0; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if ClearCommError(Handle,e,@ComStat) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;aInQueue&nbsp;&nbsp;:= ComStat.cbInQue; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;aOutQueue := ComStat.cbOutQue; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;end; <br>
+    begin <br>
+    &nbsp;&nbsp;if csDesigning in ComponentState then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Exit; <br>
+    &nbsp;&nbsp;if not Connected then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if not Connect then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;raise Exception.CreateHelp('TimerEvent: Could not
+    connect to COM-port !',101); <br>
+    &nbsp;&nbsp;Application.ProcessMessages; <br>
+    &nbsp;&nbsp;if Connected then <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;DataInBuffer(FComportHandle,InQueue,OutQueue); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if InQueue &gt; 0 then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (Assigned(FOnReceiveData) ) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FReceiving := True; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FOnReceiveData(Self); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;end; <br>
+    end; <br>
+    <br>
+    procedure TComportDriverThread.SetComportBaudRate(Value: TComPortBaudRate); <br>
+    begin <br>
+    &nbsp;&nbsp;FComportBaudRate := Value; <br>
+    &nbsp;&nbsp;if Connected then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ApplyComPortSettings; <br>
+    end; <br>
+    <br>
+    procedure TComportDriverThread.SetComportDataBits(Value: TComPortDataBits); <br>
+    begin <br>
+    &nbsp;&nbsp;FComportDataBits := Value; <br>
+    &nbsp;&nbsp;if Connected then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ApplyComPortSettings; <br>
+    end; <br>
+    <br>
+    procedure TComportDriverThread.SetComportHwHandshaking(Value: TComportHwHandshaking); <br>
+    begin <br>
+    &nbsp;&nbsp;FComportHwHandshaking := Value; <br>
+    &nbsp;&nbsp;if Connected then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ApplyComPortSettings; <br>
+    end; <br>
+    <br>
+    procedure TComportDriverThread.SetComportInputBufferSize(Value: Word); <br>
+    begin <br>
+    &nbsp;&nbsp;FreeMem(FTempInputBuffer,FComportInputBufferSize); <br>
+    &nbsp;&nbsp;FComportInputBufferSize := Value; <br>
+    &nbsp;&nbsp;GetMem(FTempInputBuffer,FComportInputBufferSize); <br>
+    &nbsp;&nbsp;if Connected then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ApplyComPortSettings; <br>
+    end; <br>
+    <br>
+    procedure TComportDriverThread.SetComportNumber(Value: TComPortNumber); <br>
+    begin <br>
+    &nbsp;&nbsp;if Connected then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;exit; <br>
+    &nbsp;&nbsp;FComportNumber := Value; <br>
+    end; <br>
+    <br>
+    procedure TComportDriverThread.SetComportOutputBufferSize(Value: Word); <br>
+    begin <br>
+    &nbsp;&nbsp;FComportOutputBufferSize := Value; <br>
+    &nbsp;&nbsp;if Connected then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ApplyComPortSettings; <br>
+    end; <br>
+    <br>
+    procedure TComportDriverThread.SetComportParity(Value: TComPortParity); <br>
+    begin <br>
+    &nbsp;&nbsp;FComportParity := Value; <br>
+    &nbsp;&nbsp;if Connected then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ApplyComPortSettings; <br>
+    end; <br>
+    <br>
+    procedure TComportDriverThread.SetComportPollingDelay(Value: Word); <br>
+    begin <br>
+    &nbsp;&nbsp;FComportPollingDelay := Value; <br>
+    end; <br>
+    <br>
+    procedure TComportDriverThread.SetComportStopBits(Value: TComPortStopBits); <br>
+    begin <br>
+    &nbsp;&nbsp;FComportStopBits := Value; <br>
+    &nbsp;&nbsp;if Connected then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ApplyComPortSettings; <br>
+    end; <br>
+    <br>
+    procedure TComportDriverThread.SetComportSwHandshaking(Value: TComPortSwHandshaking); <br>
+    begin <br>
+    &nbsp;&nbsp;FComportSwHandshaking := Value; <br>
+    &nbsp;&nbsp;if Connected then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ApplyComPortSettings; <br>
+    end; <br>
+    <br>
+    procedure TComportDriverThread.DoDataReceived; <br>
+    begin <br>
+    &nbsp;&nbsp;if Assigned(FOnReceiveData) then FOnReceiveData(Self); <br>
+    end; <br>
+    <br>
+    procedure TComportDriverThread.SetComPortActive(Value: Boolean); <br>
+    var <br>
+    &nbsp;&nbsp;DumpString : String; <br>
+    begin <br>
+    &nbsp;&nbsp;FComPortActive := Value; <br>
+    &nbsp;&nbsp;if csDesigning in ComponentState then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Exit; <br>
+    &nbsp;&nbsp;if FComPortActive then <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;//Just dump the contents of the input buffer of the com-port. <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ReadString(DumpString); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FTimer.Enabled := True; <br>
+    &nbsp;&nbsp;end <br>
+    &nbsp;&nbsp;else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FTimer.Enabled := False; <br>
+    &nbsp;&nbsp;FTimer.SupRes; <br>
+    end; <br>
+    <br>
+    { TTimerThread } <br>
+    <br>
+    procedure TTimerThread.Execute; <br>
+    begin <br>
+    &nbsp;&nbsp;Priority := tpNormal; <br>
+    &nbsp;&nbsp;repeat <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Sleep(500); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if Assigned(FOnTimer) then Synchronize(FOnTimer); <br>
+    &nbsp;&nbsp;until Terminated; <br>
+    end; <br>
+    <br>
+    procedure TTimerThread.SupRes; <br>
+    begin <br>
+    &nbsp;&nbsp;if not Suspended then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Suspend; <br>
+    &nbsp;&nbsp;if FEnabled then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Resume; <br>
+    end; <br>
+    <br>
+    end.</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

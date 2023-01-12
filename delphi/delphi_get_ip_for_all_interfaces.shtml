@@ -1,0 +1,214 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Получение IP-адреса и маски для всех сетевых
+    интерфейсов.</h3>
+    <p><b>Автор:</b> <a href="mailto:jsab@si.gr">Giannis Sampaziotis</a></p>
+    <p>Существует множество методов получения IP
+    адреса компьютера. Но данный пример представляет
+    наиболее корректный способ получения всех
+    адресов, сетевых масок, broadcast адресов и статусов
+    для всех интерфейсов включая циклический 127.0.0.1 -
+    требует WinSock 2.<br>
+    <br>
+    Совместимость: Delphi 3.х (или выше)</p>
+    <p>Это завершённый Delphi компонент. Для его
+    использования достаточно вызвать : <br>
+    <br>
+    &nbsp;&nbsp; EnumInterfaces(var s string): Boolean; <br>
+    <br>
+    которая вернёт строку, разделённую CRLF и
+    содержащую всё, нужную нам информацию.<br>
+    <br>
+    -------------------------------------------------------------------- <br>
+    <br>
+    unit USock; <br>
+    <br>
+    interface <br>
+    <br>
+    uses Windows, Winsock; <br>
+    <br>
+    { <br>
+    <br>
+    &nbsp;&nbsp;Если Вы поместите строку результатов в wide
+    TMEMO (в его свойство memo.lines.text)<br>
+    &nbsp; то никаких результатов не увидите. <br>
+    <br>
+    &nbsp;&nbsp;Тестировалось на Win98/ME/2K, 95 OSR 2 и NT service <br>
+    &nbsp;&nbsp;pack #3 , потому что используется WinSock 2 (WS2_32.DLL) <br>
+    <br>
+    } <br>
+    <br>
+    function EnumInterfaces(var sInt: string): Boolean; <br>
+    <br>
+    { функция WSAIOCtl импортируется из Winsock 2.0 - Winsock 2
+    доступен } <br>
+    { только в Win98/ME/2K и 95 OSR2, NT srv pack #3 } <br>
+    <br>
+    function WSAIoctl(s: TSocket; cmd: DWORD; lpInBuffer: PCHAR; dwInBufferLen: <br>
+    &nbsp;&nbsp;DWORD; <br>
+    &nbsp;&nbsp;lpOutBuffer: PCHAR; dwOutBufferLen: DWORD; <br>
+    &nbsp;&nbsp;lpdwOutBytesReturned: LPDWORD; <br>
+    &nbsp;&nbsp;lpOverLapped: POINTER; <br>
+    &nbsp;&nbsp;lpOverLappedRoutine: POINTER): Integer; stdcall; external 'WS2_32.DLL'; <br>
+    <br>
+    { Константы взятые из заголовка C файлов } <br>
+    <br>
+    const SIO_GET_INTERFACE_LIST = $4004747F; <br>
+    &nbsp;&nbsp;IFF_UP = $00000001; <br>
+    &nbsp;&nbsp;IFF_BROADCAST = $00000002; <br>
+    &nbsp;&nbsp;IFF_LOOPBACK = $00000004; <br>
+    &nbsp;&nbsp;IFF_POINTTOPOINT = $00000008; <br>
+    &nbsp;&nbsp;IFF_MULTICAST = $00000010; <br>
+    <br>
+    type sockaddr_gen = packed record <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;AddressIn: sockaddr_in; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;filler: packed array[0..7] of char; <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    type INTERFACE_INFO = packed record <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;iiFlags: u_long; // Флаги интерфейса <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;iiAddress: sockaddr_gen; // Адрес интерфейса <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;iiBroadcastAddress: sockaddr_gen; // Broadcast адрес <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;iiNetmask: sockaddr_gen; // Маска подсети <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    implementation <br>
+    <br>
+    {------------------------------------------------------------------- <br>
+    <br>
+    1. Открываем WINSOCK <br>
+    2. Создаём сокет <br>
+    3. Вызываем WSAIOCtl для доступа к сетевым
+    интерфейсам <br>
+    4. Для каждого интерфейса, получаем IP, MASK, BROADCAST,
+    статус <br>
+    5. Разделяем строку символом CRLF&nbsp; <br>
+    6. Конец :) <br>
+    <br>
+    --------------------------------------------------------------------} <br>
+    <br>
+    function EnumInterfaces(var sInt: string): Boolean; <br>
+    var s: TSocket; <br>
+    &nbsp;&nbsp;wsaD: WSADATA; <br>
+    &nbsp;&nbsp;NumInterfaces: Integer; <br>
+    &nbsp;&nbsp;BytesReturned, SetFlags: u_long; <br>
+    &nbsp;&nbsp;pAddrInet: SOCKADDR_IN; <br>
+    &nbsp;&nbsp;pAddrString: PCHAR; <br>
+    &nbsp;&nbsp;PtrA: pointer; <br>
+    &nbsp;&nbsp;Buffer: array[0..20] of INTERFACE_INFO; <br>
+    &nbsp;&nbsp;i: Integer; <br>
+    begin <br>
+    &nbsp;&nbsp;result := true;
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    // Инициализируем переменную <br>
+    &nbsp;&nbsp;sInt := ''; <br>
+    <br>
+    &nbsp;&nbsp;WSAStartup($0101,
+    wsaD);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//
+    Запускаем WinSock <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//
+    Здесь можно дабавить различные обработчики
+    ошибки :) <br>
+    <br>
+    &nbsp;&nbsp;s := Socket(AF_INET, SOCK_STREAM, 0);
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // Открываем сокет <br>
+    &nbsp;&nbsp;if (s = INVALID_SOCKET) then exit; <br>
+    <br>
+    &nbsp;&nbsp;try
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    // Вызываем WSAIoCtl <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;PtrA := @bytesReturned; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if (WSAIoCtl(s, SIO_GET_INTERFACE_LIST, nil, 0, @Buffer, 1024,
+    PtrA, nil, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;nil) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;&gt; SOCKET_ERROR) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    // Если OK, то определяем количество существующих
+    интерфейсов <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;NumInterfaces := BytesReturned div
+    SizeOf(INTERFACE_INFO); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for i := 0 to NumInterfaces - 1
+    do&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Для каждого
+    интерфейса <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pAddrInet :=
+    Buffer[i].iiAddress.addressIn;
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // IP адрес <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pAddrString :=
+    inet_ntoa(pAddrInet.sin_addr); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sInt := sInt + ' IP=' + pAddrString + ',';
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pAddrInet :=
+    Buffer[i].iiNetMask.addressIn;
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // Маска подсети <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pAddrString :=
+    inet_ntoa(pAddrInet.sin_addr); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sInt := sInt + ' Mask=' + pAddrString +
+    ','; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pAddrInet :=
+    Buffer[i].iiBroadCastAddress.addressIn;&nbsp;&nbsp;// Broadcast адрес <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pAddrString :=
+    inet_ntoa(pAddrInet.sin_addr); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sInt := sInt + ' Broadcast='
+    +&nbsp;&nbsp;pAddrString + ','; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SetFlags := Buffer[i].iiFlags; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (SetFlags and IFF_UP) = IFF_UP then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sInt := sInt + ' Interface
+    UP,'
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    // Статус интерфейса up/down <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sInt := sInt + ' Interface
+    DOWN,'; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (SetFlags and IFF_BROADCAST) =
+    IFF_BROADCAST then&nbsp;&nbsp;// Broadcasts <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sInt := sInt + ' Broadcasts
+    supported,'&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//
+    поддерживает или <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;else&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//
+    не поддерживается <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sInt := sInt + ' Broadcasts
+    NOT supported,'; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (SetFlags and IFF_LOOPBACK) =
+    IFF_LOOPBACK then&nbsp;&nbsp;&nbsp;&nbsp;// Циклический или <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sInt := sInt + ' Loopback
+    interface' <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sInt := sInt + ' Network
+    interface';
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    // нормальный <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sInt := sInt +
+    #13#10;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//
+    CRLF между каждым интерфейсом <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;except <br>
+    &nbsp;&nbsp;end; <br>
+    // <br>
+    // Закрываем сокеты <br>
+    // <br>
+    &nbsp;&nbsp;CloseSocket(s); <br>
+    &nbsp;&nbsp;WSACleanUp; <br>
+    &nbsp;&nbsp;result := false; <br>
+    end; <br>
+    <br>
+    end. <br>
+    <br>
+    </td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

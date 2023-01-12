@@ -1,0 +1,101 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как склеить несколько файлов в один и наоборот
+    (работа с TStream)</h3>
+    <p>Как-то раз понадобилось запихнуть много файлов
+    в один поток(stream), так как необходимо было
+    отправить их как один файл. Вот, что для этого
+    было сделано:</p>
+    <p>Procedure TForm1.ThisISHowIPutFilesIn ; <br>
+    var <br>
+    &nbsp;&nbsp;ABigFileStream, SomeSmallFiles : TMemoryStream ; <br>
+    <br>
+    begin <br>
+    &nbsp;&nbsp;ABigFileStream := TMemoryStream.Create ; <br>
+    &nbsp;&nbsp;try <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;SomeSmallFiles := TMemoryStream.Create ; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; try <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SomeSmallFiles.LoadFromFile('C:\SomeSmalFile1.txt'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;AddToStream(SomeSmallFiles,ABigFileStream); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SomeSmallFiles.LoadFromFile('C:\SomeSmalFile2.txt'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;AddToStream(SomeSmallFiles,ABigFileStream); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// enz <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; finally <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SomeSmallFiles.Free ; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; end; <br>
+    &nbsp;&nbsp;ABigFileStream.SaveToFile('C:\MrBig.DDD') <br>
+    &nbsp;&nbsp;finally <br>
+    &nbsp;&nbsp;ABigFileStream.free ; <br>
+    &nbsp;&nbsp;end; <br>
+    end; <br>
+    <br>
+    Procedure TForm1.ThisISHowIGetStufOut ; <br>
+    var <br>
+    &nbsp;&nbsp;ABigFileStream, SomeSmallFiles : TMemoryStream ; <br>
+    <br>
+    begin <br>
+    &nbsp;&nbsp;ABigFileStream := TMemoryStream.Create ; <br>
+    &nbsp;&nbsp;try <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ABigFileStream.LoadFromFile('C:\MrBig.DDD'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;SomeSmallFiles := TMemoryStream.Create ; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; try <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;GetFromStream(ABigFileStream,SomeSmallFiles,0); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SomeSmallFiles.SaveToFile('C:\SomeSmalFile1.txt'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;GetFromStream(ABigFileStream,SomeSmallFiles,1); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SomeSmallFiles.SaveToFile('C:\SomeSmalFile2.txt'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// и т.д.<br>
+    &nbsp;&nbsp;&nbsp;&nbsp; finally <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SomeSmallFiles.Free ; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; end; <br>
+    &nbsp;&nbsp;finally <br>
+    &nbsp;&nbsp;ABigFileStream.free ; <br>
+    &nbsp;&nbsp;end; <br>
+    end; <br>
+    <br>
+    Procedure TForm1.AddToStream ( Source , Dest : TStream ); <br>
+    var <br>
+    Size : Integer ; <br>
+    begin <br>
+    Source.position := 0 ; <br>
+    // Сохраняем размер, помещая его в первый байт<br>
+    Size := Source.Size ; <br>
+    Dest.Write(Size,SizeOf(Integer)); <br>
+    Dest.CopyFrom(Source,Source.size); <br>
+    end; <br>
+    <br>
+    Procedure TForm1.GetFromStream ( Source , Dest : TStream ; Index : Integer&nbsp;&nbsp;); <br>
+    Var <br>
+    &nbsp;&nbsp;Size , I : Integer ; <br>
+    <br>
+    begin <br>
+    Source.Position := 0 ; <br>
+    For i := 0 to index-1 do <br>
+    &nbsp;&nbsp; begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; Source.Read(Size,SizeOf(Integer)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; Source.Position := Source.Position + Size ; <br>
+    &nbsp;&nbsp; end; <br>
+    // Если маркёр в файле равен размеру, то что-то
+    пошло не так :( <br>
+    if Source.position = Source.Size then Raise EAccessViolation.Create('Index Out Of Bounds')
+    ; <br>
+    // Получаем желаемый размер файла<br>
+    Source.Read(Size,SizeOf(Integer)); <br>
+    // Очищаем буфер у Dest<br>
+    Dest.Position := 0 ; <br>
+    Dest.Size := 0 ; <br>
+    Dest.CopyFrom(Source,Size); <br>
+    end;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div></TBODY>
+
+
+<p align="center"><br>
+<br>
+</p>
+<!--#include virtual="/ssi/bottom.html"-->

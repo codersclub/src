@@ -1,0 +1,123 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Создаём SystemDSN при помощи Delphi 5.</h3>
+    <p><b>Автор:</b> <a href="mailto:olivio.moura@teknoland.com">Olivio Moura</a></p>
+    <p>Совместимость: Delphi 5 (или выше)</p>
+    <p>Этот пример показывает один из способов
+    создания ODBC драйвера для доступа к файлу Access
+    MDB.&nbsp;Подобная операция применима к большинству
+    файлов баз данных. Естевственно, Вам потребуется
+    MDB файл, для того, чтобы связать его с DSN.<br>
+    <br>
+    Далее следует сам пример:<br>
+    <br>
+    const <br>
+    &nbsp;&nbsp;ODBC_ADD_DSN&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=
+    1;&nbsp;&nbsp;&nbsp;&nbsp;// Добавляем источник данных <br>
+    &nbsp;&nbsp;ODBC_CONFIG_DSN&nbsp;&nbsp;&nbsp;&nbsp; = 2;&nbsp;&nbsp;&nbsp;&nbsp;//
+    Конфигурируем (редактируем) источник данных <br>
+    &nbsp;&nbsp;ODBC_REMOVE_DSN&nbsp;&nbsp;&nbsp;&nbsp; = 3;&nbsp;&nbsp;&nbsp;&nbsp;//
+    Удаляем источник данных <br>
+    &nbsp;&nbsp;ODBC_ADD_SYS_DSN&nbsp;&nbsp;&nbsp;&nbsp;= 4;&nbsp;&nbsp;&nbsp;&nbsp;//
+    Добавляем системный DSN <br>
+    &nbsp;&nbsp;ODBC_CONFIG_SYS_DSN = 5;&nbsp;&nbsp;&nbsp;&nbsp;// Конфигурируем
+    системный DSN <br>
+    &nbsp;&nbsp;ODBC_REMOVE_SYS_DSN = 6;&nbsp;&nbsp;&nbsp;&nbsp;// удаляем
+    системный DSN <br>
+    <br>
+    type <br>
+    &nbsp;&nbsp;TSQLConfigDataSource = function( hwndParent: HWND; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    fRequest: WORD; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    lpszDriver: LPCSTR; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    lpszAttributes: LPCSTR ) : BOOL; stdcall; <br>
+    <br>
+    <br>
+    procedure Form1.FormCreate(Sender: TObject); <br>
+    var <br>
+    &nbsp;&nbsp;pFn: TSQLConfigDataSource; <br>
+    &nbsp;&nbsp;hLib: LongWord; <br>
+    &nbsp;&nbsp;strDriver: string; <br>
+    &nbsp;&nbsp;strHome: string; <br>
+    &nbsp;&nbsp;strAttr: string; <br>
+    &nbsp;&nbsp;strFile: string; <br>
+    &nbsp;&nbsp;fResult: BOOL; <br>
+    &nbsp;&nbsp;ModName: array[0..MAX_PATH] of Char; <br>
+    &nbsp;&nbsp;srInfo : TSearchRec; <br>
+    begin <br>
+    &nbsp;&nbsp;Windows.GetModuleFileName( HInstance, ModName, SizeOf(ModName) ); <br>
+    &nbsp;&nbsp;strHome := ModName; <br>
+    &nbsp;&nbsp;while ( strHome[length(strHome)] &lt;&gt; '\' ) do <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Delete( strHome, length(strHome), 1 ); <br>
+    &nbsp;&nbsp;strFile := strHome + 'TestData.MDB';&nbsp;&nbsp; // Тестовая база
+    данных (Axes = Access) <br>
+    &nbsp;&nbsp;hLib := LoadLibrary( 'ODBCCP32' );&nbsp;&nbsp;&nbsp;&nbsp;//
+    загружаем библиотеку (путь по умолчанию) <br>
+    &nbsp;&nbsp;if( hLib &lt;&gt; NULL ) then <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;@pFn := GetProcAddress( hLib, 'SQLConfigDataSource' ); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if( @pFn &lt;&gt; nil ) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// начинаем создание DSN <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;strDriver := 'Microsoft Access Driver (*.mdb)'; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;strAttr := Format( 'DSN=TestDSN'+#0+ <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    'DBQ=%s'+#0+ <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    'Exclusive=1'+#0+ <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    'Description=Test Data'+#0+#0, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    [strFile] ); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fResult := pFn( 0, ODBC_ADD_SYS_DSN, @strDriver[1],
+    @strAttr[1] ); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if( fResult = false ) then ShowMessage( 'Ошибка
+    создания DSN (Datasource) !' ); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// test/create MDB file associated with DSN <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if( FindFirst( strFile, 0, srInfo ) &lt;&gt; 0 ) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;strDriver := 'Microsoft Access Driver
+    (*.mdb)'; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;strAttr := Format( 'DSN=TestDSN'+#0+ <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    'DBQ=%s'+#0+ <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    'Exclusive=1'+#0+ <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    'Description=Test Data'+#0+ <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    'CREATE_DB=&quot;%s&quot;'#0+#0, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    [strFile,strFile] ); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fResult := pFn( 0, ODBC_ADD_SYS_DSN,
+    @strDriver[1], @strAttr[1] ); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if( fResult = false ) then ShowMessage( 'Ошибка
+    создания MDB (файла базы данных) !' ); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FindClose( srInfo ); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FreeLibrary( hLib ); <br>
+    &nbsp;&nbsp;end <br>
+    &nbsp;&nbsp;else <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ShowMessage( 'Невозможно загрузить
+    ODBCCP32.DLL' ); <br>
+    &nbsp;&nbsp;end; <br>
+    end;<br>
+    </p>
+    <p><br>
+    <br>
+    </td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

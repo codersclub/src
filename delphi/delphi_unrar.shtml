@@ -1,0 +1,163 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><h3 align="center">—оздаЄм собственный UnRar, использу€
+    unrar.dll</h3>
+    <p>// ќбъ€влени€<br>
+    <br>
+    function RAROpenArchive(ArchiveData : Pointer): Integer; stdcall;<br>
+    external 'unrar.dll' name 'RAROpenArchive'; <br>
+    <br>
+    function RARCloseArchive(hArcData : Integer): Integer; stdcall;<br>
+    external 'unrar.dll' name 'RARCloseArchive';<br>
+    <br>
+    function RARReadHeader(hArcData : Integer; HeaderData : Pointer): Integer; stdcall;<br>
+    external 'unrar.dll' name 'RARReadHeader';<br>
+    <br>
+    function RARProcessFile(hArcData : Integer; Operation : Integer; DestPath : Pointer;<br>
+    DestName : Pointer): Integer; stdcall;<br>
+    external 'unrar.dll' name 'RARProcessFile';<br>
+    <br>
+    <br>
+    const<br>
+    &nbsp; ERAR_END_ARCHIVE = 10;<br>
+    &nbsp; ERAR_NO_MEMORY = 11;<br>
+    &nbsp; ERAR_BAD_DATA = 12;<br>
+    &nbsp; ERAR_BAD_ARCHIVE = 13;<br>
+    &nbsp; ERAR_UNKNOWN_FORMAT = 14;<br>
+    &nbsp; ERAR_EOPEN = 15;<br>
+    &nbsp; ERAR_ECREATE = 16;<br>
+    &nbsp; ERAR_ECLOSE = 17;<br>
+    &nbsp; ERAR_EREAD = 18;<br>
+    &nbsp; ERAR_EWRITE = 19;<br>
+    &nbsp; ERAR_SMALL_BUF = 20;<br>
+    <br>
+    &nbsp; RAR_OM_LIST = 0;<br>
+    &nbsp; RAR_OM_EXTRACT = 1;<br>
+    &nbsp; RAR_SKIP = 0;<br>
+    &nbsp; RAR_TEST = 1;<br>
+    &nbsp; RAR_EXTRACT = 2;<br>
+    &nbsp; RAR_VOL_ASK = 0;<br>
+    &nbsp; RAR_VOL_NOTIFY = 1;<br>
+    <br>
+    <br>
+    type<br>
+    &nbsp; Char260 = Array [1..260] of Char;<br>
+    <br>
+    &nbsp; TRAROpenArchiveData = record<br>
+    &nbsp;&nbsp; ArcName : PChar; // в C++ это будет выгл€деть как: char
+    *ArcName<br>
+    &nbsp;&nbsp; OpenMode : Cardinal;<br>
+    &nbsp;&nbsp; OpenResult : Cardinal;<br>
+    &nbsp;&nbsp; CmtBuf : PChar;<br>
+    &nbsp;&nbsp; CmtBufSize : Cardinal;<br>
+    &nbsp;&nbsp; CmtSize : Cardinal;<br>
+    &nbsp;&nbsp; CmtState : Cardinal;<br>
+    &nbsp; end;<br>
+    <br>
+    &nbsp; TRARHeaderData = record<br>
+    &nbsp;&nbsp; ArcName : Char260;<br>
+    &nbsp;&nbsp; FileName : Char260;<br>
+    &nbsp;&nbsp; Flags : Cardinal;<br>
+    &nbsp;&nbsp; PackSize : Cardinal;<br>
+    &nbsp;&nbsp; UnpSize : Cardinal;<br>
+    &nbsp;&nbsp; HostOS : Cardinal;<br>
+    &nbsp;&nbsp; FileCRC : Cardinal;<br>
+    &nbsp;&nbsp; FileTime : Cardinal;<br>
+    &nbsp;&nbsp; UnpVer : Cardinal;<br>
+    &nbsp;&nbsp; Method : Cardinal;<br>
+    &nbsp;&nbsp; FileAttr : Cardinal;<br>
+    &nbsp;&nbsp; CmtBuf : PChar;<br>
+    &nbsp;&nbsp; CmtBufSize : Cardinal;<br>
+    &nbsp;&nbsp; CmtSize : Cardinal;<br>
+    &nbsp;&nbsp; CmtState : Cardinal;<br>
+    &nbsp; end;<br>
+    <br>
+    <br>
+    var<br>
+    &nbsp; RARExtract : boolean;<br>
+    &nbsp; RAROpenArchiveData : TRAROpenArchiveData;<br>
+    &nbsp; RARComment : array [1..256] of Char;<br>
+    &nbsp; RARHeaderData : TRARHeaderData;<br>
+    <br>
+    ...<br>
+    <br>
+    procedure ExtractRARArchive;<br>
+    var<br>
+    &nbsp; sDir : string;<br>
+    &nbsp; s : string;<br>
+    &nbsp; sTest : string;<br>
+    &nbsp; iTest : integer;<br>
+    &nbsp; bTestDone : boolean;<br>
+    &nbsp; RARhnd : Integer;<br>
+    &nbsp; RARrc : Integer;<br>
+    &nbsp; PDestPath : Char260;<br>
+    <br>
+    begin<br>
+    &nbsp; RARExtract:=TRUE;<br>
+    &nbsp; lKBWritten:=0;<br>
+    &nbsp; ProgressBar2.Position := 0;<br>
+    &nbsp; ProgressBar2.Max := lTotalSize;<br>
+    &nbsp; RARStartTime:=Time;<br>
+    <br>
+    &nbsp; RAROpenArchiveData.OpenResult:=99;<br>
+    &nbsp; RAROpenArchiveData.OpenMode := RAR_OM_EXTRACT; // открываем дл€
+    распаковки<br>
+    &nbsp; RAROpenArchiveData.ArcName:= @RARFileName;<br>
+    &nbsp; RAROpenArchiveData.CmtBuf := @RARComment; <br>
+    &nbsp; RAROpenArchiveData.CmtBufSize := 255; <br>
+    <br>
+    // ќткрываем RAR архив и выдел€ем пам€ть<br>
+    &nbsp; RARhnd := RAROpenArchive (@RAROpenArchiveData);<br>
+    &nbsp; If RAROpenArchiveData.OpenResult &lt;&gt; 0 then<br>
+    &nbsp; begin<br>
+    &nbsp;&nbsp; case RAROpenArchiveData.OpenResult of<br>
+    &nbsp;&nbsp;&nbsp; ERAR_NO_MEMORY : s:='Not enough memory to initialize data structures';<br>
+    &nbsp;&nbsp;&nbsp; ERAR_BAD_DATA : s:='Archive header broken';<br>
+    &nbsp;&nbsp;&nbsp; ERAR_BAD_ARCHIVE : s:='File is not valid RAR archive';<br>
+    &nbsp;&nbsp;&nbsp; ERAR_EOPEN : s:='File open error';<br>
+    &nbsp;&nbsp; end;<br>
+    &nbsp;&nbsp; MessageDlg('Unable to open rar archive: ' + s + '!',mtError, [mbOK], 0);<br>
+    &nbsp; end;<br>
+    <br>
+    &nbsp; RARSetProcessDataProc(RARhnd,@Form.OnRarStatus);<br>
+    &nbsp; StrPCopy(@PDestPath, EInstallPath.Text);<br>
+    <br>
+    &nbsp; repeat<br>
+    &nbsp;&nbsp; RARrc := RARReadHeader (RARhnd, @RARHeaderData);// „итаем
+    заголовок<br>
+    &nbsp;&nbsp; if RARrc &lt;&gt; ERAR_END_ARCHIVE then<br>
+    &nbsp;&nbsp; begin<br>
+    &nbsp;&nbsp;&nbsp; ProgressBar1.Position := 0;<br>
+    &nbsp;&nbsp;&nbsp; ProgressBar1.Max := RARHeaderData.UnpSize;<br>
+    &nbsp;&nbsp;&nbsp; s:=RARHeaderData.FileName;<br>
+    &nbsp;&nbsp;&nbsp; lblCurrentFile.Caption := s;<br>
+    &nbsp;&nbsp;&nbsp; lKBytesDone := 0;<br>
+    &nbsp;&nbsp; end;<br>
+    <br>
+    &nbsp;&nbsp; if RARrc = 0 then<br>
+    &nbsp;&nbsp; RARrc:=RARProcessFile (RARhnd, RAR_EXTRACT, @PDestPath, nil);<br>
+    &nbsp;&nbsp; if (RARrc &lt;&gt; 0) and (RARrc &lt;&gt; ERAR_END_ARCHIVE) then<br>
+    &nbsp;&nbsp; begin<br>
+    &nbsp;&nbsp;&nbsp; MessageDlg('An Error occured during extracting of ' + sTest+'!' +
+    #13#10 +<br>
+    &nbsp;&nbsp;&nbsp; 'RARProcessFile: ' + MakeItAString(RARrc),mtError, [mbOK], 0);<br>
+    &nbsp;&nbsp; end;<br>
+    &nbsp; until RARrc &lt;&gt; 0;<br>
+    <br>
+    // закрываем RAR архив и освобождаем пам€ть<br>
+    &nbsp; If RARCloseArchive(RARhnd) &lt;&gt; 0 then<br>
+    &nbsp; begin<br>
+    &nbsp;&nbsp; MessageDlg('Unable to close rar archive!',mtError, [mbOK], 0);<br>
+    &nbsp; end;<br>
+    end; // ExtractRARArchive<br>
+    </p>
+    <p align="center"><b>—ам WinRar можно скачать <a href="http://www.rar.de"
+    target="_parent">сдесь</a>.</b><br>
+    </td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

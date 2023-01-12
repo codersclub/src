@@ -1,0 +1,136 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Функции для преобразования коротких и длинных
+    имён файлов</h3>
+    <p>Автор: <a href="mailto:nts4618086@aol.com">Bjarne Winkler</a></p>
+    <p>Компилятор: Delphi (все версии)</p>
+    <p>Следующие три функции помогут преобразовать
+    длинные имена файлов в коротки и наоборот.
+    Функция Mince служит для отображения полного имени
+    файла, включая путь.<br>
+    <br>
+    {=========================================================} <br>
+    Function Mince(PathToMince: String; InSpace: Integer): String; <br>
+    {=========================================================} <br>
+    // &quot;C:\Program Files\Delphi\DDrop\TargetDemo\main.pas&quot; <br>
+    // &quot;C:\Program Files\..\main.pas&quot; <br>
+    Var <br>
+    &nbsp;&nbsp;sl: TStringList; <br>
+    &nbsp;&nbsp;sHelp, sFile: String; <br>
+    &nbsp;&nbsp;iPos: Integer; <br>
+    <br>
+    Begin <br>
+    &nbsp;&nbsp;sHelp := PathToMince; <br>
+    &nbsp;&nbsp;iPos := Pos('\', sHelp); <br>
+    &nbsp;&nbsp;If iPos = 0 Then <br>
+    &nbsp;&nbsp;Begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Result := PathToMince; <br>
+    &nbsp;&nbsp;End <br>
+    &nbsp;&nbsp;Else <br>
+    &nbsp;&nbsp;Begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;sl := TStringList.Create; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// Decode string <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;While iPos &lt;&gt; 0 Do <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sl.Add(Copy(sHelp, 1, (iPos - 1))); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sHelp := Copy(sHelp, (iPos + 1), Length(sHelp)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;iPos := Pos('\', sHelp); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;End; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;If sHelp &lt;&gt; '' Then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sl.Add(sHelp); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;End; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// Encode string <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;sFile := sl[sl.Count - 1]; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;sl.Delete(sl.Count - 1); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Result := ''; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;While (Length(Result + sFile) &lt; InSpace) And (sl.Count &lt;&gt;
+    0) Do <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Result := Result + sl[0] + '\'; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sl.Delete(0); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;End; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;If sl.Count = 0 Then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Result := Result + sFile; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;End <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Result := Result + '..\' + sFile; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;End; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;sl.Free; <br>
+    &nbsp;&nbsp;End; <br>
+    End; <br>
+    <br>
+    {===================================================} <br>
+    Function ShortFileName(Const FileName: String): String; <br>
+    {===================================================} <br>
+    Var <br>
+    &nbsp;&nbsp;aTmp: Array[0..255] Of Char; <br>
+    <br>
+    Begin <br>
+    &nbsp;&nbsp;If Not FileExists(FileName) Then <br>
+    &nbsp;&nbsp;Begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Result := ''; <br>
+    &nbsp;&nbsp;End <br>
+    &nbsp;&nbsp;Else <br>
+    &nbsp;&nbsp;Begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;If GetShortPathName(PChar (FileName), aTmp, Sizeof (aTmp) - 1) = 0
+    Then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Result:= FileName; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;End <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Result:= StrPas (aTmp); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;End; <br>
+    &nbsp;&nbsp;End; <br>
+    End; <br>
+    <br>
+    {==============================================} <br>
+    Function LongFileName(ShortName: String): String; <br>
+    {==============================================} <br>
+    Var <br>
+    &nbsp;&nbsp;SR: TSearchRec; <br>
+    <br>
+    Begin <br>
+    &nbsp;&nbsp;Result := ''; <br>
+    &nbsp;&nbsp;If (pos ('\\', ShortName) + pos ('*', ShortName) + <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pos ('?', ShortName) &lt;&gt; 0) Or Not
+    FileExists(ShortName) Then <br>
+    &nbsp;&nbsp;Begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{ ignore NetBIOS name, joker chars and invalid file names } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Exit; <br>
+    &nbsp;&nbsp;End; <br>
+    &nbsp;&nbsp;While FindFirst(ShortName, faAnyFile, SR) = 0 Do <br>
+    &nbsp;&nbsp;Begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{ next part as prefix } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Result := '\' + SR.Name + Result; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;SysUtils.FindClose(SR);&nbsp;&nbsp;{ the SysUtils, not the
+    WinProcs procedure! } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{ directory up (cut before '\') } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ShortName := ExtractFileDir (ShortName); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;If length (ShortName) &lt;= 2 Then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Break;&nbsp;&nbsp;{ ShortName contains drive letter
+    followed by ':' } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;End; <br>
+    &nbsp;&nbsp;End; <br>
+    &nbsp;&nbsp;Result := ExtractFileDrive (ShortName) + Result; <br>
+    end;<br>
+    <br>
+    </p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div></TBODY>
+
+
+<p align="center"><br>
+<br>
+</p>
+<!--#include virtual="/ssi/bottom.html"-->

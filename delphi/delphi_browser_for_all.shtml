@@ -1,0 +1,205 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>&quot;Проводник&quot; для компьютеров, директорий,
+    файлов и принтеров</h3>
+    <p>(Перевод одноимённой статьи с сайта <a
+    href="http://delphi.about.com">delphi.about.com</a> )</p>
+    <p><b><font color="#000080">Обзор (Browse)</font></b><br>
+    В Windows есть несколько способов
+        отобразить структуру директорий на компьютере.
+        Большинство программистов Delphi знают, как
+        пользоваться компонентой TOpenDialog, чтобы
+        предоставить возможность пользователю перед
+        открытием файла предварительно просматривать
+        структуру директорий. Однако, используя API
+        функцию SHBrowseForFolder мы можем заставить стандартный
+        диалог Windows осуществлять просмотр не только директорий на
+        диске, но и принтеров и компьютеров в сети.</p>
+    <p align="center"><img alt="Browse dialog" border="0" height="331" src="browse2.gif"
+    width="324"> </p>
+    <p>Сперва давайте посмотрим, что необходимо для
+    SHBrowseForFolder. Вот объявление функции:</p>
+    <p>&nbsp;</p>
+    <table bgColor="#ffffcc" border="1" width="100%">
+<TBODY>
+      <tr>
+        <td><pre><b>function</b> SHBrowseForFolder
+(<b>var</b> BrowseInfo: TBrowseInfo): PItemIDList; <b>stdcall</b>;
+</pre>
+        </td>
+      </tr>
+</TBODY>
+    </table>
+    <p>Вся информация для инициализации и настройки
+    диалогового окна Browse For Folder передаётся через
+    переменную типа <i>BrowseInfo</i>. Сама же функция нам
+    возвратит список ID элементов (скажем:
+    местоположение выбранной папки). <br>
+    Теперь давайте посмотрим, как заполнить
+    структуру записей информацией, которая
+    необходима для инициализации диалогового окна
+    Browse for Folder, а затем вызовем SHBrowseForFolder для
+    отображения диалогового окна.</p>
+    <p><b>Структура BrowseInfo</b><br>
+    Основные элементы структуры, это поля <i>lpszTitle</i> и <i>ulFlags</i>.
+    Поле lpszTitle - это текст, в виде статического
+    текстового элемента управления (static text control) над
+    деревом (treeview). Элемент ulFlags определяет флаги,
+    которые задают режим отображения диалога.<br>
+    Флаги позволяют сделать диалог более юзабельным,
+    чем просто отображение директорий. В таблице
+    приведены некоторые флаги, которые позволяют
+    расширить возможности диалога Browse For Folders:</p>
+    <p>&nbsp;</p>
+    <table bgColor="#000000" border="0" cellPadding="2" cellSpacing="1" width="100%">
+<TBODY>
+      <tr>
+        <td><font color="#ffffff" size="-1">Значение</font></td>
+        <td><font color="#ffffff" size="-1" ?>Назначение</font></td>
+      </tr>
+      <tr bgColor="#ffffff">
+        <td><font size="-2">BIF_BROWSEFORCOMPUTER</font></td>
+        <td><font size="-1">Возвратить только компьютеры. Если
+        пользователь выбрал что-то отличное от
+        компьютеров, то кнопка OK останется серой.</font></td>
+      </tr>
+      <tr bgColor="#ffffff">
+        <td><font size="-2">BIF_BROWSEFORPRINTER</font></td>
+        <td><font size="-1">Возвратить только принтеры. Если
+        пользователь выбрал что-то отличное от
+        принтеров, то кнопка OK останется серой.</font></td>
+      </tr>
+      <tr bgColor="#ffffff">
+        <td><font size="-2">BIF_RETURNONLYFSDIRS</font></td>
+        <td><font size="-1">Возвратить только директории
+        файловой системы. Если пользователь выберет
+        директории, которые не являются частью файловой
+        системы, то кнопка OK останется серой.</font></td>
+      </tr>
+      <tr bgColor="#ffffff">
+        <td><font size="-2">BIF_BROWSEINCLUDEFILES</font></td>
+        <td><font size="-1">Диалог просмотра будет отображать
+        файлы вместе с директориями</font></td>
+      </tr>
+</TBODY>
+    </table>
+    <p><br>
+    Например, для просмотра как директорий, так и
+    файлов, необходимо установить <i>ulFlags</i> в <font size="-1">BIF_BROWSEINCLUDEFILES</font>.
+    </p>
+    <p align="center"><img alt="Browse Delphi Form" border="0" height="171" src="browse1.gif"
+    width="296"> </p>
+    <p>&nbsp;&nbsp;&nbsp;<b><font color="#000080">Код для Delphi</font></b><br>
+    Когда мы поместим всё вышеописанное в функцию
+    Delphi, которая будет создавать структуру,
+    инициализировать её, и вызывать SHBrowseForFolder() для
+    отображения диалогового окна, то она будет
+    выглядеть следующим образом:</p>
+    <p>&nbsp;</p>
+    <table bgColor="#ffffcc" border="1" width="100%">
+<TBODY>
+      <tr>
+        <td><pre><b>uses</b> ShellAPI, ShlObj;
+...
+<b>function</b> BrowseDialog
+ (<b>const</b> Title: <b>string</b>; <b>const</b> Flag: integer): <b>string</b>;
+<b>var</b>
+  lpItemID : PItemIDList;
+  BrowseInfo : TBrowseInfo;
+  DisplayName : <b>array</b>[0..MAX_PATH] <b>of</b> char;
+  TempPath : <b>array</b>[0..MAX_PATH] <b>of</b> char;
+<b>begin</b>
+  Result:='';
+  FillChar(BrowseInfo, sizeof(TBrowseInfo), #0);
+  <b>with</b> BrowseInfo<b> do begin</b>
+    hwndOwner := Application.Handle;
+    pszDisplayName := @DisplayName;
+    lpszTitle := PChar(<font
+color="#ff0000">Title</font>);
+    ulFlags := <font color="#ff0000">Flag</font>;
+  <b>end</b>;
+  lpItemID := SHBrowseForFolder(BrowseInfo);
+  <b>if</b> lpItemId &lt;&gt; <b>nil</b> <b>then</b> <b>begin</b>
+    SHGetPathFromIDList(lpItemID, TempPath);
+    Result := TempPath;
+    GlobalFreePtr(lpItemID);
+  <b>end</b>;
+<b>end</b>;
+</pre>
+        </td>
+      </tr>
+</TBODY>
+    </table>
+    <p>Функция <i>BrowseDialog</i> имеет на входе два
+    параметра: Title и Flag. <i>Title</i> - это текст над деревом
+    (поле lpszTitle в записи BrowseInfo). Параметр <i>Flag</i>
+    используется для заполнения поля ulFlags.</p>
+    <p>Теперь эту функцию можно вызвать (для
+    отображения директории, выбранной
+    пользователем) следующим образом:</p>
+    <p>&nbsp;</p>
+    <table bgColor="#ffffcc" border="1" width="100%">
+<TBODY>
+      <tr>
+        <td><pre><b>procedure</b> TfrMain.btnBrowseClick(Sender: TObject);
+<b>var</b> sTitle, sFolder: <b>string</b>;
+    iFlag : integer;
+<b>begin</b>
+  sTitle:='Choose a ' +
+          rgBrowseFor.Items[rgBrowseFor.ItemIndex];
+  <b>case</b> rgBrowseFor.ItemIndex <b>of</b>
+    0:  iFlag :=  BIF_RETURNONLYFSDIRS;
+    1:  iFlag :=  BIF_BROWSEINCLUDEFILES;
+    2:  iFlag :=  BIF_BROWSEFORCOMPUTER;
+    3:  iFlag :=  BIF_BROWSEFORPRINTER;
+  <b>end</b>;
+  sFolder := BrowseDialog(sTitle, iFlag);
+  <b>if</b> sFolder &lt;&gt; '' <b>then</b>
+    edSelected.text := sFolder
+  <b>else</b>
+    edSelected.text := 'Nothing selected';
+<b>end</b>;
+</pre>
+        </td>
+      </tr>
+</TBODY>
+    </table>
+    <p>Обратите внимание: На форме (с именем: frMain)
+    присутствует компонент <i>RadioGroup</i> (группа радио
+    кнопок (с именем: rgBrowseFor)) который имеет четыре
+    элеемента, каждый из которых представляет
+    значение для переменной Flag (см. картинку выже).
+    Функция извлекает из <i>lpItemID</i> путь к выбранной
+    папке и возвращает его (заполнив компонент
+    текстового поля <i>edSelected</i>). Если функция вернула
+    ошибку (или пользователь нажал кнопку Cancel), то
+    возвращённая строка будет пустой.</p>
+    <p>&nbsp;&nbsp;&nbsp;<i><font color="#000080">Ссылки на информацию,
+    относящуюся к данной статье</font></i><br>
+    Детальная информация по функции <a
+    href="http://msdn.microsoft.com/library/psdk/shellcc/shell/Functions/SHBrowseForFolder.htm">SHBrowseForFolder</a>
+    и по структуре <a
+    href="http://msdn.microsoft.com/library/psdk/shellcc/shell/Structures/BROWSEINFO.htm">BROWSEINFO</a>.
+    Так же в приложении можно ограничить диапазон
+    директорий, которые пользователь может
+    открывать, путём указания корневой директории.
+    См. как установить диалоговое окно SHBrowseForFolder с <a
+    href="http://msdn.microsoft.com/library/psdk/shellcc/shell/Shell_basics/Folder_ID.htm">корневой
+    директорией</a>, установленной на Program Files (к
+    сожалению, код не на Delphi, но смысл понятен).</p>
+    <p>&nbsp;</p>
+    <p><br>
+    </td>
+  </tr>
+</table>
+</center></div></TBODY>
+
+
+<p align="center"><br>
+<br>
+</p>
+<!--#include virtual="/ssi/bottom.html"-->

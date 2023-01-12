@@ -1,0 +1,128 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Печать содержимого DBGrid через QuickReport</h3>
+    <p>Автор: <a href="mailto:rribas@pobox.com">Rafael Ribas Aguilу</a></p>
+    <p>Совместимость: <nobr>Delphi 3.x (или выше)</nobr></p>
+    <p>Частенько у пользователя возникает
+    необходимость распечатать отчёт из базы данных.
+    Естественно, что он начинает просить Вас
+    добавить такую возможность в приложение. Как
+    оказалось, при помощи TQuickRep данную задачу можно
+    очень легко решить.</p>
+    <p>Итак, приступим. Для начала создайте новую
+    форму, назвав её TGridReport, и поместите на неё TQuickRep.
+    Переименуйте QuickRep в GridRep. Затем сделайте
+    следующию процедуру, которая получает в качестве
+    параметра DBGrid:<br>
+    <br>
+    <br>
+    <br>
+    procedure TGridReport.Preview(Grid: TDBGrid); <br>
+    var <br>
+    &nbsp;&nbsp;i, CurrentLeft, CurrentTop : integer; <br>
+    &nbsp;&nbsp;BMark: TBookmark; <br>
+    begin <br>
+    &nbsp;&nbsp;GridRep.Dataset:=Grid.DataSource.DataSet; <br>
+    <br>
+    &nbsp;&nbsp;if not GridRep.Bands.HasColumnHeader then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;GridRep.Bands.HasColumnHeader:=true; <br>
+    <br>
+    &nbsp;&nbsp;if not GridRep.Bands.HasDetail then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;GridRep.Bands.HasDetail:=true; <br>
+    <br>
+    &nbsp;&nbsp;GridRep.Bands.ColumnHeaderBand.Height:=Abs(Grid.TitleFont.Height) + 10; <br>
+    &nbsp;&nbsp;GridRep.Bands.DetailBand.Height:=Abs(Grid.Font.Height) + 10; <br>
+    &nbsp;&nbsp;CurrentLeft := 12; <br>
+    &nbsp;&nbsp;CurrentTop := 6; <br>
+    <br>
+    &nbsp;&nbsp;{Запись, на которой пользователь
+    останавливается в DBGrid} <br>
+    &nbsp;&nbsp;BMark:=Grid.DataSource.DataSet.GetBookmark; <br>
+    &nbsp;&nbsp;{Запретим мерцание грида в процессе работы
+    отчёта} <br>
+    &nbsp;&nbsp;Grid.DataSource.DataSet.DisableControls; <br>
+    &nbsp;&nbsp;try <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;for i:=0 to Grid.FieldCount - 1 do <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (CurrentLeft +
+    Canvas.TextWidth(Grid.Columns[i].Title.Caption)) &gt; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(GridRep.Bands.ColumnHeaderBand.Width)
+    then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CurrentLeft := 12; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CurrentTop := CurrentTop +
+    Canvas.TextHeight('A') + 6; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;GridRep.Bands.ColumnHeaderBand.Height :=
+    GridRep.Bands.ColumnHeaderBand.Height + <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(Canvas.TextHeight('A') + 10);
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;GridRep.Bands.DetailBand.Height :=
+    GridRep.Bands.DetailBand.Height + <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(Canvas.TextHeight('A') + 10);
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{Создадим заголовок отчёта
+    при помощи QRLabels} <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;with TQRLabel.Create(GridRep.Bands.ColumnHeaderBand)
+    do <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Parent := GridRep.Bands.ColumnHeaderBand; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Color :=
+    GridRep.Bands.ColumnHeaderBand.Color; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Left := CurrentLeft; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Top := CurrentTop; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Caption:=Grid.Columns[i].Title.Caption; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{Создадим тело отчёта при
+    помощи QRDBText} <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;with TQRDbText.Create(GridRep.Bands.DetailBand) do <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Parent := GridRep.Bands.DetailBand; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Color := GridRep.Bands.DetailBand.Color; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Left := CurrentLeft; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Top := CurrentTop; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Alignment:=Grid.Columns[i].Alignment; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;AutoSize:=false; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;AutoStretch:=true; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Width:=Grid.Columns[i].Width; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Dataset:=GridRep.Dataset; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DataField:=Grid.Fields[i].FieldName; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CurrentLeft:=CurrentLeft +
+    (Grid.Columns[i].Width) + 15; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;lblPage.Left := bdTitle.Width - lblPage.Width - 10; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;lblDate.Left := bdTitle.Width - lblDate.Width - 10; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{Далее вызовем метод
+    предварительного просмотра из QuickRep} <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;GridRep.PreviewModal; {либо, если желаете, то
+    PreviewModal} <br>
+    <br>
+    &nbsp;&nbsp;finally <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;with Grid.DataSource.DataSet do <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;GotoBookmark(BMark); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FreeBookmark(BMark); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;EnableControls; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;end; <br>
+    end; <br>
+    <br>
+    <br>
+    Вот собственно и всё :)<br>
+    </td>
+  </tr>
+</table>
+</center></div></TBODY>
+
+
+<p align="center"><br>
+<br>
+</p>
+<!--#include virtual="/ssi/bottom.html"-->

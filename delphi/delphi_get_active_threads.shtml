@@ -1,0 +1,449 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Получаем из реестра количество активных
+    потоков, загруженность процессора и т.д.</h3>
+    <p><b>Автор:</b> <a href="mailto:vava@bplnet.com">Vimil Saju</a> </p>
+    <p><font face="Tahoma" size="-1">В реестре есть раздел HKEY_DYN_DATA.
+    Основная информация о системе хранится в ключе
+    PerfStats. <br>
+    <br>
+    О получении информации,например, о загруженности
+    процессора, необходимо проделать следующие шаги:
+    <br>
+    <br>
+    Для начала необходимо запустить установленный
+    счётчик в реестре. Это возможно путём считывания
+    значения ключа, отвечающего за нужный параметр
+    системы. <br>
+    <br>
+    Например <br>
+    Просто считываем значение ключа 'PerfStats\<b>StartStat</b>\KERNEL\CPUusage'
+    в секции HKEY_DYN_DATA. данное действие запускает
+    счётчик. После этого в ключе 'PerfStats\<b>StatData</b>\KERNEL\CPUusage'
+    будет храниться значение в процентах о
+    загруженности процессора.<br>
+    <br>
+    Далее, если добавить считывание загруженности
+    процессора в событие On timer, то мы сможем наблюдать
+    изменение загруженности процессора в динамике. <br>
+    <br>
+    По завершении, Ваша программа должна остановить
+    счётчик в реестре. Для этого просто считай ключ
+    'PerfStats\<b>StopStat</b>\KERNEL\CPUusage'.Это остановит счётчик. <br>
+    Так же в системе есть много других счётчиков.
+    Весь список счётчиков можно посмотреть в ключе
+    PerfStats\StatData, используя редактор реестра. <br>
+    <br>
+    Представленный ниже исходник получает значения
+    всех счётчиков, расположенных в секции HKEY_DYN_DATA. <br>
+    <br>
+    </p>
+    <table border="0" cellpadding="0" cellspacing="0">
+      <tr>
+        <td width="750" bgcolor="#A5E4A7"><font face="Tahoma" style="font-size: 10pt" size="-1"><b>&nbsp;
+        Собственно сам исходный код</b></font></td>
+      </tr>
+    </table>
+    <p><br>
+    <br>
+    unit SystemInfo; <br>
+    <br>
+    interface <br>
+    <br>
+    uses <br>
+    &nbsp;&nbsp;Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, <br>
+    &nbsp;&nbsp;Dialogs,extctrls; <br>
+    <br>
+    type TDialupAdapterInfo = record //Информация о Dialup адаптере <br>
+    &nbsp;&nbsp;alignment:dword; <br>
+    &nbsp;&nbsp;buffer:dword; <br>
+    &nbsp;&nbsp;bytesrecieved:dword; <br>
+    &nbsp;&nbsp;bytesXmit:dword; <br>
+    &nbsp;&nbsp;ConnectSpeed:dword; <br>
+    &nbsp;&nbsp;CRC:dword; <br>
+    &nbsp;&nbsp;framesrecieved:dword; <br>
+    &nbsp;&nbsp;FramesXmit:dword; <br>
+    &nbsp;&nbsp;Framing:dword; <br>
+    &nbsp;&nbsp;runts:dword; <br>
+    &nbsp;&nbsp;Overrun:dword; <br>
+    &nbsp;&nbsp;timeout:dword; <br>
+    &nbsp;&nbsp;totalbytesrecieved:dword; <br>
+    &nbsp;&nbsp;totalbytesXmit:dword; <br>
+    end; <br>
+    <br>
+    type TKernelInfo = record <br>
+    &nbsp;&nbsp;CpuUsagePcnt:dword; <br>
+    &nbsp;&nbsp;Numthreads:dword; <br>
+    &nbsp;&nbsp;NumVMS:dword; <br>
+    end; <br>
+    <br>
+    type TVCACHEInfo = record <br>
+    &nbsp;&nbsp;ccurpages:dword; <br>
+    &nbsp;&nbsp;cMacPages:dword; <br>
+    &nbsp;&nbsp;cminpages:dword; <br>
+    &nbsp;&nbsp;FailedRecycles:dword; <br>
+    &nbsp;&nbsp;Hits:dword; <br>
+    &nbsp;&nbsp;LRUBuffers:dword; <br>
+    &nbsp;&nbsp;LRURecycles:dword; <br>
+    &nbsp;&nbsp;Misses:dword; <br>
+    &nbsp;&nbsp;RandomRecycles:dword; <br>
+    end; <br>
+    <br>
+    type TFATInfo = record <br>
+    &nbsp;&nbsp;BreadsSec:dword; <br>
+    &nbsp;&nbsp;BwritesSec:dword; <br>
+    &nbsp;&nbsp;Dirtydata:dword; <br>
+    &nbsp;&nbsp;ReadsSec:dword; <br>
+    &nbsp;&nbsp;WritesSec:dword; <br>
+    end; <br>
+    <br>
+    type TVMMInfo = record <br>
+    &nbsp;&nbsp;CDiscards:dword; <br>
+    &nbsp;&nbsp;CInstancefaults:dword; <br>
+    &nbsp;&nbsp;CPageFaults:dword; <br>
+    &nbsp;&nbsp;cPageIns:dword; <br>
+    &nbsp;&nbsp;cPageOuts:dword; <br>
+    &nbsp;&nbsp;cpgCommit:dword; <br>
+    &nbsp;&nbsp;cpgDiskCache:dword; <br>
+    &nbsp;&nbsp;cpgDiskCacheMac:dword; <br>
+    &nbsp;&nbsp;cpgDiskCacheMid:dword; <br>
+    &nbsp;&nbsp;cpgDiskCacheMin:dword; <br>
+    &nbsp;&nbsp;cpgfree:dword; <br>
+    <br>
+    &nbsp;&nbsp;cpglocked:dword; <br>
+    &nbsp;&nbsp;cpglockedNoncache:dword; <br>
+    &nbsp;&nbsp;cpgother:dword; <br>
+    &nbsp;&nbsp;cpgsharedpages:dword; <br>
+    &nbsp;&nbsp;cpgswap:dword; <br>
+    &nbsp;&nbsp;cpgswapfile:dword; <br>
+    &nbsp;&nbsp;cpgswapfiledefective:dword; <br>
+    &nbsp;&nbsp;cpgswapfileinuse:dword; <br>
+    end; <br>
+    <br>
+    type <br>
+    &nbsp;&nbsp;TSysInfo = class(TComponent) <br>
+    &nbsp;&nbsp;private <br>
+    &nbsp;&nbsp; fDialupAdapterInfo:TDialupAdapterInfo; <br>
+    &nbsp;&nbsp; fKernelInfo:TKernelInfo; <br>
+    &nbsp;&nbsp; fVCACHEInfo:TVCACHEInfo; <br>
+    &nbsp;&nbsp; fFATInfo:TFATInfo; <br>
+    &nbsp;&nbsp; fVMMInfo:TVMMInfo; <br>
+    &nbsp;&nbsp; ftimer:TTimer; <br>
+    &nbsp;&nbsp; fupdateinterval:integer; <br>
+    &nbsp;&nbsp; tmp:dword; <br>
+    &nbsp;&nbsp; vsize:dword; <br>
+    &nbsp;&nbsp; pkey:hkey; <br>
+    &nbsp;&nbsp; regtype:pdword; <br>
+    &nbsp;&nbsp; fstopped:boolean; <br>
+    &nbsp;&nbsp; procedure fupdatinginfo(sender:tobject); <br>
+    &nbsp;&nbsp; procedure fsetupdateinterval(aupdateinterval:integer); <br>
+    &nbsp;&nbsp;protected <br>
+    &nbsp;&nbsp; fsysInfoChanged:TNotifyEvent; <br>
+    &nbsp;&nbsp;public <br>
+    &nbsp;&nbsp; constructor Create(Aowner:Tcomponent);override; <br>
+    &nbsp;&nbsp; destructor&nbsp;&nbsp;Destroy;override; <br>
+    <br>
+    &nbsp;&nbsp; property DialupAdapterInfo: TDialupAdapterInfo read fDialupAdapterInfo; <br>
+    &nbsp;&nbsp; property KernelInfo: TKernelInfo read fKernelInfo; <br>
+    &nbsp;&nbsp; property VCACHEInfo: TVCACHEInfo read fVCACHEInfo; <br>
+    &nbsp;&nbsp; property FATInfo: TFATInfo read fFATInfo; <br>
+    &nbsp;&nbsp; property VMMInfo: TVMMInfo read fVMMInfo; <br>
+    &nbsp;&nbsp; procedure StartRecievingInfo; <br>
+    &nbsp;&nbsp; procedure StopRecievingInfo; <br>
+    &nbsp;&nbsp;published <br>
+    &nbsp;&nbsp; property SysInfoChanged:TNotifyEvent read fsysInfoChanged write <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;fsysInfoChanged;//Это событие вызывается
+    после определённого интервала времени. <br>
+    &nbsp;&nbsp; property UpdateInterval:integer read fupdateInterval write <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;fsetupdateinterval default 5000; <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    procedure Register; <br>
+    <br>
+    implementation <br>
+    <br>
+    constructor TSysInfo.Create(Aowner:Tcomponent); <br>
+    begin <br>
+    inherited; <br>
+    ftimer:=ttimer.Create(self); <br>
+    ftimer.enabled:=false; <br>
+    ftimer.OnTimer:=fupdatinginfo; <br>
+    vsize:=4; <br>
+    fstopped:=true; <br>
+    end; <br>
+    <br>
+    procedure TSysInfo.startrecievingInfo; <br>
+    var <br>
+    res:integer; <br>
+    begin <br>
+    res:=RegOpenKeyEx(HKEY_DYN_DATA,'PerfStats\StartStat',0,KEY_ALL_ACCESS,pkey); <br>
+    if res&lt;&gt;0 then <br>
+    &nbsp;&nbsp;raise exception.Create('Could not open registry key'); <br>
+    fstopped:=false; <br>
+    // Для Dial Up Адаптера <br>
+    RegQueryValueEx(pkey,'Dial-Up Adapter\Alignment',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'Dial-Up Adapter\Buffer',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'Dial-Up Adapter\Framing',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'Dial-Up Adapter\Overrun ',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'Dial-Up Adapter\Timeout',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'Dial-Up Adapter\CRC',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'Dial-Up Adapter\Runts',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'Dial-Up Adapter\FramesXmit',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'Dial-Up Adapter\FramesRecvd',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'Dial-Up Adapter\BytesXmit',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'Dial-Up Adapter\BytesRecvd',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'Dial-Up Adapter\TotalBytesXmit',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'Dial-Up Adapter\TotalBytesRecvd',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'Dial-Up Adapter\ConnectSpeed',nil,regtype,@tmp,@vsize); <br>
+    <br>
+    // Для VCACHE <br>
+    RegQueryValueEx(pkey,'VCACHE\LRUBuffers',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'VCACHE\FailedRecycles',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'VCACHE\RandomRecycles',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'VCACHE\LRURecycles',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'VCACHE\Misses',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'VCACHE\Hits',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'VCACHE\cMacPages',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'VCACHE\cMinPages',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'VCACHE\cCurPages',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'Dial-Up Adapter\BytesXmit',nil,regtype,@tmp,@vsize); <br>
+    <br>
+    //Для VFAT <br>
+    <br>
+    RegQueryValueEx(pkey,'VFAT\DirtyData',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'VFAT\BReadsSec',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'VFAT\BWritesSec',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'VFAT\ReadsSec',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'VFAT\WritesSec',nil,regtype,@tmp,@vsize); <br>
+    //Для VMM <br>
+    <br>
+    RegQueryValueEx(pkey,'VMM\cpgLockedNoncache',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'VMM\cpgCommit',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'VMM\cpgSharedPages',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'VMM\cpgDiskcacheMid',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'VMM\cpgDiskcacheMac',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'VMM\cpgDiskcacheMin',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'VMM\cpgDiskcache',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'VMM\cpgSwapfileDefective',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'VMM\cpgSwapfileInUse',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'VMM\cpgSwapfile',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'VMM\cDiscards',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'VMM\cPageOuts',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'VMM\cPageIns',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'VMM\cInstanceFaults',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'VMM\cPageFaults',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'VMM\cpgOther',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'VMM\cpgSwap',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'VMM\cpgLocked',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'VMM\cpgFree',nil,regtype,@tmp,@vsize); <br>
+    //Для KERNEL <br>
+    RegQueryValueEx(pkey,'KERNEL\CPUUsage',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'KERNEL\VMs',nil,regtype,@tmp,@vsize); <br>
+    RegQueryValueEx(pkey,'KERNEL\Threads',nil,regtype,@tmp,@vsize); <br>
+    RegCloseKey(pkey); <br>
+    ftimer.enabled:=true; <br>
+    end; <br>
+    <br>
+    procedure tsysinfo.fupdatinginfo(sender:tobject); <br>
+    var <br>
+    res:integer; <br>
+    begin <br>
+    res:=RegOpenKeyEx(HKEY_DYN_DATA,'PerfStats\StatData',0,KEY_ALL_ACCESS,pkey); <br>
+    if res&lt;&gt;0 then <br>
+    &nbsp;&nbsp;raise exception.Create('Could not open registry key'); <br>
+    //Для Dial Up Адаптера <br>
+    RegQueryValueEx(pkey,'Dial-Up
+    Adapter\Alignment',nil,regtype,@fDialupAdapterInfo.alignment,@vsize); <br>
+    RegQueryValueEx(pkey,'Dial-Up
+    Adapter\Buffer',nil,regtype,@fDialupAdapterInfo.buffer,@vsize); <br>
+    RegQueryValueEx(pkey,'Dial-Up
+    Adapter\Framing',nil,regtype,@fDialupAdapterInfo.framing,@vsize); <br>
+    RegQueryValueEx(pkey,'Dial-Up Adapter\Overrun
+    ',nil,regtype,@fDialupAdapterInfo.overrun,@vsize); <br>
+    RegQueryValueEx(pkey,'Dial-Up
+    Adapter\Timeout',nil,regtype,@fDialupAdapterInfo.timeout,@vsize); <br>
+    RegQueryValueEx(pkey,'Dial-Up Adapter\CRC',nil,regtype,@fDialupAdapterInfo.crc,@vsize); <br>
+    RegQueryValueEx(pkey,'Dial-Up
+    Adapter\Runts',nil,regtype,@fDialupAdapterInfo.runts,@vsize); <br>
+    RegQueryValueEx(pkey,'Dial-Up
+    Adapter\FramesXmit',nil,regtype,@fDialupAdapterInfo.framesxmit,@vsize); <br>
+    RegQueryValueEx(pkey,'Dial-Up
+    Adapter\FramesRecvd',nil,regtype,@fDialupAdapterInfo.framesrecieved,@vsize); <br>
+    RegQueryValueEx(pkey,'Dial-Up
+    Adapter\BytesXmit',nil,regtype,@fDialupAdapterInfo.bytesxmit,@vsize); <br>
+    RegQueryValueEx(pkey,'Dial-Up
+    Adapter\BytesRecvd',nil,regtype,@fDialupAdapterInfo.bytesrecieved,@vsize); <br>
+    RegQueryValueEx(pkey,'Dial-Up
+    Adapter\TotalBytesXmit',nil,regtype,@fDialupAdapterInfo.totalbytesxmit,@vsize); <br>
+    RegQueryValueEx(pkey,'Dial-Up
+    Adapter\TotalBytesRecvd',nil,regtype,@fDialupAdapterInfo.totalbytesrecieved,@vsize); <br>
+    RegQueryValueEx(pkey,'Dial-Up
+    Adapter\ConnectSpeed',nil,regtype,@fDialupAdapterInfo.connectspeed,@vsize); <br>
+    // Для VCACHE <br>
+    RegQueryValueEx(pkey,'VCACHE\LRUBuffers',nil,regtype,@fVCACHEInfo.lrubuffers,@vsize); <br>
+    RegQueryValueEx(pkey,'VCACHE\FailedRecycles',nil,regtype,@fVCACHEInfo.failedrecycles,@vsize);
+    <br>
+    RegQueryValueEx(pkey,'VCACHE\RandomRecycles',nil,regtype,@fVCACHEInfo.randomrecycles,@vsize);
+    <br>
+    RegQueryValueEx(pkey,'VCACHE\LRURecycles',nil,regtype,@fVCACHEInfo.lrurecycles,@vsize); <br>
+    RegQueryValueEx(pkey,'VCACHE\Misses',nil,regtype,@fVCACHEInfo.misses,@vsize); <br>
+    RegQueryValueEx(pkey,'VCACHE\Hits',nil,regtype,@fVCACHEInfo.hits,@vsize); <br>
+    RegQueryValueEx(pkey,'VCACHE\cMacPages',nil,regtype,@fVCACHEInfo.cmacpages,@vsize); <br>
+    RegQueryValueEx(pkey,'VCACHE\cMinPages',nil,regtype,@fVCACHEInfo.cminpages,@vsize); <br>
+    RegQueryValueEx(pkey,'VCACHE\cCurPages',nil,regtype,@fVCACHEInfo.ccurpages,@vsize); <br>
+    //Для VFAT <br>
+    RegQueryValueEx(pkey,'VFAT\DirtyData',nil,regtype,@ffatinfo.dirtydata,@vsize); <br>
+    RegQueryValueEx(pkey,'VFAT\BReadsSec',nil,regtype,@ffatinfo.breadssec,@vsize); <br>
+    RegQueryValueEx(pkey,'VFAT\BWritesSec',nil,regtype,@ffatinfo.bwritessec,@vsize); <br>
+    RegQueryValueEx(pkey,'VFAT\ReadsSec',nil,regtype,@ffatinfo.readssec,@vsize); <br>
+    RegQueryValueEx(pkey,'VFAT\WritesSec',nil,regtype,@ffatinfo.writessec,@vsize); <br>
+    //Для VMM <br>
+    RegQueryValueEx(pkey,'VMM\cpgLockedNoncache',nil,regtype,@fvmminfo.cpglockednoncache,@vsize);
+    <br>
+    RegQueryValueEx(pkey,'VMM\cpgCommit',nil,regtype,@fvmminfo.cpgcommit,@vsize); <br>
+    RegQueryValueEx(pkey,'VMM\cpgSharedPages',nil,regtype,@fvmminfo.cpgsharedpages,@vsize); <br>
+    RegQueryValueEx(pkey,'VMM\cpgDiskcacheMid',nil,regtype,@fvmminfo.cpgdiskcacheMid,@vsize); <br>
+    RegQueryValueEx(pkey,'VMM\cpgDiskcacheMac',nil,regtype,@fvmminfo.cpgdiskcacheMac,@vsize); <br>
+    RegQueryValueEx(pkey,'VMM\cpgDiskcacheMin',nil,regtype,@fvmminfo.cpgdiskcacheMin,@vsize); <br>
+    RegQueryValueEx(pkey,'VMM\cpgDiskcache',nil,regtype,@fvmminfo.cpgdiskcache,@vsize); <br>
+    RegQueryValueEx(pkey,'VMM\cpgSwapfileDefective',nil,regtype,@fvmminfo.cpgswapfiledefective,@vsize);
+    <br>
+    RegQueryValueEx(pkey,'VMM\cpgSwapfileInUse',nil,regtype,@fvmminfo.cpgswapfileinuse,@vsize);
+    <br>
+    RegQueryValueEx(pkey,'VMM\cpgSwapfile',nil,regtype,@fvmminfo.cpgswapfile,@vsize); <br>
+    RegQueryValueEx(pkey,'VMM\cDiscards',nil,regtype,@fvmminfo.cdiscards,@vsize); <br>
+    RegQueryValueEx(pkey,'VMM\cPageOuts',nil,regtype,@fvmminfo.cpageouts,@vsize); <br>
+    RegQueryValueEx(pkey,'VMM\cPageIns',nil,regtype,@fvmminfo.cpageins,@vsize); <br>
+    RegQueryValueEx(pkey,'VMM\cInstanceFaults',nil,regtype,@fvmminfo.cinstancefaults,@vsize); <br>
+    RegQueryValueEx(pkey,'VMM\cPageFaults',nil,regtype,@fvmminfo.cpagefaults,@vsize); <br>
+    RegQueryValueEx(pkey,'VMM\cpgOther',nil,regtype,@fvmminfo.cpgother,@vsize); <br>
+    RegQueryValueEx(pkey,'VMM\cpgSwap',nil,regtype,@fvmminfo.cpgswap,@vsize); <br>
+    RegQueryValueEx(pkey,'VMM\cpgLocked',nil,regtype,@fvmminfo.cpglocked,@vsize); <br>
+    RegQueryValueEx(pkey,'VMM\cpgFree',nil,regtype,@fvmminfo.cpgfree,@vsize); <br>
+    //Для KERNEL <br>
+    RegQueryValueEx(pkey,'KERNEL\CPUUsage',nil,regtype,@fkernelinfo.cpuusagepcnt,@vsize); <br>
+    RegQueryValueEx(pkey,'KERNEL\VMs',nil,regtype,@fkernelinfo.numvms,@vsize); <br>
+    RegQueryValueEx(pkey,'KERNEL\Threads',nil,regtype,@fkernelinfo.numThreads,@vsize); <br>
+    RegCloseKey(pkey); <br>
+    if assigned(SysInfoChanged) then <br>
+    &nbsp;&nbsp;SysInfoChanged(self); <br>
+    end; <br>
+    <br>
+    procedure TSysInfo.stoprecievingInfo; <br>
+    var <br>
+    res:integer; <br>
+    begin <br>
+    res:=RegOpenKeyEx(HKEY_DYN_DATA,'PerfStats\StopStat',0,KEY_ALL_ACCESS,pkey); <br>
+    if not fstopped then <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp; if res&lt;&gt;0 then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;raise exception.Create('Could not open registry key'); <br>
+    &nbsp;&nbsp; //Для Dial Up Адаптера <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'Dial-Up Adapter\Alignment',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'Dial-Up Adapter\Buffer',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'Dial-Up Adapter\Framing',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'Dial-Up Adapter\Overrun ',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'Dial-Up Adapter\Timeout',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'Dial-Up Adapter\CRC',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'Dial-Up Adapter\Runts',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'Dial-Up Adapter\FramesXmit',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'Dial-Up Adapter\FramesRecvd',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'Dial-Up Adapter\BytesXmit',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'Dial-Up Adapter\BytesRecvd',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'Dial-Up
+    Adapter\TotalBytesXmit',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'Dial-Up
+    Adapter\TotalBytesRecvd',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'Dial-Up Adapter\ConnectSpeed',nil,regtype,@tmp,@vsize);
+    <br>
+    <br>
+    &nbsp;&nbsp; // Для VCACHE <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'VCACHE\LRUBuffers',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'VCACHE\FailedRecycles',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'VCACHE\RandomRecycles',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'VCACHE\LRURecycles',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'VCACHE\Misses',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'VCACHE\Hits',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'VCACHE\cMacPages',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'VCACHE\cMinPages',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'VCACHE\cCurPages',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'Dial-Up Adapter\BytesXmit',nil,regtype,@tmp,@vsize); <br>
+    <br>
+    &nbsp;&nbsp; //Для VFAT <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'VFAT\DirtyData',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'VFAT\BReadsSec',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'VFAT\BWritesSec',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'VFAT\ReadsSec',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'VFAT\WritesSec',nil,regtype,@tmp,@vsize); <br>
+    <br>
+    &nbsp;&nbsp; //Для VMM <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'VMM\cpgLockedNoncache',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'VMM\cpgCommit',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'VMM\cpgSharedPages',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'VMM\cpgDiskcacheMid',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'VMM\cpgDiskcacheMac',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'VMM\cpgDiskcacheMin',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'VMM\cpgDiskcache',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'VMM\cpgSwapfileDefective',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'VMM\cpgSwapfileInUse',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'VMM\cpgSwapfile',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'VMM\cDiscards',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'VMM\cPageOuts',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'VMM\cPageIns',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'VMM\cInstanceFaults',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'VMM\cPageFaults',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'VMM\cpgOther',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'VMM\cpgSwap',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'VMM\cpgLocked',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'VMM\cpgFree',nil,regtype,@tmp,@vsize); <br>
+    <br>
+    &nbsp;&nbsp; //Для KERNEL <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'KERNEL\CPUUsage',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'KERNEL\VMs',nil,regtype,@tmp,@vsize); <br>
+    &nbsp;&nbsp; RegQueryValueEx(pkey,'KERNEL\Threads',nil,regtype,@tmp,@vsize); <br>
+    <br>
+    &nbsp;&nbsp; RegCloseKey(pkey); <br>
+    &nbsp;&nbsp; ftimer.enabled:=false; <br>
+    &nbsp;&nbsp; fstopped:=true; <br>
+    &nbsp;&nbsp;end; <br>
+    end; <br>
+    <br>
+    procedure tsysinfo.fsetupdateinterval(aupdateinterval:integer); <br>
+    begin <br>
+    if (ftimer&lt;&gt;nil) and(aupdateinterval&gt;0) then <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;ftimer.Interval:=aupdateinterval; <br>
+    &nbsp;&nbsp;fupdateinterval:=aupdateinterval; <br>
+    end; <br>
+    if (ftimer&lt;&gt;nil) and(aupdateinterval=0) then <br>
+    begin <br>
+    &nbsp;&nbsp;ftimer.Interval:=500; <br>
+    &nbsp;&nbsp;fupdateinterval:=500; <br>
+    end; <br>
+    <br>
+    end; <br>
+    <br>
+    destructor tsysinfo.Destroy; <br>
+    begin <br>
+    StopRecievingInfo; <br>
+    ftimer.Destroy; <br>
+    inherited; <br>
+    end; <br>
+    <br>
+    procedure Register; <br>
+    begin <br>
+    &nbsp;&nbsp;RegisterComponents('Samples', [TSysInfo]); <br>
+    end; <br>
+    <br>
+    <br>
+    Скопируйте это в файл .pas и проинсталлируйте его. </font></p>
+    <p><font face="Tahoma" size="-1"><br>
+    </font></td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

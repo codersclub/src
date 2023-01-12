@@ -1,0 +1,146 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Обмен данными с Excel.</h3>
+    <p>Автор: <a href="mailto:magico@galaxycorp.com">Fernando Silva</a></p>
+    <p>В Delphi 5, для обмена данными между Вашим
+    приложением и Excel можно использовать компонент
+    TExcelApplication, доступный на Servers Page в Component Palette. </p>
+    <p>Совместимость: Delphi (5.x или выше)</p>
+    <p>На форме находится TStringGrid, заполненный
+    некоторыми данными и две кнопки, с названиями To
+    Excel и From Excel. Так же на форме находится компонент
+    TExcelApplication со свойством Name, содержащим XLApp и
+    свойством ConnectKind, содержащим ckNewInstance. <br>
+    <br>
+    Когда нам необходимо работать с Excel, то обычно мы
+    открываем ExcelApplication, затем открываем WorkBook и в
+    конце используем WorkSheet. <br>
+    <br>
+    Итак, несомненный интерес представляет для нас
+    листы (WorkSheets) в книге (WorkBook). Давайте посмотрим как
+    всё это работает. <br>
+    <br>
+    <b>Посылка данных в Excel</b><br>
+    <br>
+    Это можно сделать с помощью следующей процедуры :
+    <br>
+    <br>
+    procedure TForm1.BitBtnToExcelOnClick(Sender: TObject); <br>
+    var <br>
+    WorkBk : _WorkBook; //&nbsp;&nbsp;определяем WorkBook <br>
+    WorkSheet : _WorkSheet; //&nbsp;&nbsp;определяем WorkSheet <br>
+    I, J, K, R, C : Integer; <br>
+    IIndex : OleVariant; <br>
+    TabGrid : Variant; <br>
+    begin <br>
+    if GenericStringGrid.Cells[0,1] &lt;&gt; '' then <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp; IIndex := 1; <br>
+    &nbsp;&nbsp; R := GenericStringGrid.RowCount; <br>
+    &nbsp;&nbsp; C := GenericStringGrid.ColCount; <br>
+    &nbsp;&nbsp; // Создаём массив-матрицу <br>
+    &nbsp;&nbsp; TabGrid := VarArrayCreate([0,(R - 1),0,(C - 1)],VarOleStr); <br>
+    &nbsp;&nbsp; I := 0; <br>
+    &nbsp;&nbsp; //&nbsp;&nbsp;Определяем цикл для заполнения
+    массива-матрицы <br>
+    &nbsp;&nbsp; repeat <br>
+    &nbsp;&nbsp; for J := 0 to (C - 1) do <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; TabGrid[I,J] := GenericStringGrid.Cells[J,I]; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Inc(I,1); <br>
+    &nbsp;&nbsp; until <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;I &gt; (R - 1); <br>
+    <br>
+    &nbsp;&nbsp; // Соединяемся с сервером TExcelApplication <br>
+    &nbsp;&nbsp; XLApp.Connect; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// Добавляем WorkBooks в ExcelApplication <br>
+    &nbsp;&nbsp; XLApp.WorkBooks.Add(xlWBatWorkSheet,0); <br>
+    &nbsp;&nbsp; // Выбираем первую WorkBook <br>
+    &nbsp;&nbsp; WorkBk := XLApp.WorkBooks.Item[IIndex]; <br>
+    &nbsp;&nbsp; // Определяем первый WorkSheet <br>
+    &nbsp;&nbsp; WorkSheet := WorkBk.WorkSheets.Get_Item(1) as _WorkSheet; <br>
+    &nbsp;&nbsp; // Сопоставляем Delphi массив-матрицу с
+    матрицей в WorkSheet <br>
+    &nbsp;&nbsp; Worksheet.Range['A1',Worksheet.Cells.Item[R,C]].Value := TabGrid; <br>
+    &nbsp;&nbsp; // Заполняем свойства WorkSheet <br>
+    &nbsp;&nbsp; WorkSheet.Name := 'Customers'; <br>
+    &nbsp;&nbsp; Worksheet.Columns.Font.Bold := True; <br>
+    &nbsp;&nbsp; Worksheet.Columns.HorizontalAlignment := xlRight; <br>
+    &nbsp;&nbsp; WorkSheet.Columns.ColumnWidth := 14; <br>
+    &nbsp;&nbsp; // Заполняем всю первую колонку <br>
+    &nbsp;&nbsp; WorkSheet.Range['A' + IntToStr(1),'A' + IntToStr(R)].Font.Color := clBlue; <br>
+    &nbsp;&nbsp; WorkSheet.Range['A' + IntToStr(1),'A' + IntToStr(R)].HorizontalAlignment :=
+    xlHAlignLeft; <br>
+    &nbsp;&nbsp; WorkSheet.Range['A' + IntToStr(1),'A' + IntToStr(R)].ColumnWidth := 31; <br>
+    &nbsp;&nbsp; // Показываем Excel <br>
+    &nbsp;&nbsp; XLApp.Visible[0] := True; <br>
+    &nbsp;&nbsp; // Разрываем связь с сервером <br>
+    &nbsp;&nbsp; XLApp.Disconnect; <br>
+    &nbsp;&nbsp; // Unassign the Delphi Variant Matrix <br>
+    &nbsp;&nbsp; TabGrid := Unassigned; <br>
+    &nbsp;&nbsp;end; <br>
+    end; <br>
+    <br>
+    <br>
+    <b>Получение данных из Excel</b><br>
+    <br>
+    Это можно сделать с помощью следующей процедуры :
+    <br>
+    &nbsp;&nbsp; <br>
+    procedure TForm1.BitBtnFromExcelOnClick(Sender: TObject); <br>
+    var <br>
+    WorkBk : _WorkBook; <br>
+    WorkSheet : _WorkSheet; <br>
+    K, R, X, Y : Integer; <br>
+    IIndex : OleVariant; <br>
+    RangeMatrix : Variant; <br>
+    NomFich : WideString; <br>
+    begin <br>
+    NomFich := ‘C:\MyDirectory\NameOfFile.xls’; <br>
+    IIndex := 1; <br>
+    XLApp.Connect; <br>
+    // Открываем файл Excel <br>
+    XLApp.WorkBooks.Open(NomFich,EmptyParam,EmptyParam,EmptyParam,EmptyParam,
+    EmptyParam,EmptyParam,EmptyParam,EmptyParam,EmptyParam,EmptyParam, <br>
+    EmptyParam,EmptyParam,0); <br>
+    WorkBk := XLApp.WorkBooks.Item[IIndex]; <br>
+    WorkSheet := WorkBk.WorkSheets.Get_Item(1) as _WorkSheet; <br>
+    // Чтобы знать размер листа (WorkSheet), т.е. количество
+    строк и количество <br>
+    // столбцов, мы активируем его последнюю непустую
+    ячейку<br>
+    WorkSheet.Cells.SpecialCells(xlCellTypeLastCell,EmptyParam).Activate; <br>
+    // Получаем значение последней строки<br>
+    X := XLApp.ActiveCell.Row; <br>
+    // Получаем значение последней колонки<br>
+    Y := XLApp.ActiveCell.Column; <br>
+    // Определяем количество колонок в TStringGrid <br>
+    &nbsp;&nbsp;GenericStringGrid.ColCount := Y; <br>
+    // Сопоставляем матрицу WorkSheet с нашей Delphi матрицей<br>
+    &nbsp;&nbsp;RangeMatrix := XLApp.Range['A1',XLApp.Cells.Item[X,Y]].Value; <br>
+    // Выходим из Excel и отсоединяемся от сервера <br>
+    &nbsp;&nbsp;XLApp.Quit; <br>
+    &nbsp;&nbsp;XLApp.Disconnect; <br>
+    //&nbsp;&nbsp;Определяем цикл для заполнения TStringGrid <br>
+    &nbsp;&nbsp;K := 1; <br>
+    &nbsp;&nbsp;repeat <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;for R := 1 to Y do <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;GenericStringGrid.Cells[(R - 1),(K - 1)] :=
+    RangeMatrix[K,R]; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Inc(K,1); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;GenericStringGrid.RowCount := K + 1; <br>
+    &nbsp;&nbsp;until <br>
+    &nbsp;&nbsp; K &gt; X; <br>
+    // Unassign the Delphi Variant Matrix <br>
+    &nbsp;&nbsp; RangeMatrix := Unassigned; <br>
+    end; <br>
+    </p>
+    <p><br>
+    </td>
+  </tr>
+</table>
+</center></div></TBODY>
+<!--#include virtual="/ssi/bottom.html"-->

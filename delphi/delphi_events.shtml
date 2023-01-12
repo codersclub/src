@@ -1,0 +1,151 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="650" cellspacing="0" cellpadding="0">
+  <tr>
+    <td>&nbsp;<div class="shadow"><p align="center"><font size="4"><b>События,
+    происходящие в приложениях Delphi при завершении
+    работы Windows</b></font> </p>
+    </div><p>&nbsp; </p>
+    <div class="first"><p>Я провел небольшое исследование, и
+    вот что я выяснил: </p>
+    </div><p>При закрытии приложения (используя
+    системное меню или вызывая метод закрытия формы),
+    возникают следующие события:<ol>
+      <li>FormCloseQuery - действие по умолчанию, устанавливает
+        переменную CanClose в значание TRUE и продолжает
+        закрытие формы. <div></div></li>
+      <li>FormClose </li>
+      <li>FormDestroy </li>
+    </ol>
+    <p>Если приложение активно и вы пытаетесь
+    завершить работу Windows (Shut Down), происходят
+    следующие события (с соблюдением
+    последовательности):<ol>
+      <li>FormCloseQuery </li>
+      <li>FormDestroy </li>
+    </ol>
+    <p>Мы видим, что метод FormClose в этом случае не
+    вызывается.</p>
+    <p>Теперь воспроизведем всю последовательность
+    событий, происходящую при попытке завершить
+    работу Windows:<ol>
+      <li>Windows посылает сообщение WM_QUERYENDSESSION всем
+        приложениям и ожидает ответ. </li>
+      <li>Каждое приложение получает сообщение и
+        возвращает одну из величин: не равную нулю -
+        приложение готово завершить свою работу, 0 -
+        приложение не может завершить свою работу. </li>
+      <li>Если одно из приложений возвращает 0, Windows не
+        завершает свою работу, а снова рассылает всем
+        окнам сообщение, на этот раз WM_ENDSESSION. </li>
+      <li>Каждое приложение должно снова подтвердить
+        свою готовность завершить работу, поэтому
+        операционная система ожидает ответа TRUE, резонно
+        предполагая, что оставшиеся приложения с момента
+        предыдущего сообщения закрыли свои сессии и
+        готовы завершить работу. Теперь посмотрим, как на
+        это реагирует Delphi-приложение: приложение
+        возвращает значение TRUE и немедленно вызывает
+        метод FormDestroy, игнорируя при этом метод FormClose.
+        Налицо проблема. </li>
+      <li>Завершение работы Windows. </li>
+    </ol>
+    <p>Первое решение проблемы: приложение Delphi на
+    сообщение WM_QUERYENDSESSION должно возвратить 0, не дав
+    при этом Windows завершить свою работу. При этом
+    бессмысленно пытаться воспользоваться методом
+    FormCloseQuery, поскольку нет возможности определить
+    виновника завершения работы приложения (это
+    может являться как результатом сообщения
+    WM_QUERYENDSESSION, так и просто действием пользователя
+    при попытке закрыть приложение).</p>
+    <p>Другое решение состоит в том, чтобы при
+    получении сообщения WM_QUERYENDSESSION самим выполнить
+    необходимые действия, вызвав метод FormClose.</p>
+    <div class="gl"><p>Пример: </p>
+    </div><p>&nbsp; </p>
+    <hr>
+    <table border="0">
+<TBODY>
+      <tr>
+        <td bgColor="#f0f0f0"><font face="Courier New" size="2"><b>unit</b> Unit1;<br>
+        <b>interface<br>
+        uses</b><br>
+        <div class="O2"><p>SysUtils, WinTypes, WinProcs, Messages, Classes, Graphics, Controls,
+        Forms, </p>
+        </div><p>Dialogs;<br>
+        <b>type</b><br>
+        </p>
+        <div class="O2"><p>TForm1 = <b>class</b>(TForm) </p>
+        </div><div class="O4"><p>procedure FormClose(Sender: TObject; <b>var</b> Action:
+        TCloseAction); </p>
+        </div><div class="O2"><b><p>private</b> </p>
+        </div><div class="O2"><font color="#408080"><p>{--------------------------------------------------------}
+        </p>
+        </div><div class="O2"><p>{ Объявляем свой обработчик
+        сообщения WM_QUERYENDSESSION } </p>
+        </div><div class="O2"><p>{--------------------------------------------------------}</font>
+        </p>
+        </div><div class="O2"><b><p>procedure</b> WMQueryEndSession( </p>
+        </div><div class="O13"><b><p>var Message</b>: TWMQueryEndSession); <b>message</b>
+        WM_QUERYENDSESSION; </p>
+        </div><div class="O2"><b><p>public</b> </p>
+        </div><div class="O4"><font color="#408080"><p>{ Public declarations }</font> </p>
+        </div><div class="O2"><b><p>end</b>; </p>
+        </div><p><b>var</b><br>
+        </p>
+        <div class="O2"><p>Form1&nbsp;&nbsp;&nbsp;&nbsp;: TForm1; </p>
+        </div><p><br>
+        <b>implementation</b><br>
+        <font color="#408080">{$R *.DFM}<br>
+        <br>
+        {--------------------------------------------------------------}<br>
+        { Создаем процедуру обработки сообщения
+        WM_QUERYENDSESSION.&nbsp;&nbsp;&nbsp; }<br>
+        { Приложение получит только это сообщение при
+        попытке Windows&nbsp;&nbsp;}<br>
+        { завершить работу&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+        {--------------------------------------------------------------}</font><br>
+        <b>procedure</b> TForm1.WMQueryEndSession(<b>var Message</b>: TWMQueryEndSession);<br>
+        <b>begin</b><br>
+        </p>
+        <div class="O2"><b><p>inherited</b>;&nbsp;&nbsp;&nbsp;<font color="#408080">{
+        сначала сообщание должен обработать наследуемый
+        метод } </p>
+        </div><div class="O2"><p>{--------------------------------------------------------------------}
+        </p>
+        </div><div class="O2"><p>{ в этой точке вы также можете
+        сообщить Windows о неготовности&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+        </p>
+        </div><div class="O2"><p>{ приложения завершить работу...&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+        </p>
+        </div><div class="O2"><p>{
+        Message.Result:=0;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+        </p>
+        </div><div class="O2"><p>{-------------------------------------------или----------------------}
+        </p>
+        </div><div class="O2"><p>{ вызов процедуры освобождения
+        ресурсов, предусмотренной в FormClose } </p>
+        </div><div class="O2"><p>{
+        MyCleanUpProcedure;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+        </p>
+        </div><div class="O2"><p>{--------------------------------------------------------------------}</font>
+        </p>
+        </div><p><b>end</b>;<br>
+        <br>
+        <b>procedure</b> TForm1.FormClose(Sender: TObject; <b>var</b> Action: TCloseAction);<br>
+        <b>begin</b><br>
+        </p>
+        <div class="O2"><p>MyCleanUpProcedure; </p>
+        </div><p><b>end</b>;<br>
+        <br>
+        <b>end</b>.</font></td>
+      </tr>
+</TBODY>
+    </table>
+    </td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

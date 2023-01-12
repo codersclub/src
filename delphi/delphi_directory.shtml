@@ -1,0 +1,267 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <p><b>Как получить список файлов в указанной
+    директории, а заодно и список поддиректорий ? </b></p>
+    <p><font face="Tahoma" style="font-size: 8pt" size="-1">(Для использования
+    этого объекта необходима библиотека <a
+    href="http://anso.virtualave.net/delphi_stuff_rus.htm#TRegExpr">TRegExpr</a> )<br>
+    <br>
+    <br>
+    <br>
+    {$B-} <br>
+    unit DirScan; <br>
+    <br>
+    interface <br>
+    <br>
+    uses <br>
+    RegExpr, <br>
+    SysUtils, <br>
+    Classes; <br>
+    <br>
+    type <br>
+    PDirectoryScannerItem = ^TDirectoryScannerItem; <br>
+    TDirectoryScannerItem = packed record <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Name : string; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Size : integer; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;LastWriteTime : TDateTime; <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    TOnDirScanFileProceed = procedure (Sender : TObject; const ABaseFolder : string; <br>
+    &nbsp;&nbsp; const ASearchRecord : TSearchRec; var ACancel : boolean) of object; <br>
+    TOnDirScanStartFolderScanning = procedure (Sender : TObject; const AFolder : string) of
+    object; <br>
+    TOnDirScanTimeSlice = procedure (Sender : TObject; var ACancel : boolean) of object; <br>
+    <br>
+    TCustomDirectoryScanner = class <br>
+    &nbsp;&nbsp; private <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;fRegExprMask : string; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;fRecursive : boolean; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;fCount : integer; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;fOnFileProceed : TOnDirScanFileProceed; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;fOnStartFolderScanning : TOnDirScanStartFolderScanning; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;fOnTimeSlice : TOnDirScanTimeSlice; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;fMaskRegExpr : TRegExpr; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;function BuildFileListInt (const AFolder : string) : boolean; <br>
+    &nbsp;&nbsp; public <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;constructor Create; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;destructor Destroy; override; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property Recursive : boolean read fRecursive write fRecursive; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property RegExprMask : string read fRegExprMask write
+    fRegExprMask; <br>
+    // regular expresion for file names masks (like '(\.html?|\.xml)' etc) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;function BuildFileList (AFolder : string) : boolean; <br>
+    // Build list of all files in folder AFolder. <br>
+    // If ASubFolder = true then recursivly scans subfolders. <br>
+    // Returns false if there was file error and user <br>
+    // decided to terminate process. <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property Count : integer read fCount; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// matched in last BuildFileList files count <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// Events <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property OnFileProceed : TOnDirScanFileProceed read fOnFileProceed
+    write fOnFileProceed; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// for each file matched <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property OnStartFolderScanning : TOnDirScanStartFolderScanning
+    read fOnStartFolderScanning write fOnStartFolderScanning; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// before scanning each directory (starting with root) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property OnTimeSlice : TOnDirScanTimeSlice read fOnTimeSlice write
+    fOnTimeSlice; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// for progress bur an so on (called in each internal iteration) <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    TDirectoryScanner = class (TCustomDirectoryScanner) <br>
+    // simple descendant - after BuildFileList call make list of files <br>
+    // (You can access list thru Item property) <br>
+    &nbsp;&nbsp; private <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;fList : TList; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;function GetItem (AIdx : integer) : PDirectoryScannerItem; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure KillItem (AIdx : integer); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure FileProceeding (Sender : TObject; const ABaseFolder :
+    string; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; const ASearchRecord : TSearchRec; var ACancel : boolean); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure TimeSlice (Sender : TObject; var ACancel : boolean); <br>
+    &nbsp;&nbsp; public <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;constructor Create; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;destructor Destroy; override; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property Item [AIdx : integer] : PDirectoryScannerItem read
+    GetItem; <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    <br>
+    <br>
+    implementation <br>
+    <br>
+    uses <br>
+    Windows, <br>
+    Controls, // mrYes <br>
+    TFUS; <br>
+    <br>
+    constructor TCustomDirectoryScanner.Create; <br>
+    begin <br>
+    &nbsp;&nbsp;inherited; <br>
+    &nbsp;&nbsp;fRecursive := true; <br>
+    &nbsp;&nbsp;fOnFileProceed := nil; <br>
+    &nbsp;&nbsp;fOnStartFolderScanning := nil; <br>
+    &nbsp;&nbsp;fOnTimeSlice := nil; <br>
+    &nbsp;&nbsp;fMaskRegExpr := nil; <br>
+    &nbsp;&nbsp;fRegExprMask := ''; <br>
+    end; { of constructor TDirectoryScanner.Create <br>
+    --------------------------------------------------------------} <br>
+    <br>
+    destructor TCustomDirectoryScanner.Destroy; <br>
+    begin <br>
+    &nbsp;&nbsp;fMaskRegExpr.Free; <br>
+    &nbsp;&nbsp;inherited; <br>
+    end; { of destructor TCustomDirectoryScanner.Destroy <br>
+    --------------------------------------------------------------} <br>
+    <br>
+    function TCustomDirectoryScanner.BuildFileList (AFolder : string) : boolean; <br>
+    begin <br>
+    &nbsp;&nbsp;if (length (AFolder) &gt; 0) and (AFolder [length (AFolder)] = '\') <br>
+    &nbsp;&nbsp; then AFolder := copy (AFolder, 1, length (AFolder) - 1); <br>
+    <br>
+    &nbsp;&nbsp;fMaskRegExpr := TRegExpr.Create; <br>
+    &nbsp;&nbsp;fMaskRegExpr.Expression := RegExprMask; <br>
+    <br>
+    &nbsp;&nbsp;fCount := 0; <br>
+    &nbsp;&nbsp;Result := BuildFileListInt (AFolder); <br>
+    end; { function BuildFileList <br>
+    --------------------------------------------------------------} <br>
+    <br>
+    function TCustomDirectoryScanner.BuildFileListInt (const AFolder : string) : boolean; <br>
+    var <br>
+    &nbsp;&nbsp;sr : SysUtils.TSearchRec; <br>
+    &nbsp;&nbsp;Canceled : boolean; <br>
+    begin <br>
+    &nbsp;&nbsp;Result := true; <br>
+    &nbsp;&nbsp;if Assigned (OnStartFolderScanning) <br>
+    &nbsp;&nbsp; then OnStartFolderScanning (Self, AFolder + '\'); <br>
+    <br>
+    &nbsp;&nbsp;if SysUtils.FindFirst (AFolder + '\' + '*.*', faAnyFile, sr) = 0 then try <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; REPEAT <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if (sr.Attr and
+    SysUtils.faDirectory) = SysUtils.faDirectory then begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if Recursive and
+    (sr.Name <> '.') and (sr.Name <> '..') <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;then
+    Result := BuildFileListInt (AFolder + '\' + sr.Name); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; end <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;else begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if
+    fMaskRegExpr.Exec (sr.Name) then begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canceled
+    := false; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if
+    Assigned (OnFileProceed) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    then OnFileProceed (Self, AFolder, sr, Canceled); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if
+    Canceled <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    then Result := false; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;inc
+    (fCount); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;except on E:Exception do begin
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case MsgBox
+    ('Replacing error', <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'Can''t
+    replace file contetn due to error:'#$d#$a#$d#$a <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+
+    E.Message + #$d#$a#$d#$a + 'Continue processing ?', <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mb_YesNo
+    or mb_IconQuestion) of <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mrYes
+    : Result := false; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;else ;
+    // must be No <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canceled := false; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if Assigned (OnTimeSlice) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; then OnTimeSlice (Self, Canceled); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if Canceled <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; then Result := false; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; UNTIL not Result or (SysUtils.FindNext (sr) <> 0); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;finally SysUtils.FindClose (sr); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; end; <br>
+    &nbsp;&nbsp;if not Result <br>
+    &nbsp;&nbsp; then EXIT; <br>
+    end; { function BuildFileListInt <br>
+    --------------------------------------------------------------} <br>
+    <br>
+    constructor TDirectoryScanner.Create; <br>
+    begin <br>
+    &nbsp;&nbsp;inherited; <br>
+    &nbsp;&nbsp;fList := TList.Create; <br>
+    &nbsp;&nbsp;OnFileProceed := FileProceeding; <br>
+    &nbsp;&nbsp;fOnTimeSlice := TimeSlice; <br>
+    end; { of constructor TDirectoryScanner.Create <br>
+    --------------------------------------------------------------} <br>
+    <br>
+    destructor TDirectoryScanner.Destroy; <br>
+    var <br>
+    &nbsp;&nbsp;i : integer; <br>
+    begin <br>
+    &nbsp;&nbsp;for i := fList.Count - 1 downto 0 do <br>
+    &nbsp;&nbsp; KillItem (i); <br>
+    &nbsp;&nbsp;fList.Free; <br>
+    &nbsp;&nbsp;inherited; <br>
+    end; { of destructor TDirectoryScanner.Destroy <br>
+    --------------------------------------------------------------} <br>
+    <br>
+    procedure TDirectoryScanner.KillItem (AIdx : integer); <br>
+    var <br>
+    &nbsp;&nbsp;p : PDirectoryScannerItem; <br>
+    begin <br>
+    &nbsp;&nbsp;p := PDirectoryScannerItem (fList.Items [AIdx]); <br>
+    &nbsp;&nbsp;Dispose (p); <br>
+    &nbsp;&nbsp;fList.Delete (AIdx); <br>
+    end; { of procedure TDirectoryScanner.KillItem <br>
+    --------------------------------------------------------------} <br>
+    <br>
+    function TDirectoryScanner.GetItem (AIdx : integer) : PDirectoryScannerItem; <br>
+    begin <br>
+    &nbsp;&nbsp;Result := PDirectoryScannerItem (fList.Items [AIdx]); <br>
+    end; { of function TDirectoryScanner.GetItem <br>
+    --------------------------------------------------------------} <br>
+    <br>
+    procedure TDirectoryScanner.FileProceeding (Sender : TObject; const ABaseFolder : string; <br>
+    const ASearchRecord : TSearchRec; var ACancel : boolean); <br>
+    var <br>
+    &nbsp;&nbsp;p : PDirectoryScannerItem; <br>
+    begin <br>
+    &nbsp;&nbsp;p := New (PDirectoryScannerItem); <br>
+    &nbsp;&nbsp;p.Name := ABaseFolder + '\' + ASearchRecord.Name; <br>
+    &nbsp;&nbsp;fList.Add (p); <br>
+    end; { of procedure TDirectoryScanner.FileProceeding <br>
+    --------------------------------------------------------------} <br>
+    <br>
+    procedure TDirectoryScanner.TimeSlice (Sender : TObject; var ACancel : boolean); <br>
+    begin <br>
+    &nbsp;&nbsp;if Count mod 100 = 0 <br>
+    &nbsp;&nbsp; then Sleep (0); <br>
+    end; { of procedure TDirectoryScanner.TimeSlice <br>
+    --------------------------------------------------------------} <br>
+    <br>
+    end. <br>
+    <br>
+    <br>
+    </font></p>
+    <p align="right"><b>Андрей Сорокин</b><br>
+    <a href="http://anso.da.ru/">anso.da.ru</a></td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

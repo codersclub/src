@@ -1,0 +1,241 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <pre><i><font color="navy">{
+Исходник к статье: Перетасовка экрана в Delphi
+
+http://delphi.about.com/
+
+Пример, который позволяет
+разделить экран на блоки, а затем поменять эти
+блоки местами. Так же можно менять размеры блоков
+и скрость их перемещения. На мой взгляд неплохое
+начало для создания логической игрушки либо
+экранной заставки.. 
+
+.zip файл данного проекта можно взять <a
+href="shuffler.zip">здесь</a>.
+}</font></i>
+
+<b>unit</b> <b>Unit</b>1;
+
+<b>interface</b>
+
+<b>uses</b>
+  Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs, ExtCtrls;
+
+<b>type</b>
+  TShuffler = <b>class</b>(TForm)
+    Image1: TImage;
+    Timer1: TTimer;
+    <b>procedure</b> FormCreate(Sender: TObject);
+    <b>procedure</b> Timer1Timer(Sender: TObject);
+    <b>procedure</b> FormDestroy(Sender: TObject);
+  <b>private</b>
+    <i><font
+color="navy">{ Private declarations }</font></i>
+  <b>public</b>
+    <i><font color="navy">{ Public declarations }</font></i>
+  <b>end</b>;
+
+<b>var</b>
+  Shuffler: TShuffler;
+
+  DesktopBitmap   : TBitmap;
+  gx, gy          : Integer;
+  redRect         : TBitmap;
+
+  rW, rH          : Integer; <i><font
+color="navy">//witdh and height of the shuffling rectangle</font></i>
+
+<b>const</b>
+  DELTA = 4; <i><font
+color="navy">//shoul be 2^n -&gt; makes the Screen to be matrix DELTA x DELTA</font></i>
+
+<b>implementation</b>
+<i><font
+color="navy">{$R *.DFM}</font></i>
+
+<b>procedure</b> InitScreen;
+<b>var</b> i,j:integer;
+<b>begin</b>
+  DesktopBitmap := TBitmap.Create;
+  <b>with</b> DesktopBitmap <b>do</b> <b>begin</b>
+    Width := Screen.Width;
+    Height := Screen.Height;
+  <b>end</b>;
+  BitBlt(DesktopBitmap.Canvas.Handle,0,0,Screen.Width,Screen.Height,
+         GetDC(GetDesktopWindow),0,0,SrcCopy);
+  Shuffler.Image1.Picture.Bitmap := DesktopBitmap;
+
+  Randomize;
+
+  gx := Trunc(Random * DELTA);
+  gy := Trunc(Random * DELTA);
+
+  Shuffler.Image1.Canvas.CopyRect(Rect(rW * gx, rH * gy, rW * gx + rW, rH * gy + rH),redRect.Canvas,Rect(0,0,rW,rH));
+
+  <i><font
+color="navy">//draw matrix</font></i>
+  <b>for</b> i:=0 <b>to</b> DELTA-1 <b>do</b> <b>begin</b>
+    Shuffler.Image1.Canvas.MoveTo(rW * i,0);
+    Shuffler.Image1.Canvas.LineTo(rW * i,Screen.Height);
+
+    Shuffler.Image1.Canvas.MoveTo(0, rH * i);
+    Shuffler.Image1.Canvas.LineTo(Screen.Width, rH * i);
+  <b>end</b>;
+
+  <i><font
+color="navy">{
+  **add cell numbers (row; column)**
+  Shuffler.Image1.Canvas.Font.Size:=30;
+  for i := 0 to DELTA-1 do begin
+    for j := 0 to DELTA-1 do begin
+      Shuffler.Image1.Canvas.TextOut(rw * i, rh * j, IntToStr(i+1)+';'+ IntToStr(j+1));
+    end; //for j
+  end; //for i
+  }</font></i>
+<b>end</b>;
+
+<b>procedure</b> DrawScreen;
+<b>var</b>
+  r1,r2:TRect;
+  Direction:integer;
+<b>begin</b>
+  r1:=Rect(rW * gx , rH * gy,  rW * gx + rW  , rH * gy + rH);
+
+  Direction := Trunc(Random*4);
+  <b>case</b> Direction <b>of</b>
+   0: gx := Abs((gx + 1) <b>MOD</b> DELTA);    <i><font
+color="navy">//right</font></i>
+   1: gx := Abs((gx - 1) <b>MOD</b> DELTA);    <i><font
+color="navy">//left</font></i>
+   2: gy := Abs((gy + 1) <b>MOD</b> DELTA);    <i><font
+color="navy">//down</font></i>
+   3: gy := Abs((gy - 1) <b>MOD</b> DELTA);    <i><font
+color="navy">//up</font></i>
+  <b>end</b>; <i><font color="navy">//case</font></i>
+
+  r2 := Rect(rW * gx , rH * gy,  rW * gx + rW  , rH * gy + rH);
+
+  <b>with</b> Shuffler.Image1.Canvas <b>do</b> <b>begin</b>
+    CopyRect(r1, Shuffler.Image1.Canvas, r2);
+    CopyRect(r2, redRect.Canvas, redRect.Canvas.ClipRect);
+  <b>end</b>;
+<b>end</b>;
+
+<b>procedure</b> TShuffler.FormCreate(Sender: TObject);
+<b>begin</b>
+  rW := Screen.Width <b>div</b> DELTA;
+  rH := Screen.Height <b>div</b> DELTA;
+
+  redRect:=TBitmap.Create;
+  <b>with</b> redRect <b>do</b> <b>begin</b>
+    Width := rW;
+    Height := rH;
+    Canvas.Brush.Color := clRed;
+    Canvas.Brush.Style := bssolid;
+    Canvas.Rectangle(0,0,rW,rH);
+    Canvas.Font.Color := clNavy;
+    Canvas.Font.Style := Canvas.Font.Style + [fsBold];
+    Canvas.TextOut(2,2,<font
+color="blue">'About'</font>);
+    Canvas.Font.Style := Canvas.Font.Style - [fsBold];
+    Canvas.TextOut(2,17,<font
+color="blue">'Delphi'</font>);
+    Canvas.TextOut(2,32,<font color="blue">'Programming'</font>);
+  <b>end</b>;
+
+  Timer1.Enabled := False;
+  image1.Align := alClient;
+  Visible := False;
+  BorderStyle := bsNone;
+  Top := 0;
+  Left := 0;
+  Width := Screen.Width;
+  Height := Screen.Height;
+  InitScreen;
+<i><font
+color="navy">//  SetWindowPos(Handle,HWND_TOPMOST,0,0,0,0,SWP_NOSIZE + SWP_NOMOVE);</font></i>
+  Visible := True;
+  Timer1.Interval := 10; <i><font
+color="navy">// smaller := faster</font></i>
+  Timer1.Enabled  := True; <i><font color="navy">// start calling DrawScreen</font></i>
+<b>end</b>;
+
+<b>procedure</b> TShuffler.Timer1Timer(Sender: TObject);
+<b>begin</b>
+  DrawScreen;
+<b>end</b>;
+
+<b>procedure</b> TShuffler.FormDestroy(Sender: TObject);
+<b>begin</b>
+  DesktopBitmap.Free;
+  redRect.Free;
+<b>end</b>;
+
+<b>end</b>.
+
+
+
+<font
+color="#808080">UNIT1.DFM
+object Shuffler: TShuffler
+  Left = 368
+  Top = 331
+  Width = 209
+  Height = 123
+  Caption = 'Shuffler'
+  Color = clBtnFace
+  Font.Charset = DEFAULT_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -11
+  Font.Name = 'MS Sans Serif'
+  Font.Style = []
+  OldCreateOrder = False
+  OnCreate = FormCreate
+  OnDestroy = FormDestroy
+  PixelsPerInch = 96
+  TextHeight = 13
+  object Image1: TImage
+    Left = 48
+    Top = 16
+    Width = 113
+    Height = 65
+  end
+  object Timer1: TTimer
+    OnTimer = Timer1Timer
+    Left = 8
+    Top = 8
+  end
+end</font>
+
+
+
+<font
+color="navy"><i>{
+********************************************
+Zarko Gajic
+About.com Guide to Delphi Programming
+http://delphi.about.com
+email: delphi.guide@about.com
+free newsletter: http://delphi.about.com/library/blnewsletter.htm
+forum: http://forums.about.com/ab-delphi/start/
+********************************************
+}</i></font>
+<!--GIMCLOSTRT--></pre>
+    <p><!--GIMCLOSTRT--> </p>
+    <p><br>
+    </td>
+  </tr>
+</table>
+</center></div></TBODY>
+
+
+<p align="center"><br>
+<br>
+</p>
+<!--#include virtual="/ssi/bottom.html"-->

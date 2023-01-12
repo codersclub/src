@@ -1,0 +1,506 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Отображаем текст в System Tray.</h3>
+    <p>Автор: <a href="mailto:delphi@neo.net.ua">Ruslan Abu Zant</a></p>
+    <p>Данный код сперва конвертирует Ваш текст в DIB, а
+    затем DIB в иконку и далее в ресурс. После этого
+    изображение иконки отображается в <font color="#000000"
+    face="Verdana" size="2">System Tray</font>. <br>
+    <br>
+    Совместимость: Все версии Delphi</p>
+    <table border="0" cellpadding="0" cellspacing="0">
+      <tr>
+        <td width="750" bgcolor="#A5E4A7"><font face="Tahoma" style="font-size: 10pt" size="-1"><b>&nbsp;
+        Пример:</b></font></td>
+      </tr>
+    </table>
+    <font color="#000000" face="Verdana" size="2"><p>Вызов просходит
+    следующим образом.... <br>
+    <br>
+    StringToIcon('This Is Made By Ruslan K. Abu Zant'); <br>
+    <br>
+    N.B&gt;&gt; Не забудьте удалить объект HIcon, после
+    вызова функции... <br>
+    <br>
+    <br>
+    <br>
+    unit MainForm; <br>
+    <br>
+    interface <br>
+    <br>
+    uses <br>
+    Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs, <br>
+    StdCtrls, ExtCtrls; <br>
+    <br>
+    type <br>
+    TForm1 = class(TForm) <br>
+    &nbsp;&nbsp; Button1: TButton; <br>
+    &nbsp;&nbsp; Image1: TImage; <br>
+    &nbsp;&nbsp; Timer1: TTimer; <br>
+    &nbsp;&nbsp; procedure Button1Click(Sender: TObject); <br>
+    &nbsp;&nbsp; procedure Timer1Timer(Sender: TObject); <br>
+    private <br>
+    &nbsp;&nbsp; function StringToIcon (const st : string) : HIcon; <br>
+    public <br>
+    &nbsp;&nbsp; { Public declarations } <br>
+    end; <br>
+    <br>
+    var <br>
+    Form1: TForm1; <br>
+    <br>
+    implementation <br>
+    <br>
+    {$R *.DFM} <br>
+    <br>
+    type <br>
+    ICONIMAGE = record <br>
+    &nbsp;&nbsp; Width, Height, Colors : DWORD; // Ширина, Высота и кол-во
+    цветов<br>
+    &nbsp;&nbsp; lpBits :
+    PChar;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//
+    указатель на DIB биты <br>
+    &nbsp;&nbsp; dwNumBytes :
+    DWORD;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//
+    Сколько байт? <br>
+    &nbsp;&nbsp; lpbi : PBitmapInfoHeader;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//
+    указатель на заголовок <br>
+    &nbsp;&nbsp; lpXOR : PChar;
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    // указатель на XOR биты изображения <br>
+    &nbsp;&nbsp; lpAND : PChar;
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    // указатель на AND биты изображения <br>
+    end; <br>
+    <br>
+    function CopyColorTable (var lpTarget : BITMAPINFO; const lpSource : <br>
+    BITMAPINFO) : boolean; <br>
+    var <br>
+    dc : HDC; <br>
+    hPal : HPALETTE; <br>
+    pe : array [0..255] of PALETTEENTRY; <br>
+    i : Integer; <br>
+    begin <br>
+    result := False; <br>
+    case (lpTarget.bmiHeader.biBitCount) of <br>
+    &nbsp;&nbsp; 8 : <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; if lpSource.bmiHeader.biBitCount = 8 then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Move (lpSource.bmiColors, lpTarget.bmiColors, 256 *
+    sizeof (RGBQUAD)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; result := True <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; end <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; dc := GetDC (0); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if dc &lt;&gt; 0 then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; try <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; hPal := CreateHalftonePalette (dc); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if hPal &lt;&gt; 0 then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; try <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if GetPaletteEntries (hPal,
+    0, 256, pe) &lt;&gt; 0 then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; for i := 0 to 255
+    do <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    lpTarget.bmiColors [i].rgbRed := pe [i].peRed; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    lpTarget.bmiColors [i].rgbGreen := pe [i].peGreen; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    lpTarget.bmiColors [i].rgbBlue := pe [i].peBlue; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    lpTarget.bmiColors [i].rgbReserved := pe [i].peFlags <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; result := True <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; end <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; finally <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; DeleteObject (hPal) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; end <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; finally <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ReleaseDC (0, dc) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; end <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; end; <br>
+    <br>
+    &nbsp;&nbsp; 4 : <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; if lpSource.bmiHeader.biBitCount = 4 then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Move (lpSource.bmiColors, lpTarget.bmiColors, 16 *
+    sizeof (RGBQUAD)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; result := True <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; end <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; hPal := GetStockObject (DEFAULT_PALETTE); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if (hPal &lt;&gt; 0) and (GetPaletteEntries (hPal, 0,
+    16, pe) &lt;&gt; 0) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; for i := 0 to 15 do <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; lpTarget.bmiColors [i].rgbRed
+    := pe [i].peRed; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; lpTarget.bmiColors
+    [i].rgbGreen := pe [i].peGreen; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; lpTarget.bmiColors
+    [i].rgbBlue := pe [i].peBlue; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; lpTarget.bmiColors
+    [i].rgbReserved := pe [i].peFlags <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; result := True <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; end <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; end; <br>
+    &nbsp;&nbsp; 1: <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; i := 0; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; lpTarget.bmiColors[i].rgbRed := 0; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; lpTarget.bmiColors[i].rgbGreen := 0; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; lpTarget.bmiColors[i].rgbBlue := 0; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; lpTarget.bmiColors[i].rgbReserved := 0; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; i := 1; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; lpTarget.bmiColors[i].rgbRed := 255; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; lpTarget.bmiColors[i].rgbGreen := 255; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; lpTarget.bmiColors[i].rgbBlue := 255; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; lpTarget.bmiColors[i].rgbReserved := 0; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; result := True <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp; else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; result := True <br>
+    end <br>
+    end; <br>
+    <br>
+    function WidthBytes (bits : DWORD) : DWORD; <br>
+    begin <br>
+    result := ((bits + 31) shr 5) shl 2 <br>
+    end; <br>
+    <br>
+    function BytesPerLine (const bmih : BITMAPINFOHEADER) : DWORD; <br>
+    begin <br>
+    result := WidthBytes (bmih.biWidth * bmih.biPlanes * bmih.biBitCount) <br>
+    end; <br>
+    <br>
+    function DIBNumColors (const lpbi : BitmapInfoHeader) : word; <br>
+    var <br>
+    dwClrUsed : DWORD; <br>
+    begin <br>
+    dwClrUsed := lpbi.biClrUsed; <br>
+    if dwClrUsed &lt;&gt; 0 then <br>
+    &nbsp;&nbsp; result := Word (dwClrUsed) <br>
+    else <br>
+    &nbsp;&nbsp; case lpbi.biBitCount of <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; 1 : result := 2; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; 4 : result := 16; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; 8 : result := 256 <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; result := 0 <br>
+    &nbsp;&nbsp; end <br>
+    end; <br>
+    <br>
+    function PaletteSize (const lpbi : BitmapInfoHeader) : word; <br>
+    begin <br>
+    result := DIBNumColors (lpbi) * sizeof (RGBQUAD) <br>
+    end; <br>
+    <br>
+    function FindDIBBits (const lpbi : BitmapInfo) : PChar; <br>
+    begin <br>
+    result := @lpbi; <br>
+    result := result + lpbi.bmiHeader.biSize + PaletteSize (lpbi.bmiHeader) <br>
+    end; <br>
+    <br>
+    function ConvertDIBFormat (var lpSrcDIB : BITMAPINFO; nWidth, nHeight, nbpp : DWORD;
+    bStretch : boolean) : <br>
+    PBitmapInfo; <br>
+    var <br>
+    lpbmi : PBITMAPINFO; <br>
+    lpSourceBits, lpTargetBits : Pointer; <br>
+    DC, hSourceDC, hTargetDC : HDC; <br>
+    hSourceBitmap, hTargetBitmap, hOldTargetBitmap, hOldSourceBitmap : <br>
+    HBITMAP; <br>
+    dwSourceBitsSize, dwTargetBitsSize, dwTargetHeaderSize : DWORD; <br>
+    begin <br>
+    result := Nil; <br>
+    &nbsp;&nbsp; // Располагаем и заполняем структуру BITMAPINFO
+    для нового DIB <br>
+    &nbsp;&nbsp; // Обеспечиваем достаточно места для 256-цветной
+    таблицы <br>
+    dwTargetHeaderSize := sizeof ( BITMAPINFO ) + ( 256 * sizeof( RGBQUAD ) ); <br>
+    GetMem (lpbmi, dwTargetHeaderSize); <br>
+    try <br>
+    &nbsp;&nbsp; lpbmi^.bmiHeader.biSize := sizeof (BITMAPINFOHEADER); <br>
+    &nbsp;&nbsp; lpbmi^.bmiHeader.biWidth := nWidth; <br>
+    &nbsp;&nbsp; lpbmi^.bmiHeader.biHeight := nHeight; <br>
+    &nbsp;&nbsp; lpbmi^.bmiHeader.biPlanes := 1; <br>
+    &nbsp;&nbsp; lpbmi^.bmiHeader.biBitCount := nbpp; <br>
+    &nbsp;&nbsp; lpbmi^.bmiHeader.biCompression := BI_RGB; <br>
+    &nbsp;&nbsp; lpbmi^.bmiHeader.biSizeImage := 0; <br>
+    &nbsp;&nbsp; lpbmi^.bmiHeader.biXPelsPerMeter := 0; <br>
+    &nbsp;&nbsp; lpbmi^.bmiHeader.biYPelsPerMeter := 0; <br>
+    &nbsp;&nbsp; lpbmi^.bmiHeader.biClrUsed := 0; <br>
+    &nbsp;&nbsp; lpbmi^.bmiHeader.biClrImportant := 0;&nbsp;&nbsp;&nbsp;&nbsp; //
+    Заполняем в таблице цветов <br>
+    &nbsp;&nbsp; if CopyColorTable (lpbmi^, lpSrcDIB) then <br>
+    &nbsp;&nbsp; begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; DC := GetDC (0); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; hTargetBitmap := CreateDIBSection (DC, lpbmi^, DIB_RGB_COLORS, <br>
+    lpTargetBits, 0, 0 ); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; hSourceBitmap := CreateDIBSection (DC, lpSrcDIB, DIB_RGB_COLORS, <br>
+    lpSourceBits, 0, 0 ); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; try <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if (dc &lt;&gt; 0) and (hTargetBitmap &lt;&gt; 0) and
+    (hSourceBitmap &lt;&gt; 0) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; hSourceDC := CreateCompatibleDC (DC); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; hTargetDC := CreateCompatibleDC (DC); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; try <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if (hSourceDC &lt;&gt; 0) and
+    (hTargetDC &lt;&gt; 0) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // Flip the bits
+    on the source DIBSection to match the source DIB <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; dwSourceBitsSize
+    := DWORD (lpSrcDIB.bmiHeader.biHeight) * BytesPerLine(lpSrcDIB.bmiHeader); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; dwTargetBitsSize
+    := DWORD (lpbmi^.bmiHeader.biHeight) * <br>
+    BytesPerLine(lpbmi^.bmiHeader); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Move (FindDIBBits
+    (lpSrcDIB)^, lpSourceBits^, dwSourceBitsSize ); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // Select
+    DIBSections into DCs <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; hOldSourceBitmap
+    := SelectObject( hSourceDC, hSourceBitmap ); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; hOldTargetBitmap
+    := SelectObject( hTargetDC, hTargetBitmap ); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; try <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if
+    (hOldSourceBitmap &lt;&gt; 0) and (hOldTargetBitmap &lt;&gt; 0) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; begin
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // Устанавливаем
+    таблицу цветов для DIBSections <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    if lpSrcDIB.bmiHeader.biBitCount &lt;= 8 then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    SetDIBColorTable (hSourceDC, 0, 1 shl lpSrcDIB.bmiHeader.biBitCount, lpSrcDIB.bmiColors); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    if lpbmi^.bmiHeader.biBitCount &lt;= 8&nbsp;&nbsp;then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    SetDIBColorTable (hTargetDC, 0, 1 shl <br>
+    lpbmi^.bmiHeader.biBitCount, lpbmi^.bmiColors ); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//
+    If we are asking for a straight copy, do it <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    if (lpSrcDIB.bmiHeader.biWidth = lpbmi^.bmiHeader.biWidth) and
+    (lpSrcDIB.bmiHeader.biHeight = lpbmi^.bmiHeader.biHeight) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    BitBlt (hTargetDC, 0, 0, lpbmi^.bmiHeader.biWidth, lpbmi^.bmiHeader.biHeight, hSourceDC,
+    0, 0, SRCCOPY) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    if bStretch then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    SetStretchBltMode (hTargetDC, COLORONCOLOR); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    StretchBlt (hTargetDC, 0, 0, lpbmi^.bmiHeader.biWidth, <br>
+    lpbmi^.bmiHeader.biHeight, <br>
+    hSourceDC, 0, 0, lpSrcDIB.bmiHeader.biWidth, lpSrcDIB.bmiHeader.biHeight, <br>
+    SRCCOPY ) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    end <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    BitBlt (hTargetDC, 0, 0, lpbmi^.bmiHeader.biWidth, lpbmi^.bmiHeader.biHeight, hSourceDC,
+    0, 0, SRCCOPY ); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    GDIFlush; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    GetMem (result, Integer (dwTargetHeaderSize + dwTargetBitsSize)); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    Move (lpbmi^, result^, dwTargetHeaderSize); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    Move (lpTargetBits^, FindDIBBits (result^)^, dwTargetBitsSize) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; end <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; finally <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if
+    hOldSourceBitmap &lt;&gt; 0 then SelectObject (hSourceDC, hOldSourceBitmap); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if
+    hOldTargetBitmap &lt;&gt; 0 then SelectObject (hTargetDC, hOldTargetBitmap); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; end <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; end <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; finally <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if hSourceDC &lt;&gt; 0 then
+    DeleteDC (hSourceDC); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if hTargetDC &lt;&gt; 0 then
+    DeleteDC (hTargetDC) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; end <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; finally <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if hTargetBitmap &lt;&gt; 0 then DeleteObject
+    (hTargetBitmap); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if hSourceBitmap &lt;&gt; 0 then DeleteObject
+    (hSourceBitmap); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if dc &lt;&gt; 0 then ReleaseDC (0, dc) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; end <br>
+    &nbsp;&nbsp; end <br>
+    finally <br>
+    &nbsp;&nbsp; FreeMem (lpbmi) <br>
+    end <br>
+    end; <br>
+    <br>
+    function DIBToIconImage (var lpii : ICONIMAGE; var lpDIB : BitmapInfo; <br>
+    bStretch : boolean) : boolean; <br>
+    var <br>
+    lpNewDIB : PBitmapInfo; <br>
+    begin <br>
+    result := False; <br>
+    lpNewDIB := ConvertDIBFormat (lpDIB, lpii.Width, lpii.Height, lpii.Colors, <br>
+    bStretch ); <br>
+    if Assigned (lpNewDIB) then <br>
+    try <br>
+    <br>
+    &nbsp;&nbsp; lpii.dwNumBytes := sizeof
+    (BITMAPINFOHEADER)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    &nbsp;&nbsp;&nbsp;&nbsp; // Заголовок <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    + PaletteSize (lpNewDIB^.bmiHeader)
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; //
+    Палитра <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    + lpii.Height * BytesPerLine (lpNewDIB^.bmiHeader)&nbsp; // XOR маска <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    + lpii.Height * WIDTHBYTES (lpii.Width);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;// AND маска <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Если здесь уже картинка, то
+    освобождаем её<br>
+    &nbsp;&nbsp; if lpii.lpBits &lt;&gt; Nil then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; FreeMem (lpii.lpBits); <br>
+    <br>
+    &nbsp;&nbsp; GetMem (lpii.lpBits,&nbsp;&nbsp;lpii.dwNumBytes); <br>
+    &nbsp;&nbsp; Move (lpNewDib^, lpii.lpBits^, sizeof (BITMAPINFOHEADER) + PaletteSize <br>
+    (lpNewDIB^.bmiHeader)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; // Выравниваем внутренние указатели/переменные
+    для новой картинки<br>
+    &nbsp;&nbsp; lpii.lpbi := PBITMAPINFOHEADER (lpii.lpBits); <br>
+    &nbsp;&nbsp; lpii.lpbi^.biHeight := lpii.lpbi^.biHeight * 2; <br>
+    <br>
+    &nbsp;&nbsp; lpii.lpXOR := FindDIBBits (PBitmapInfo (lpii.lpbi)^); <br>
+    &nbsp;&nbsp; Move (FindDIBBits (lpNewDIB^)^, lpii.lpXOR^, lpii.Height * BytesPerLine <br>
+    (lpNewDIB^.bmiHeader)); <br>
+    <br>
+    &nbsp;&nbsp; lpii.lpAND := lpii.lpXOR + lpii.Height * BytesPerLine <br>
+    (lpNewDIB^.bmiHeader); <br>
+    &nbsp;&nbsp; Fillchar (lpii.lpAnd^, lpii.Height * WIDTHBYTES (lpii.Width), $00); <br>
+    <br>
+    &nbsp;&nbsp; result := True <br>
+    finally <br>
+    &nbsp;&nbsp; FreeMem (lpNewDIB) <br>
+    end <br>
+    end; <br>
+    <br>
+    function TForm1.StringToIcon (const st : string) : HIcon; <br>
+    var <br>
+    memDC : HDC; <br>
+    bmp : HBITMAP; <br>
+    oldObj : HGDIOBJ; <br>
+    rect : TRect; <br>
+    size : TSize; <br>
+    infoHeaderSize : DWORD; <br>
+    imageSize : DWORD; <br>
+    infoHeader : PBitmapInfo; <br>
+    icon : IconImage; <br>
+    oldFont : HFONT; <br>
+    <br>
+    begin <br>
+    result := 0; <br>
+    memDC := CreateCompatibleDC (0); <br>
+    if memDC &lt;&gt; 0 then <br>
+    try <br>
+    &nbsp;&nbsp; bmp := CreateCompatibleBitmap (Canvas.Handle, 16, 16); <br>
+    &nbsp;&nbsp; if bmp &lt;&gt; 0 then <br>
+    &nbsp;&nbsp; try <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; oldObj := SelectObject (memDC, bmp); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; if oldObj &lt;&gt; 0 then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; try <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; rect.Left := 0; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; rect.top := 0; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; rect.Right := 16; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; rect.Bottom := 16; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; SetTextColor (memDC, RGB (255, 0, 0)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; SetBkColor (memDC, RGB (128, 128, 128)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; oldFont := SelectObject (memDC, font.Handle); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; GetTextExtentPoint32 (memDC, PChar (st), Length (st),
+    size); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ExtTextOut (memDC, (rect.Right - size.cx) div 2,
+    (rect.Bottom - size.cy) div 2, ETO_OPAQUE, @rect, PChar (st), Length (st), Nil); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; SelectObject (memDC, oldFont); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; GDIFlush; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; GetDibSizes (bmp, infoHeaderSize, imageSize); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; GetMem (infoHeader, infoHeaderSize + ImageSize); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; try <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; GetDib (bmp, SystemPalette16,
+    infoHeader^, PChar (DWORD (infoHeader) + infoHeaderSize)^); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; icon.Colors := 4; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; icon.Width := 32; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; icon.Height := 32; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; icon.lpBits := Nil; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if DibToIconImage (icon, infoHeader^,
+    True) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; try <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; result :=
+    CreateIconFromResource (PByte (icon.lpBits), icon.dwNumBytes, True, $00030000); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Finally <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; FreeMem (icon.lpBits) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; end <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; finally <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; FreeMem (infoHeader) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; end <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; finally <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; SelectObject (memDC, oldOBJ) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; end <br>
+    &nbsp;&nbsp; finally <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; DeleteObject (bmp) <br>
+    &nbsp;&nbsp; end <br>
+    finally <br>
+    &nbsp;&nbsp; DeleteDC (memDC) <br>
+    end <br>
+    end; <br>
+    <br>
+    procedure TForm1.Button1Click(Sender: TObject); <br>
+    begin <br>
+    Application.Icon.Handle := StringToIcon ('0'); <br>
+    Timer1.Enabled := True; <br>
+    Button1.Enabled := False; <br>
+    end; <br>
+    <br>
+    procedure TForm1.Timer1Timer(Sender: TObject); <br>
+    const i : Integer = 0; <br>
+    begin <br>
+    Inc (i); <br>
+    if i = 100 then i := 1; <br>
+    Application.Icon.Handle := StringToIcon (IntToStr (i)); <br>
+    <br>
+    end; <br>
+    <br>
+    end. </p>
+    </font><p><font color="#000000" face="Verdana" size="2"><br>
+    </font></td>
+  </tr>
+</table>
+</center></div></TBODY>
+<!--#include virtual="/ssi/bottom.html"-->

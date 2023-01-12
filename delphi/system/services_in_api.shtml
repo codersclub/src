@@ -1,0 +1,453 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Написание сервисов Windows NT на WinAPI</h3>
+    <p>Источник: <a
+    href="http://delphi.xonix.ru/">delphi.xonix.ru</a></p>
+    <p>Причиной написания этой статьи, как не странно,
+    стала необходимость написания своего сервиса. Но
+    в Borland'е решили немного &quot;порадовать&quot; нас,
+    пользователей Delphi 6 Personal, не добавив возможности
+    создания сервисов (в остальных версиях Delphi 5 и 6
+    эта возможность имеется в виде класса TService).
+    Решив, что еще не все потеряно, взял на проверку
+    компоненты из одноименного раздела этого сайта.
+    Первый оказался с многочисленными багами, а до
+    пробы второго я не дошел, взглянув на исходник -
+    модуль Forms в Uses это не только окошки, но и более 300
+    килобайт &quot;веса&quot; программы. Бессмысленного
+    увеличения размера не хотелось и пришлось
+    творить свое.<br>
+    Так как сервис из воздуха не сотворишь, то мой
+    исходник и эта статья очень сильно опираются на
+    MSDN. </p>
+    <p align="center"><br>
+    </p>
+    <p>Итак, приступим к написанию своего сервиса...<br>
+    Обычный Win32-сервис это обычная программа.
+    Программу рекомендуется сделать консольной <u><nobr>(DELPHI
+    MENU | Project | Options.. | Linker [X]Generate Console Application)</nobr></u> и
+    крайне рекомендуется сделать ее <b>без форм </b>!!! и <b>удалить
+    модуль Forms</b> из Uses. Рекомендуется потому, что,
+    во-первых, это окошко показывать не стоит потому,
+    что оно позволит любому юзеру, прибив ваше окошко
+    прибить и сервис и, во-вторых, конечно же, размер
+    файла (19Kb против 350 ). Поэтому удаляем форму <nobr>(<u>DELPHI
+    MENU | Project | Remove from project...</u> )</nobr>. Удалив все формы,
+    перейдем на главный модуль проекта, в котором
+    удаляем текст между begin и end и Forms из Uses и добавляем
+    Windows и WinSvc. В результате должно получиться что-то
+    вроде этого<br>
+    </p>
+    <pre>program Project1;
+
+uses
+ Windows,WinSvc;
+
+{$R *.res}
+
+begin
+
+end.
+</pre>
+    <p>На этом подготовительный этап закончен -
+    начинаем писАть сервис.<br>
+    </p>
+    <table width="100%" align="center" border="1">
+<TBODY>
+      <tr bgColor="#ffffff">
+        <td><font class="subheader">Главная часть программы</font></td>
+      </tr>
+</TBODY>
+    </table>
+    <p>Как уже отмечалось - сервис это обычная
+    программа. Программа в Pascal'е находится между begin и
+    end. После запуска нашего сервиса (здесь и далее
+    под запуском сервиса понимается именно запуск
+    его из Менеджера сервисов, а не просто запуск
+    exe'шника сервиса) менеджер сервисов ждет пока наш
+    сервис вызовет функцию StartServiceCtrlDispatcher.Ждать он
+    будет недолго - если в нашем exe'шнике несколько
+    сервисов то секунд 30, если один - около секунды,
+    поэтому помещаем вызов <b>StartServiceCtrlDispatcher</b>
+    поближе к begin. <br>
+    <br>
+    StartServiceCtrlDispatcher качестве аргумента требует <b>_SERVICE_TABLE_ENTRYA</b>,
+    поэтому добавляем в var <i>DispatchTable : array [0..кол-во
+    сервисов] of _SERVICE_TABLE_ENTRYA;</i> и заполняем этот
+    массив (естественно перед вызовом
+    StartServiceCtrlDispatcher).<br>
+    <br>
+    Т.к. в нашем ехешнике будет 1 сервис, то заполняем
+    его так :<br>
+    </p>
+    <pre> DispatchTable[0].lpServiceName:=ServiceName;
+ DispatchTable[0].lpServiceProc:=@ServiceProc;
+
+ DispatchTable[1].lpServiceName:=nil;
+ DispatchTable[1].lpServiceProc:=nil;
+</pre>
+    <p>Советую завести константы ServiceName - имя сервиса и
+    ServiceDisplayName - отображаемое имя.<br>
+    ServiceProc - основная функция сервиса(о ней ниже), а в
+    функцию мы передаем ее адрес.<br>
+    В DispatchTable[кол-во сервисов] все равно nil - это
+    показывает функции, что предыдущее поле было
+    последним. У меня получилось так :<br>
+    </p>
+    <pre><i>begin
+ DispatchTable[0].lpServiceName:=ServiceName;
+ DispatchTable[0].lpServiceProc:=@ServiceProc;
+
+ DispatchTable[1].lpServiceName:=nil;
+ DispatchTable[1].lpServiceProc:=nil;
+
+ if not StartServiceCtrlDispatcher(DispatchTable[0])
+  then LogError('StartServiceCtrlDispatcher Error');
+end.</i></pre>
+    <p><br>
+    StartServiceCtrlDispatcher выполнится только после того, как
+    все сервисы будут остановлены.<br>
+    <br>
+    Функция LogError протоколирует ошибки - напишите ее
+    сами.<br>
+    </p>
+    <table width="100%" align="center" border="1">
+<TBODY>
+      <tr bgColor="#ffffff">
+        <td><font class="subheader">Функция ServiceMain</font></td>
+      </tr>
+</TBODY>
+    </table>
+    <p><br>
+    </p>
+    <p>ServiceMain - основная функция сервиса. Если в
+    ехешнике несколько сервисов, но для каждого
+    сервиса пишется своя ServiceMain функция. Имя функции
+    может быть любым! и передается в
+    DispatchTable.lpServiceProc:=@ServiceMain (см.предыдущущий абзац). У
+    меня она называется ServiceProc и описывается так:<br>
+    <i>procedure ServiceProc(argc : DWORD;var argv : array of PChar);<b>stdcall;</b></i><br>
+    argc кол-во аргументов и их массив argv передаются
+    менеджером сервисов из настроек сервиса. НЕ
+    ЗАБЫВАЙТЕ STDCALL!!! Такая забывчивость - частая
+    причина ошибки в программе.<br>
+    <br>
+    В ServiceMain требуется выполнить подготовку к
+    запуску сервиса и зарегистрировать обработчик
+    сообщений от менеджера сервисов (Handler). Опять
+    после запуска ServiceMain и до запуска <b>RegisterServiceCtrlHandler</b>
+    должно пройти минимум времени. Если сервису надо
+    делать что-нибудь очень долго и обязательно до
+    вызова RegisterServiceCtrlHandler, то надо посылать сообщение
+    <b>SERVICE_START_PENDING</b> функией <b>SetServiceStatus</b>.<br>
+    <br>
+    Итак, в RegisterServiceCtrlHandler передаем название нашего
+    сервиса и адрес функции Handler'а (см.далее). Далее
+    выполняем подготовку к запуску и настройку
+    сервиса. Остановимся на настройке поподробнее.<br>
+    Эта самая настройка <i><b>var</b> ServiceStatus : SERVICE_STATUS; </i><br>
+    (ServiceStatusHandle : SERVICE_STATUS_HANDLE и ServiceStatus надо сделать
+    глобальными переменными и поместить их выше всех
+    функций).<br>
+    <br>
+    </p>
+    <table width="80%" border="1">
+<TBODY>
+      <tr bgColor="#c2ccff">
+        <td colSpan="2"><b>dwServiceType</b> - тип сервиса</td>
+      </tr>
+      <tr bgColor="#ffffff">
+        <td>SERVICE_WIN32_OWN_PROCESS</td>
+        <td>Одиночный сервис</td>
+      </tr>
+      <tr>
+        <td>SERVICE_WIN32_SHARE_PROCESS</td>
+        <td>Несколько сервисов в одном процессе</td>
+      </tr>
+      <tr bgColor="#ffffff">
+        <td>SERVICE_INTERACTIVE_PROCESS</td>
+        <td>интерактивный сервис (может взаимодействовать
+        с пользователем).</td>
+      </tr>
+</TBODY>
+    </table>
+    <p>Остальные константы - о драйверах. Если надо -
+    смотрите их в MSDN.<br>
+    <br>
+    </p>
+    <table width="80%" border="1">
+<TBODY>
+      <tr bgColor="#c2ccff">
+        <td colSpan="2"><b>dwControlsAccepted</b> - принимаемые сообщения
+        (какие сообщения мы будем обрабатывать) </td>
+      </tr>
+      <tr bgColor="#ffffff">
+        <td>SERVICE_ACCEPT_PAUSE_CONTINUE</td>
+        <td>приостановка/перезапуск</td>
+      </tr>
+      <tr>
+        <td>SERVICE_ACCEPT_STOP</td>
+        <td>остановка сервиса</td>
+      </tr>
+      <tr bgColor="#ffffff">
+        <td>SERVICE_ACCEPT_SHUTDOWN</td>
+        <td>перезагрузка компьютера</td>
+      </tr>
+      <tr>
+        <td>SERVICE_ACCEPT_PARAMCHANGE</td>
+        <td>изменение параметров сервиса без перезапуска
+        (Win2000 и выше)</td>
+      </tr>
+</TBODY>
+    </table>
+    <p>Остальные сообщения смотрите опять же в MSDN
+    (куда уж без него ;-)<br>
+    <br>
+    <b>dwWin32ExitCode</b> и <b>dwServiceSpecificExitCode</b> - коды ошибок
+    сервиса. Если все идет нормально, то они должны
+    быть равны нулю, иначе коду ошибки.<br>
+    <br>
+    <b>dwCheckPoint</b> - если сервис выполняет какое-нибудь
+    долгое действие при остановке, запуске и т.д. то
+    dwCheckPoint является индикатором прогресса
+    (увеличивайте его, чтобы дать понять, что сервис
+    не завис), иначе он должен быть равен нулю.<br>
+    <br>
+    <b>dwWaitHint</b> - время, через которое сервис должен
+    послать свой новый статус менеджеру сервисов при
+    выполнении действия (запуска, остановки и т.д.).
+    Если dwCurrentState и dwCheckPoint через это кол-во
+    миллисекунд не изменится, то менеджер сервисов
+    решит, что произошла ошибка.<br>
+    <br>
+    <b>dwCurrentState</b> - см. где-то <a href="?id=serviceinfo" target="_blank">здесь</a>
+    Ставим его в SERVICE_RUNNING, если сервис запущен<br>
+    <br>
+    После заполнения этой структуры посылаем наш
+    новый статус функцией SetServiceStatus и мы работаем :).<br>
+    <br>
+    После этого пишем код самого сервиса. Я вернусь к
+    этому попозже.<br>
+    Вот так выглядит моя ServiceMain :<br>
+    </p>
+    <pre>procedure ServiceProc(argc : DWORD;var argv : array of PChar);stdcall;
+var
+ Status : DWORD;
+ SpecificError : DWORD;
+begin
+  ServiceStatus.dwServiceType      := SERVICE_WIN32;
+  ServiceStatus.dwCurrentState     := SERVICE_START_PENDING;
+  ServiceStatus.dwControlsAccepted := SERVICE_ACCEPT_STOP 
+    or SERVICE_ACCEPT_PAUSE_CONTINUE;
+  ServiceStatus.dwWin32ExitCode           := 0;
+  ServiceStatus.dwServiceSpecificExitCode := 0;
+  ServiceStatus.dwCheckPoint              := 0;
+  ServiceStatus.dwWaitHint                := 0;
+
+  ServiceStatusHandle := 
+           RegisterServiceCtrlHandler(ServiceName,@ServiceCtrlHandler);
+  if ServiceStatusHandle = 0 then WriteLn('RegisterServiceCtrlHandler Error');
+
+  Status :=ServiceInitialization(argc,argv,SpecificError);
+  if Status &lt;&gt; NO_ERROR
+   then begin
+    ServiceStatus.dwCurrentState := SERVICE_STOPPED;
+    ServiceStatus.dwCheckPoint   := 0;
+    ServiceStatus.dwWaitHint     := 0;
+    ServiceStatus.dwWin32ExitCode:=Status;
+    ServiceStatus.dwServiceSpecificExitCode:=SpecificError;
+
+    SetServiceStatus (ServiceStatusHandle, ServiceStatus);
+	LogError('ServiceInitialization');
+    exit;
+   end;
+
+   ServiceStatus.dwCurrentState :=SERVICE_RUNNING;
+   ServiceStatus.dwCheckPoint   :=0;
+   ServiceStatus.dwWaitHint     :=0;
+
+   if not SetServiceStatus (ServiceStatusHandle,ServiceStatus)
+    then begin
+     Status:=GetLastError;
+	 LogError('SetServiceStatus');
+     exit;
+    end;
+  // WORK HERE 
+  //ЗДЕСЬ БУДЕТ ОСНОВНОЙ КОД ПРОГРАММЫ
+end;</pre>
+    <p><br>
+<!-- Part 5 -->    </p>
+    <table width="100%" align="center" border="1">
+<TBODY>
+      <tr bgColor="#ffffff">
+        <td><font class="subheader">Функция Handler</font></td>
+      </tr>
+</TBODY>
+    </table>
+    <p>Функция Handler будет вызываться менеджером
+    сервисов при передаче сообщений сервису. Опять
+    же название функции - любое. Адрес функции
+    передается с помощью функции RegisterServiceCtrlHandler (см.
+    выше). Функция имеет один параметр типа DWORD (Cardinal) -
+    сообщение сервису. Если в одном процессе
+    несколько сервисов - для каждого из них должна
+    быть своя функция.<br>
+    <i>procedure ServiceCtrlHandler(Opcode : Cardinal);<b>stdcall;</b></i><br>
+    Опять не забываем про stdcall.<br>
+    <br>
+    Итак, функция получает код сообщения, который мы
+    и проверяем. Начинаем вспоминать, что мы писали в
+    ServiceStatus.dwControlsAccepted. У меня это SERVICE_ACCEPT_STOP и
+    SERVICE_ACCEPT_PAUSE_CONTINUE, значит, мне надо проверять
+    сообщения SERVICE_CONTROL_PAUSE, SERVICE_CONTROL_CONTINUE, SERVICE_CONTROL_STOP
+    и выполнять соответствующие действия. Остальные
+    сообщения:<br>
+    <br>
+    </p>
+    <table width="80%" border="1">
+<TBODY>
+      <tr bgColor="#c2ccff">
+        <td><b>ServiceStatus.dwControlsAccepted</b></td>
+        <td><b>Обрабатываемые сообщения</b></td>
+      </tr>
+      <tr bgColor="#ffffff">
+        <td>SERVICE_ACCEPT_PAUSE_CONTINUE</td>
+        <td>SERVICE_CONTROL_PAUSE и SERVICE_CONTROL_CONTINUE </td>
+      </tr>
+      <tr>
+        <td>SERVICE_ACCEPT_STOP</td>
+        <td>SERVICE_CONTROL_STOP</td>
+      </tr>
+      <tr bgColor="#ffffff">
+        <td>SERVICE_ACCEPT_SHUTDOWN</td>
+        <td>SERVICE_CONTROL_SHUTDOWN</td>
+      </tr>
+      <tr>
+        <td>SERVICE_ACCEPT_PARAMCHANGE</td>
+        <td>SERVICE_CONTROL_PARAMCHANGE</td>
+      </tr>
+</TBODY>
+    </table>
+
+<br>
+  <p>Также надо обрабатывать SERVICE_CONTROL_INTERROGATE. Что это
+  такое - непонятно, но обрабатывать надо :)
+  Передаем новый статус сервиса менеджеру
+  сервисов функцией SetServiceStatus.<br>
+  <br>
+  Пример функции Handler:<br>
+  <br>
+  </p>
+  <pre>procedure ServiceCtrlHandler(Opcode : Cardinal);stdcall;
+var
+ Status : Cardinal;
+begin
+ case Opcode of
+  SERVICE_CONTROL_PAUSE    :
+   begin
+    ServiceStatus.dwCurrentState := SERVICE_PAUSED;
+    end;
+  SERVICE_CONTROL_CONTINUE :
+   begin
+    ServiceStatus.dwCurrentState := SERVICE_RUNNING;
+   end;
+  SERVICE_CONTROL_STOP     :
+   begin
+    ServiceStatus.dwWin32ExitCode:=0;
+    ServiceStatus.dwCurrentState := SERVICE_STOPPED;
+    ServiceStatus.dwCheckPoint   :=0;
+    ServiceStatus.dwWaitHint     :=0;
+
+    if not SetServiceStatus (ServiceStatusHandle,ServiceStatus)
+     then begin
+      Status:=GetLastError;
+	  LogError('SetServiceStatus');
+      Exit;
+     end;
+     exit;
+   end;
+
+  SERVICE_CONTROL_INTERROGATE : ;
+ end;
+
+ if not SetServiceStatus (ServiceStatusHandle, ServiceStatus)
+  then begin
+   Status := GetLastError;
+   LogError('SetServiceStatus');
+   Exit;
+  end;
+end;
+</pre>
+  <p>&nbsp;</p>
+  <table width="100%" align="center" border="1">
+<TBODY>
+    <tr bgColor="#ffffff">
+      <td><font class="subheader">Реализация главной функции
+      программы</font></td>
+    </tr>
+</TBODY>
+  </table>
+  <p><br>
+  </p>
+  <p>В функции ServiceMain (см.там, где отмечено) пишем код
+  сервиса. Так как сервис обычно постоянно
+  находится в памяти компьютера, то скорее всего
+  код будет находиться в цикле. Например в таком :<br>
+  <br>
+  </p>
+  <pre>repeat
+ Что-нибудь делаем пока сервис не завершится.
+until ServiceStatus.dwCurrentState = SERVICE_STOPPED;
+</pre>
+  <p>Но это пройдет если сервис не обрабатывает
+  сообщения приостановки/перезапуска, иначе
+  сервис никак не прореагирует. Другой вариант :<br>
+  </p>
+  <pre>repeat 
+ if ServiceStatus.dwCurrentState &lt;&gt; SERVICE_PAUSED
+  then чего-то делаем
+until ServiceStatus.dwCurrentState = SERVICE_STOPPED; 
+</pre>
+  <p>И третий, имхо, самый правильный вариант =
+  использование потока :<br>
+  Пишем функцию </p>
+  <pre>function MainServiceThread(p:Pointer):DWORD;stdcall;
+begin
+ что-то делаем
+end;  
+</pre>
+  <p>и в ServiceMain создаем поток </p>
+  <pre>var
+ ThID : Cardinal;
+  
+hThread:=CreateThread(nil,0,@MainServiceThread,nil,0,ThID);
+и ждем его завершения
+WaitForSingleObject(hThread,INFINITE);
+закрывая после этого его дескриптор
+CloseHandle(hThread);
+</pre>
+  <p>При этом hThread делаем глобальной переменной.<br>
+  Теперь при приостановке сервиса (в Handler) делаем
+  так </p>
+  <pre>  SERVICE_CONTROL_PAUSE    :
+   begin
+    ServiceStatus.dwCurrentState := SERVICE_PAUSED;
+    SuspendThread(hThread); // приостанавливаем поток
+   end;</pre>
+  <p>и при возобновлении работы сервиса </p>
+  <pre>  SERVICE_CONTROL_CONTINUE :
+   begin
+    ServiceStatus.dwCurrentState := SERVICE_RUNNING;
+    ResumeThread(hThread); // возобновляем поток
+   end;</pre>
+  <p><br>
+  </p>
+  <p>&nbsp;</p>
+    </td>
+  </tr>
+</table>
+<!--#include virtual="/ssi/bottom.html"-->

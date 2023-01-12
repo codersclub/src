@@ -1,0 +1,150 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как создать Bitmap из массива пикселей</h3>
+    <p>Один из способов создания битмапа из массива
+    пикселей заключается в использовании Windows API
+    функции CreateDiBitmap(). Это позволит использовать один
+    из многих форматов битмапа, которые Windows
+    использует для хранения пикселей. Следующий
+    пример создаёт 256-цветный битмап из массива
+    пикселей. Битмап состит из 256 оттенков серого
+    цвета плавно переходящих от белого к чёрному.
+    Обратите внимание, что Windows резервирует первые и
+    последние 10 цветов для системных нужд, поэтому Вы
+    можете получить максимум 236 оттенков серого.<br>
+    <br>
+    {$IFNDEF WIN32} <br>
+    type <br>
+    {Used for pointer math under Win16} <br>
+    &nbsp;&nbsp;PPtrRec = ^TPtrRec; <br>
+    &nbsp;&nbsp;TPtrRec = record <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Lo : Word; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Hi : Word; <br>
+    &nbsp;&nbsp;end; <br>
+    {$ENDIF} <br>
+    <br>
+    {Used for huge pointer math} <br>
+    function GetBigPointer(lp : pointer; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    Offset : Longint) : Pointer; <br>
+    begin <br>
+    {$IFDEF WIN32} <br>
+    &nbsp;&nbsp;GetBigPointer := @PByteArray(lp)^[Offset]; <br>
+    {$ELSE} <br>
+    &nbsp;&nbsp;Offset := Offset + TPtrRec(lp).Lo; <br>
+    &nbsp;&nbsp;GetBigPointer := Ptr(TPtrRec(lp).Hi + TPtrRec(Offset).Hi * <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    SelectorInc, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    TPtrRec(Offset).Lo); <br>
+    {$ENDIF} <br>
+    end; <br>
+    <br>
+    procedure TForm1.Button1Click(Sender: TObject); <br>
+    var <br>
+    &nbsp;&nbsp;hPixelBuffer : THandle; {Handle to the pixel buffer} <br>
+    &nbsp;&nbsp;lpPixelBuffer : pointer; {pointer to the pixel buffer} <br>
+    &nbsp;&nbsp;lpPalBuffer : PLogPalette; {The palette buffer} <br>
+    &nbsp;&nbsp;lpBitmapInfo : PBitmapInfo; {The bitmap info header} <br>
+    &nbsp;&nbsp;BitmapInfoSize : longint; {Size of the bitmap info header} <br>
+    &nbsp;&nbsp;BitmapSize : longint; {Size of the pixel array} <br>
+    &nbsp;&nbsp;PaletteSize : integer; {Size of the palette buffer} <br>
+    &nbsp;&nbsp;i : longint; {loop variable} <br>
+    &nbsp;&nbsp;j : longint; {loop variable} <br>
+    &nbsp;&nbsp;OldPal : hPalette; {temp palette} <br>
+    &nbsp;&nbsp;hPal : hPalette; {handle to our palette} <br>
+    &nbsp;&nbsp;hBm : hBitmap; {handle to our bitmap} <br>
+    &nbsp;&nbsp;Bm : TBitmap; {temporary TBitmap} <br>
+    &nbsp;&nbsp;Dc : hdc; {used to convert the DOB to a DDB} <br>
+    &nbsp;&nbsp;IsPaletteDevice : bool; <br>
+    begin <br>
+    Application.ProcessMessages; <br>
+    {If range checking is on - turn it off for now} <br>
+    {we will remember if range checking was on by defining} <br>
+    {a define called CKRANGE if range checking is on.} <br>
+    {We do this to access array members past the arrays} <br>
+    {defined index range without causing a range check} <br>
+    {error at runtime. To satisfy the compiler, we must} <br>
+    {also access the indexes with a variable. ie: if we} <br>
+    {have an array defined as a: array[0..0] of byte,} <br>
+    {and an integer i, we can now access a[3] by setting} <br>
+    {i := 3; and then accessing a[i] without error} <br>
+    {$IFOPT R+} <br>
+    &nbsp;&nbsp;{$DEFINE CKRANGE} <br>
+    &nbsp;&nbsp;{$R-} <br>
+    {$ENDIF} <br>
+    <br>
+    {Lets check to see if this is a palette device - if so, then} <br>
+    {we must do palette handling for a successful operation.} <br>
+    {Get the screen's dc to use since memory dc's are not reliable} <br>
+    &nbsp;&nbsp;dc := GetDc(0); <br>
+    &nbsp;&nbsp;IsPaletteDevice := <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;GetDeviceCaps(dc, RASTERCAPS) and RC_PALETTE = RC_PALETTE; <br>
+    {Give back the screen dc} <br>
+    &nbsp;&nbsp;dc := ReleaseDc(0, dc); <br>
+    <br>
+    {Размер информации о рисунке должен равняться
+    размеру BitmapInfo} <br>
+    {плюс размер таблицы цветов, минус одна таблица} <br>
+    {так как она уже объявлена в TBitmapInfo} <br>
+    &nbsp;&nbsp;BitmapInfoSize := sizeof(TBitmapInfo) + (sizeof(TRGBQUAD) * 255); <br>
+    <br>
+    {The bitmap size must be the width of the bitmap rounded} <br>
+    {up to the nearest 32 bit boundary} <br>
+    &nbsp;&nbsp;BitmapSize := (sizeof(byte) * 256) * 256; <br>
+    <br>
+    {Размер палитры должен равняться размеру TLogPalette} <br>
+    {плюс количество ячеек цветовой палитры - 1, так
+    как}<br>
+    {одна палитра уже объявлена в TLogPalette} <br>
+    &nbsp;&nbsp;if IsPaletteDevice then <br>
+    &nbsp;&nbsp; PaletteSize := sizeof(TLogPalette) + (sizeof(TPaletteEntry) * 255); <br>
+    <br>
+    {Выделяем память под BitmapInfo, PixelBuffer, и Palette} <br>
+    &nbsp;&nbsp;GetMem(lpBitmapInfo, BitmapInfoSize); <br>
+    &nbsp;&nbsp;hPixelBuffer := GlobalAlloc(GHND, BitmapSize); <br>
+    &nbsp;&nbsp;lpPixelBuffer := GlobalLock(hPixelBuffer); <br>
+    <br>
+    &nbsp;&nbsp;if IsPaletteDevice then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;GetMem(lpPalBuffer, PaletteSize); <br>
+    <br>
+    {Заполняем нулями BitmapInfo, PixelBuffer, и Palette} <br>
+    &nbsp;&nbsp;FillChar(lpBitmapInfo^, BitmapInfoSize, #0); <br>
+    &nbsp;&nbsp;FillChar(lpPixelBuffer^, BitmapSize, #0); <br>
+    &nbsp;&nbsp;if IsPaletteDevice then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FillChar(lpPalBuffer^,PaletteSize, #0); <br>
+    <br>
+    {Заполняем структуру BitmapInfo} <br>
+    &nbsp;&nbsp;lpBitmapInfo^.bmiHeader.biSize := sizeof(TBitmapInfoHeader); <br>
+    &nbsp;&nbsp;lpBitmapInfo^.bmiHeader.biWidth := 256; <br>
+    &nbsp;&nbsp;lpBitmapInfo^.bmiHeader.biHeight := 256; <br>
+    &nbsp;&nbsp;lpBitmapInfo^.bmiHeader.biPlanes := 1; <br>
+    &nbsp;&nbsp;lpBitmapInfo^.bmiHeader.biBitCount := 8; <br>
+    &nbsp;&nbsp;lpBitmapInfo^.bmiHeader.biCompression := BI_RGB; <br>
+    &nbsp;&nbsp;lpBitmapInfo^.bmiHeader.biSizeImage := BitmapSize; <br>
+    &nbsp;&nbsp;lpBitmapInfo^.bmiHeader.biXPelsPerMeter := 0; <br>
+    &nbsp;&nbsp;lpBitmapInfo^.bmiHeader.biYPelsPerMeter := 0; <br>
+    &nbsp;&nbsp;lpBitmapInfo^.bmiHeader.biClrUsed := 256; <br>
+    &nbsp;&nbsp;lpBitmapInfo^.bmiHeader.biClrImportant := 256; <br>
+    <br>
+    {Заполняем таблицу цветов BitmapInfo оттенками серого:
+    от чёрного до белого} <br>
+    &nbsp;&nbsp;for i := 0 to 255 do begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;lpBitmapInfo^.bmiColors[i].rgbRed := i; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;lpBitmapInfo^.bmiColors[i].rgbGreen := i; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;lpBitmapInfo^.bmiColors[i].rgbBlue := i; <br>
+    &nbsp;&nbsp;end;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div></TBODY>
+
+
+<p align="center"><br>
+<br>
+</p>
+<!--#include virtual="/ssi/bottom.html"-->

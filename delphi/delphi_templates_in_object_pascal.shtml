@@ -1,0 +1,375 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="17">
+  <tr>
+    <td><hr>
+    <h3>Шаблоны в Object Pascal</h3>
+    <p>( перевод одноимённой статьи с сайта <a
+    href="http://community.borland.com/">community.borland.com</a> )</p>
+    <p>Наверное каждый Delphi программист хоть раз
+    общался с программистом C++ и объяснял насколько<br>
+    Delphi мощнее и удобнее. Но в некоторый момент,
+    программист C++ заявляет примерно следующее<br>
+    &quot;OK, но Delphi использует Pascal, а значит не
+    поддерживает множественное наследование и
+    шаблоны,<br>
+    поэтому он не так хорош как C++.&quot;</p>
+    <p>Насчёт множественного наследования можно
+    легко заявить, что Delphi имеет интерфейсы, которые<br>
+    прекрасно справляются со своей задачей, но вот
+    насчёт шаблонов Вам прийдётся согласится, так
+    как<br>
+    Object Pascal не поддерживает их.</p>
+    <h3>Давайте посмотрим на эту проблему
+    по-внимательней</h3>
+    <p>Шаблоны позволяют делать универсальные
+    контейнеры такие как списки, стеки, очереди, и т.д.<br>
+    Если Вы хотите осуществить что-то подобное в Delphi,
+    то у Вас есть два пути:<ol>
+      <li>Использовать контейнер TList, который содержит
+        указатели. В этом случае Вам прийдётся всё<br>
+        время делать явное приведение типов.</li>
+      <li>Сделать подкласс контейнера TCollection или TObjectList, и
+        убрать все методы, зависящие от типов<br>
+        каждый раз, когда Вы захотите использовать новый
+        тип данных.</li>
+    </ol>
+    <p>Третий вариант, это сделать модуль с
+    универсальным классом контейнера, и каждый раз,
+    когда нужно<br>
+    использовать новый тип данных, нам прийдётся в
+    редакторе искать и вносить исправления. Было бы<br>
+    здорово, если всю эту работу за Вас делал
+    компилятор.... вот этим мы сейчас и займёмся!</p>
+    <p>Например, возьмём классы TCollection и TCollectionItem.
+    Когда Вы объявляете нового потомка TCollectionItem<br>
+    , то так же Вы наследуете новый класс от TOwnedCollection
+    и переопределяете большинство методов, чтобы<br>
+    их можно было вызывать&nbsp; с новыми типами.</p>
+    <p>Давайте посмотрим, как создать универсальную
+    коллекцию шаблонов класса:</p>
+    <p>Шаг 1: Создайте новый текстовый файл (не
+    юнитовский) с именем <i>TemplateCollectionInterface.pas</i>:</p>
+    <pre>_COLLECTION_ = <b>class</b> (TOwnedCollection)
+<b>protected</b>
+ <b>function</b>  GetItem (<b>const</b> aIndex : Integer) : _COLLECTION_ITEM_;
+ <b>procedure</b> SetItem (<b>const</b> aIndex : Integer;
+                    <b>const</b> aValue : _COLLECTION_ITEM_);
+<b>public</b>
+ <b>constructor</b> Create (<b>const</b> aOwner : TComponent);
+
+ <b>function</b> Add                                 : _COLLECTION_ITEM_;
+ <b>function</b> FindItemID (<b>const</b> aID    : Integer) : _COLLECTION_ITEM_;
+ <b>function</b> Insert     (<b>const</b> aIndex : Integer) : _COLLECTION_ITEM_;
+ <b>property</b> Items      [<b>const</b> aIndex : Integer] : _COLLECTION_ITEM_ <b>read</b> GetItem <b>write</b> SetItem;
+<b>end</b>;</pre>
+    <p>Обратите внимание, что нет никаких uses или interface
+    clauses, только универсальное объявление<br>
+    типа, в котором _COLLECTION_ это имя универсальной
+    коллекции класса, а _COLLECTION_ITEM_<br>
+    это имя методов, содержащихся в нашем шаблоне.</p>
+    <p>Шаг 2: Создайте второй текстовый файл и
+    сохраните его как <i>TemplateCollectionImplementation.pas</i>:</p>
+    <pre class="sourcecode"><b>constructor</b> _COLLECTION_.Create (<b>const</b> aOwner : TComponent);
+<b>begin</b>
+ <b>inherited</b> Create (aOwner, _COLLECTION_ITEM_);
+<b>end</b>;
+
+<b>function</b> _COLLECTION_.Add : _COLLECTION_ITEM_;
+<b>begin</b>
+ Result := _COLLECTION_ITEM_ (<b>inherited</b> Add);
+<b>end</b>;
+
+<b>function</b> _COLLECTION_.FindItemID (<b>const</b> aID : Integer) : _COLLECTION_ITEM_;
+<b>begin</b>
+ Result := _COLLECTION_ITEM_ (<b>inherited</b> FindItemID (aID));
+<b>end</b>;
+
+<b>function</b> _COLLECTION_.GetItem (<b>const</b> aIndex : Integer) : _COLLECTION_ITEM_;
+<b>begin</b>
+ Result := _COLLECTION_ITEM_ (<b>inherited</b> GetItem (aIndex));
+<b>end</b>;
+
+<b>function</b> _COLLECTION_.Insert (<b>const</b> aIndex : Integer) : _COLLECTION_ITEM_;
+<b>begin</b>
+ Result := _COLLECTION_ITEM_ (<b>inherited</b> Insert (aIndex));
+<b>end</b>;
+
+<b>procedure</b> _COLLECTION_.SetItem (<b>const</b> aIndex : Integer;
+                                <b>const</b> aValue : _COLLECTION_ITEM_);
+<b>begin</b>
+ <b>inherited</b> SetItem (aIndex, aValue);
+<b>end</b>;</pre>
+    <p>Снова нет никаких uses или interface clauses , а только код
+    универсального типа.</p>
+    <p>Шаг 3: Создайте новый unit-файл с именем <i>MyCollectionUnit.pas</i>:</p>
+    <pre class="sourcecode"><b>unit</b> MyCollectionUnit;
+
+<b>interface</b>
+
+<b>uses</b> Classes;
+
+<b>type</b> TMyCollectionItem = <b>class</b> (TCollectionItem)
+     <b>private</b>
+      FMyStringData  : <b>String</b>;
+      FMyIntegerData : Integer;
+     <b>public</b>
+      <b>procedure</b> Assign (aSource : TPersistent); override;
+     <b>published</b>
+      <b>property</b> MyStringData  : <b>String</b>  <b>read</b> FMyStringData  <b>write</b> FMyStringData;
+      <b>property</b> MyIntegerData : Integer <b>read</b> FMyIntegerData <b>write</b> FMyIntegerData;
+     <b>end</b>;
+
+     <font
+color="#003399"><i>// !!! Указываем универсальному классу на реальный тип</i></font>
+     
+     _COLLECTION_ITEM_ = TMyCollectionItem; 
+     
+     <font
+color="#003399"><i>// !!! директива добавления интерфейса универсального класса</i></font>
+
+     <font
+color="#990033"><i>{$INCLUDE TemplateCollectionInterface}</i></font> 
+
+     <font
+color="#003399"><i>// !!! переименовываем универсальный класс</i></font>
+
+     TMyCollection = _COLLECTION_;          
+
+<b>implementation</b>
+
+<b>uses</b> SysUtils;
+
+<font
+color="#003399"><i>// !!! препроцессорная директива добавления универсального класса</i></font>
+
+<font
+color="#990033"><i>{$INCLUDE TemplateCollectionImplementation}</i></font> 
+
+<b>procedure</b> TMyCollectionItem.Assign (aSource : TPersistent);
+<b>begin</b>
+ <b>if</b> aSource <b>is</b> TMyCollectionItem <b>then</b>
+ <b>begin</b>
+  FMyStringData  := TMyCollectionItem(aSource).FMyStringData;
+  FMyIntegerData := TMyCollectionItem(aSource).FMyIntegerData;
+ <b>end</b>
+ <b>else</b> <b>inherited</b>;
+<b>end</b>;
+
+<b>end</b>.</pre>
+    <p>Вот и всё! Теперь компилятор будет делать всю
+    работу за Вас! Если Вы измените интерфейс<br>
+    универсального класса, то изменения
+    автоматически распространятся на все модули,
+    которые<br>
+    он использует.</p>
+    <h3>Второй пример</h3>
+    <p>&nbsp;Давайте создадим универсальный класс для
+    динамических массивов.</p>
+    <p>Шаг 1: Создайте текстовый файл с именем <i>TemplateVectorInterface.pas</i>:</p>
+    <pre class="sourcecode">_VECTOR_INTERFACE_ = <b>nterface</b>
+ <b>function</b>  GetLength : Integer;
+ <b>procedure</b> SetLength (<b>const</b> aLength : Integer);
+
+ <b>function</b>  GetItems (<b>const</b> aIndex : Integer) : _VECTOR_DATA_TYPE_;
+ <b>procedure</b> SetItems (<b>const</b> aIndex : Integer;
+                     <b>const</b> aValue : _VECTOR_DATA_TYPE_);
+
+ <b>function</b>  GetFirst : _VECTOR_DATA_TYPE_;
+ <b>procedure</b> SetFirst (<b>const</b> aValue : _VECTOR_DATA_TYPE_);
+
+ <b>function</b>  GetLast  : _VECTOR_DATA_TYPE_;
+ <b>procedure</b> SetLast  (<b>const</b> aValue : _VECTOR_DATA_TYPE_);
+
+ <b>function</b>  High  : Integer;
+ <b>function</b>  Low   : Integer;
+
+ <b>function</b>  Clear                              : _VECTOR_INTERFACE_;
+ <b>function</b>  Extend   (<b>const</b> aDelta : Word = 1) : _VECTOR_INTERFACE_;
+ <b>function</b>  Contract (<b>const</b> aDelta : Word = 1) : _VECTOR_INTERFACE_; 
+
+ <b>property</b>  Length                         : Integer             <b>read</b> GetLength <b>write</b> SetLength;
+ <b>property</b>  Items [<b>const</b> aIndex : Integer] : _VECTOR_DATA_TYPE_  <b>read</b> GetItems  <b>write</b> SetItems; <b>default</b>;
+ <b>property</b>  First                          : _VECTOR_DATA_TYPE_  <b>read</b> GetFirst  <b>write</b> SetFirst;
+ <b>property</b>  Last                           : _VECTOR_DATA_TYPE_  <b>read</b> GetLast   <b>write</b> SetLast;
+<b>end</b>;
+
+_VECTOR_CLASS_ = <b>class</b> (TInterfacedObject, _VECTOR_INTERFACE_)
+<b>private</b>
+ FArray : <b>array</b> <b>of</b> _VECTOR_DATA_TYPE_;
+<b>protected</b>
+ <b>function</b>  GetLength : Integer;
+ <b>procedure</b> SetLength (<b>const</b> aLength : Integer);
+
+ <b>function</b>  GetItems (<b>const</b> aIndex : Integer) : _VECTOR_DATA_TYPE_;
+ <b>procedure</b> SetItems (<b>const</b> aIndex : Integer;
+                     <b>const</b> aValue : _VECTOR_DATA_TYPE_);
+
+ <b>function</b>  GetFirst : _VECTOR_DATA_TYPE_;
+ <b>procedure</b> SetFirst (<b>const</b> aValue : _VECTOR_DATA_TYPE_);
+
+ <b>function</b>  GetLast  : _VECTOR_DATA_TYPE_;
+ <b>procedure</b> SetLast  (<b>const</b> aValue : _VECTOR_DATA_TYPE_);
+<b>public</b>
+ <b>function</b>  High  : Integer;
+ <b>function</b>  Low   : Integer;
+
+ <b>function</b>  Clear                              : _VECTOR_INTERFACE_;
+ <b>function</b>  Extend   (<b>const</b> aDelta : Word = 1) : _VECTOR_INTERFACE_;
+ <b>function</b>  Contract (<b>const</b> aDelta : Word = 1) : _VECTOR_INTERFACE_; 
+
+ <b>constructor</b> Create (<b>const</b> aLength : Integer);
+<b>end</b>;</pre>
+    <p>Шаг 2: Создайте текстовый файл и сохраните его
+    как <i>TemplateVectorImplementation.pas</i>:</p>
+    <pre class="sourcecode"><b>constructor</b> _VECTOR_CLASS_.Create (<b>const</b> aLength : Integer);
+<b>begin</b>
+ <b>inherited</b> Create;
+
+ SetLength (aLength);
+<b>end</b>;
+
+<b>function</b> _VECTOR_CLASS_.GetLength : Integer;
+<b>begin</b>
+ Result := System.Length (FArray);
+<b>end</b>;
+
+<b>procedure</b> _VECTOR_CLASS_.SetLength (<b>const</b> aLength : Integer);
+<b>begin</b>
+ System.SetLength (FArray, aLength);
+<b>end</b>;
+
+<b>function</b> _VECTOR_CLASS_.GetItems (<b>const</b> aIndex : Integer) : _VECTOR_DATA_TYPE_;
+<b>begin</b>
+ Result := FArray [aIndex];
+<b>end</b>;
+
+<b>procedure</b> _VECTOR_CLASS_.SetItems (<b>const</b> aIndex : Integer;
+                                   <b>const</b> aValue : _VECTOR_DATA_TYPE_);
+<b>begin</b>
+ FArray [aIndex] := aValue;
+<b>end</b>;
+
+<b>function</b> _VECTOR_CLASS_.High : Integer;
+<b>begin</b>
+ Result := System.High (FArray);
+<b>end</b>;
+
+<b>function</b> _VECTOR_CLASS_.Low : Integer;
+<b>begin</b>
+ Result := System.Low (FArray);
+<b>end</b>;
+
+<b>function</b> _VECTOR_CLASS_.GetFirst : _VECTOR_DATA_TYPE_;
+<b>begin</b>
+ Result := FArray [System.Low (FArray)];
+<b>end</b>;
+
+<b>procedure</b> _VECTOR_CLASS_.SetFirst (<b>const</b> aValue : _VECTOR_DATA_TYPE_);
+<b>begin</b>
+ FArray [System.Low (FArray)] := aValue;
+<b>end</b>;
+
+<b>function</b> _VECTOR_CLASS_.GetLast : _VECTOR_DATA_TYPE_;
+<b>begin</b>
+ Result := FArray [System.High (FArray)];
+<b>end</b>;
+
+<b>procedure</b> _VECTOR_CLASS_.SetLast (<b>const</b> aValue : _VECTOR_DATA_TYPE_);
+<b>begin</b>
+ FArray [System.High (FArray)] := aValue;
+<b>end</b>;
+
+<b>function</b> _VECTOR_CLASS_.Clear : _VECTOR_INTERFACE_;
+<b>begin</b>
+ FArray := <b>Nil</b>;
+
+ Result := Self;
+<b>end</b>;
+
+<b>function</b> _VECTOR_CLASS_.Extend (<b>const</b> aDelta : Word) : _VECTOR_INTERFACE_;
+<b>begin</b>
+ System.SetLength (FArray, System.Length (FArray) + aDelta);
+
+ Result := Self;
+<b>end</b>;
+
+<b>function</b> _VECTOR_CLASS_.Contract (<b>const</b> aDelta : Word) : _VECTOR_INTERFACE_;
+<b>begin</b>
+ System.SetLength (FArray, System.Length (FArray) - aDelta);
+
+ Result := Self;
+<b>end</b>;</pre>
+    <p>Шаг 3: Создайте unit файл с именем <i>FloatVectorUnit.pas</i>:</p>
+    <pre class="sourcecode"><b>unit</b> FloatVectorUnit;
+
+<b>interface</b>
+
+<b>uses</b> Classes;                           <font
+color="#003399"><i>// !!! Модуль &quot;Classes&quot; содержит объявление класса TInterfacedObject</i></font>
+
+<b>type</b> _VECTOR_DATA_TYPE_ = Double;       <font
+color="#003399"><i>// !!! тип данных для класса массива Double</i></font>
+
+     <font
+color="#990033"><i>{$INCLUDE TemplateVectorInterface}</i></font>
+
+     IFloatVector = _VECTOR_INTERFACE_; <font
+color="#003399"><i>// !!! give the interface a meanigful name</i></font>
+     TFloatVector = _VECTOR_CLASS_;     <font
+color="#003399"><i>// !!! give the class a meanigful name</i></font>
+
+<b>function</b> CreateFloatVector (<b>const</b> aLength : Integer = 0) : IFloatVector; <font
+color="#003399"><i>// !!! дополнительная функция </i></font>
+
+<b>implementation</b>
+
+<font
+color="#990033"><i>{$INCLUDE TemplateVectorImplementation}</i></font>
+
+<b>function</b> CreateFloatVector (<b>const</b> aLength : Integer = 0) : IFloatVector;     
+<b>begin</b>
+ Result := TFloatVector.Create (aLength);
+<b>end</b>;
+
+<b>end</b>.</pre>
+    <p>Естевственно, можно дополнить универсальный
+    класс дополнительными<br>
+    функциями. Всё зависит от Вашей фантазии!</p>
+    <h3>Использование шаблонов</h3>
+    <p>Вот пример использования нового векторного
+    интерфейса:</p>
+    <pre class="sourcecode"><b>procedure</b> TestFloatVector;
+ <b>var</b> aFloatVector : IFloatVector;
+     aIndex       : Integer;
+<b>begin</b>
+ aFloatVector := CreateFloatVector;
+
+ aFloatVector.Extend.Last := 1;
+ aFloatVector.Extend.Last := 2;
+
+ <b>for</b> aIndex := aFloatVector.Low <b>to</b> aFloatVector.High <b>do</b>
+ <b>begin</b>
+  WriteLn (FloatToStr (aFloatVector [aIndex]));
+ <b>end</b>;
+<b>end</b>.</pre>
+    <p>Единственное требование при создании шаблонов
+    таким способом, это то, что<br>
+    каждый новый тип должен быть объявлен в
+    отдельном модуле, а так же Вы должны<br>
+    иметь исходники для универсальных классов.</p>
+    <p>Комментарии и вопросы присылайте по адресу <a
+    href="mailto:rossen_assenov@yahoo.com">rossen_assenov@yahoo.com</a>!</p>
+    <p><br>
+    <br>
+    </td>
+  </tr>
+</table>
+</center></div></TBODY>
+
+
+<p align="center"><br>
+<br>
+</p>
+<!--#include virtual="/ssi/bottom.html"-->

@@ -1,0 +1,232 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как определить скорость процессора</h3>
+    <p><b>Вариант 1 (ассемблерная версия):</b></p>
+    <p>function GetCPUSpeed: real; <br>
+    <br>
+    &nbsp;&nbsp;function IsCPUID_Available: Boolean; assembler; register; <br>
+    &nbsp;&nbsp;asm <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;PUSHFD
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {
+    прямой доступ к флагам невозможен, только через
+    стек }<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;POP&nbsp;&nbsp;&nbsp;&nbsp;EAX
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; { флаги в EAX } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MOV&nbsp;&nbsp;&nbsp;&nbsp;EDX,EAX
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; { сохраняем текущие флаги }<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;XOR&nbsp;&nbsp;&nbsp;&nbsp;EAX,$200000
+    &nbsp;&nbsp; { бит ID не нужен }<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;PUSH &nbsp;&nbsp;
+    EAX&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; { в стек } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;POPFD&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{
+    из стека в флаги, без бита ID } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;PUSHFD
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {
+    возвращаем в стек }<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;POP&nbsp;&nbsp;&nbsp;&nbsp;EAX
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; { обратно в EAX } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;XOR&nbsp;&nbsp;&nbsp;&nbsp;EAX,EDX
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; { проверяем, появился ли бит ID
+    }<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;JZ
+    &nbsp;&nbsp;&nbsp;&nbsp; @exit&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; { нет,
+    CPUID не доступен }<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MOV&nbsp;&nbsp;&nbsp;&nbsp;AL,True
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; { Result=True } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;@exit: <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    &nbsp;&nbsp;function hasTSC: Boolean; <br>
+    &nbsp;&nbsp;var <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Features: Longword; <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;asm <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MOV&nbsp;&nbsp;&nbsp;&nbsp;Features,0
+    &nbsp;&nbsp; { Features = 0 } <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;PUSH
+    &nbsp;&nbsp; EBX <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;XOR&nbsp;&nbsp;&nbsp;&nbsp;EAX,EAX
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DW
+    &nbsp;&nbsp;&nbsp;&nbsp; $A20F <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;POP&nbsp;&nbsp;&nbsp;&nbsp;EBX
+    <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CMP&nbsp;&nbsp;&nbsp;&nbsp;EAX,$01
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;JL
+    &nbsp;&nbsp;&nbsp;&nbsp; @Fail <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;XOR&nbsp;&nbsp;&nbsp;&nbsp;EAX,EAX
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MOV&nbsp;&nbsp;&nbsp;&nbsp;EAX,$01
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;PUSH
+    &nbsp;&nbsp; EBX <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DW
+    &nbsp;&nbsp;&nbsp;&nbsp; $A20F <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MOV&nbsp;&nbsp;&nbsp;&nbsp;Features,EDX
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;POP&nbsp;&nbsp;&nbsp;&nbsp;EBX
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;@Fail:
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;hasTSC := (Features and $10) &lt;&gt; 0; <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    const <br>
+    &nbsp;&nbsp;DELAY = 500; <br>
+    var <br>
+    &nbsp;&nbsp;TimerHi, TimerLo: Integer; <br>
+    &nbsp;&nbsp;PriorityClass, Priority: Integer; <br>
+    begin <br>
+    &nbsp;&nbsp;Result := 0; <br>
+    &nbsp;&nbsp;if not (IsCPUID_Available and hasTSC) then Exit; <br>
+    &nbsp;&nbsp;PriorityClass := GetPriorityClass(GetCurrentProcess); <br>
+    &nbsp;&nbsp;Priority := GetThreadPriority(GetCurrentThread); <br>
+    <br>
+    &nbsp;&nbsp;SetPriorityClass(GetCurrentProcess, REALTIME_PRIORITY_CLASS); <br>
+    &nbsp;&nbsp;SetThreadPriority(GetCurrentThread, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;THREAD_PRIORITY_TIME_CRITICAL); <br>
+    <br>
+    &nbsp;&nbsp;SleepEx(10, FALSE); <br>
+    <br>
+    &nbsp;&nbsp;asm <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DB
+    &nbsp;&nbsp;&nbsp;&nbsp; $0F&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {
+    $0F31 op-code for RDTSC Pentium инструкции } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DB
+    &nbsp;&nbsp;&nbsp;&nbsp; $31&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {
+    возвращает 64-битное целое (Integer) } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MOV&nbsp;&nbsp;&nbsp;&nbsp;TimerLo,EAX
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MOV&nbsp;&nbsp;&nbsp;&nbsp;TimerHi,EDX
+    <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    &nbsp;&nbsp;SleepEx(DELAY, FALSE); <br>
+    <br>
+    &nbsp;&nbsp;asm <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DB
+    &nbsp;&nbsp;&nbsp;&nbsp; $0F&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {
+    $0F31 op-code для RDTSC Pentium инструкции } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DB
+    &nbsp;&nbsp;&nbsp;&nbsp; $31&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {
+    возвращает 64-битное целое (Integer) } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SUB&nbsp;&nbsp;&nbsp;&nbsp;EAX,TimerLo
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SBB&nbsp;&nbsp;&nbsp;&nbsp;EDX,TimerHi
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MOV&nbsp;&nbsp;&nbsp;&nbsp;TimerLo,EAX
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MOV&nbsp;&nbsp;&nbsp;&nbsp;TimerHi,EDX
+    <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    &nbsp;&nbsp;SetThreadPriority(GetCurrentThread, Priority); <br>
+    &nbsp;&nbsp;SetPriorityClass(GetCurrentProcess, PriorityClass); <br>
+    &nbsp;&nbsp;Result := TimerLo / (1000 * DELAY); <br>
+    end;</p>
+    <p>&nbsp;</p>
+    <p>-----------------------------------------------------------------------------------------------------------</p>
+    <p><b>Вариант 2 (Тоже с ассемблерной вставкой, но
+    проще и вдобавок сразу получаем MHz):</b></p>
+    <p>Program ....; <br>
+    &nbsp;&nbsp;.. <br>
+    .. <br>
+    &nbsp;&nbsp; <br>
+    <br>
+    const <br>
+    ID_BIT=$200000; // EFLAGS ID bit <br>
+    <br>
+    function GetCPUSpeed: Double; <br>
+    const <br>
+    &nbsp;&nbsp;DelayTime = 500; <br>
+    var <br>
+    &nbsp;&nbsp;TimerHi, TimerLo: DWORD; <br>
+    &nbsp;&nbsp;PriorityClass, Priority: Integer; <br>
+    begin <br>
+    try <br>
+    &nbsp;&nbsp;PriorityClass := GetPriorityClass(GetCurrentProcess); <br>
+    &nbsp;&nbsp;Priority := GetThreadPriority(GetCurrentThread); <br>
+    <br>
+    &nbsp;&nbsp;SetPriorityClass(GetCurrentProcess, REALTIME_PRIORITY_CLASS); <br>
+    SetThreadPriorit(GetCurrentThread,THREAD_PRIORITY_TIME_CRITICAL); <br>
+    <br>
+    &nbsp;&nbsp;Sleep(10); <br>
+    &nbsp;&nbsp;asm <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;dw 310Fh // rdtsc <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;mov TimerLo, eax <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;mov TimerHi, edx <br>
+    &nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;Sleep(DelayTime); <br>
+    &nbsp;&nbsp;asm <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;dw 310Fh // rdtsc <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;sub eax, TimerLo <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;sbb edx, TimerHi <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;mov TimerLo, eax <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;mov TimerHi, edx <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    &nbsp;&nbsp;SetThreadPriority(GetCurrentThread, Priority); <br>
+    &nbsp;&nbsp;SetPriorityClass(GetCurrentProcess, PriorityClass); <br>
+    <br>
+    &nbsp;&nbsp;Result := TimerLo / (1000.0 * DelayTime); <br>
+    &nbsp;&nbsp;except end; <br>
+    end; <br>
+    <br>
+    <br>
+    procedure TForm1.Button1Click(Sender: TObject); <br>
+    var cpuspeed:string; <br>
+    begin <br>
+    cpuspeed:=Format('%f MHz', [GetCPUSpeed]); <br>
+    edit1.text := cpuspeed; <br>
+    end;</p>
+    <p>&nbsp;</p>
+    <p>-----------------------------------------------------------------------------------------------------------</p>
+    <p><b>Вариант 3 (WinApi):</b></p>
+    <p>function RdTSC : int64; register; <br>
+    asm <br>
+    &nbsp;&nbsp;db&nbsp;&nbsp; $0f, $31 <br>
+    end;
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    <br>
+    <br>
+    function GetCyclesPerSecond : int64; <br>
+    var <br>
+    &nbsp;&nbsp;hF, T, et, sc : int64; <br>
+    begin <br>
+    &nbsp;&nbsp;QueryPerformanceFrequency(hF);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//
+    HiTicks / second <br>
+    &nbsp;&nbsp;QueryPerformanceCounter(T);
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    // Determine start HiTicks <br>
+    &nbsp;&nbsp;et := T + hF;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; //
+    (Cycles are passing, but we can still USE them!) <br>
+    &nbsp;&nbsp;sc := RdTSC;
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    // Get start cycles <br>
+    &nbsp;&nbsp;repeat&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//
+    Use Hi Perf Timer to loop for 1 second <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;QueryPerformanceCounter(T);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//
+    Check ticks NOW <br>
+    &nbsp;&nbsp;until (T &gt;= et);
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    //&nbsp;&nbsp;Break the moment we equal or exceed et <br>
+    &nbsp;&nbsp;Result := RdTSC - sc;
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; //
+    Get stop cycles and calculate result <br>
+    end;</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

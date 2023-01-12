@@ -1,0 +1,174 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Динамическая загрузка DLL</h3>
+    <p>DLL возможно загружать двумя способами:<br>
+    <br>
+    &nbsp;&nbsp;- статически<br>
+    &nbsp;&nbsp;- динамически<br>
+    <br>
+    <br>
+    Давайте создадим простую библиотеку DLL:<br>
+    <br>
+    Project file name: c:\example\exdouble\exdouble.dpr <br>
+    <br>
+    ----------------------------------------------------------------------<br>
+    library ExDouble; <br>
+    // my simple dll <br>
+    <br>
+    function calc_double ( r: real ): real; stdcall; <br>
+    begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; result := r * 2; <br>
+    end; <br>
+    <br>
+    exports <br>
+    &nbsp;&nbsp;calc_double index 1; <br>
+    <br>
+    end; <br>
+    ---------------------------------------------------------------------- <br>
+    </p>
+    <p>Теперь посмотрим, как её можно загружать:<br>
+    <br>
+    <br>
+    <strong>СТАТИЧЕСКАЯ ЗАГРУЗКА DLL</strong><br>
+    ================== <br>
+    <br>
+    При таком способе загрузки достаточно поместить
+    файл DLL в директорию приложения или в директорию
+    Windows, или в Windows\System, Windows\Command. Однако, если система
+    не найдёт этого файла в этих директория, то
+    высветится сообщение об ошибке (DLL не найдена, или
+    что-то в этом духе).<br>
+    <br>
+    ----------------------------------------------------------------------<br>
+    unit untMain; <br>
+    <br>
+    interface <br>
+    <br>
+    uses <br>
+    &nbsp;&nbsp;Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs, <br>
+    &nbsp;&nbsp;StdCtrls; <br>
+    <br>
+    type <br>
+    &nbsp;&nbsp;TForm1 = class(TForm) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Button1: TButton; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure Button1Click(Sender: TObject); <br>
+    &nbsp;&nbsp;private <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{ Private declarations } <br>
+    &nbsp;&nbsp;public <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{ Public declarations } <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    var <br>
+    &nbsp;&nbsp;Form1: TForm1; <br>
+    <br>
+    implementation <br>
+    <br>
+    <font style="COLOR: #990000"><b>function calc_double ( r: real ): real; stdcall; external
+    'ExDouble.dll';</b></font> <br>
+    <br>
+    {$R *.DFM} <br>
+    <br>
+    procedure TForm1.Button1Click(Sender: TObject); <br>
+    begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; // в окошке сообщения будет цифра 21<br>
+    &nbsp;&nbsp;&nbsp;&nbsp; showMessage ( floatToStr ( calc_double ( 10.5 ) ) ); <br>
+    end; <br>
+    <br>
+    end. <br>
+    ---------------------------------------------------------------------- <br>
+    <br>
+    </p>
+    <p><strong>ДИНАМИЧЕСКАЯ ЗАГРУЗКА DLL</strong><br>
+    =================== <br>
+    <br>
+    При динамической загрузке требуется написать
+    немного больше кода.<br>
+    <br>
+    <br>
+    А вот как это выглядит:<br>
+    ---------------------------------------------------------------------- <br>
+    <br>
+    unit untMain; <br>
+    <br>
+    interface <br>
+    <br>
+    uses <br>
+    &nbsp;&nbsp;Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs, <br>
+    &nbsp;&nbsp;StdCtrls; <br>
+    <br>
+    type <br>
+    &nbsp;&nbsp;<font style="COLOR: #990000"><b>Tcalc_double = function&nbsp;&nbsp;( r: real
+    ): real;</b></font> <br>
+    <br>
+    &nbsp;&nbsp;TForm1 = class(TForm) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Button1: TButton; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure Button1Click(Sender: TObject); <br>
+    &nbsp;&nbsp;private <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{ Private declarations } <br>
+    &nbsp;&nbsp;public <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{ Public declarations } <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    var <br>
+    &nbsp;&nbsp;Form1: TForm1; <br>
+    <br>
+    implementation <br>
+    <br>
+    {$R *.DFM} <br>
+    <br>
+    procedure TForm1.Button1Click(Sender: TObject); <br>
+    var <br>
+    &nbsp;&nbsp; hndDLLHandle: THandle; <br>
+    &nbsp;&nbsp; <font style="COLOR: #990000"><b>calc_double: Tcalc_double;</b></font> <br>
+    begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; try <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// загружаем dll
+    динамически<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;hndDLLHandle := loadLibrary (
+    'ExDouble.dll' ); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if hndDLLHandle &lt;&gt; 0 then begin <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // получаем
+    адрес функции<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; @calc_double :=
+    getProcAddress ( hndDLLHandle, 'calc_double' ); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // если адрес
+    функции найден<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if addr ( calc_double )
+    &lt;&gt; nil then begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//
+    показываем результат ( 21...) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;showMessage
+    ( floatToStr ( calc_double ( 10.5 ) ) ); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; end else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// DLL
+    не найдена (&quot;handleable&quot;) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;showMessage
+    ( 'Function not exists...' ); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // DLL не найдена
+    (&quot;handleable&quot;) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; showMessage ( 'DLL not
+    found...' ); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; finally <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// liberar <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;freeLibrary ( hndDLLHandle ); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; end; <br>
+    end; <br>
+    <br>
+    end. <br>
+    ----------------------------------------------------------------------</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

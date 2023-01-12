@@ -1,0 +1,103 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как получить определённую часть текста из RichEdit</h3>
+    <p>Иногда бывает необходимо полудить только часть
+    текста из RichEdit не выделяя его, то есть не
+    используя свойство SelText. Ниже представлен код,
+    который позволяет сделать это.</p>
+    <p>{Переопределяем неправильное объявление TTextRange
+    в RichEdit.pas} <br>
+    &nbsp;&nbsp;TTextRange = record <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; chrg:
+    TCharRange; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; lpstrText:
+    PAnsiChar; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; end; <br>
+    <br>
+    <br>
+    function REGetTextRange(RichEdit: TRichEdit; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;BeginPos,
+    MaxLength: Integer): string; <br>
+    {RichEdit - RichEdit control <br>
+    BeginPos - абсолютное значение первого символа<br>
+    MaxLength - максимально число получаемых символов}<br>
+    var <br>
+    &nbsp;&nbsp;TextRange: TTextRange; <br>
+    begin <br>
+    &nbsp;&nbsp;if MaxLength&gt;0 then <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; SetLength(Result, MaxLength); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; with TextRange do <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; chrg.cpMin := BeginPos; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; chrg.cpMax := BeginPos+MaxLength; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; lpstrText := PChar(Result); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; SetLength(Result, SendMessage(RichEdit.Handle, EM_GETTEXTRANGE,
+    0, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; longint(@TextRange)));
+    <br>
+    &nbsp;&nbsp;end <br>
+    &nbsp;&nbsp; else Result:=''; <br>
+    end; <br>
+    <br>
+    Следующую функцию можно использовать для
+    получения слова, над которым находится курсор
+    мышки:<br>
+    <br>
+    function RECharIndexByPos(RichEdit: TRichEdit; X, Y: Integer): Integer; <br>
+    { функция возвращает абсолютное положение
+    символа для данных координат курсора}<br>
+    <br>
+    var <br>
+    &nbsp;&nbsp;P: TPoint; <br>
+    begin <br>
+    &nbsp;&nbsp;P := Point(X, Y); <br>
+    &nbsp;&nbsp;Result := SendMessage(RichEdit.Handle, EM_CHARFROMPOS, 0, longint(@P)); <br>
+    end; <br>
+    <br>
+    function REExtractWordFromPos(RichEdit:
+    TRichEdit;&nbsp;&nbsp;X,&nbsp;&nbsp;Y:&nbsp;&nbsp;Integer):= <br>
+    string; <br>
+    { X, Y - координаты в rich edit }<br>
+    {возвращает слово в текущих координатах курсора}<br>
+    <br>
+    var <br>
+    &nbsp;&nbsp;BegPos, EndPos: Integer; <br>
+    begin <br>
+    &nbsp;&nbsp; BegPos := RECharIndexByPos(RichEdit, X,&nbsp;&nbsp;Y); <br>
+    &nbsp;&nbsp;if (BegPos &lt; 0)&nbsp;&nbsp;or <br>
+    &nbsp;&nbsp; (SendMessage(RichEdit.Handle,EM_FINDWORDBREAK,WB_CLASSIFY,BegPos) and <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(WBF_BREAKLINE
+    or WBF_ISWHITE) &lt;&gt; 0 )&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;then <br>
+    &nbsp;&nbsp; begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;result:=''; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exit; <br>
+    &nbsp;&nbsp; end; <br>
+    <br>
+    &nbsp;&nbsp; if SendMessage(RichEdit.Handle, EM_FINDWORDBREAK,WB_CLASSIFY,BegPos-1) and <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(WBF_BREAKLINE or
+    WBF_ISWHITE)&nbsp;&nbsp;=&nbsp;&nbsp;0&nbsp;&nbsp;then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; BegPos:=SendMessage(RichEdit.Handle,
+    EM_FINDWORDBREAK, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; WB_MOVEWORDLEFT,
+    BegPos); <br>
+    &nbsp;&nbsp;EndPos:=SendMessage(RichEdit.Handle,EM_FINDWORDBREAK,WB_MOVEWORDRIGHT,BegPos);
+    <br>
+    &nbsp;&nbsp;Result:=TrimRight(REGetTextRange(RichEdit, BegPos, EndPos - BegPos)); <br>
+    end;</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div></TBODY>
+
+
+<p align="center"><br>
+<br>
+</p>
+<!--#include virtual="/ssi/bottom.html"-->

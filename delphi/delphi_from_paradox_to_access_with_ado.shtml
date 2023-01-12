@@ -1,0 +1,308 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Из Paradox в Access при помощи ADO</h3>
+    <p>(Перевод одноимённой статьи с сайта <a
+    href="http://delphi.about.com">delphi.about.com</a> )</p>
+    <p>В данной статье мы обратим внимание на
+    компонент TADOCommand и использование языка SQL DDL (Data
+    Definition Language), с целью помочь Вам с проблемой <b>переноса
+    данных BDE/Paradox в ADO/Access.</b></p>
+    <p>&nbsp;&nbsp;&nbsp;<b><font color="#000080">Язык определения данных
+    (Data Definition Language)</font></b><br>
+    Не многие программисты создают базу данных
+    программным путём, большинство из нас для этого
+    используют некую визуальную среду наподобие MS
+    Access для построения файла MDB. Но иногда нам всё
+    таки приходится создавать и удалять базу данных,
+    а так же объекты базы данных программным путём.
+    Для этого используется наиболее
+    распространённая на сегодняшний день технология
+    Structured Query Language Data Definition Language (SQL DDL). Выраджения
+    языка определения данных (DDL) - это SQL выражения,
+    которые поддерживают определения или объявления
+    объектов базы данных (например, CREATE TABLE, DROP TABLE, CREATE
+    INDEX либо подобные им).<br>
+    В рамки данной статьи не входит детальное
+    ознакомление с языком DDL. Если Вы знакомы с языком
+    SQL DML (Data Manipulation Language - это выражения типа SELECT, UPDATE и
+    DELETE), то DDL не будет для Вас серьёзным барьером.
+    Обратите внимание, что работа с DDL может быть
+    весьма ухищрённой, так как каждый производитель
+    базы данных може включать в неё собственные
+    расширения для SQL. </p>
+    <p>Давайте взглянем на простейший пример
+    выражения CREATE TABLE: </p>
+    <p><font color="#808080">CREATE TABLE PhoneBook(<br>
+    &nbsp;&nbsp;Name TEXT(50)<br>
+    &nbsp;&nbsp;Tel TEXT(50)<br>
+    );</font> </p>
+    <p>Данное DDL выражение (для MS Access) в время
+    выполнения создаст новую таблицу с названием
+    PhoneBook. Таблица PhoneBook будет иметь два поля: Name и Tel.
+    Оба поля имеют строковый тип (TEXT) и размер поля 50
+    символов. </p>
+    <p><b><i>TFieldDef.DataType</i></b><br>
+    Очевидно, что в Access тип данных, представленный
+    строкой это TEXT. В Paradox это STRING. Чтобы передать
+    таблицы Paradox в Access, нам необходимо знать какие
+    типы данных присутствуют и, соответственно их
+    имена. При работе в BDE с таблицами Paradox, <i>TFieldDef.DataType</i>
+    определяет тип физического поля в (dataset) таблице.
+    Поэтому для успешного перенесения данных из
+    таблиц Paradox в Access Вам необходимо создать функцию,
+    которая бы преобразовывала соотвествующие типы
+    полей Paradox в типы Access. <br>
+    Давайте посмотрим на пример функции, которая
+    проверяет тип поля (fd) и возвращает
+    соответствующий тип Access, а заоодно и размер поля,
+    который необходим для выражения CREATE TABLE DDL. </p>
+    <table bgColor="#ffffcc" border="1" width="100%">
+<TBODY>
+      <tr>
+        <td><pre><b>function</b> AccessType(fd:TFieldDef):string;
+<b>begin</b>
+ <b>case</b> fd.DataType <b>of</b>
+  ftString: Result:='TEXT('+IntToStr(fd.Size)+')';
+  ftSmallint: Result:='SMALLINT';
+  ftInteger: Result:='INTEGER';
+  ftWord: Result:='WORD';
+  ftBoolean: Result:='YESNO';
+  ftFloat : Result:='FLOAT';
+  ...
+ <b>else</b>
+  Result:='TEXT(50)';
+ <b>end</b>;
+<b>end</b>;
+</pre>
+        </td>
+      </tr>
+</TBODY>
+    </table>
+    <p>&nbsp;&nbsp;&nbsp;<b><font color="#000080">ADOX</font></b><br>
+    ADOX - это расширения ADO для Data Definition Language а так же
+    для модели защиты (<a
+    href="http://msdn.microsoft.com/library/default.asp?url=/library/en-us/ado270/htm/admscadoxfundamentals.asp">ADOX</a>).
+    ADOX предоставляет разработчикам богатый набор
+    инструментов для получения доступа к структуре,
+    модели защиты, а так же процедурам, хранимым в
+    базе данных. </p>
+    <p>Для использования ADOX в Delphi, Вам необходимы
+    установить библиотеку типа ADOX.<br>
+    1. Select Project | Import Type Library <br>
+    3. Выберите &quot;Microsoft ADO Ext 2.x for DDL and Security (Version 2.x)&quot; <br>
+    4. Измените &quot;TTable&quot; на &quot;TADOXTable&quot; <br>
+    5. Измените &quot;TColumn&quot; на &quot;TADOXColumn&quot; <br>
+    6 .Измените &quot;TIndex&quot; на &quot;TADOXIndex&quot; <br>
+    7. Нажмите кнопку Install (перекомпиляция пакетов
+    (packages))<br>
+    8. Нажмите один раз OK и дважды Yes <br>
+    9. File | Close All | Yes <br>
+    </p>
+    <p>На вершине объектной модели ADOX находится
+    объект Catalog. Он обеспечивает доступ к набору
+    Таблиц (Tables), Видов (Views) и Процедур, который
+    используется для работы со структурой базы
+    данных, а так же к набору Пользователей (Users) и
+    рупп (Groups), которые используются для авторизации
+    доступа. Каждый объект Catalog связан только с одним
+    подключением к источнику данных. </p>
+    <p>Давайте оставим ADOX (пока) и перейдём к ADOExpress. </p>
+    <p>&nbsp;&nbsp;&nbsp;<b><font color="#000080">TADOCommand</font></b><br>
+    В ADOExpress компонент <i>TADOCommand</i> - это VCL
+    представление объекта ADO Command. Объект Command
+    представляет команду (запрос или выражение),
+    которая может быть обработана источником данных.
+    Команды могут быть выполнены методом&nbsp; <i>Execute</i>,
+    используемым в ADOCommand. TADOCommand чаще всего
+    используется для исполнения команд языка
+    определения данных (DDL) SQL. Свойство <i>CommandText </i>содержит
+    в себе саму команду. Свойство <i>CommandType </i>используется
+    для того, как интерпретировать свойство CommandText.
+    Тип <i>cmdText </i>используется для указания
+    инструкции DDL. Впринципе, использовать компонент
+    ADOCommand для получения данных из таблицы, запросов
+    или хранимых процедур не имеет смысла, но никто
+    не запрещает Вам пользоваться данным
+    компонентов и в таких целях. </p>
+    <p>Итак, самое время приступить к реальному
+    программированию... </p>
+    <p>Приведённый ниже проект демонстрирует
+    следующее:<br>
+    Получение списка всех таблиц из BDE, использование
+    TFieldDefs чтобы получить определения (имя, тип данных,
+    размер, и т.д.) полей в таблице, создание
+    инструкции CREATE TABLE и копирование данных из
+    таблицы BDE/Paradox в таблицу ADO/Access. </p>
+    <p>Давайте решим эту задачу по шагам: <br>
+    <b><i>GUI</i></b><br>
+    Запускаем Delphi - получаем новый проект с пустой
+    формой. Добавляем две кнопки, один ComboBox и один
+    компонент Memo. Далее добавляем компоненты TTable,
+    TADOTable, TADOConnection и TADOCommand. Чтобы установить
+    следующие свойства, используем Object Inspector (оставьте
+    все другие свойства как есть - например, Memo будет
+    иметь имя по умолчанию: Memo1): </p>
+    <p><img align="left" alt="At design time" border="0" height="136" src="dbc11_1.jpg"
+    width="150"> <font color="#808080" size="-2">Button1.Caption = 'Construct Create command'<br>
+    Button2.Caption = 'Create Table and copy data'<br>
+    ComboBox.Name = cboBDETblNames;<br>
+    &nbsp;<br>
+    ADOConnection1.ConnectionString = ...<br>
+    TADOTable.Name = ADOTable<br>
+    ADOTable.Connection = ADOConnection1<br>
+    TADOCommand.Name = ADOCommand<br>
+    ADOCommand.Connection = ADOConnection1<br>
+    TTable.Name = BDETable<br>
+    BDETable.DatabaseName = 'DBDEMOS'</font><br>
+    </p>
+    <p><b><i>Пример</i></b><br>
+    Для получения списка таблиц, связанных с данной
+    базо данных (DBDEMOS) мы воспользуемся следующим
+    кодом (OnCreate для формы): </p>
+    <table bgColor="#ffffcc" border="1" width="100%">
+<TBODY>
+      <tr>
+        <td><pre><b>procedure</b> TForm1.FormCreate(Sender: TObject);
+<b>begin</b>
+ Session.<font
+color="#ff0000">GetTableNames</font>('DBDEMOS',
+                       '*.db',False, False,
+                       cboBDETblNames.Items);
+<b>end;</b>
+</pre>
+        </td>
+      </tr>
+</TBODY>
+    </table>
+    <p>В самом начале ComboBox содержит имена таблиц (Paradox)
+    в базе данных DBDEMOS. В нижеприведённом коде мы
+    выберем таблицу Country. </p>
+    <p>Следующая наша задача - это создание инструкции
+    CREATE TABLE DDL. Это делается в процедуре OnClick кнопки
+    'Construct Create command': </p>
+    <table bgColor="#ffffcc" border="1" width="100%">
+<TBODY>
+      <tr>
+        <td><pre><b>procedure</b> TForm1.Button1Click(Sender: TObject);
+<font color="#000080"><i>//Кнопка 'Construct Create command'</i></font>
+<b>var</b> i:integer;
+    s:string;
+<b>begin</b>
+ BDETable.TableName:=cboBDETblNames.Text;
+ BDETable.FieldDefs.Update;
+
+ s:='CREATE TABLE ' + BDETable.TableName + ' (';
+ <b>with</b> BDETable.FieldDefs <b>do begin</b>
+  <b>for</b> i:=0 to Count-1 <b>do begin</b>
+   s:=s + ' ' + Items[i].Name;
+   s:=s + ' ' + AccessType(Items[i]);
+   s:=s + ',';
+  <b>end</b>; <font
+color="#000080"><i>//for</i></font>
+  s[Length(s)]:=')';
+ <b>end</b>;<font color="#000080"><i>//with</i></font>
+
+ Memo1.Clear;
+ Memo1.lines.Add (s);
+<b>end</b>;
+</pre>
+        </td>
+      </tr>
+</TBODY>
+    </table>
+    <p>Вышеприведённый код просто анализирует
+    определения полей для выбранной таблицы
+    (cboBDETblNames) и генерирует строку, которая будет
+    использоваться свойством CommandText компоненты
+    TADOCommand. </p>
+    <p>Например, когда Вы выбираете таблицу Country, то Memo
+    будет заполнен следующей строкой: </p>
+    <p><font color="#808080">CREATE TABLE country (<br>
+    &nbsp;&nbsp;Name TEXT(24),<br>
+    &nbsp;&nbsp;Capital TEXT(24),<br>
+    &nbsp;&nbsp;Continent TEXT(24),<br>
+    &nbsp;&nbsp;Area FLOAT,<br>
+    &nbsp;&nbsp;Population FLOAT<br>
+    )<br>
+    </font></p>
+    <p>И в заключении, пример для кнопки 'Create Table and copy
+    data' , которая удаляет таблицу (<font size="-2">DROP..EXECUTE</font>),
+    создаёт таблицу (<font size="-2">CREATE..EXECUTE</font>), и затем
+    копирует данные в новую таблицу (<font size="-2">INSERT...POST</font>).
+    Так же присутствует некоторая обработка ошибок,
+    но код будет выходить на ошибку, если, например,
+    (новая) таблица ещё не существует (в случае
+    удаления). </p>
+    <table bgColor="#ffffcc" border="1" width="100%">
+<TBODY>
+      <tr>
+        <td><pre><b>procedure</b> TForm1.Button2Click(Sender: TObject);
+<font color="#000080"><i>//Кнопка 'Create Table and copy data'</i></font>
+<b>var</b> i:integer;
+    tblName:string;
+<b>begin</b>
+ tblName:=cboBDETblNames.Text;
+
+<font
+color="#000080"><i>//обновляем</i></font>
+ Button1Click(Sender);
+
+<font color="#000080"><i>//удаление &amp; создание таблицы</i></font>
+ ADOCommand.CommandText:='DROP TABLE ' + tblName;
+ ADOCommand.Execute;
+
+ ADOCommand.CommandText:=Memo1.Text;
+ ADOCommand.Execute;
+
+ ADOTable.TableName:=tblName;
+
+<font
+color="#000080"><i>//копируем данные</i></font>
+ BDETable.Open;
+ ADOTable.Open;
+ <b>try</b>
+  <b>while not</b> BDETable.Eof <b>do begin</b>
+   ADOTable.Insert;
+   <b>for</b> i:=0 to BDETable.Fields.Count-1 <b>do begin</b>
+    ADOTable.FieldByName
+   (BDETable.FieldDefs[i].Name).Value :=
+      BDETable.Fields[i].Value;
+   <b>end</b>;<font
+color="#000080"><i>//for</i></font>
+   ADOTable.Post;
+   BDETable.Next
+  <b>end</b>;<font
+color="#000080"><i>//while</i></font>
+ <b>finally</b>
+  BDETable.Close;
+  ADOTable.Close;
+ <b>end</b>;<font
+color="#000080"><i>//try</i></font>
+<b>end</b>;
+</pre>
+        </td>
+      </tr>
+</TBODY>
+    </table>
+    <p>Вот и всё. Теперь проверьте Вашу базу данных
+    Access...вуаля :) теперь в ней находится таблица Country
+    со всеми данными из DBDEMOS. </p>
+    <p>Однако некоторые вопросы остались без ответа,
+    например: как добавлять индексы в таблицу (<font
+    size="-2">CREATE INDEX ON ...</font>), или как создавать пустую
+    базу данных Access.</p>
+    <p><br>
+    </td>
+  </tr>
+</table>
+</center></div></TBODY>
+
+
+<p align="center"><br>
+<br>
+</p>
+<!--#include virtual="/ssi/bottom.html"-->

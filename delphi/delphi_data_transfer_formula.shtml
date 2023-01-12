@@ -1,0 +1,324 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Формулы передачи данных для начинающих</h3>
+    <p>Автор: <a href="mailto:jason@realtimestudios.net">Jason Pierce</a></p>
+    <p>Данным примером я попытаюсь дать ответы на
+    следующие вопросы:<br>
+    Каково различие между KBps и Kbps? В чём заключается
+    отличие битов, байтов и бодов? Как определить
+    скорость передачи данных? Как выяснить,
+    насколько долго будет загружаться файл с
+    определённой скоростью? Как посчитать время,
+    оставшее до окончания загрузки?</p>
+    <p>Для начала хотельсы навести порядок с
+    некоторой неразберихой по поводу KBps и Kbps (буква b
+    в нижнем регистре). KBps это обозначение для
+    килобайт в секунду, в то время как Kbps обозначает
+    килобиты в секунду. 1 килобайт (KB) = 8 килобитам (Kb). <br>
+    <br>
+    Когда речь идёт о скорости передачи, то
+    применяется Kbps. Таким образом модем со скорость
+    передачи 33.6K (33600 bps) передаёт данные со скоростью
+    4.2 KBps (4.2 килобайта в секунду). Как мы видим,
+    разница между KB и Kb довольно ощутима. В этом
+    кроется причина того, что некоторые пользователи
+    модемов по своему незнанию не могут понять,
+    почему данные передаются так медленно. На самом
+    деле данные объёмом 33.6K передаются не за 1 секунду,
+    а за 8, соответственно за одну секунду будет
+    передано 33.6 Kb / 8 = 4.2.<br>
+    <br>
+    Так же хотелось бы дать некоторые разъяснения по
+    поводу слова &quot;бод&quot; (baud). Обычно для модема &quot;боды&quot;
+    расшифровываются как бит в секунду. На самом деле
+    это не так. Бод (Baud) означает частоту звука в
+    телефонной линии. Т. е. в зависимости от модема,
+    который Вы используете, количество бит, которые
+    могут быть переданы зависит от частоты звука,
+    необходимой для обеспечения нужной скорости
+    передачи.<br>
+    <br>
+    Обратите внимание: Приведённый ниже пример,
+    использует компонент NetMasters TNMHTTP. Однако, если Вы
+    &quot;прикипели&quot; к какому-то другому компоненту
+    TCP/IP, то переделать пример под этот компонент не
+    составит большого труда. <br>
+    <br>
+    Используемые обозначения:<br>
+    bps = байт, переданных за 1 секунду<br>
+    KBps (KB/Sec) = bps / 1024 <br>
+    Kbps (Kb/Sec) = KBps x 8 <br>
+    <br>
+    Краткий алгоритм приведённого ниже примера:<br>
+    1. Сохраняем в переменной время начала загрузки:
+    nStartTime := GetTickCount; <br>
+    2. Сохраняем в переменной размер файла (KB): nFileSize :=
+    &quot;File Size&quot;; <br>
+    3. Начало передачи данных. <br>
+    4. Обновляем количество переданных байт:
+    Inc(nBytesTransferred, nNewBytes); <br>
+    5. Получаем оставшееся время: nTimeElapsed := (GetTickCount -
+    nStartTime) / 1000; <br>
+    6. Вычисляем bps: nBps := BytesTransferred / nTimeElapsed; <br>
+    7. Вычисляем KBps: nKBps := nBps / 1024; <br>
+    <br>
+    Используемые данные:<br>
+    Общее время скачивания (секунд) := nFileSize / nKBps; <br>
+    bps := FloatToStr(nBps); <br>
+    KB/Sec (KBps) := FloatToStr(nKBps); <br>
+    Осталось секунд := FloatToStr(((nFileSize - BytesTransferred) / 1024) /
+    KBps); <br>
+    <br>
+    Рабочий пример:<br>
+    <br>
+    unit Main; <br>
+    <br>
+    interface <br>
+    <br>
+    uses <br>
+    &nbsp;&nbsp;Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs, <br>
+    &nbsp;&nbsp;StdCtrls, Gauges, Psock, NMHttp; <br>
+    <br>
+    type <br>
+    &nbsp;&nbsp;TfMain = class(TForm) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Label1: TLabel; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;eURL: TEdit; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;bGet: TButton; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;lbMessages: TListBox; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;gbDetails: TGroupBox; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;lEstimate: TLabel; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;lKBps: TLabel; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;lReceived: TLabel; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;lRemaining: TLabel; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;gProgress: TGauge; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;NMHTTP1: TNMHTTP; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;lbps: TLabel; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;bCancel: TButton; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure NMHTTP1PacketRecvd(Sender: TObject); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure bGetClick(Sender: TObject); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure bCancelClick(Sender: TObject); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure NMHTTP1Connect(Sender: TObject); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure NMHTTP1ConnectionFailed(Sender: TObject); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure NMHTTP1Disconnect(Sender: TObject); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure NMHTTP1Failure(Cmd: CmdType); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure NMHTTP1HostResolved(Sender: TComponent); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure NMHTTP1InvalidHost(var Handled: Boolean); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure NMHTTP1Status(Sender: TComponent; Status: String); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure NMHTTP1Success(Cmd: CmdType); <br>
+    &nbsp;&nbsp;private <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{ Private declarations } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;function ss2nn(Seconds: Integer): String; <br>
+    &nbsp;&nbsp;public <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{ Public declarations } <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    var <br>
+    &nbsp;&nbsp;fMain: TfMain; <br>
+    &nbsp;&nbsp;nFileSize: Double; <br>
+    &nbsp;&nbsp;nStartTime: DWord; <br>
+    <br>
+    implementation <br>
+    <br>
+    {$R *.DFM} <br>
+    <br>
+    {Цель этой функции состоит в том, чтобы
+    определить, сколько минут и секунд там находятся
+    в данном количестве секунд} <br>
+    function TfMain.ss2nn(Seconds: Integer): String; <br>
+    var <br>
+    &nbsp;&nbsp;nMin, nSec: Integer; <br>
+    begin <br>
+    &nbsp;&nbsp;{Проверяем, меньше чем 1/Min} <br>
+    &nbsp;&nbsp;if Seconds &lt; 60 then Result := '0 minutes ' + IntToStr(Seconds) + '
+    seconds' <br>
+    &nbsp;&nbsp;else begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{Определяем минуты} <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;nMin := Seconds div 60; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{Определяем секунды} <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;nSec := Seconds - (nMin * 60); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{Возвращаем результат} <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Result := IntToStr(nMin) + ' minutes ' + IntToStr(nSec) + '
+    seconds'; <br>
+    &nbsp;&nbsp;end; <br>
+    end; <br>
+    <br>
+    procedure TfMain.NMHTTP1PacketRecvd(Sender: TObject); <br>
+    var <br>
+    &nbsp;&nbsp;nBytesReceived, nTimeElapsed, nBps, nKBps: Double; <br>
+    begin <br>
+    &nbsp;&nbsp;{Следующий код выполняется только однажды,
+    при приёме первого пакета}<br>
+    &nbsp;&nbsp;if nFileSize &lt;&gt; NMHTTP1.BytesTotal then <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{Получаем размер файла} <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;nFileSize := NMHTTP1.BytesTotal; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{Вычисляем время передачи, исходя из
+    скорости соединения 33.6 Kbps} <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;lEstimate.Caption := 'Estimated download time at 33.6 Kbps: ' +
+    ss2nn(Round( <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(nFileSize / 1024) / 4.2)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{Получаем время начала} <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;nStartTime := GetTickCount; <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    &nbsp;&nbsp;{Обновляем nBytesReceived} <br>
+    &nbsp;&nbsp;nBytesReceived := NMHTTP1.BytesRecvd; <br>
+    <br>
+    &nbsp;&nbsp;{Вычисляем количество секунд прошедших с
+    момента начала передачи} <br>
+    &nbsp;&nbsp;nTimeElapsed := (GetTickCount - nStartTime) / 1000; <br>
+    &nbsp;&nbsp;{Проверяем на 0/Sec, если так, то
+    устанавливаем 1, чтобы предотвратить деления на
+    ноль} <br>
+    &nbsp;&nbsp;if nTimeElapsed = 0 then nTimeElapsed := 1; <br>
+    <br>
+    &nbsp;&nbsp;{Вычисляем байт в секунду} <br>
+    &nbsp;&nbsp;nBps := nBytesReceived / nTimeElapsed; <br>
+    &nbsp;&nbsp;{Вычисляем килобайт в секунду} <br>
+    &nbsp;&nbsp;nKBps := nBps / 1024; <br>
+    <br>
+    &nbsp;&nbsp;{Обновляем контролы} <br>
+    &nbsp;&nbsp;gProgress.Progress := Round((nBytesReceived * 100) / nFileSize); <br>
+    &nbsp;&nbsp;lbps.Caption := IntToStr(Round(nBps * 8)) + ' bits per second'; <br>
+    &nbsp;&nbsp;lKBps.Caption := IntToStr(Round(nKBps)) + ' KB/Sec (KBps)'; <br>
+    &nbsp;&nbsp;lReceived.Caption := FloatToStr(nBytesReceived) + ' of ' + FloatToStr( <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;nFileSize) + ' bytes received'; <br>
+    &nbsp;&nbsp;lRemaining.Caption := ss2nn(Round(((nFileSize - nBytesReceived) / 1024) / <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;nKBps)) + ' remaining'; <br>
+    end; <br>
+    <br>
+    procedure TfMain.bGetClick(Sender: TObject); <br>
+    begin <br>
+    &nbsp;&nbsp;{Сбрасываем переменные} <br>
+    &nbsp;&nbsp;nFileSize := 0; <br>
+    <br>
+    &nbsp;&nbsp;{Обнуляем контролы} <br>
+    &nbsp;&nbsp;lbMessages.Clear; <br>
+    &nbsp;&nbsp;gProgress.Progress := 0; <br>
+    &nbsp;&nbsp;lEstimate.Caption := 'Estimated download time at 33.6 Kbps: 0 minutes 0 ' + <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;'seconds'; <br>
+    &nbsp;&nbsp;lbps.Caption := '0 bits per second'; <br>
+    &nbsp;&nbsp;lKBps.Caption := '0 KB/Sec (KBps)'; <br>
+    &nbsp;&nbsp;lReceived.Caption := '0 of 0 bytes received'; <br>
+    &nbsp;&nbsp;lRemaining.Caption := '0 minutes 0 seconds remaining'; <br>
+    <br>
+    &nbsp;&nbsp;{Получаем файл} <br>
+    &nbsp;&nbsp;NMHTTP1.Get(eURL.Text); <br>
+    end; <br>
+    <br>
+    procedure TfMain.bCancelClick(Sender: TObject); <br>
+    begin <br>
+    &nbsp;&nbsp;{Разрываем соединение с сервером} <br>
+    &nbsp;&nbsp;NMHTTP1.Disconnect; <br>
+    <br>
+    &nbsp;&nbsp;{Обновляем lbMessages} <br>
+    &nbsp;&nbsp;lbMessages.Items.Append('Get Canceled'); <br>
+    &nbsp;&nbsp;lbMessages.Items.Append('Disconnected'); <br>
+    end; <br>
+    <br>
+    procedure TfMain.NMHTTP1Connect(Sender: TObject); <br>
+    begin <br>
+    &nbsp;&nbsp;{Запрещаем/Разрешаем контролы} <br>
+    &nbsp;&nbsp;bGet.Enabled := False; <br>
+    &nbsp;&nbsp;bCancel.Enabled := True; <br>
+    <br>
+    &nbsp;&nbsp;{Работаем с lbMessages} <br>
+    &nbsp;&nbsp;with lbMessages.Items do <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Append('Connected'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Append('Local Address: ' + NMHTTP1.LocalIP); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Append('Remote Address: ' + NMHTTP1.RemoteIP); <br>
+    &nbsp;&nbsp;end; <br>
+    end; <br>
+    <br>
+    procedure TfMain.NMHTTP1ConnectionFailed(Sender: TObject); <br>
+    begin <br>
+    &nbsp;&nbsp;ShowMessage('Connection Failed.'); <br>
+    end; <br>
+    <br>
+    procedure TfMain.NMHTTP1Disconnect(Sender: TObject); <br>
+    begin <br>
+    &nbsp;&nbsp;{Запрещаем/Разрешаем контролы} <br>
+    &nbsp;&nbsp;bCancel.Enabled := False; <br>
+    &nbsp;&nbsp;bGet.Enabled := True; <br>
+    <br>
+    &nbsp;&nbsp;{Обновляем lbMessages} <br>
+    &nbsp;&nbsp;if NMHTTP1.Connected then lbMessages.Items.Append('Disconnected'); <br>
+    end; <br>
+    <br>
+    procedure TfMain.NMHTTP1Failure(Cmd: CmdType); <br>
+    begin <br>
+    &nbsp;&nbsp;case Cmd of <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CmdGET&nbsp;&nbsp;&nbsp;&nbsp;: lbMessages.Items.Append('Get
+    Failed'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CmdOPTIONS: lbMessages.Items.Append('Options Failed'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CmdHEAD&nbsp;&nbsp; : lbMessages.Items.Append('Head Failed'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CmdPOST&nbsp;&nbsp; : lbMessages.Items.Append('Post Failed'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CmdPUT&nbsp;&nbsp;&nbsp;&nbsp;: lbMessages.Items.Append('Put
+    Failed'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CmdPATCH&nbsp;&nbsp;: lbMessages.Items.Append('Patch Failed'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CmdCOPY&nbsp;&nbsp; : lbMessages.Items.Append('Copy Failed'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CmdMOVE&nbsp;&nbsp; : lbMessages.Items.Append('Move Failed'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CmdDELETE : lbMessages.Items.Append('Delete Failed'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CmdLINK&nbsp;&nbsp; : lbMessages.Items.Append('Link Failed'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CmdUNLINK : lbMessages.Items.Append('UnLink Failed'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CmdTRACE&nbsp;&nbsp;: lbMessages.Items.Append('Trace Failed'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CmdWRAPPED: lbMessages.Items.Append('Wrapped Failed'); <br>
+    &nbsp;&nbsp;end; <br>
+    end; <br>
+    <br>
+    procedure TfMain.NMHTTP1HostResolved(Sender: TComponent); <br>
+    begin <br>
+    &nbsp;&nbsp;lbMessages.Items.Append('Host Resolved'); <br>
+    end; <br>
+    <br>
+    procedure TfMain.NMHTTP1InvalidHost(var Handled: Boolean); <br>
+    begin <br>
+    &nbsp;&nbsp;ShowMessage('Invalid Host. Please specify a new URL.'); <br>
+    end; <br>
+    <br>
+    procedure TfMain.NMHTTP1Status(Sender: TComponent; Status: String); <br>
+    begin <br>
+    &nbsp;&nbsp;if NMHTTP1.ReplyNumber = 404 then ShowMessage('Object Not Found.'); <br>
+    end; <br>
+    <br>
+    procedure TfMain.NMHTTP1Success(Cmd: CmdType); <br>
+    begin <br>
+    &nbsp;&nbsp;case Cmd of <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{Удостоверяемся, что процедура
+    получения не была прервана} <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CmdGET: if NMHTTP1.Connected then lbMessages.Items.Append('Get
+    Succeeded'); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CmdOPTIONS: lbMessages.Items.Append('Options Succeeded'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CmdHEAD&nbsp;&nbsp; : lbMessages.Items.Append('Head Succeeded'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CmdPOST&nbsp;&nbsp; : lbMessages.Items.Append('Post Succeeded'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CmdPUT&nbsp;&nbsp;&nbsp;&nbsp;: lbMessages.Items.Append('Put
+    Succeeded'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CmdPATCH&nbsp;&nbsp;: lbMessages.Items.Append('Patch Succeeded'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CmdCOPY&nbsp;&nbsp; : lbMessages.Items.Append('Copy Succeeded'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CmdMOVE&nbsp;&nbsp; : lbMessages.Items.Append('Move Succeeded'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CmdDELETE : lbMessages.Items.Append('Delete Succeeded'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CmdLINK&nbsp;&nbsp; : lbMessages.Items.Append('Link Succeeded'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CmdUNLINK : lbMessages.Items.Append('UnLink Succeeded'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CmdTRACE&nbsp;&nbsp;: lbMessages.Items.Append('Trace Succeeded'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CmdWRAPPED: lbMessages.Items.Append('Wrapped Succeeded'); <br>
+    &nbsp;&nbsp;end; <br>
+    end; <br>
+    <br>
+    end.</p>
+    <p><br>
+    </td>
+  </tr>
+</table>
+</center></div></TBODY>
+
+
+<p align="center"><br>
+<br>
+</p>
+<!--#include virtual="/ssi/bottom.html"-->

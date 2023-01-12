@@ -1,0 +1,74 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как узнать, по какой колонке был клик в TListView.</h3>
+    <p>Компилятор: Delphi</p>
+    <p>Метод <code>GetItemAt</code> позволяет получить
+    координаты <code>ListItem</code>, по которой был клик, но
+    только для первой колонки <code>TListView</code>. Если
+    нужно узнать по какому элементу из другой
+    колонки кликнул пользователь, то прийдётся
+    объявить новый метод в наследованном классе:</p>
+    <pre class="snippet"><code><b>uses</b> ComCtrls;
+
+<b>type</b>
+  TListViewX = <b>class</b>(TListView)
+  <b>public</b>
+    <b>function</b> GetItemAtX(X, Y: integer; <b>var</b> Col: integer): TListItem;
+  <b>end</b>;
+
+<b>implementation</b>
+
+<b>function</b> TListViewX.GetItemAtX(X, Y: integer;
+    <b>var</b> Col: integer): TListItem;
+<b>var</b>
+  i, n, RelativeX, ColStartX: Integer;
+  ListItem: TlistItem;
+<b>begin</b>
+  Result := GetItemAt(X, Y);
+  <b>if</b> Result &lt;&gt; <b>nil then begin</b>
+    Col := 0; // Первая колонка
+  <b>end else if</b> (ViewStyle = vsReport)
+      <b>and</b> (TopItem &lt;&gt; <b>nil</b>) <b>then begin</b>
+    // Первая, попробуем найти строку
+    ListItem := GetItemAt(TopItem.Position.X, Y);
+    <b>if</b> ListItem &lt;&gt; <b>nil then begin</b>
+      // Теперь попробуем найти колонку
+      RelativeX := X-ListItem.Position.X-BorderWidth;
+      ColStartX := Columns[0].Width;
+      n := Columns.Count - 1;
+      <b>for</b> i := 1 <b>to</b> n <b>do begin</b>
+        <b>if</b> RelativeX &lt; ColStartX <b>then</b> break;
+        <b>if</b> RelativeX &lt;= ColStartX +
+            StringWidth(ListItem.SubItems[i-1]) <b>then</b>
+        <b>begin</b>
+          Result := ListItem;
+          Col := i;
+          break;
+        <b>end</b>;//if
+        Inc(ColStartX, Columns[i].Width);
+      <b>end</b>;//for
+    <b>end</b>;//if
+  <b>end</b>;//if
+<b>end</b>;</code></pre>
+    <p>А вот так выглядит событие MouseDown:</p>
+    <pre class="snippet"><code><b>procedure</b> TForm1.ListView1MouseDown(Sender: TObject;
+  Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+<b>var</b>
+  col: integer;
+  li: TListItem;
+<b>begin</b>
+  li := TListViewX(ListView1).GetItemAtX(x, y, col);
+  <b>if</b> li &lt;&gt; <b>nil</b> <b>then</b>
+    ShowMessage('Column #' + IntToStr(col));
+<b>end</b>;</code></pre>
+    <p>&nbsp;</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

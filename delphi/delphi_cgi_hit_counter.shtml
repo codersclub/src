@@ -1,0 +1,288 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+<h3>Создание CGI счётчика в Delphi 5</h3>
+
+<p>(Перевод одноимённой статьи с сайта <a href="http://homepages.borland.com/aohlsson/Articles/CounterCGI.html">http://homepages.borland.com/aohlsson/Articles/CounterCGI.html</a>)</p>
+
+<p>Если Вы программируете в Delphi и, хотели бы, чтобы Ваш любимый компилятор поучавствовал в создании Вашей веб-странички, то можно начать с маленькой, но довольно важной части веб-проекта - счётчика. Обычно, счётчик выглядит как кнопка на странице. В данном случае это JPEG картинка, генерируемая на лету.</p>
+
+<p>Те, кто желает сразу приступить к компиляции, могут <a href="CounterCGI_120199.zip">скачать исходник</a> и, в случае возникновения каких либо вопросов, вернуться к данной статье.</p>
+
+<p>Для начала давайте посмотрим - как этот счётчик может выглядеть:</p>
+
+<center>
+  <img src="http://ww5.borland.com/scripts/CounterCGI.exe?FileName=Article&Txt=You%20are%20article%20reader%20number%20%%d%20today,%20and%20number%20%%d%20since%20December%201st,%201999.">
+</center>
+
+<p>Вызывается счётчик тэгом IMG примерно так:</p>
+
+<p><ul>  &lt;img src="http://ww5.borland.com/scripts/CounterCGI.exe?FileName=Article"&gt;</ul>
+
+<p>CGI скрипт так же может получать определённый набор параметров:</p>
+
+<pre>
+     Txt              e.g. "You are visitor %d today, and %d ever."
+     FontName         e.g. "Courier"
+     FontColor        e.g. "clGreen"  or "$404040"
+     BackgroundColor  e.g. "clYellow" or "$808080"
+</pre>
+
+<p>А вот так выглядит вызов скрипта с несколькими параметрами:</p>
+
+<p><ul>  <a href="http://ww5.borland.com/scripts/CounterCGI.exe?FileName=Article&BackgroundColor=$808080&FontColor=$404040&FontName=Courier">http://ww5.borland.com/scripts/CounterCGI.exe?FileName=Article&amp;BackgroundColor=$808080&amp;FontColor=$404040&amp;FontName=Courier</a></ul>
+
+<p>Итак, давайте разбираться с кодом.</p>
+
+<p>Начать создавать новое CGI приложение следует с выбора File | New | Web Server Application | CGI stand-alone executable. После этого Вы получите чистый Web модуль. Добавьте новый TWebActionItem в подсвеченном свойстве действий (Actions) в TWebModule, нажав на Add Item. Затем двойным щелчком на событие OnAction создайте обработчик действия.</p>
+
+<p>Изображение JPEG, получается как снимок изображения с TPanel, с TMemo внитри него. Таким способом легче придать 3D вид счётчику. Для начала нам необходимо добавить следующую строку в раздел implementation:</p>
+
+<pre>
+     <b>implementation</b>
+
+     <b>uses</b>
+       ExtCtrls, StdCtrls, Controls, Forms, Graphics, JPEG;
+</pre>  
+
+<p>Теперь, мы определим некоторые основные процедуры, которые будут использоваться в коде. GetPaths будет обеспечивать нас двумя жизненно важными путями. Первый путь будет указывать где хранится сам скрипт по отношению к корневой директории web сервера (т.е. относительный путь). Скорее всего это будет "scripts" или "cgi-bin" в зависимости от того, куда Вы его положите. Второй - это локальный путь в Windows. Он может выглядеть как "C:\InetPub". Для нас важны оба пути, чтобы обеспечить переносимость CGI скрипта из директории в директорию и с одного сервера на другой.</p>
+
+<pre>
+     <b>procedure</b> GetPaths(Request: TWebRequest; <b>var</b> ScriptPath, LocalPath : <b>String</b>);
+     <b>var</b>
+       ScriptFileName : <b>String</b>;
+     <b>begin</b>
+       ScriptPath := Request.ScriptName;
+       ScriptFileName := ExtractFileName(ParamStr(0));
+       <font face="" color="Blue"><i>// Убираем EXE/DLL имя, чтобы получить путь</i></font>
+       Delete(ScriptPath,Pos(ScriptFileName,ScriptPath)-1,Length(ScriptFileName)+1);
+       <font face="" color="Blue"><i>// Убираем главную косую</i></font>
+       Delete(ScriptPath,1,1);
+
+       LocalPath := ExtractFilePath(ParamStr(0));
+       <font face="" color="Blue"><i>// Удаление ScriptPath даёт нам корневой путь</i></font>
+       Delete(LocalPath,Pos(ScriptPath,LocalPath)-1,Length(ScriptPath)+1);
+     <b>end</b>;
+</pre>
+
+<p>Процедура SetVariable будет использоваться для инициализации нужных нам переменных.</p>
+
+<pre>
+     <b>procedure</b> SetVariable(<b>var</b> S : <b>String</b>; <b>const</b> Value, <b>Default</b> : <b>String</b>);
+     <b>begin</b>
+       S := Value;
+       <b>if</b> S = <font face="" color="Purple">''</font> <b>then</b>
+         S := <b>Default</b>;
+     <b>end</b>;
+</pre>
+
+<p>Вся суть CGI скрипта заключается в событие OnAction. Давайте рассмотрим его по шагам.</p>
+
+<pre>
+     <b>procedure</b> TWebModule1.WebModule1WebActionItem1Action(Sender: TObject;
+       Request: TWebRequest; Response: TWebResponse; <b>var</b> Handled: Boolean);
+</pre>
+
+<p>Сперва объявим некоторые локальные переменные.</p>
+
+<pre>
+     <b>var</b>
+       ScriptPath,
+       LocalPath,
+       FileName,
+       Txt, FontColor,
+       BackgroundColor,
+       FontName,
+       FontSize        : <b>String</b>;
+       Today, LastEver,
+       Ever, LastToday : Integer;
+       LastDate        : TDate;
+       MS              : TMemoryStream;
+       Panel           : TPanel;
+       Memo            : TMemo;
+       Bitmap          : TBitmap;
+       Form            : TForm;
+       fp              : TextFile;
+</pre>
+
+<p>Теперь вызовем GetPaths, чтобы выяснить путь к скрипту, а так же локальный путь. В данном примере мы будем помещать наши счётчики в директорию "counters". Физический путь будет выглядеть примерно так "C:\InetPub\counters".</p>
+
+<pre>
+     <b>begin</b>
+       GetPaths(Request,ScriptPath,LocalPath);
+       LocalPath := LocalPath+<font face="" color="Purple">'counters\'</font>;
+</pre>  
+
+<p>Затем, мы получаем все параметры, переданные вместе с вызовом скрипта. Параметры поступают к нам через свойство Request.QueryFields. Обратите внимание, что если какой-то параметр не был передан, то SetVariable устанавливает его по умолчанию.</p>
+
+<pre>
+       <b>with</b> Request.QueryFields <b>do</b> <b>begin</b>
+         FileName := LocalPath+Values&#91;<font face="" color="Purple">'FileName'</font>&#93;+<font face="" color="Purple">'.txt'</font>;
+         SetVariable(Txt,Values&#91;<font face="" color="Purple">'Txt'</font>&#93;,<font face="" color="Purple">'You are visitor %d today, and %d ever.'</font>);
+         SetVariable(FontName,Values&#91;<font face="" color="Purple">'FontName'</font>&#93;,<font face="" color="Purple">'Arial'</font>);
+         SetVariable(FontSize,Values&#91;<font face="" color="Purple">'FontSize'</font>&#93;,<font face="" color="Purple">'10'</font>);
+         SetVariable(FontColor,Values&#91;<font face="" color="Purple">'FontColor'</font>&#93;,<font face="" color="Purple">'clWhite'</font>);
+         SetVariable(BackgroundColor,Values&#91;<font face="" color="Purple">'BackgroundColor'</font>&#93;,<font face="" color="Purple">'clBlack'</font>);
+       <b>end</b>;
+</pre>
+
+<p>Теперь мы должны быть уверены, что присутствует файл для данного счётчика. Если его нет, то просто создаём его.</p>
+
+<pre>
+       <b>try</b>
+         <font face="" color="Blue"><i>// Write a new empty counter file if it doesn't exist</i></font>
+         <b>if</b> <b>not</b> FileExists(FileName) <b>then</b> <b>begin</b>
+           AssignFile(fp,FileName);
+           Rewrite(fp);
+           WriteLn(fp,0);
+           WriteLn(fp,Date);
+           WriteLn(fp,0);
+           CloseFile(fp);
+         <b>end</b>;
+</pre>    
+
+<p>Итак, файл существует. Естевственно, если мы создали его, что счётчик будет равен 0, иначе будем считывать старые значения, и зменять их, если необходимо. Обратите внимание , на то, как мы отслеживаем общее число посещение и посещений за день.</p>
+
+<pre>
+         <font face="" color="Blue"><i>// Читаем старые значения счётчика</i></font>
+         AssignFile(fp,FileName);
+         Reset(fp);
+         ReadLn(fp,LastEver);
+         Ever := LastEver+1;
+         ReadLn(fp,LastDate);
+         ReadLn(fp,LastToday);
+         <b>if</b> Date = LastDate <b>then</b>
+           Today := LastToday+1
+         <b>else</b>
+           Today := 1;
+         CloseFile(fp);
+</pre>    
+
+<p>И в заключении, надо записать новые значения в файл, содержащий данные счётчика.</p>
+
+<pre>
+         <font face="" color="Blue"><i>// Записываем новые значения счётчика</i></font>
+         AssignFile(fp,FileName);
+         Rewrite(fp);
+         WriteLn(fp,Ever);
+         WriteLn(fp,Date);
+         WriteLn(fp,Today);
+         CloseFile(fp);
+</pre>
+
+<p>Теперь приступим к созднию того, что в конечном итоге будет называться JPEG. Для начала сделаем невидимым TForm которая содержит TPanel и TMemo. Так же устанавливаем FontName и FontSize.</p>
+
+<pre>
+         Form := TForm.Create(<b>nil</b>);
+         <b>with</b> Form.Font <b>do</b> <b>begin</b>
+           Name := FontName;
+           Size := StrToInt(FontSize);
+         <b>end</b>;
+</pre>
+
+<p>Удостоверимся в том, что текст, который мы помещаем в memo контрол, содержит значения счётчика, считанные из файла.</p>
+
+<pre>
+         Txt := Format(Txt,&#91;Today,Ever&#93;);
+</pre>    
+
+<p>Далее мы создаём панель. Ширина и высота будут определяться шириной текста, который мы помещаем в неё. Так же устанавливаем скашивание для 3D эффекта.</p>
+
+<pre>
+         Panel := TPanel.Create(<b>nil</b>);
+         <b>with</b> Panel <b>do</b> <b>begin</b>
+           BevelInner := bvRaised;
+           BevelOuter := bvLowered;
+           Parent := Form;
+           Width := Form.Canvas.TextWidth(Txt)+9;
+           Height := Form.Canvas.TextHeight(Txt)+9;
+         <b>end</b>;
+</pre>
+
+<p>Помещаем memo в панель, и устанавливаем её ширину и высоту, а так же цвет, который указан в BackgroundColor.</p>
+
+<pre>
+         Memo := TMemo.Create(<b>nil</b>);
+         <b>with</b> Memo <b>do</b> <b>begin</b>
+           Top := 2;
+           Left := 2;
+           Width := Panel.Width-5;
+           Height := Panel.Height-5;
+           Alignment := taCenter;
+           Color := StringToColor(BackgroundColor);
+           BorderStyle := bsNone;
+           Parent := Panel;
+         <b>end</b>;
+</pre>
+
+<p>Теперь необходимо сделать изображение эелемента управления, который мы создали. Для этого создаём TBitmap и закрашеваем его панелью. За одно рисуем текст на битмапе.</p>
+
+<pre>
+         Bitmap := TBitmap.Create;
+         <b>with</b> Bitmap <b>do</b> <b>begin</b>
+           Width := Panel.Width-1;
+           Height := Panel.Height-1;
+           Canvas.Lock;
+           Panel.PaintTo(Canvas.Handle,0,0);
+           Canvas.Unlock;
+           Canvas.Brush.Style := bsClear;
+           <b>with</b> Canvas.Font <b>do</b> <b>begin</b>
+             Name := FontName;
+             Size := StrToInt(FontSize);
+             Color := StringToColor(FontColor);
+           <b>end</b>;
+           Canvas.TextOut(4,3,Txt);
+         <b>end</b>;
+</pre>
+
+<p>Затем преобразовываем bitmap в JPEG. JPEG будет записан в memory stream. Этот поток будет связан с браузером и передаваться посетителю странички в виде картинки.</p>
+
+<pre>
+         <b>with</b> Response <b>do</b> <b>begin</b>
+           MS := TMemoryStream.Create;
+           <b>with</b> TJPEGImage.Create <b>do</b> <b>begin</b>
+             CompressionQuality := 75;
+             Assign(Bitmap);
+             SaveToStream(MS);
+             Free;
+           <b>end</b>;
+           ContentType := <font face="" color="Purple">'image/jpeg'</font>;
+           MS.Position := 0;
+           SendResponse;
+           SendStream(MS);
+         <b>end</b>;
+</pre>
+
+<p>Освобождаем ресурсы.</p>
+
+<pre>
+         Panel.Free;
+         Bitmap.Free;
+         Form.Free;
+</pre>
+
+<p>На всякий случай обрабатываем исключительные ситуации.</p>
+
+<pre>
+       <b>except</b>
+         <b>on</b> E: Exception <b>do</b>
+           Response.Content := E.Message;
+       <b>end</b>;
+       Handled := True;
+     <b>end</b>;
+</pre>
+
+<p>Вот собственно и всё. Наслаждайтесь счётчиком, сделанным в Delphi 5 :)</p>
+
+    </td>
+  </tr>
+</table>
+</center></div></TBODY>
+
+<p align="center"><br>
+<br>
+</p>
+<!--#include virtual="/ssi/bottom.html"-->

@@ -1,0 +1,90 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Буфер обмена (Clipboard) и TMemoryStream.</h3>
+    <p>Компилятор: Delphi</p>
+    <p>Обычно, это нужно для того, чтобы запихнуть в
+    буфер обмена данные собственного формата.
+    Сначала необходимо зарегистрировать этот формат
+    при помощи функции RegisterClipboardFormat():<br>
+    <br>
+    CF_MYFORMAT := RegisterClipboardFormat('My Format Description'); <br>
+    <br>
+    Затем необходимо проделать следующие шаги:<br>
+    1. Создать поток (stream) и записать в него данные.<br>
+    2. Создать в памяти глобальный буфер и
+    скопировать в него поток (stream).<br>
+    3. При помощи Clipboard.SetAsHandle() поместить глобальный
+    буфер в буфер обмена.<br>
+    <br>
+    Пример:<br>
+    <br>
+    var<br>
+    &nbsp;&nbsp;hbuf&nbsp;&nbsp;&nbsp;&nbsp;: THandle;<br>
+    &nbsp;&nbsp;bufptr&nbsp;&nbsp;: Pointer;<br>
+    &nbsp;&nbsp;mstream : TMemoryStream;<br>
+    begin<br>
+    &nbsp;&nbsp;mstream := TMemoryStream.Create;<br>
+    &nbsp;&nbsp;try<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{-- Записываем данные в mstream. --}<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;hbuf := GlobalAlloc(GMEM_MOVEABLE, mstream.size);<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;try<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;bufptr := GlobalLock(hbuf);<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Move(mstream.Memory^, bufptr^,
+    mstream.size);<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Clipboard.SetAsHandle(CF_MYFORMAT, hbuf);<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;finally<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;GlobalUnlock(hbuf);<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;except<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;GlobalFree(hbuf);<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;raise;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end;<br>
+    &nbsp;&nbsp;finally<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;mstream.Free;<br>
+    &nbsp;&nbsp;end;<br>
+    end;<br>
+    <br>
+    ВАЖНО: Не удаляйте буфер после GlobalAlloc().&nbsp;Как
+    только Вы поместите его в буфер обмена, то буфер
+    обмена будет пользоваться им.<br>
+    <br>
+    Для получения данных из потока, можно
+    воспользоваться следующим кодом:<br>
+    <br>
+    var<br>
+    &nbsp;&nbsp;hbuf&nbsp;&nbsp;&nbsp;&nbsp;: THandle;<br>
+    &nbsp;&nbsp;bufptr&nbsp;&nbsp;: Pointer;<br>
+    &nbsp;&nbsp;mstream : TMemoryStream;<br>
+    begin<br>
+    &nbsp;&nbsp;hbuf := Clipboard.GetAsHandle(CF_MYFORMAT);<br>
+    &nbsp;&nbsp;if hbuf &lt;&gt; 0 then begin<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;bufptr := GlobalLock(hbuf);<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if bufptr &lt;&gt; nil then begin<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mstream := TMemoryStream.Create;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mstream.WriteBuffer(bufptr^,
+    GlobalSize(hbuf));<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mstream.Position := 0;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{-- Читаем данные
+    из mstream. --}<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;finally<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mstream.Free;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;finally<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;GlobalUnlock(hbuf);<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end;<br>
+    &nbsp;&nbsp;end;<br>
+    end;</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

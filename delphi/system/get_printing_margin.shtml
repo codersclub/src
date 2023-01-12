@@ -1,0 +1,79 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3 align="center">Как узнать края печати в Win16 и Win32.</h3>
+    <p>Компилятор: Delphi</p>
+    <p>В Win16, для этого используется API функция Escape() с
+    константой GETPRINTINGOFFSET. В Win32, используется API
+    функция GetDeviceCaps() с константами PHYSICALOFFSETX и
+    PHYSICALOFFSETY. Однако, нет гарантии, что данная
+    последовательность кодов поддерживается
+    принтером, поэтому для проверки желательно
+    всегда вызывать функцию Escape с константой
+    QUERYESCSUPPORT.</p>
+    <p>Следующий пример возвращает отступы печати как
+    в WIN16, так и в WIN32, учитывая тот факт, что не все
+    принтеры поддерживают код GETPRINTINGOFFSET (в WIN16). Если
+    дело обстоит так, то смещение печати вычисляется
+    приближённо, получая размер страницы, вычитая
+    физическую разрешающую способность устройства,
+    и деля пополам.</p>
+    <p>Пример: </p>
+    <pre>uses Printers;
+
+procedure TForm1.Button1Click(Sender: TObject);
+var
+  EscapeCode : integer;
+  Margin : TPoint;
+begin
+  if PrintDialog1.Execute then begin
+   {$IFDEF WIN32}
+    Margin.x :=GetDeviceCaps(Printer.Handle, PHYSICALOFFSETX);
+    Margin.y :=GetDeviceCaps(Printer.Handle, PHYSICALOFFSETY);
+   {$ELSE}
+    EscapeCode := GETPRINTINGOFFSET;
+    if Escape(Printer.Handle,
+              QUERYESCSUPPORT,
+              sizeof(EscapeCode),
+              @EscapeCode,
+              nil) <> 0 then
+      if Escape(Printer.Handle,
+                GETPRINTINGOFFSET,
+                0,
+                nil,
+                @Margin) &lt; 1  then begin
+       EscapeCode := GETPHYSPAGESIZE;
+       if Escape(Printer.Handle,
+                 QUERYESCSUPPORT,
+                 sizeof(EscapeCode),
+                 @EscapeCode,
+                 nil) <> 0 then
+        if Escape(Printer.Handle,
+                  GETPHYSPAGESIZE,
+                  0,
+                  nil,
+                  @Margin) &gt; 0  then begin
+          Margin.x := (Margin.x -
+                       GetDeviceCaps(Printer.Handle, HorzRes)) div 2;
+          Margin.y := (Margin.y -
+                       GetDeviceCaps(Printer.Handle, VertRes)) div 2;
+        end else begin
+          Margin.x := 0;
+          Margin.y := 0;
+        end;
+      end;
+   {$ENDIF}
+    Memo1.Lines.Add(IntToStr(Margin.x));
+    Memo1.Lines.Add(IntToStr(Margin.y));
+  end;
+end;
+</pre>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

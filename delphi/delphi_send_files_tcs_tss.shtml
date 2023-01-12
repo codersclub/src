@@ -1,0 +1,149 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Простой способ отправки файлов при помощи
+    TClientSocket &amp; TServerSocket</h3>
+    <p>Автор: <a href="mailto:mummud@hotmail.com">M K</p>
+    </a><p>На вопрос &quot;Как я могу отправлять файлы
+    через TClientSocket &amp; TServerSocket?&quot; даём наш ответ :) <br>
+    </p>
+    <p>unit Unit1; <br>
+    <br>
+    interface <br>
+    <br>
+    uses <br>
+    &nbsp;&nbsp;Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs, <br>
+    &nbsp;&nbsp;ScktComp, ExtCtrls, StdCtrls; <br>
+    <br>
+    type <br>
+    &nbsp;&nbsp;TForm1 = class(TForm) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Image1: TImage; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Image2: TImage; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ClientSocket1: TClientSocket; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ServerSocket1: TServerSocket; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Button1: TButton; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure Image1Click(Sender: TObject); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure FormCreate(Sender: TObject); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure ClientSocket1Connect(Sender: TObject; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Socket: TCustomWinSocket); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure ServerSocket1ClientRead(Sender: TObject; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Socket: TCustomWinSocket); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure ClientSocket1Read(Sender: TObject; Socket:
+    TCustomWinSocket); <br>
+    &nbsp;&nbsp;private <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{ Private declarations } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Reciving: boolean; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;DataSize: integer; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Data: TMemoryStream; <br>
+    &nbsp;&nbsp;public <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{ Public declarations } <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    var <br>
+    &nbsp;&nbsp;Form1: TForm1; <br>
+    <br>
+    implementation <br>
+    <br>
+    {$R *.DFM} <br>
+    <br>
+    procedure TForm1.Image1Click(Sender: TObject); <br>
+    begin <br>
+    &nbsp;&nbsp;// Это процедура для открытия сокета на
+    ПРИЁМ (RECEIVING). <br>
+    &nbsp;&nbsp;// Button1.Click is this procedure as well. <br>
+    &nbsp;&nbsp;ClientSocket1.Active:= true; <br>
+    end; <br>
+    <br>
+    procedure TForm1.FormCreate(Sender: TObject); <br>
+    begin <br>
+    &nbsp;&nbsp;// Открытие ОТПРАВЛЯЮЩЕГО (SENDING) сокета. <br>
+    &nbsp;&nbsp;ServerSocket1.Active:= true; <br>
+    end; <br>
+    <br>
+    procedure TForm1.ClientSocket1Connect(Sender: TObject; <br>
+    &nbsp;&nbsp;Socket: TCustomWinSocket); <br>
+    begin <br>
+    &nbsp;&nbsp;// Посылаем команду для начала передачи
+    файла. <br>
+    &nbsp;&nbsp;Socket.SendText('send'); <br>
+    end; <br>
+    <br>
+    procedure TForm1.ClientSocket1Read(Sender: TObject; <br>
+    &nbsp;&nbsp;Socket: TCustomWinSocket); <br>
+    var <br>
+    &nbsp;&nbsp;s, sl: string; <br>
+    begin <br>
+    &nbsp;&nbsp;s:= Socket.ReceiveText; <br>
+    &nbsp;&nbsp;// Если мы не в режиме приёма: <br>
+    &nbsp;&nbsp;if not Reciving then <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// Теперь нам необходимо получить
+    длину потока данных. <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;SetLength(sl, StrLen(PChar(s))+1); // +1 for the null terminator <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;StrLCopy(@sl[1], PChar(s), Length(sl)-1); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;DataSize:= StrToInt(sl); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Data:= TMemoryStream.Create; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// Удаляем информацию о размере из
+    данных. <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Delete(s, 1, Length(sl)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Reciving:= true; <br>
+    &nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;// Сохраняем данные в файл, до тех пор, пока
+    не получим все данные. <br>
+    &nbsp;&nbsp;try <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Data.Write(s[1], length(s)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if Data.Size = DataSize then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Data.Position:= 0; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Image2.Picture.Bitmap.LoadFromStream(Data); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Data.Free; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Reciving:= false; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Socket.Close; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;except <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Data.Free; <br>
+    &nbsp;&nbsp;end; <br>
+    end; <br>
+    <br>
+    procedure TForm1.ServerSocket1ClientRead(Sender: TObject; <br>
+    &nbsp;&nbsp;Socket: TCustomWinSocket); <br>
+    var <br>
+    &nbsp;&nbsp;ms: TMemoryStream; <br>
+    begin <br>
+    &nbsp;&nbsp;// Клиент получает команду на передачу
+    файла. <br>
+    &nbsp;&nbsp;if Socket.ReceiveText = 'send' then <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ms:= TMemoryStream.Create; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;try <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Получаем данные на передачу.
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Image1.Picture.Bitmap.SaveToStream(ms); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ms.Position:= 0; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Добавляем длину данных,
+    чтобы клиент знал, сколько данных будет передано<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Добавляем #0 , чтобы можно
+    было определить, где заканчивается информация о
+    размере. <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Socket.SendText(IntToStr(ms.Size) + #0); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Посылаем его. <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Socket.SendStream(ms); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;except <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Итак, осталось освободить
+    поток, если что-то не так. <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ms.Free; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;end; <br>
+    end; <br>
+    <br>
+    end.</p>
+    <p><br>
+    <br>
+    </td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

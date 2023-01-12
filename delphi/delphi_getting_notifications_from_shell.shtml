@@ -1,0 +1,526 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Получение уведомлений от оболочки (shell)</h3>
+    <p>Автор: <a href="mailto:maniac_n@hotmail.com">maniac_n@hotmail.com</a></p>
+    <p>Пример показывает - как можно отслеживать
+    практически все события происходящий в Вашей
+    оболочке. Код находится в процессе разработки, но
+    уже содержит в себе большое количество
+    возможностей.</p>
+    <p>Совместимость Delphi 3 (или выше) <br>
+    <br>
+    &lt;--------------&nbsp;&nbsp;Begin UNIT code ----------------------------&gt; <br>
+    <br>
+    {$IFNDEF VER80} {$IFNDEF VER90} {$IFNDEF VER93} <br>
+    &nbsp;&nbsp;{$DEFINE Delphi3orHigher} <br>
+    {$ENDIF} {$ENDIF} {$ENDIF} <br>
+    <br>
+    unit ShellNotify; <br>
+    interface <br>
+    <br>
+    uses Windows, Messages, SysUtils, Classes, Controls, Forms, Dialogs, <br>
+    &nbsp;&nbsp;{$IFNDEF Delphi3orHigher} OLE2, {$ELSE} ActiveX, ComObj, {$ENDIF} <br>
+    &nbsp;&nbsp;ShlObj; <br>
+    <br>
+    <br>
+    type <br>
+    &nbsp;&nbsp;NOTIFYREGISTER = record <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;pidlPath&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: PItemIDList; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;bWatchSubtree : boolean; <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    &nbsp;&nbsp;PNOTIFYREGISTER = ^NOTIFYREGISTER; <br>
+    <br>
+    const <br>
+    &nbsp;&nbsp;SNM_SHELLNOTIFICATION = WM_USER +1; <br>
+    &nbsp;&nbsp;SHCNF_ACCEPT_INTERRUPTS&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= $0001; <br>
+    &nbsp;&nbsp;SHCNF_ACCEPT_NON_INTERRUPTS&nbsp;&nbsp;= $0002; <br>
+    &nbsp;&nbsp;SHCNF_NO_PROXY
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; =
+    $8000; <br>
+    <br>
+    type <br>
+    &nbsp;&nbsp;TNotificationEvent = (neAssociationChange, neAttributesChange, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;neFileChange, neFileCreate, neFileDelete, neFileRename, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;neDriveAdd, neDriveRemove, neShellDriveAdd, neDriveSpaceChange, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;neMediaInsert, neMediaRemove, neFolderCreate, neFolderDelete, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;neFolderRename, neFolderUpdate, neNetShare, neNetUnShare, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;neServerDisconnect, neImageListChange); <br>
+    &nbsp;&nbsp;TNotificationEvents = set of TNotificationEvent; <br>
+    <br>
+    &nbsp;&nbsp;TShellNotificationEvent1 = procedure(Sender: TObject; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Path: String)of Object; <br>
+    &nbsp;&nbsp;TShellNotificationEvent2 = procedure(Sender: TObject; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;path1, path2: String) of Object; <br>
+    //&nbsp;&nbsp;TShellNotificationAttributesEvent = procedure(Sender: TObject; <br>
+    &nbsp;&nbsp;//&nbsp;&nbsp;OldAttribs, NewAttribs: Integer) of Object; <br>
+    <br>
+    &nbsp;&nbsp;TShellNotification = class( TComponent ) <br>
+    &nbsp;&nbsp;private <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;fWatchEvents: TNotificationEvents; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;fPath: String; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;fActive, fWatch: Boolean; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;prevPath1, prevPath2: String; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;PrevEvent: Integer; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Handle, NotifyHandle: HWND; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;fOnAssociationChange: TNotifyEvent; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;fOnAttribChange: TShellNotificationEvent2; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FOnCreate: TShellNotificationEvent1; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FOnDelete: TShellNotificationEvent1; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FOnDriveAdd: TShellNotificationEvent1; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FOnDriveAddGui: TShellNotificationEvent1; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FOnDriveRemove: TShellNotificationEvent1; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FOnMediaInsert: TShellNotificationEvent1; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FOnMediaRemove: TShellNotificationEvent1; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FOnDirCreate: TShellNotificationEvent1; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FOnNetShare: TShellNotificationEvent1; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FOnNetUnShare: TShellNotificationEvent1; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FOnRenameFolder: TShellNotificationEvent2; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FOnItemRename: TShellNotificationEvent2; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FOnFolderRemove: TShellNotificationEvent1; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FOnServerDisconnect: TShellNotificationEvent1; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FOnFolderUpdate: TShellNotificationEvent1; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;function&nbsp;&nbsp;PathFromPidl(Pidl: PItemIDList): String; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure SetWatchEvents(const Value: TNotificationEvents); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;function GetActive: Boolean; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure SetActive(const Value: Boolean); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure SetPath(const Value: String); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure SetWatch(const Value: Boolean); <br>
+    &nbsp;&nbsp;protected <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure ShellNotifyRegister; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure ShellNotifyUnregister; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure WndProc(var Message: TMessage); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure DoAssociationChange; dynamic; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure DoAttributesChange(Path1, Path2: String); dynamic; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure DoCreateFile(Path: String); dynamic; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure DoDeleteFile(Path: String); dynamic; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure DoDriveAdd(Path:String); dynamic; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure DoDriveAddGui(Path: String); dynamic; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure DoDriveRemove(Path: String); dynamic; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure DoMediaInsert(Path: String); dynamic; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure DoMediaRemove(Path: String); dynamic; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure DoDirCreate(Path: String); dynamic; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure DoNetShare(Path: String); dynamic; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure DoNetUnShare(Path: String); dynamic; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure DoRenameFolder(Path1, Path2: String); dynamic; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure DoRenameItem(Path1, Path2: String); dynamic; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure DoFolderRemove(Path: String); dynamic; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure DoServerDisconnect(Path: String); dynamic; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure DoDirUpdate(Path: String); dynamic; <br>
+    &nbsp;&nbsp;public <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;constructor Create(AOwner: TComponent); override; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;destructor&nbsp;&nbsp;Destroy; override; <br>
+    &nbsp;&nbsp;published <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property Path: String read fPath write SetPath; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property Active: Boolean read GetActive write SetActive; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property WatchSubTree: Boolean read fWatch write SetWatch; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property WatchEvents: TNotificationEvents <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;read fWatchEvents write SetWatchEvents; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property OnAssociationChange: TNotifyEvent <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;read fOnAssociationChange write FOnAssociationChange; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property OnAttributesChange: TShellNotificationEvent2 <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;read fOnAttribChange write fOnAttribChange; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property OnFileCreate: TShellNotificationEvent1 <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;read FOnCreate write FOnCreate; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property OnFolderRename: TShellNotificationEvent2 <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;read FOnRenameFolder write FOnRenameFolder; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property OnFolderUpdate: TShellNotificationEvent1 <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;read FOnFolderUpdate write FOnFolderUpdate; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property OnFileDelete: TShellNotificationEvent1 <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;read FOnDelete write FOnDelete; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property OnDriveAdd: TShellNotificationEvent1 <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;read FOnDriveAdd write FOnDriveAdd; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property OnFolderRemove: TShellNotificationEvent1 <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;read FOnFolderRemove write FOnFolderRemove; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property OnItemRename: TShellNotificationEvent2 <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;read FOnItemRename write FOnItemRename; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property OnDriveAddGui: TShellNotificationEvent1 <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;read FOnDriveAddGui write FOnDriveAddGui; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property OnDriveRemove: TShellNotificationEvent1 <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;read FOnDriveRemove write FOnDriveRemove; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property OnMediaInserted: TShellNotificationEvent1 <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;read FOnMediaInsert write FOnMediaInsert; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property OnMediaRemove: TShellNotificationEvent1 <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;read FOnMediaRemove write FOnMediaRemove; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property OnDirCreate: TShellNotificationEvent1 <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;read FOnDirCreate write FOnDirCreate; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property OnNetShare: TShellNotificationEvent1 <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;read FOnNetShare write FOnNetShare; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property OnNetUnShare: TShellNotificationEvent1 <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;read FOnNetUnShare write FOnNetUnShare; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property OnServerDisconnect: TShellNotificationEvent1 <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;read FOnServerDisconnect write FOnServerDisconnect; <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    &nbsp;&nbsp;function SHChangeNotifyRegister( hWnd: HWND; dwFlags: integer; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; wEventMask&nbsp;&nbsp;: cardinal; uMsg: UINT;
+    cItems&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: integer; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; lpItems&nbsp;&nbsp;&nbsp;&nbsp; : PNOTIFYREGISTER) :
+    HWND; stdcall; <br>
+    &nbsp;&nbsp;function SHChangeNotifyDeregister(hWnd: HWND) : boolean; stdcall; <br>
+    &nbsp;&nbsp;function SHILCreateFromPath(Path: Pointer; PIDL: PItemIDList; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;var Attributes: ULONG):HResult; stdcall; <br>
+    implementation <br>
+    <br>
+    const Shell32DLL = 'shell32.dll'; <br>
+    <br>
+    &nbsp;&nbsp;function SHChangeNotifyRegister;&nbsp;&nbsp; external Shell32DLL index 2; <br>
+    &nbsp;&nbsp;function SHChangeNotifyDeregister; external Shell32DLL index 4; <br>
+    &nbsp;&nbsp;function SHILCreateFromPath;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; external
+    Shell32DLL index 28; <br>
+    <br>
+    { TShellNotification } <br>
+    <br>
+    constructor TShellNotification.Create(AOwner: TComponent); <br>
+    begin <br>
+    &nbsp;&nbsp;inherited Create( AOwner ); <br>
+    &nbsp;&nbsp;if not (csDesigning in ComponentState) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Handle := AllocateHWnd(WndProc); <br>
+    end; <br>
+    <br>
+    destructor TShellNotification.Destroy; <br>
+    begin <br>
+    &nbsp;&nbsp;if not (csDesigning in ComponentState) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Active := False; <br>
+    &nbsp;&nbsp;if Handle &lt;&gt; 0 then DeallocateHWnd( Handle ); <br>
+    &nbsp;&nbsp;inherited Destroy; <br>
+    end; <br>
+    <br>
+    procedure TShellNotification.DoAssociationChange; <br>
+    begin <br>
+    &nbsp;&nbsp;if Assigned( fOnAssociationChange ) and (neAssociationChange in fWatchEvents)
+    then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;fOnAssociationChange( Self ); <br>
+    end; <br>
+    <br>
+    procedure TShellNotification.DoAttributesChange; <br>
+    begin <br>
+    &nbsp;&nbsp;if Assigned( fOnAttribChange ) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;fOnAttribChange( Self, Path1, Path2 ); <br>
+    end; <br>
+    <br>
+    procedure TShellNotification.DoCreateFile(Path: String); <br>
+    begin <br>
+    &nbsp;&nbsp;if Assigned( fOnCreate ) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FOnCreate(Self, Path) <br>
+    end; <br>
+    <br>
+    procedure TShellNotification.DoDeleteFile(Path: String); <br>
+    begin <br>
+    &nbsp;&nbsp;if Assigned( FOnDelete ) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FOnDelete(Self, Path); <br>
+    end; <br>
+    <br>
+    procedure TShellNotification.DoDirCreate(Path: String); <br>
+    begin <br>
+    &nbsp;&nbsp;if Assigned( FOnDirCreate ) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FOnDirCreate( Self, Path ); <br>
+    end; <br>
+    <br>
+    procedure TShellNotification.DoDirUpdate(Path: String); <br>
+    begin <br>
+    &nbsp;&nbsp;if Assigned( FOnFolderUpdate ) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FOnFolderUpdate(Self, Path); <br>
+    end; <br>
+    <br>
+    procedure TShellNotification.DoDriveAdd(Path: String); <br>
+    begin <br>
+    &nbsp;&nbsp;if Assigned( FOnDriveAdd ) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FOnDriveAdd(Self, Path); <br>
+    end; <br>
+    <br>
+    procedure TShellNotification.DoDriveAddGui(Path: String); <br>
+    begin <br>
+    &nbsp;&nbsp;if Assigned( FOnDriveAddGui ) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FOnDriveAdd(Self, Path); <br>
+    end; <br>
+    <br>
+    procedure TShellNotification.DoDriveRemove(Path: String); <br>
+    begin <br>
+    &nbsp;&nbsp;if Assigned( FOnDriveRemove ) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FOnDriveRemove(Self, Path); <br>
+    end; <br>
+    <br>
+    procedure TShellNotification.DoFolderRemove(Path: String); <br>
+    begin <br>
+    &nbsp;&nbsp;if Assigned(FOnFolderRemove) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FOnFolderRemove( Self, Path ); <br>
+    end; <br>
+    <br>
+    procedure TShellNotification.DoMediaInsert(Path: String); <br>
+    begin <br>
+    &nbsp;&nbsp;if Assigned( FOnMediaInsert ) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FOnMediaInsert(Self, Path); <br>
+    end; <br>
+    <br>
+    procedure TShellNotification.DoMediaRemove(Path: String); <br>
+    begin <br>
+    &nbsp;&nbsp;if Assigned(FOnMediaRemove) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FOnMediaRemove(Self, Path); <br>
+    end; <br>
+    <br>
+    procedure TShellNotification.DoNetShare(Path: String); <br>
+    begin <br>
+    &nbsp;&nbsp;if Assigned(FOnNetShare) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FOnNetShare(Self, Path); <br>
+    end; <br>
+    <br>
+    procedure TShellNotification.DoNetUnShare(Path: String); <br>
+    begin <br>
+    &nbsp;&nbsp;if Assigned(FOnNetUnShare) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FOnNetUnShare(Self, Path); <br>
+    end; <br>
+    <br>
+    procedure TShellNotification.DoRenameFolder(Path1, Path2: String); <br>
+    begin <br>
+    &nbsp;&nbsp;if Assigned( FOnRenameFolder ) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FOnRenameFolder(Self, Path1, Path2); <br>
+    end; <br>
+    <br>
+    procedure TShellNotification.DoRenameItem(Path1, Path2: String); <br>
+    begin <br>
+    &nbsp;&nbsp;if Assigned( FOnItemRename ) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FonItemRename(Self, Path1, Path2); <br>
+    end; <br>
+    <br>
+    procedure TShellNotification.DoServerDisconnect(Path: String); <br>
+    begin <br>
+    &nbsp;&nbsp;if Assigned( FOnServerDisconnect ) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FOnServerDisconnect(Self, Path); <br>
+    end; <br>
+    <br>
+    function TShellNotification.GetActive: Boolean; <br>
+    begin <br>
+    &nbsp;&nbsp;Result := (NotifyHandle &lt;&gt; 0) and (fActive); <br>
+    end; <br>
+    <br>
+    function TShellNotification.PathFromPidl(Pidl: PItemIDList): String; <br>
+    begin <br>
+    &nbsp;&nbsp;SetLength(Result, Max_Path); <br>
+    &nbsp;&nbsp;if not SHGetPathFromIDList(Pidl, PChar(Result)) then Result := ''; <br>
+    &nbsp;&nbsp;if pos(#0, Result) &gt; 0 then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;SetLength(Result, pos(#0, Result)); <br>
+    end; <br>
+    <br>
+    procedure TShellNotification.SetActive(const Value: Boolean); <br>
+    begin <br>
+    &nbsp;&nbsp;if (Value &lt;&gt; fActive) then <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;fActive := Value; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if fActive then ShellNotifyRegister else ShellNotifyUnregister; <br>
+    &nbsp;&nbsp;end; <br>
+    end; <br>
+    <br>
+    procedure TShellNotification.SetPath(const Value: String); <br>
+    begin <br>
+    &nbsp;&nbsp;if fPath &lt;&gt; Value then <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;fPath := Value; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ShellNotifyRegister; <br>
+    &nbsp;&nbsp;end; <br>
+    end; <br>
+    <br>
+    procedure TShellNotification.SetWatch(const Value: Boolean); <br>
+    begin <br>
+    &nbsp;&nbsp;if fWatch &lt;&gt; Value then <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;fWatch := Value; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ShellNotifyRegister; <br>
+    &nbsp;&nbsp;end; <br>
+    end; <br>
+    <br>
+    procedure TShellNotification.SetWatchEvents( <br>
+    &nbsp;&nbsp;const Value: TNotificationEvents); <br>
+    begin <br>
+    &nbsp;&nbsp;if fWatchEvents &lt;&gt; Value then <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;fWatchEvents := Value; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ShellNotifyRegister; <br>
+    &nbsp;&nbsp;end; <br>
+    end; <br>
+    <br>
+    procedure TShellNotification.ShellNotifyRegister; <br>
+    var <br>
+    &nbsp;&nbsp;NotifyRecord: PNOTIFYREGISTER; <br>
+    &nbsp;&nbsp;Flags: DWORD; <br>
+    &nbsp;&nbsp;Pidl: PItemIDList; <br>
+    &nbsp;&nbsp;Attributes: ULONG; <br>
+    begin <br>
+    &nbsp;&nbsp;if not (csDesigning in ComponentState) and <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; not (csLoading in ComponentState) then <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;SHILCreatefromPath( PChar(fPath), Addr(Pidl), Attributes); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;NotifyRecord^.pidlPath := Pidl; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;NotifyRecord^.bWatchSubtree := fWatch; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if NotifyHandle &lt;&gt; 0 then ShellNotifyUnregister; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Flags := 0; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if neAssociationChange in FWatchEvents then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Flags := Flags or SHCNE_ASSOCCHANGED; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if neAttributesChange in FWatchEvents then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Flags := Flags or SHCNE_ATTRIBUTES; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if neFileChange in FWatchEvents then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Flags := Flags or SHCNE_UPDATEITEM; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if neFileCreate in FWatchEvents then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Flags := Flags or SHCNE_CREATE; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if neFileDelete in FWatchEvents then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Flags := Flags or SHCNE_DELETE; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if neFileRename in FWatchEvents then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Flags := Flags or SHCNE_RENAMEITEM; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if neDriveAdd in FWatchEvents then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Flags := Flags or SHCNE_DRIVEADD; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if neDriveRemove in FWatchEvents then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Flags := Flags or SHCNE_DRIVEREMOVED; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if neShellDriveAdd in FWatchEvents then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Flags := Flags or SHCNE_DRIVEADDGUI; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if neDriveSpaceChange in FWatchEvents then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Flags := Flags or SHCNE_FREESPACE; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if neMediaInsert in FWatchEvents then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Flags := Flags or SHCNE_MEDIAINSERTED; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if neMediaRemove in FWatchEvents then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Flags := Flags or SHCNE_MEDIAREMOVED; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if neFolderCreate in FWatchEvents then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Flags := Flags or SHCNE_MKDIR; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if neFolderDelete in FWatchEvents then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Flags := Flags or SHCNE_RMDIR; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if neFolderRename in FWatchEvents then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Flags := Flags or SHCNE_RENAMEFOLDER; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if neFolderUpdate in FWatchEvents then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Flags := Flags or SHCNE_UPDATEDIR; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if neNetShare in FWatchEvents then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Flags := Flags or SHCNE_NETSHARE; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if neNetUnShare in FWatchEvents then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Flags := Flags or SHCNE_NETUNSHARE; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if neServerDisconnect in FWatchEvents then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Flags := Flags or SHCNE_SERVERDISCONNECT; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if neImageListChange in FWatchEvents then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Flags := Flags or SHCNE_UPDATEIMAGE; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;NotifyHandle := SHChangeNotifyRegister(Handle, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SHCNF_ACCEPT_INTERRUPTS or
+    SHCNF_ACCEPT_NON_INTERRUPTS, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Flags, SNM_SHELLNOTIFICATION, 1, NotifyRecord); <br>
+    &nbsp;&nbsp;end; <br>
+    end; <br>
+    <br>
+    procedure TShellNotification.ShellNotifyUnregister; <br>
+    begin <br>
+    &nbsp;&nbsp;if NotifyHandle &lt;&gt; 0 then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;SHChangeNotifyDeregister(NotifyHandle); <br>
+    end; <br>
+    <br>
+    procedure TShellNotification.WndProc(var Message: TMessage); <br>
+    type <br>
+    &nbsp;&nbsp; TPIDLLIST = record <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pidlist : array[1..2] of PITEMIDLIST; <br>
+    &nbsp;&nbsp; end; <br>
+    &nbsp;&nbsp; PIDARRAY = ^TPIDLLIST; <br>
+    var <br>
+    &nbsp;&nbsp; Path1&nbsp;&nbsp;&nbsp;&nbsp;: string; <br>
+    &nbsp;&nbsp; Path2&nbsp;&nbsp;&nbsp;&nbsp;: string; <br>
+    &nbsp;&nbsp; ptr&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: PIDARRAY; <br>
+    &nbsp;&nbsp; repeated : boolean; <br>
+    &nbsp;&nbsp; event&nbsp;&nbsp;&nbsp;&nbsp;: longint; <br>
+    <br>
+    begin <br>
+    &nbsp;&nbsp;case Message.Msg of <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;SNM_SHELLNOTIFICATION: <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;event := Message.LParam and ($7FFFFFFF); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Ptr&nbsp;&nbsp; := PIDARRAY(Message.WParam); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Path1 := PathFromPidl( Ptr^.pidlist[1] ); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Path2 := PathFromPidl( Ptr^.pidList[2] ); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;repeated := (PrevEvent = event) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;and (uppercase(prevpath1) =
+    uppercase(Path1)) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;and (uppercase(prevpath2) =
+    uppercase(Path2)); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if Repeated then exit; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;PrevEvent := Message.Msg; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;prevPath1 := Path1; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;prevPath2 := Path2; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case event of <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SHCNE_ASSOCCHANGED
+    &nbsp;&nbsp;&nbsp;&nbsp; : DoAssociationChange; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SHCNE_ATTRIBUTES
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : DoAttributesChange( Path1, Path2); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SHCNE_CREATE
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : DoCreateFile(Path1); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SHCNE_DELETE
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : DoDeleteFile(Path1); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SHCNE_DRIVEADD
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : DoDriveAdd(Path1); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SHCNE_DRIVEADDGUI&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:
+    DoDriveAddGui(path1); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SHCNE_DRIVEREMOVED
+    &nbsp;&nbsp;&nbsp;&nbsp; : DoDriveRemove(Path1); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SHCNE_MEDIAINSERTED&nbsp;&nbsp;&nbsp;&nbsp;:
+    DoMediaInsert(Path1); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SHCNE_MEDIAREMOVED
+    &nbsp;&nbsp;&nbsp;&nbsp; : DoMediaRemove(Path1); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SHCNE_MKDIR&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:
+    DoDirCreate(Path1); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SHCNE_NETSHARE
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : DoNetShare(Path1); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SHCNE_NETUNSHARE
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : DoNetUnShare(Path1); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SHCNE_RENAMEFOLDER
+    &nbsp;&nbsp;&nbsp;&nbsp; : DoRenameFolder(Path1, Path2); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SHCNE_RENAMEITEM
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : DoRenameItem(Path1, Path2); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SHCNE_RMDIR&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:
+    DoFolderRemove(Path1); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SHCNE_SERVERDISCONNECT :
+    DoServerDisconnect(Path); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SHCNE_UPDATEDIR&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:
+    DoDirUpdate(Path); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SHCNE_UPDATEIMAGE&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:
+    ; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SHCNE_UPDATEITEM
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : ; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end;//Case event of <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end;//SNM_SHELLNOTIFICATION <br>
+    &nbsp;&nbsp;end; //case <br>
+    end; <br>
+    <br>
+    end. <br>
+    <br>
+    &lt;------------------ End Unit Code --------------------------&gt; <br>
+    <br>
+    <br>
+    </td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

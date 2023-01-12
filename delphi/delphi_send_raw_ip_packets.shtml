@@ -1,0 +1,486 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Посылка Raw IP-пакетов</h3>
+    <p><b>Автор:</b> <a href="mailto:xes@dds.nl">Erwin Molendijk</a></p>
+    <p>Используя данный исходник можно
+    конструировать собственные пакеты содержащие
+    внутри всё, что угодно. Можно самостоятельно
+    указывать в пакете IP-адрес получателя и
+    отправителя, порт назначения и т.д. Если Вы не
+    знаете, что это такое, то лучше не
+    эксперементировать. Единственный недостаток, то,
+    что скорее всего данный пример будет работать
+    только в Windows 2000. Так же исходник позволяет
+    произвести SYN flood и IP spoofing.</p>
+    <p>Необходимо зайти в систему под
+    Администратором.</p>
+    <p>Совместимость: <nobr>Delphi 5.x (или выше)</nobr></p>
+    <p>{ <br>
+    &nbsp;&nbsp;Raw Packet Sender <br>
+    &nbsp;&nbsp;using: Delphi + Winsock 2 <br>
+    <br>
+    &nbsp;&nbsp;Copyright (c) 2000 by E.J.Molendijk (xes@dds.nl) <br>
+    <br>
+    ---------------------------------------------------------------------- <br>
+    &nbsp;&nbsp;Перед использованием измените значения
+    SrcIP+SrcPort+ <br>
+    &nbsp;&nbsp;DestIP+DestPort на нужные! <br>
+    ---------------------------------------------------------------------- <br>
+    <br>
+    } <br>
+    unit main; <br>
+    <br>
+    interface <br>
+    <br>
+    uses <br>
+    &nbsp;&nbsp;Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs, <br>
+    &nbsp;&nbsp;StdCtrls, OleCtrls, Registry; <br>
+    <br>
+    Const <br>
+    &nbsp;&nbsp;SrcIP&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; = '123.123.123.1'; <br>
+    &nbsp;&nbsp;SrcPort&nbsp;&nbsp;&nbsp;&nbsp; = 1234; <br>
+    &nbsp;&nbsp;DestIP&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= '123.123.123.2'; <br>
+    &nbsp;&nbsp;DestPort&nbsp;&nbsp;&nbsp;&nbsp;= 4321; <br>
+    <br>
+    &nbsp;&nbsp;Max_Message = 4068; <br>
+    &nbsp;&nbsp;Max_Packet&nbsp;&nbsp;= 4096; <br>
+    <br>
+    type <br>
+    <br>
+    &nbsp;&nbsp;TPacketBuffer = Array[0..Max_Packet-1] of byte; <br>
+    <br>
+    &nbsp;&nbsp;TForm1 = class(TForm) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Button1: TButton; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Memo1: TMemo; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure Button1Click(Sender: TObject); <br>
+    &nbsp;&nbsp;private <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{ Private declarations } <br>
+    &nbsp;&nbsp;public <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{ Public declarations } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure SendIt; <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    // Заголовок IP пакета<br>
+    type <br>
+    &nbsp;&nbsp;T_IP_Header = record <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ip_verlen&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : Byte; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ip_tos&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:
+    Byte; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ip_totallength&nbsp;&nbsp;: Word; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ip_id &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    : Word; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ip_offset&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : Word; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ip_ttl&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:
+    Byte; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ip_protocol&nbsp;&nbsp;&nbsp;&nbsp; : Byte; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ip_checksum&nbsp;&nbsp;&nbsp;&nbsp; : Word; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ip_srcaddr&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: LongWord; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ip_destaddr&nbsp;&nbsp;&nbsp;&nbsp; : LongWord; <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    // Заголовок UDP пакета <br>
+    Type <br>
+    &nbsp;&nbsp;T_UDP_Header = record <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;src_portno&nbsp;&nbsp;&nbsp;&nbsp;: Word; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;dst_portno&nbsp;&nbsp;&nbsp;&nbsp;: Word; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;udp_length&nbsp;&nbsp;&nbsp;&nbsp;: Word; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;udp_checksum&nbsp;&nbsp;: Word; <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    // Некоторые объявления типов для Winsock 2 <br>
+    &nbsp;&nbsp;u_char&nbsp;&nbsp;= Char; <br>
+    &nbsp;&nbsp;u_short = Word; <br>
+    &nbsp;&nbsp;u_int&nbsp;&nbsp; = Integer; <br>
+    &nbsp;&nbsp;u_long&nbsp;&nbsp;= Longint; <br>
+    <br>
+    &nbsp;&nbsp;SunB = packed record <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;s_b1, s_b2, s_b3, s_b4: u_char; <br>
+    &nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;SunW = packed record <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;s_w1, s_w2: u_short; <br>
+    &nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;in_addr = record <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;case integer of <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;0: (S_un_b: SunB); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1: (S_un_w: SunW); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2: (S_addr: u_long); <br>
+    &nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;TInAddr = in_addr; <br>
+    &nbsp;&nbsp;Sockaddr_in = record <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;case Integer of <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;0: (sin_family: u_short; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sin_port: u_short; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sin_addr: TInAddr; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sin_zero: array[0..7] of
+    Char); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1: (sa_family: u_short; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sa_data: array[0..13] of Char)
+    <br>
+    &nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;TSockAddr = Sockaddr_in; <br>
+    &nbsp;&nbsp;TSocket = u_int; <br>
+    <br>
+    const <br>
+    &nbsp;&nbsp;WSADESCRIPTION_LEN&nbsp;&nbsp;&nbsp;&nbsp; =&nbsp;&nbsp; 256; <br>
+    &nbsp;&nbsp;WSASYS_STATUS_LEN&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;&nbsp; 128; <br>
+    <br>
+    type <br>
+    &nbsp;&nbsp;PWSAData = ^TWSAData; <br>
+    &nbsp;&nbsp;WSAData = record // !!! also WSDATA <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;wVersion: Word; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;wHighVersion: Word; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;szDescription: array[0..WSADESCRIPTION_LEN] of Char; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;szSystemStatus: array[0..WSASYS_STATUS_LEN] of Char; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;iMaxSockets: Word; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;iMaxUdpDg: Word; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;lpVendorInfo: PChar; <br>
+    &nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;TWSAData = WSAData; <br>
+    <br>
+    // Определяем необходимые функции winsock 2 <br>
+    function closesocket(s: TSocket): Integer; stdcall; <br>
+    function socket(af, Struct, protocol: Integer): TSocket; stdcall; <br>
+    function sendto(s: TSocket; var Buf; len, flags: Integer; var addrto: TSockAddr; <br>
+    &nbsp;&nbsp;tolen: Integer): Integer; stdcall;{} <br>
+    function setsockopt(s: TSocket; level, optname: Integer; optval: PChar; <br>
+    &nbsp;&nbsp;optlen: Integer): Integer; stdcall; <br>
+    function inet_addr(cp: PChar): u_long; stdcall; {PInAddr;}&nbsp;&nbsp;{ TInAddr } <br>
+    function htons(hostshort: u_short): u_short; stdcall; <br>
+    function WSAGetLastError: Integer; stdcall; <br>
+    function WSAStartup(wVersionRequired: word; var WSData: TWSAData): Integer; stdcall; <br>
+    function WSACleanup: Integer; stdcall; <br>
+    <br>
+    const <br>
+    &nbsp;&nbsp;AF_INET&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; = 2;
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; //
+    internetwork: UDP, TCP, etc. <br>
+    <br>
+    &nbsp;&nbsp;IP_HDRINCL&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= 2;
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; //
+    включаем заголовок IP пакета <br>
+    <br>
+    &nbsp;&nbsp;SOCK_RAW&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= 3;
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; //
+    интерфейс raw-протокола <br>
+    <br>
+    &nbsp;&nbsp;IPPROTO_IP&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= 0;
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; //
+    dummy for IP <br>
+    &nbsp;&nbsp;IPPROTO_TCP&nbsp;&nbsp;&nbsp;&nbsp; = 6;
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; //
+    tcp <br>
+    &nbsp;&nbsp;IPPROTO_UDP&nbsp;&nbsp;&nbsp;&nbsp; =
+    17;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//
+    user datagram protocol <br>
+    &nbsp;&nbsp;IPPROTO_RAW&nbsp;&nbsp;&nbsp;&nbsp; = 255;
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // raw IP
+    пакет <br>
+    <br>
+    &nbsp;&nbsp;INVALID_SOCKET = TSocket(NOT(0)); <br>
+    &nbsp;&nbsp;SOCKET_ERROR&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=
+    -1; <br>
+    <br>
+    var <br>
+    &nbsp;&nbsp;Form1: TForm1; <br>
+    <br>
+    implementation <br>
+    <br>
+    // Импортируем функции Winsock 2 <br>
+    const WinSocket = 'WS2_32.DLL'; <br>
+    <br>
+    function closesocket; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    external&nbsp;&nbsp;&nbsp;&nbsp;winsocket name 'closesocket'; <br>
+    function
+    socket;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;external&nbsp;&nbsp;&nbsp;&nbsp;winsocket
+    name 'socket'; <br>
+    function
+    sendto;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;external&nbsp;&nbsp;&nbsp;&nbsp;winsocket
+    name 'sendto'; <br>
+    function
+    setsockopt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;external&nbsp;&nbsp;&nbsp;&nbsp;winsocket
+    name 'setsockopt'; <br>
+    function inet_addr; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    external&nbsp;&nbsp;&nbsp;&nbsp;winsocket name 'inet_addr'; <br>
+    function htons; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    external&nbsp;&nbsp;&nbsp;&nbsp;winsocket name 'htons'; <br>
+    function WSAGetLastError;&nbsp;&nbsp; external&nbsp;&nbsp;&nbsp;&nbsp;winsocket name
+    'WSAGetLastError'; <br>
+    function
+    WSAStartup;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;external&nbsp;&nbsp;&nbsp;&nbsp;winsocket
+    name 'WSAStartup'; <br>
+    function
+    WSACleanup;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;external&nbsp;&nbsp;&nbsp;&nbsp;winsocket
+    name 'WSACleanup'; <br>
+    <br>
+    <br>
+    {$R *.DFM} <br>
+    <br>
+    // <br>
+    // Function: checksum <br>
+    // <br>
+    // Description: <br>
+    //&nbsp;&nbsp;&nbsp;&nbsp;This function calculates the 16-bit one's complement sum <br>
+    //&nbsp;&nbsp;&nbsp;&nbsp;for the supplied buffer <br>
+    // <br>
+    function CheckSum(Var Buffer; Size : integer) : Word; <br>
+    type <br>
+    &nbsp;&nbsp;TWordArray = Array[0..1] of Word; <br>
+    var <br>
+    &nbsp;&nbsp;ChkSum : LongWord; <br>
+    &nbsp;&nbsp;i&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: Integer; <br>
+    begin <br>
+    &nbsp;&nbsp;ChkSum := 0; <br>
+    &nbsp;&nbsp;i := 0; <br>
+    &nbsp;&nbsp;While Size &gt; 1 do begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ChkSum := ChkSum + TWordArray(Buffer)[i]; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;inc(i); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Size := Size - SizeOf(Word); <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    &nbsp;&nbsp;if Size=1 then ChkSum := ChkSum + Byte(TWordArray(Buffer)[i]); <br>
+    <br>
+    &nbsp;&nbsp;ChkSum := (ChkSum shr 16) + (ChkSum and $FFFF); <br>
+    &nbsp;&nbsp;ChkSum := ChkSum + (Chksum shr 16); <br>
+    <br>
+    &nbsp;&nbsp;Result := Word(ChkSum); <br>
+    end; <br>
+    <br>
+    <br>
+    procedure BuildHeaders( <br>
+    &nbsp;&nbsp;FromIP&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: String; <br>
+    &nbsp;&nbsp;iFromPort&nbsp;&nbsp; : Word; <br>
+    &nbsp;&nbsp;ToIP&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: String; <br>
+    &nbsp;&nbsp;iToPort&nbsp;&nbsp;&nbsp;&nbsp; : Word; <br>
+    &nbsp;&nbsp;StrMessage&nbsp;&nbsp;: String; <br>
+    &nbsp;&nbsp;Var Buf&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : TPacketBuffer; <br>
+    &nbsp;&nbsp;Var remote&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: TSockAddr; <br>
+    &nbsp;&nbsp;Var iTotalSize&nbsp;&nbsp;: Word <br>
+    ); <br>
+    Var <br>
+    &nbsp;&nbsp;dwFromIP&nbsp;&nbsp;&nbsp;&nbsp;: LongWord; <br>
+    &nbsp;&nbsp;dwToIP&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: LongWord; <br>
+    <br>
+    &nbsp;&nbsp;iIPVersion&nbsp;&nbsp;: Word; <br>
+    &nbsp;&nbsp;iIPSize&nbsp;&nbsp;&nbsp;&nbsp; : Word; <br>
+    &nbsp;&nbsp;ipHdr&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : T_IP_Header; <br>
+    &nbsp;&nbsp;udpHdr&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: T_UDP_Header; <br>
+    <br>
+    &nbsp;&nbsp;iUdpSize&nbsp;&nbsp;&nbsp;&nbsp;: Word; <br>
+    &nbsp;&nbsp;iUdpChecksumSize : Word; <br>
+    &nbsp;&nbsp;cksum&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : Word; <br>
+    <br>
+    &nbsp;&nbsp;Ptr&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : ^Byte; <br>
+    <br>
+    &nbsp;&nbsp;procedure IncPtr(Value : Integer); <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ptr := pointer(integer(ptr) + Value); <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    begin <br>
+    &nbsp;&nbsp; // преобразуем ip адреса <br>
+    <br>
+    &nbsp;&nbsp; dwFromIP&nbsp;&nbsp;&nbsp;&nbsp;:= inet_Addr(PChar(FromIP)); <br>
+    &nbsp;&nbsp; dwToIP&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:= inet_Addr(PChar(ToIP)); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// Инициализируем заголовок IP пакета
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;iTotalSize := sizeof(ipHdr) + sizeof(udpHdr) + length(strMessage);
+    <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;iIPVersion := 4; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;iIPSize := sizeof(ipHdr) div sizeof(LongWord); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// IP version goes in the high order 4 bits of ip_verlen. The <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// IP header length (in 32-bit words) goes in the lower 4 bits. <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ipHdr.ip_verlen := (iIPVersion shl 4) or iIPSize; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ipHdr.ip_tos := 0;
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    // IP type of service <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ipHdr.ip_totallength := htons(iTotalSize); // Total packet len <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ipHdr.ip_id := 0;
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    // Unique identifier: set to 0 <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ipHdr.ip_offset := 0;
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // Fragment
+    offset field <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ipHdr.ip_ttl :=
+    128;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//
+    время жизни пакета <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ipHdr.ip_protocol := $11;
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // Protocol(UDP) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ipHdr.ip_checksum := 0
+    ;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// IP checksum <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ipHdr.ip_srcaddr := dwFromIP;&nbsp;&nbsp;&nbsp;&nbsp; // Source
+    address <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ipHdr.ip_destaddr := dwToIP;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//
+    Destination address <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// Инициализируем заголовок UDP
+    пакета <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;iUdpSize := sizeof(udpHdr) + length(strMessage); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;udpHdr.src_portno := htons(iFromPort) ; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;udpHdr.dst_portno := htons(iToPort) ; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;udpHdr.udp_length := htons(iUdpSize) ; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;udpHdr.udp_checksum := 0 ; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// Build the UDP pseudo-header for calculating the UDP checksum. <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// The pseudo-header consists of the 32-bit source IP address, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// the 32-bit destination IP address, a zero byte, the 8-bit <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// IP protocol field, the 16-bit UDP length, and the UDP <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// header itself along with its data (padded with a 0 if <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// the data is odd length). <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;iUdpChecksumSize := 0; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ptr := @buf[0]; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FillChar(Buf, SizeOf(Buf), 0); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Move(ipHdr.ip_srcaddr, ptr^, SizeOf(ipHdr.ip_srcaddr)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;IncPtr(SizeOf(ipHdr.ip_srcaddr)); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;iUdpChecksumSize := iUdpChecksumSize + sizeof(ipHdr.ip_srcaddr); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Move(ipHdr.ip_destaddr, ptr^, SizeOf(ipHdr.ip_destaddr)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;IncPtr(SizeOf(ipHdr.ip_destaddr)); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;iUdpChecksumSize := iUdpChecksumSize + sizeof(ipHdr.ip_destaddr); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;IncPtr(1); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Inc(iUdpChecksumSize); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Move(ipHdr.ip_protocol, ptr^, sizeof(ipHdr.ip_protocol)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;IncPtr(sizeof(ipHdr.ip_protocol)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;iUdpChecksumSize := iUdpChecksumSize + sizeof(ipHdr.ip_protocol); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Move(udpHdr.udp_length, ptr^, sizeof(udpHdr.udp_length)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;IncPtr(sizeof(udpHdr.udp_length)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;iUdpChecksumSize := iUdpChecksumSize + sizeof(udpHdr.udp_length); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;move(udpHdr, ptr^, sizeof(udpHdr)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;IncPtr(sizeof(udpHdr)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;iUdpChecksumSize := iUdpCheckSumSize + sizeof(udpHdr); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Move(StrMessage[1], ptr^, Length(strMessage)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;IncPtr(Length(StrMessage)); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;iUdpChecksumSize := iUdpChecksumSize + length(strMessage); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;cksum := checksum(buf, iUdpChecksumSize); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;udpHdr.udp_checksum := cksum; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// Now assemble the IP and UDP headers along with the data <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;&nbsp;so we can send it <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FillChar(Buf, SizeOf(Buf), 0); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Ptr := @Buf[0]; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Move(ipHdr, ptr^,
+    SizeOf(ipHdr));&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;IncPtr(SizeOf(ipHdr)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Move(udpHdr, ptr^,
+    SizeOf(udpHdr));&nbsp;&nbsp;&nbsp;&nbsp;IncPtr(SizeOf(udpHdr)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Move(StrMessage[1], ptr^, length(StrMessage)); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// Apparently, this SOCKADDR_IN structure makes no difference. <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// Whatever we put as the destination IP addr in the IP header <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// is what goes. Specifying a different destination in remote <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// will be ignored. <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;remote.sin_family := AF_INET; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;remote.sin_port := htons(iToPort); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;remote.sin_addr.s_addr := dwToIP; <br>
+    end; <br>
+    <br>
+    procedure TForm1.SendIt; <br>
+    Var <br>
+    &nbsp;&nbsp;sh&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: TSocket; <br>
+    &nbsp;&nbsp;bOpt&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: Integer; <br>
+    &nbsp;&nbsp;ret&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : Integer; <br>
+    &nbsp;&nbsp;Buf&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : TPacketBuffer; <br>
+    &nbsp;&nbsp;Remote&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: TSockAddr; <br>
+    &nbsp;&nbsp;Local&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : TSockAddr; <br>
+    &nbsp;&nbsp;iTotalSize&nbsp;&nbsp;: Word; <br>
+    &nbsp;&nbsp;wsdata&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: TWSAdata; <br>
+    <br>
+    begin <br>
+    &nbsp;&nbsp;// Startup Winsock 2 <br>
+    &nbsp;&nbsp;ret := WSAStartup($0002, wsdata); <br>
+    &nbsp;&nbsp;if ret&lt;&gt;0 then begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;memo1.lines.add('WSA Startup failed.'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;exit; <br>
+    &nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;with memo1.lines do begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;add('WSA Startup:'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;add('Desc.:&nbsp;&nbsp;'+wsData.szDescription); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;add('Status: '+wsData.szSystemStatus); <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    &nbsp;&nbsp;try <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// Создаём сокет <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;sh := Socket(AF_INET, SOCK_RAW, IPPROTO_UDP); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if (sh = INVALID_SOCKET) then begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;memo1.lines.add('Socket() failed:
+    '+IntToStr(WSAGetLastError)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exit; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Memo1.lines.add('Socket Handle = '+IntToStr(sh)); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// Option: Header Include <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;bOpt := 1; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ret := SetSockOpt(sh, IPPROTO_IP, IP_HDRINCL, @bOpt,
+    SizeOf(bOpt)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if ret = SOCKET_ERROR then begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Memo1.lines.add('setsockopt(IP_HDRINCL) failed:
+    '+IntToStr(WSAGetLastError)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exit; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// строим пакет <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;BuildHeaders( SrcIP,&nbsp;&nbsp;SrcPort, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DestIP,
+    DestPort, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'THIS
+    IS A TEST PACKET', <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Buf,
+    Remote, iTotalSize ); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// Отправляем пакет <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;ret := SendTo(sh, buf, iTotalSize, 0, Remote, SizeOf(Remote)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if ret = SOCKET_ERROR then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Memo1.Lines.Add('sendto() failed:
+    '+IntToStr(WSAGetLastError)) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Memo1.Lines.Add('send '+IntToStr(ret)+' bytes.'); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// Закрываем сокет <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CloseSocket(sh); <br>
+    &nbsp;&nbsp;finally <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// Закрываем Winsock 2 <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;WSACleanup; <br>
+    &nbsp;&nbsp;end; <br>
+    end; <br>
+    <br>
+    procedure TForm1.Button1Click(Sender: TObject); <br>
+    begin <br>
+    &nbsp;&nbsp;SendIt; <br>
+    end; <br>
+    <br>
+    end.<br>
+    </p>
+    <p><a href="winsock2.zip"><img border="0" height="42" src="winzipicon_medium.gif"
+    width="43"><b>СКАЧАТЬ Winsock2.pas</b>(~26Kb)</a></p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

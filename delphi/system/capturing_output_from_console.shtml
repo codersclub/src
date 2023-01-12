@@ -1,0 +1,141 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как захватить весь вывод в консоли.</h3>
+    <p>Компилятор: Delphi</p>
+    <p>&nbsp;</p>
+    <p>unit consoleoutput; <br>
+    <br>
+    interface<br>
+    <br>
+    uses<br>
+    &nbsp;&nbsp;Controls, Windows, SysUtils, Forms;<br>
+    <br>
+    function GetDosOutput(const CommandLine:string): string;<br>
+    <br>
+    implementation<br>
+    <br>
+    function GetDosOutput(const CommandLine:string): string;<br>
+    var<br>
+    &nbsp;&nbsp;SA: TSecurityAttributes;<br>
+    &nbsp;&nbsp;SI: TStartupInfo;<br>
+    &nbsp;&nbsp;PI: TProcessInformation;<br>
+    &nbsp;&nbsp;StdOutPipeRead, StdOutPipeWrite: THandle;<br>
+    &nbsp;&nbsp;WasOK: Boolean;<br>
+    &nbsp;&nbsp;Buffer: array[0..255] of Char;<br>
+    &nbsp;&nbsp;BytesRead: Cardinal;<br>
+    &nbsp;&nbsp;WorkDir, Line: String;<br>
+    begin<br>
+    &nbsp;&nbsp;Application.ProcessMessages;<br>
+    &nbsp;&nbsp;with SA do<br>
+    &nbsp;&nbsp;begin<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;nLength := SizeOf(SA);<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;bInheritHandle := True;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;lpSecurityDescriptor := nil;<br>
+    &nbsp;&nbsp;end;<br>
+    &nbsp;&nbsp;// создаём пайп для перенаправления
+    стандартного вывода<br>
+    &nbsp;&nbsp;CreatePipe(StdOutPipeRead,&nbsp;&nbsp;// дескриптор чтения<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; StdOutPipeWrite,
+    // дескриптор записи<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; @SA,
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; //
+    аттрибуты безопасности<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//
+    количество байт принятых для пайпа - 0 по
+    умолчанию<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; );<br>
+    &nbsp;&nbsp;try<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// Создаём дочерний процесс,
+    используя StdOutPipeWrite в качестве стандартного
+    вывода,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// а так же проверяем, чтобы он не
+    показывался на экране.<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;with SI do<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FillChar(SI, SizeOf(SI), 0);<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cb := SizeOf(SI);<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dwFlags := STARTF_USESHOWWINDOW or
+    STARTF_USESTDHANDLES;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wShowWindow := SW_HIDE;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;hStdInput := GetStdHandle(STD_INPUT_HANDLE); //
+    стандартный ввод не перенаправляем<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;hStdOutput := StdOutPipeWrite;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;hStdError := StdOutPipeWrite;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end;<br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// Запускаем компилятор из командной
+    строки<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;WorkDir := ExtractFilePath(CommandLine);<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;WasOK := CreateProcess(nil, PChar(CommandLine), nil, nil, True, 0,
+    nil, PChar(WorkDir), SI, PI);<br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// Теперь, когда дескриптор получен,
+    для безопасности закрываем запись.<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// Нам не нужно, чтобы произошло
+    случайное чтение или запись.<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;CloseHandle(StdOutPipeWrite); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// если процесс может быть создан, то
+    дескриптор, это его вывод<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if not WasOK then<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;raise Exception.Create('Could not execute command
+    line!')<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;else<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// получаем весь вывод
+    до тех пор, пока DOS-приложение не будет завершено<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Line := '';<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;repeat<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// читаем блок
+    символов (могут содержать возвраты каретки и
+    переводы строки)<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;WasOK :=
+    ReadFile(StdOutPipeRead, Buffer, 255, BytesRead, nil);<br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// есть ли что-нибудь
+    ещё для чтения?<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if BytesRead &gt; 0 then<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;begin<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//
+    завершаем буфер PChar-ом<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Buffer[BytesRead]
+    := #0;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//
+    добавляем буфер в общий вывод<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Line := Line +
+    Buffer;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;until not WasOK or (BytesRead = 0);<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// ждём, пока завершится
+    консольное приложение<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;WaitForSingleObject(PI.hProcess,
+    INFINITE);<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;finally<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Закрываем все
+    оставшиеся дескрипторы<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CloseHandle(PI.hThread);<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CloseHandle(PI.hProcess);<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end;<br>
+    &nbsp;&nbsp;finally<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;result:=Line;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CloseHandle(StdOutPipeRead);<br>
+    &nbsp;&nbsp;end;<br>
+    end;<br>
+    <br>
+    <br>
+    end.</p>
+    <p><br>
+    </p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div></TBODY>
+
+
+<p align="center"><br>
+<br>
+</p>
+<!--#include virtual="/ssi/bottom.html"-->

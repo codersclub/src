@@ -1,0 +1,336 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <p><b>Маааленькое PING-приложеньице :)</b><br>
+    <br>
+    Протокол Ping предназначен для тестирования
+    компьютерных соединений в Интернете путём
+    посылки через протокол Internet Protocol (IP) по
+    обределённому адресу сообщения и ожидания от
+    него ответа. <br>
+    <br>
+    ICMP - Internet Control Message Protocol. ICMP служит для передачи
+    сообщений об ошибках а так же управляющих
+    сообщений .&nbsp;&nbsp; ICMP-тест может показать
+    насколько быстро проходит информация между
+    двумя узлами в Интернете. <br>
+    <br>
+    <br>
+    1. Запускаем Delphi; <br>
+    2. В Новом проекте добавляем в форму Tbutton, Tedit и Tmemo; <br>
+    3. Вставляем “winsock”; <br>
+    4. объявляем структурку для IP-заголовка: <br>
+    <b>type <br>
+    &nbsp;&nbsp;IPINFO = record <br>
+    &nbsp;&nbsp;Ttl&nbsp;&nbsp;&nbsp;&nbsp; :char; <br>
+    &nbsp;&nbsp;Tos&nbsp;&nbsp;&nbsp;&nbsp; :char; <br>
+    &nbsp;&nbsp;IPFlags :char; <br>
+    &nbsp;&nbsp;OptSize :char; <br>
+    &nbsp;&nbsp;Options :^char; <br>
+    end; </b><br>
+    <br>
+    5. объявляем структурку для хранения ICMP пакета: <br>
+    <b>type <br>
+    &nbsp; ICMPECHO = record <br>
+    &nbsp; Source&nbsp;&nbsp;:longint; <br>
+    &nbsp; Status&nbsp;&nbsp;:longint; <br>
+    &nbsp; RTTime&nbsp;&nbsp;:longint; <br>
+    &nbsp; DataSize:Shortint; <br>
+    &nbsp; Reserved:Shortint; <br>
+    &nbsp; pData&nbsp;&nbsp; :^variant; <br>
+    &nbsp; i_ipinfo:IPINFO; <br>
+    end; </b><br>
+    <br>
+    6. Объявляем функции и процедуры, которые мы будем
+    вызывать из ICMP.DLL <br>
+    <b>TIcmpCreateFile = function():integer; {$IFDEF WIN32} stdcall; {$ENDIF} <br>
+    TIcmpCloseHandle = procedure(var handle:integer);{$IFDEF WIN32} stdcall; {$ENDIF} <br>
+    TIcmpSendEcho = function(var handle:integer; endereco:DWORD; buffer:variant; tam:WORD;
+    IP:IPINFO; ICMP:ICMPECHO; tamicmp:DWORD; tempo:DWORD):DWORD;{$IFDEF WIN32} stdcall;
+    {$ENDIF} </b><br>
+    <br>
+    7. В Tbutton в событие Onclick вставляем следующий код: <br>
+    <br>
+    <b>procedure TForm1.Button1Click(Sender: TObject); <br>
+    var <br>
+    wsadt : wsadata; <br>
+    icmp&nbsp;&nbsp;:icmpecho; <br>
+    HNDicmp : integer; <br>
+    hndFile :integer; <br>
+    Host :PHostEnt; <br>
+    Destino :in_addr; <br>
+    Endereco :^DWORD; <br>
+    IP : ipinfo; <br>
+    Retorno :integer; <br>
+    dwRetorno :DWORD; <br>
+    x :integer; <br>
+    <br>
+    IcmpCreateFile : TIcmpCreateFile; <br>
+    IcmpCloseHandle : TIcmpCloseHandle; <br>
+    IcmpSendEcho : TIcmpSendEcho; <br>
+    <br>
+    begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if (edit1.Text = '') then begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; Application.MessageBox('Enter a HostName ro a IP Adress', <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    'Error', MB_OK); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; exit; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;HNDicmp := LoadLibrary('ICMP.DLL'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if (HNDicmp &lt;&gt; 0) then begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; @IcmpCreateFile :=
+    GetProcAddress(HNDicmp,'IcmpCreateFile'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; @IcmpCloseHandle :=
+    GetProcAddress(HNDicmp,'IcmpCloseHandle'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; @IcmpSendEcho :=
+    GetProcAddress(HNDicmp,'IcmpSendEcho'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if (@IcmpCreateFile=nil) or (@IcmpCloseHandle=nil) or
+    (@IcmpSendEcho=nil) then&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Application.MessageBox('Error getting
+    ICMP Adress’,'Error', MB_OK); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; FreeLibrary(HNDicmp); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Retorno := WSAStartup($0101,wsadt); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if (Retorno &lt;&gt; 0) then begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Application.MessageBox('Canґt Load
+    WinSockets','WSAStartup', MB_OK); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;WSACleanup(); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FreeLibrary(HNDicmp); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Destino.S_addr := inet_addr(Pchar(Edit1.text)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if (Destino.S_addr = 0) then begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Host := GetHostbyName(PChar(Edit1.text)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; end <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;else begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Host := GetHostbyAddr(@Destino,sizeof(in_addr),
+    AF_INET); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if (host = nil) then begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Application.MessageBox('Host not
+    found','Error', MB_OK); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; WSACleanup(); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; FreeLibrary(HNDicmp); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; exit; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;memo1.Lines.Add('Pinging ' + Edit1.text); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Endereco := @Host.h_addr_list; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;HNDFile := IcmpCreateFile(); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;for x:= 0 to 4 do begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Ip.Ttl := char(255); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Ip.Tos := char(0); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Ip.IPFlags := char(0); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Ip.OptSize := char(0); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Ip.Options := nil; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dwRetorno := IcmpSendEcho( <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    HNDFile, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    Endereco^, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    null, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    0, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    Ip, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    Icmp, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    sizeof(Icmp), <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    DWORD(5000)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Destino.S_addr := icmp.source; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Memo1.Lines.Add('Ping ' + Edit1.text); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; end; <br>
+    <br>
+    <br>
+    &nbsp;&nbsp; IcmpCLoseHandle(HNDFile); <br>
+    &nbsp;&nbsp; FreeLibrary(HNDicmp); <br>
+    &nbsp;&nbsp; WSACleanup(); <br>
+    end; </b><br>
+    <br>
+    У данного примера есть один недостаток -
+    программа не воспримет доменное имя, только
+    IP-адресс. Для пользователей NT не используйте
+    функцию <b>IcmpCloseHandle</b>.<br>
+    <br>
+    Это всё….. <br>
+    <br>
+    Ну и в конце полный исходный код примера: <br>
+    <br>
+    <b>---------------------------------- <br>
+    unit Unit1; <br>
+    <br>
+    interface <br>
+    <br>
+    uses <br>
+    &nbsp;&nbsp;Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs, <br>
+    &nbsp;&nbsp;winsock, StdCtrls; <br>
+    <br>
+    type <br>
+    &nbsp;&nbsp;IPINFO = record <br>
+    &nbsp;&nbsp;Ttl&nbsp;&nbsp;&nbsp;&nbsp; :char; <br>
+    &nbsp;&nbsp;Tos&nbsp;&nbsp;&nbsp;&nbsp; :char; <br>
+    &nbsp;&nbsp;IPFlags :char; <br>
+    &nbsp;&nbsp;OptSize :char; <br>
+    &nbsp;&nbsp;Options :^char; <br>
+    end; <br>
+    <br>
+    type <br>
+    ICMPECHO = record <br>
+    Source&nbsp;&nbsp;:longint; <br>
+    Status&nbsp;&nbsp;:longint; <br>
+    RTTime&nbsp;&nbsp;:longint; <br>
+    DataSize:Shortint; <br>
+    Reserved:Shortint; <br>
+    pData&nbsp;&nbsp; :^variant; <br>
+    i_ipinfo:IPINFO; <br>
+    end; <br>
+    <br>
+    TIcmpCreateFile = function():integer; {$IFDEF WIN32} stdcall; {$ENDIF} <br>
+    TIcmpCloseHandle = procedure(var handle:integer);{$IFDEF WIN32} stdcall; {$ENDIF} <br>
+    TIcmpSendEcho = function(var handle:integer; endereco:DWORD; buffer:variant; tam:WORD;
+    IP:IPINFO; ICMP:ICMPECHO; tamicmp:DWORD; tempo:DWORD):DWORD;{$IFDEF WIN32} stdcall;
+    {$ENDIF} <br>
+    <br>
+    <br>
+    type <br>
+    &nbsp;&nbsp;TForm1 = class(TForm) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Button1: TButton; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Button2: TButton; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Edit1: TEdit; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Memo1: TMemo; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure Button1Click(Sender: TObject); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure Button2Click(Sender: TObject); <br>
+    &nbsp;&nbsp;private <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;{ Private declarations } <br>
+    &nbsp;&nbsp;public <br>
+    <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    var <br>
+    &nbsp;&nbsp;Form1: TForm1; <br>
+    <br>
+    implementation <br>
+    <br>
+    {$R *.DFM} <br>
+    <br>
+    procedure TForm1.Button1Click(Sender: TObject); <br>
+    var <br>
+    wsadt : wsadata; <br>
+    icmp&nbsp;&nbsp;:icmpecho; <br>
+    HNDicmp : integer; <br>
+    hndFile :integer; <br>
+    Host :PHostEnt; <br>
+    Destino :in_addr; <br>
+    Endereco :^DWORD; <br>
+    IP : ipinfo; <br>
+    Retorno :integer; <br>
+    dwRetorno :DWORD; <br>
+    x :integer; <br>
+    <br>
+    IcmpCreateFile : TIcmpCreateFile; <br>
+    IcmpCloseHandle : TIcmpCloseHandle; <br>
+    IcmpSendEcho : TIcmpSendEcho; <br>
+    <br>
+    begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if (edit1.Text = '') then begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; Application.MessageBox('Digite um HostName ou um End. IP', <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    'Error', MB_OK); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; exit; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;HNDicmp := LoadLibrary('ICMP.DLL'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if (HNDicmp &lt;&gt; 0) then begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; @IcmpCreateFile :=
+    GetProcAddress(HNDicmp,'IcmpCreateFile'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; @IcmpCloseHandle :=
+    GetProcAddress(HNDicmp,'IcmpCloseHandle'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; @IcmpSendEcho :=
+    GetProcAddress(HNDicmp,'IcmpSendEcho'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if (@IcmpCreateFile=nil) or (@IcmpCloseHandle=nil) or
+    (@IcmpSendEcho=nil) then&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Application.MessageBox('Erro pegando
+    endereзos ICMP','Error', MB_OK); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; FreeLibrary(HNDicmp); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Retorno := WSAStartup($0101,wsadt); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if (Retorno &lt;&gt; 0) then begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Application.MessageBox('Nгo foi possнvel carregar
+    WinSockets','WSAStartup', MB_OK); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;WSACleanup(); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FreeLibrary(HNDicmp); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Destino.S_addr := inet_addr(Pchar(Edit1.text)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if (Destino.S_addr = 0) then begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Host := GetHostbyName(PChar(Edit1.text)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; end <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;else begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Host := GetHostbyAddr(@Destino,sizeof(in_addr),
+    AF_INET); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if (host = nil) then begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Application.MessageBox('Host nгo
+    encontrado','Error', MB_OK); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; WSACleanup(); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; FreeLibrary(HNDicmp); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; exit; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;memo1.Lines.Add('Pinging ' + Edit1.text); <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Endereco := @Host.h_addr_list; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;HNDFile := IcmpCreateFile(); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;for x:= 0 to 4 do begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Ip.Ttl := char(255); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Ip.Tos := char(0); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Ip.IPFlags := char(0); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Ip.OptSize := char(0); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Ip.Options := nil; <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dwRetorno := IcmpSendEcho( <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    HNDFile, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    Endereco^, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    null, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    0, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    Ip, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    Icmp, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    sizeof(Icmp), <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    DWORD(5000)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Destino.S_addr := icmp.source; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Memo1.Lines.Add('Pingou ' + Edit1.text); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp; end; <br>
+    <br>
+    <br>
+    &nbsp;&nbsp; IcmpCLoseHandle(HNDFile); <br>
+    &nbsp;&nbsp; FreeLibrary(HNDicmp); <br>
+    &nbsp;&nbsp; WSACleanup(); <br>
+    end; <br>
+    <br>
+    end. <br>
+    -------------------------------------------- </b></td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

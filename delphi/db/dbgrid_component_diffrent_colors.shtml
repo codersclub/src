@@ -1,0 +1,255 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>DBGrid компонент, который отображает разными
+    цветами удалЄнные, обновлЄнные и добавленные
+    записи</h3>
+    <p>unit atcDBGrid; <br>
+    (* <br>
+    &nbsp;&nbsp;(c) Aveen Tech <br>
+    &nbsp;&nbsp;2001 - 2002 <br>
+    <br>
+    &nbsp;&nbsp;FileName: atcDBGrid.pas <br>
+    <br>
+    &nbsp;&nbsp;Version
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Date&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Author
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Comment <br>
+    &nbsp;&nbsp;1.0
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 13/06/2000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Majid
+    Vafai Jahan&nbsp;&nbsp;Create. <br>
+    <br>
+    OVERVIEW <br>
+    &nbsp;&nbsp;- This grid is inherited from DBGrid and add some required functionality to
+    it. <br>
+    <br>
+    Functionality: <br>
+    &nbsp;&nbsp;- Record type are all records that may be modified, unmodified, inserted,
+    deleted. <br>
+    &nbsp;&nbsp;- Coloring according to Record type. <br>
+    &nbsp;&nbsp;- show selected Record Type. <br>
+    <br>
+    *) <br>
+    <br>
+    interface <br>
+    <br>
+    uses <br>
+    &nbsp;&nbsp;Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs, <br>
+    &nbsp;&nbsp;Grids, DBGrids, dbTables, db; <br>
+    const <br>
+    &nbsp;&nbsp;AlignFlags : array [TAlignment] of Integer = <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;( DT_LEFT or DT_WORDBREAK or DT_EXPANDTABS or DT_NOPREFIX, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DT_RIGHT or DT_WORDBREAK or DT_EXPANDTABS or
+    DT_NOPREFIX, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DT_CENTER or DT_WORDBREAK or DT_EXPANDTABS or
+    DT_NOPREFIX ); <br>
+    &nbsp;&nbsp;RTL: array [Boolean] of Integer = (0, DT_RTLREADING); <br>
+    type <br>
+    &nbsp;&nbsp;TCachedShow = (csModify, csUnModify, csRemoved, csInserted, csAll, csNormal); <br>
+    &nbsp;&nbsp;TatcDBGrid = class(TDBGrid) <br>
+    &nbsp;&nbsp;private <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FCachedShow: TCachedShow; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FModifiedColor: TColor; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FInsertedColor: TColor; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FDeletedColor: TColor; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure SetCachedShow(const Value: TCachedShow); <br>
+    &nbsp;&nbsp;protected <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure DrawDataCell(const Rect: TRect; Field: TField; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;State: TGridDrawState); override; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;procedure DrawColumnCell(const Rect: TRect; DataCol: Integer; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Column: TColumn; State: TGridDrawState); override; <br>
+    &nbsp;&nbsp;public <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;constructor Create(AOwner: TComponent); override; <br>
+    &nbsp;&nbsp;published <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property atcCachedShow: TCachedShow read FCachedShow write
+    SetCachedShow; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property atcDeletedColor: TColor read FDeletedColor write
+    FDeletedColor; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property atcInsertedColor: TColor read FInsertedColor write
+    FInsertedColor; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;property atcModifiedColor: TColor read FModifiedColor write
+    FModifiedColor; <br>
+    &nbsp;&nbsp;end; <br>
+    <br>
+    procedure Register; <br>
+    <br>
+    implementation <br>
+    <br>
+    (******************************************************************************) <br>
+    procedure Register; <br>
+    begin <br>
+    &nbsp;&nbsp;RegisterComponents('ATC DB Compo', [TatcDBGrid]); <br>
+    end; <br>
+    <br>
+    (******************************************************************************) <br>
+    constructor TatcDBGrid.Create(AOwner: TComponent); <br>
+    (* <br>
+    &nbsp;&nbsp;Description: Record Type Showing is All except Deletes. <br>
+    *) <br>
+    <br>
+    begin <br>
+    &nbsp;&nbsp;inherited; <br>
+    &nbsp;&nbsp;FCachedShow := csNormal; <br>
+    &nbsp;&nbsp;FDeletedColor := clGray; <br>
+    &nbsp;&nbsp;FInsertedColor := clAqua; <br>
+    &nbsp;&nbsp;FModifiedColor := clRed; <br>
+    end; <br>
+    <br>
+    (******************************************************************************) <br>
+    procedure TatcDBGrid.DrawColumnCell(const Rect: TRect; DataCol: Integer; <br>
+    &nbsp;&nbsp;Column: TColumn; State: TGridDrawState); <br>
+    (* <br>
+    &nbsp;&nbsp;Description: On Drawing Column Color Updated Records. <br>
+    *) <br>
+    var <br>
+    &nbsp;&nbsp;ARect: TRect; <br>
+    begin <br>
+    &nbsp;&nbsp;inherited; <br>
+    &nbsp;&nbsp;if not Assigned(Column.Field) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;exit; <br>
+    &nbsp;&nbsp;// Copy Rect into Variable. <br>
+    &nbsp;&nbsp;CopyRect(ARect, Rect); <br>
+    &nbsp;&nbsp;if Assigned(DataLink) and (DataLink.Active) and (DataLink.DataSet &lt;&gt;
+    nil) then <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// если текуща€ запись изменена<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if DataLink.DataSet.UpdateStatus = usModified then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.Brush.Color := atcModifiedColor; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.Font.Color := clBlack; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.FillRect(Rect); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DrawText(Canvas.Handle, PChar(Column.Field.Text),
+    Length(Column.Field.Text), ARect, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; AlignFlags[Column.Alignment] or
+    RTL[UseRightToLeftAlignmentForField(Column.Field, Column.Alignment)]); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// если текуща€ запись добавлена.<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;else if DataLink.DataSet.UpdateStatus = usInserted then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.Brush.Color := atcInsertedColor; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.Font.Color := clBlack; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.FillRect(Rect); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DrawText(Canvas.Handle, PChar(Column.Field.Text),
+    Length(Column.Field.Text), ARect, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; AlignFlags[Column.Alignment] or
+    RTL[UseRightToLeftAlignmentForField(Column.Field, Column.Alignment)]); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// если текуща€ запись удалена.<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;else if DataLink.DataSet.UpdateStatus = usDeleted then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.Brush.Color := atcDeletedColor; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.Font.Color := clWhite; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.FillRect(Rect); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DrawText(Canvas.Handle, PChar(Column.Field.Text),
+    Length(Column.Field.Text), ARect, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; AlignFlags[Column.Alignment] or
+    RTL[UseRightToLeftAlignmentForField(Column.Field, Column.Alignment)]); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;end; <br>
+    end; <br>
+    <br>
+    (******************************************************************************) <br>
+    procedure TatcDBGrid.DrawDataCell(const Rect: TRect; Field: TField; <br>
+    &nbsp;&nbsp;State: TGridDrawState); <br>
+    (* <br>
+    &nbsp;&nbsp;ќписание: –исуем €чейки<br>
+    *) <br>
+    var <br>
+    &nbsp;&nbsp;ARect: TRect; <br>
+    begin <br>
+    &nbsp;&nbsp;inherited; <br>
+    &nbsp;&nbsp;CopyRect(ARect, Rect); <br>
+    <br>
+    &nbsp;&nbsp;if Assigned(DataLink) and (DataLink.Active) and (DataLink.DataSet &lt;&gt;
+    nil) then <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// если текуща€ запись изменена<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if DataLink.DataSet.UpdateStatus = usModified then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.Brush.Color := clRed; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.Font.Color := clBlack; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.FillRect(Rect); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DrawText(Canvas.Handle, PChar(Field.Text),
+    Length(Field.Text), ARect, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; AlignFlags[Field.Alignment] or
+    RTL[UseRightToLeftAlignmentForField(Field, Field.Alignment)]); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// если текуща€ запись добавлена.<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;else if DataLink.DataSet.UpdateStatus = usInserted then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.Brush.Color := clAqua; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.Font.Color := clBlack; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.FillRect(Rect); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DrawText(Canvas.Handle, PChar(Field.Text),
+    Length(Field.Text), ARect, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; AlignFlags[Field.Alignment] or
+    RTL[UseRightToLeftAlignmentForField(Field, Field.Alignment)]); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;// если текуща€ запись удалена.<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;else if DataLink.DataSet.UpdateStatus = usDeleted then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.Brush.Color := clGray; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.Font.Color := clWhite; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas.FillRect(Rect); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DrawText(Canvas.Handle, PChar(Field.Text),
+    Length(Field.Text), ARect, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; AlignFlags[Field.Alignment] or
+    RTL[UseRightToLeftAlignmentForField(Field, Field.Alignment)]); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;end; <br>
+    end; <br>
+    <br>
+    (******************************************************************************) <br>
+    procedure TatcDBGrid.SetCachedShow(const Value: TCachedShow); <br>
+    (* <br>
+    &nbsp;&nbsp;Description: Record type for showing in grid. <br>
+    &nbsp;&nbsp;Parameters: Value cached record show. <br>
+    *) <br>
+    <br>
+    begin <br>
+    &nbsp;&nbsp;FCachedShow := Value; <br>
+    &nbsp;&nbsp;if ComponentState = [csDesigning] then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;exit; <br>
+    &nbsp;&nbsp;if not Assigned(DataSource) or not Assigned(DataSource.DataSet) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;exit; <br>
+    &nbsp;&nbsp;// дл€ показа только выбранного типа
+    записей.<br>
+    &nbsp;&nbsp;if Assigned(DataLink) and Assigned(DataLink.DataSet) and (DataLink.Active)
+    then <br>
+    &nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;case FCachedShow of <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;csAll: <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TBDEDataSet(DataSource.DataSet).UpdateRecordTypes :=
+    [rtModified, rtInserted, rtDeleted, rtUnmodified]; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;csModify: <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TBDEDataSet(DataSource.DataSet).UpdateRecordTypes :=
+    [rtModified]; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;csUnModify: <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TBDEDataSet(DataSource.DataSet).UpdateRecordTypes :=
+    [rtUnmodified]; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;csInserted: <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TBDEDataSet(DataSource.DataSet).UpdateRecordTypes :=
+    [rtInserted]; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;csRemoved: <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TBDEDataSet(DataSource.DataSet).UpdateRecordTypes :=
+    [rtDeleted]; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;csNormal: <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TBDEDataSet(DataSource.DataSet).UpdateRecordTypes :=
+    [rtModified, rtInserted, rtUnmodified]; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;end; <br>
+    end; <br>
+    <br>
+    (******************************************************************************) <br>
+    end.</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

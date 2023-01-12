@@ -1,0 +1,409 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <p align="center"><font size="6"><b>Консольные приложения в Delphi</b></font><br>
+    <i>Автор: <a href="mailto:alexfedorov@geocities.com">Alex G. Fedorov</a></i></p>
+    <hr SIZE="3" width="75%">
+    <p><br>
+    Статья представляет собой изучение создания
+    консольного приложения в Delphi. Прежде чем начать
+    вникать в подробности, необходимо уточнить, что
+    консольные приложения это особый вид Windows
+    приложений - с одной стороны он имеет полный
+    доступ к функциям Win API, с другой - не имеет
+    графического интерфейса и выполняется в
+    текстовом режиме.</p>
+    <p><font size="4"><b>Простая консольная программа</b></font></p>
+    <p>На момент написания статьи (1997г.), в Delphi не было
+    возможности автоматически создавать консольные
+    приложения (возможно на сегодняшний день этот
+    недостаток устранён), поэтому мы создадим пустой
+    файл и поместим в него следующий код:</p>
+    <pre><font size="4">  program ConPrg;
+  {$APPTYPE CONSOLE}
+  begin
+  end.
+</font> </pre>
+    <p>Затем сохраним этот файл с расширением <b>.dpr</b> -
+    в данном случае conprg.dpr. Далее, его можно загрузить
+    в Delphi (File|Open) и приступить к добавлению кода.<br>
+    <b>Обратите внимание:</b> Если Вы запустите
+    вышеприведённую программу, то она немедленно
+    завершится, так как в ней нет никакого рабочего
+    кода.</p>
+    <p>Для начала, в неё можно добавить строчку <b>readln</b>:</p>
+    <pre><font size="4">  program ConPrg;
+  {$APPTYPE CONSOLE}
+  begin
+   readln
+  end.
+</font> </pre>
+    <p>Вы увидите пустое текстовое окошко, которое
+    закроется, если нажать клавишу Enter.</p>
+    <p><font size="4"><strong>Идём дальше</strong></font></p>
+    <p>Как упоминалось раньше, Вы можете использовать
+    почти любую функцию Win32 API из консольного
+    приложения. Такое приложение очень удобно ещё и
+    тем, что о пользовательском интерфейсе можно
+    вообще не думать, а для вывода информации
+    использовать только пару функций Write/Writeln.
+    Примеров применения консольных приложений
+    великое множество: это и различного вида утилиты,
+    и тестовые программы для проверки работы функций
+    API и т.д. Мы не будет погружаться в примеры того
+    как использовать определённые API, а поговорим
+    только о <strong>Консольных API </strong>(<strong>Console API</strong>).</p>
+    <p><font size="4"><strong>Консольные API (Console API)</strong></font></p>
+    <p>Microsoft предоставляет определённый набор
+    функций, которые очень даже полезны при создании
+    консольных приложений. Для начала скажу, что
+    существует по крайней мере два <strong>дескриптора
+    (handles)</strong>, которые связаны с консольным окном.
+    Один для ввода, второй для вывода. Ниже
+    приводятся две небольшие функции, которые
+    показывают, как получить эти дескрипторы.</p>
+    <p><font face="Courier New">//-----------------------------------------<br>
+    // Получение дескриптора для консольного ввода<br>
+    //-----------------------------------------<br>
+    function GetConInputHandle : THandle;<br>
+    begin<br>
+    Result := GetStdHandle(STD_INPUT_HANDLE)<br>
+    end;<br>
+    //-----------------------------------------<br>
+    // Получение дескриптора для консольного вывода<br>
+    //-----------------------------------------<br>
+    function GetConOutputHandle : THandle;<br>
+    begin<br>
+    Result := GetStdHandle(STD_OUTPUT_HANDLE)<br>
+    end;<br>
+    </font></p>
+    <p>Так же, лучше сразу создать свои функции для
+    таких простых операций как позиционирование
+    курсора, очистки экрана и отображение/скрытие
+    курсора (так как в консольных API они немножко
+    громозки и запутаны). Вот как они выглядят:</p>
+    <p><font face="Courier New">//-----------------------------------------<br>
+    // Установка курсора в координаты X, Y<br>
+    //-----------------------------------------<br>
+    procedure GotoXY(X, Y : Word);<br>
+    begin<br>
+    Coord.X := X; Coord.Y := Y;<br>
+    SetConsoleCursorPosition(ConHandle, Coord);<br>
+    end;<br>
+    //-----------------------------------------<br>
+    // Очистка экрана - заполнение его пробелами<br>
+    //-----------------------------------------<br>
+    procedure Cls;<br>
+    begin<br>
+    Coord.X := 0; Coord.Y := 0;<br>
+    FillConsoleOutputCharacter(ConHandle, ' ', MaxX*MaxY, Coord, NOAW);<br>
+    GotoXY(0, 0);<br>
+    end;<br>
+    //--------------------------------------<br>
+    // Показываем/Скрываем курсор<br>
+    //--------------------------------------<br>
+    procedure ShowCursor(Show : Bool);<br>
+    begin<br>
+    CCI.bVisible := Show;<br>
+    SetConsoleCursorInfo(ConHandle, CCI);<br>
+    end;<br>
+    </font></p>
+    <p>Как Вы успели заметить, мы воспользовались
+    четырьмя функциями консольного API: <strong>GetStdHandle</strong>,
+    <strong>SetConsoleCursorPosition</strong>, <strong>FillConsoleOutputCharacter</strong>, <strong>SetConsoleCursorInfo</strong>.
+    Иногда может возникнуть задача определения
+    размера консольного окна по вертикали и по
+    горизонтали. Для этого мы создадим две
+    переменные: MaxX и MaxY, типа WORD:</p>
+    <p><font face="Courier New CE">//--------------------------------------<br>
+    // Инициализация глобальных переменных<br>
+    //--------------------------------------<br>
+    procedure Init;<br>
+    begin<br>
+    // Получаем дескриптор вывода (output)<br>
+    ConHandle := GetConOutputHandle;<br>
+    // Получаем максимальные размеры окна<br>
+    Coord := GetLargestConsoleWindowSize(ConHandle);<br>
+    MaxX := Coord.X;<br>
+    MaxY := Coord.Y;<br>
+    end;<br>
+    </font></p>
+    <p>Мы даже можем сделать &quot;цикл обработки
+    сообщений&quot; (message loop) - <em>для тех, кто только
+    начинает программировать в Delphi - цикл обработки
+    сообщений необходимо делать, если приложение
+    создаётся в чистом API - при этом необходимы как
+    минимум три составляющие: WinMain, message loop и window proc.</em></p>
+    <p>Ниже приведён код &quot;цикла обработки
+    сообщений&quot;:</p>
+    <p><font face="Courier New">SetConsoleCtrlHandler(@ConProc, False);<br>
+    Cls;<br>
+    //<br>
+    // &quot;</font>Цикл обработки сообщений<font face="Courier New">&quot;<br>
+    //<br>
+    Continue := True;<br>
+    While Continue do<br>
+    Begin<br>
+    ReadConsoleInput(GetConInputHandle, IBuff, 1, IEvent);<br>
+    Case IBuff.EventType of<br>
+    KEY_EVENT : Begin<br>
+    // Проверяем клавишу ESC и завершаем программу<br>
+    If ((IBuff.KeyEvent.bKeyDown = True) AND<br>
+    (IBuff.KeyEvent.wVirtualKeyCode = VK_ESCAPE)) Then<br>
+    Continue := False;<br>
+    End;<br>
+    _MOUSE_EVENT : Begin<br>
+    With IBuff.MouseEvent.dwMousePosition do<br>
+    StatusLine(Format('%d, %d', [X, Y]));<br>
+    End;<br>
+    end;<br>
+    End {While}</font><br>
+    </p>
+    <p>Так же можно добавить &quot;обработчик событий&quot;
+    и перехватывать такие комбинации клавиш как Ctrl+C
+    и Ctrl+Break:</p>
+    <p><font face="Courier New">//-----------------------------------------------------<br>
+    // Обработчик консольных событий<br>
+    //-----------------------------------------------------<br>
+    function ConProc(CtrlType : DWord) : Bool; stdcall; far;<br>
+    var<br>
+    S : String;<br>
+    begin<br>
+    case CtrlType of<br>
+    CTRL_C_EVENT : S := 'CTRL_C_EVENT';<br>
+    CTRL_BREAK_EVENT : S := 'CTRL_BREAK_EVENT';<br>
+    CTRL_CLOSE_EVENT : S := 'CTRL_CLOSE_EVENT';<br>
+    CTRL_LOGOFF_EVENT : S := 'CTRL_LOGOFF_EVENT';<br>
+    CTRL_SHUTDOWN_EVENT : S := 'CTRL_SHUTDOWN_EVENT';<br>
+    else<br>
+    S := 'UNKNOWN_EVENT';<br>
+    end;<br>
+    MessageBox(0, PChar(S + ' detected'), 'Win32 Console', MB_OK);<br>
+    Result := True;<br>
+    end;</font><br>
+    </p>
+    <p>Чтобы посмотреть всё это в действии, я сделал
+    небольшую демонстрационную программу, которая
+    содержит подпрограммы, приведённые выше, а так же
+    некоторые другие возможности. Далее приведён
+    полный исходный код этого приложения.
+    Наслаждайтесь!</p>
+    <p><br>
+    </p>
+    <pre>{
+[]-----------------------------------------------------------------------[]
+      CON001 - Show various Console API functions. Checked with Win95
+
+                             version 1.01
+
+                  by Alex G. Fedorov, May-July, 1997
+                      alexfedorov@geocities.com
+
+   09-Jul-97   some minor corrections (shown in comments)
+[]-----------------------------------------------------------------------[]
+}
+program Con001;
+{$APPTYPE CONSOLE}
+uses Windows, SysUtils;
+
+const
+// Некоторые стандартные цвета
+ YellowOnBlue = FOREGROUND_GREEN OR FOREGROUND_RED OR
+                FOREGROUND_INTENSITY OR BACKGROUND_BLUE;
+ WhiteOnBlue  = FOREGROUND_BLUE OR FOREGROUND_GREEN OR
+                FOREGROUND_RED OR FOREGROUND_INTENSITY OR
+                BACKGROUND_BLUE;
+ RedOnWhite   = FOREGROUND_RED OR FOREGROUND_INTENSITY OR
+                BACKGROUND_RED OR BACKGROUND_GREEN OR BACKGROUND_BLUE
+                OR BACKGROUND_INTENSITY;
+ WhiteOnRed   = BACKGROUND_RED OR BACKGROUND_INTENSITY OR
+                FOREGROUND_RED OR FOREGROUND_GREEN OR FOREGROUND_BLUE
+                OR FOREGROUND_INTENSITY;
+
+var
+ ConHandle  : THandle; // Дескриптор консольного окна
+ Coord      : TCoord;  // Для хранения/установки позиции экрана
+ MaxX, MaxY : Word;    // Для хранения максимальных размеров окна
+ CCI        : TConsoleCursorInfo;
+ NOAW       : LongInt; // Для хранения результатов некоторых функций
+
+//-----------------------------------------
+//      <font
+face="Courier New">Получение дескриптора для консольного ввода</font>
+//-----------------------------------------
+function GetConInputHandle : THandle;
+begin
+ Result := GetStdHandle(STD_INPUT_HANDLE)
+end;
+//-----------------------------------------
+//      <font
+face="Courier New">Получение дескриптора для консольного вывода</font>
+//-----------------------------------------
+function GetConOutputHandle : THandle;
+begin
+ Result := GetStdHandle(STD_OUTPUT_HANDLE)
+end;
+//-----------------------------------------
+//        <font
+face="Courier New">Установка курсора в координаты X, Y</font>
+//-----------------------------------------
+procedure GotoXY(X, Y : Word);
+begin
+ Coord.X := X; Coord.Y := Y;
+ SetConsoleCursorPosition(ConHandle, Coord);
+end;
+//-----------------------------------------
+//   <font
+face="Courier New">Очистка экрана - заполнение его пробелами</font>
+//-----------------------------------------
+procedure Cls;
+begin
+ Coord.X := 0; Coord.Y := 0;
+ FillConsoleOutputCharacter(ConHandle, ' ', MaxX*MaxY,  Coord, NOAW);
+ GotoXY(0, 0);
+end;
+//--------------------------------------
+//           <font
+face="Courier New">Показываем/Скрываем курсор</font>
+//--------------------------------------
+procedure ShowCursor(Show : Bool);
+begin
+ CCI.bVisible := Show;
+ SetConsoleCursorInfo(ConHandle, CCI);
+end;
+//--------------------------------------
+//     Инициализация глобальных переменных
+//--------------------------------------
+procedure Init;
+begin
+// Получаем дескриптор вывода (output)
+ ConHandle := GetConOutputHandle;
+// Получаем максимальные размеры окна
+ Coord := GetLargestConsoleWindowSize(ConHandle);
+ MaxX := Coord.X;
+ MaxY := Coord.Y;
+end;
+//---------------------------------------
+//          рисуем строку статуса (&quot;status line&quot;)
+//---------------------------------------
+procedure StatusLine(S : String);
+begin
+ Coord.X := 0; Coord.Y := 0;
+ WriteConsoleOutputCharacter(ConHandle, PChar(S),   Length(S)+1, Coord, NOAW);
+ FillConsoleOutputAttribute (ConHandle, WhiteOnRed, Length(S),   Coord, NOAW);
+end;
+
+//-----------------------------------------------------
+//               Консольный обработчик событий
+//-----------------------------------------------------
+function ConProc(CtrlType : DWord) : Bool; stdcall; far;
+var
+ S : String;
+begin
+ case CtrlType of
+   CTRL_C_EVENT        : S := 'CTRL_C_EVENT';
+   CTRL_BREAK_EVENT    : S := 'CTRL_BREAK_EVENT';
+   CTRL_CLOSE_EVENT    : S := 'CTRL_CLOSE_EVENT';
+   CTRL_LOGOFF_EVENT   : S := 'CTRL_LOGOFF_EVENT';
+   CTRL_SHUTDOWN_EVENT : S := 'CTRL_SHUTDOWN_EVENT';
+  else
+   S := 'UNKNOWN_EVENT';
+ end;
+ MessageBox(0, PChar(S + ' detected'), 'Win32 Console', MB_OK);
+ Result := True;
+end;
+{
+[]---------------------------------------------------------------[]
+  Основная программа - показывает использование некоторых подпрограмм
+  а так же некоторых функций консольного API
+[]---------------------------------------------------------------[]
+}
+var
+ R        : TSmallRect;
+ Color    : Word;
+ OSVer    : TOSVersionInfo;
+ IBuff    : TInputRecord;
+ IEvent   : DWord;
+ Continue : Bool;
+
+begin
+// Инициализация глобальных переменных
+ Init;
+// Расположение окна на экране
+ With R do
+{!! 1.01 !!}
+  begin
+   Left  := 10;  Top    := 10; Right := 40;  Bottom := 40;
+  end
+{!! 1.01 !!}
+ SetConsoleWindowInfo(ConHandle, False, R);
+// Устанавливаем обработчик событий
+ SetConsoleCtrlHandler(@ConProc, True);
+// Проверяем обработчик событий
+ GenerateConsoleCtrlEvent(CTRL_C_EVENT, 0);
+// Изменяем заголовок окна
+ SetConsoleTitle('Console Demo');
+// Прячем курсор
+ ShowCursor(False);
+ Coord.X := 0; Coord.Y := 0;
+// Устанавливаем белый текст на синем фоне
+ Color := WhiteOnBlue;
+ FillConsoleOutputAttribute(ConHandle, Color, MaxX*MaxY, Coord, NOAW);
+// Console Code Page API is not supported under Win95 - only GetConsoleCP
+ Writeln('Console Code Page = ', GetConsoleCP);
+ Writeln('Max X=', MaxX,' Max Y=', MaxY);
+ Readln;            // ожидаем ввода пользователя
+ Cls;               // очищаем экран
+ ShowCursor(True);  // показываем курсор
+//
+// Use some Win32API stuff
+//
+ OSVer.dwOSVersionInfoSize := SizeOf(TOSVersionInfo);
+ GetVersionEx(OSVer);
+ With OSVer do
+  Begin
+   Writeln('dwMajorVersion = ', dwMajorVersion);
+   Writeln('dwMinorVersion = ', dwMinorVersion);
+   Writeln('dwBuildNumber  = ', dwBuildNumber);
+   Writeln('dwPlatformID   = ', dwPlatformID);
+  End;
+
+//
+ Readln;           // ожидаем ввода пользователя
+// Удаляем обработчик событий
+ SetConsoleCtrlHandler(@ConProc, False);
+ Cls;
+//
+// &quot;Цикл обработки сообщений&quot;
+//
+ Continue := True;
+ While Continue do
+ Begin
+  ReadConsoleInput(GetConInputHandle, IBuff, 1, IEvent);
+  Case IBuff.EventType of
+   KEY_EVENT   : Begin
+// <font
+face="Courier New">Проверяем клавишу ESC и завершаем программу</font>
+                   If ((IBuff.KeyEvent.bKeyDown = True) AND
+                       (IBuff.KeyEvent.wVirtualKeyCode = VK_ESCAPE)) Then
+                       Continue := False;
+                  End;
+   _MOUSE_EVENT : Begin
+                   With IBuff.MouseEvent.dwMousePosition do
+                    StatusLine(Format('%d, %d', [X, Y]));
+                  End;
+  end;
+ End {While}
+end.
+
+</pre>
+    <p align="center"><br>
+    <br>
+    </td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

@@ -1,0 +1,512 @@
+<!--#include virtual="/ssi/top.html"-->
+
+<table>
+  <tr>
+    <td></td>
+    <td><p align="center">&nbsp;</p>
+    <h3 align="center"><b>Введение</b></h3>
+    <p>Данная статья посвящена созданию приложений
+    архитектуры клиент/сервер в Borland Delphi на основе
+    сокетов (&quot;sockets&quot; - <i>гнезда</i>). В отличие от
+    предыдущей статьи на тему сокетов, здесь мы
+    разберем создание серверных приложений.</p>
+    <p>Следует сразу заметить, что для
+    сосуществования отдельных приложений клиента и
+    сервера не обязательно иметь несколько
+    компьютеров. Достаточно иметь лишь один, на
+    котором Вы одновременно запустите и сервер, и
+    клиент. При этом нужно в качестве имени
+    компьютера, к которому надо подключиться,
+    использовать хост-имя <i>localhost</i> или IP-адрес - <i>127.0.0.1</i>.</p>
+    <p>Итак, начнем с теории. Если Вы убежденный
+    практик (и в глаза не можете видеть всяких
+    алгоритмов), то Вам следует пропустить этот
+    раздел.<br>
+    <br>
+    </p>
+    <p align="center">&nbsp;</p>
+    <h3 align="center"><b>Алгоритм работы сокетного сервера</b></h3>
+    <p>Что же позволяет делать сокетный сервер?.. По
+    какому принципу он работает?.. Сервер, основанный
+    на сокетном протоколе, позволяет обслуживать
+    сразу множество клиентов. Причем, ограничение на
+    их количество Вы можете указать сами (или вообще
+    убрать это ограничение, как это сделано по
+    умолчанию). Для каждого подключенного клиента
+    сервер открывает отдельный сокет, по которому Вы
+    можете обмениваться данными с клиентом. Также
+    отличным решением является создание для каждого
+    подключения отдельного процесса (Thread).</p>
+    <p>Ниже следует примерная схема работы сокетного
+    сервера в Дельфи-приложениях:</p>
+    <p><img border="0" src="http://delphi.mastak.com/articles/socksrv/images/serv_port.gif"> <img
+    border="0" src="http://delphi.mastak.com/articles/socksrv/images/aaa.gif"> <img border="0"
+    src="http://delphi.mastak.com/articles/socksrv/images/serv_open.gif"> <img border="0"
+    src="http://delphi.mastak.com/articles/socksrv/images/aaa.gif"> <img border="0"
+    src="http://delphi.mastak.com/articles/socksrv/images/serv_connect.gif"> <img border="0"
+    src="http://delphi.mastak.com/articles/socksrv/images/bbb.gif"> <img border="0"
+    src="http://delphi.mastak.com/articles/socksrv/images/serv_disconnect.gif"> <img
+    border="0" src="http://delphi.mastak.com/articles/socksrv/images/aaa.gif"> <img border="0"
+    src="http://delphi.mastak.com/articles/socksrv/images/serv_close.gif"> </p>
+    <p>Разберем схему подробнее:<ul>
+      <li><b><i>Определение св-в Port и ServerType</i></b> - чтобы к
+        серверу могли нормально подключаться клиенты,
+        нужно, чтобы порт, используемый сервером точно
+        совпадал с портом, используемым клиентом (и
+        наоборот). Свойство ServerType определяет тип
+        подключения (подробнее см.ниже); </li>
+      <li><b><i>Открытие сокета</i></b> - открытие сокета и
+        указанного порта. Здесь выполняется
+        автоматическое начало ожидания подсоединения
+        клиентов (<i>Listen</i>); </li>
+      <li><b><i>Подключение клиента и обмен данными с ним</i></b>
+        - здесь подключается клиент и идет обмен данными
+        с ним. Подробней об этом этапе можно узнать ниже в
+        этой статье и в статье про сокеты (клиентская
+        часть); </li>
+      <li><b><i>Отключение клиента</i></b> - Здесь клиент
+        отключается и закрывается его сокетное
+        соединение с сервером; </li>
+      <li><b><i>Закрытие сервера и сокета</i></b> - По команде
+        администратора сервер завершает свою работу,
+        закрывая все открытые сокетные каналы и
+        прекращая ожидание подключений клиентов. </li>
+    </ul>
+    <p>Следует заметить, что пункты 3-4 повторяются
+    многократно, т.е. эти пункты выполняются для
+    каждого нового подключения клиента.</p>
+    <p><u><b>Примечание</b></u>: Документации по сокетам в
+    Дельфи на данный момент очень мало, так что, если
+    Вы хотите максимально глубоко изучить эту тему,
+    то советую просмотреть литературу и электронную
+    документацию по Unix/Linux-системам - там <b>очень</b>
+    хорошо описана теория работы с сокетами. Кроме
+    того, для этих ОС есть множество примеров
+    сокетных приложений (правда, в основном на C/C++ и
+    Perl).</p>
+    <p align="center">&nbsp;</p>
+    <h3 align="center"><b>Краткое описание компонента TServerSocket</b></h3>
+    <p>Здесь мы познакомимся с <b>основными</b>
+    свойствами, методами и событиями компонента <i>TServerSocket</i>.</p>
+    <table border="1" cellPadding="5" cellSpacing="0" width="100%">
+<TBODY>
+      <tr>
+        <td align="middle" bgColor="silver" width="33%">Свойства </td>
+        <td>&nbsp;</td>
+        <td align="middle" bgColor="silver" width="33%">Методы </td>
+        <td>&nbsp;</td>
+        <td align="middle" bgColor="silver" width="33%">События </td>
+      </tr>
+      <tr>
+        <td bgColor="#f4f4f4" vAlign="top" width="33%"><b><i><u>Socket</u></i></b> - класс
+        TServerWinSocket, через который Вы имеете доступ к
+        открытым сокетным каналам. Далее мы рассмотрим
+        это свойство более подробно, т.к. оно, собственно
+        и есть одно из главных. <i>Тип: <b>TServerWinSocket</b></i>;<br>
+        &nbsp;&nbsp;<b><i><u>ServerType</u></i></b> - тип сервера. Может
+        принимать одно из двух значений: <i>stNonBlocking</i> -
+        синхронная работа с клиентскими сокетами. При
+        таком типе сервера Вы можете работать с
+        клиентами через события <i>OnClientRead</i> и <i>OnClientWrite</i>. <i>stThreadBlocking</i>
+        - асинхронный тип. Для каждого клиентского
+        сокетного канала создается отдельный процесс
+        (Thread). <i>Тип: <b>TServerType</b></i>;<br>
+        &nbsp;&nbsp;<b><i><u>ThreadCacheSize</u></i></b> - количество
+        клиентских процессов (Thread), которые будут
+        кэшироваться сервером. Здесь необходимо
+        подбирать среднее значение в зависимости от
+        загруженности Вашего сервера. Кэширование
+        происходит для того, чтобы не создавать каждый
+        раз отдельный процесс и не убивать закрытый
+        сокет, а оставить их для дальнейшего
+        использования. <i>Тип: <b>Integer</b></i>;<br>
+        &nbsp;&nbsp;<b><i><u>Active</u></i></b> - показатель того, активен в
+        данных момент сервер, или нет. Т.е., фактически,
+        значение <i>True</i> указывает на то, что сервер
+        работает и готов к приему клиентов, а <i>False</i> -
+        сервер выключен. Чтобы запустить сервер, нужно
+        просто присвоить этому свойству значение <i>True</i>. <i>Тип:
+        <b>Boolean</b></i>;<br>
+        &nbsp;&nbsp;<b><i><u>Port</u></i></b> - номер порта для
+        установления соединений с клиентами. Порт у
+        сервера и у клиентов должны быть одинаковыми.
+        Рекомендуются значения от 1025 до 65535, т.к. от 1 до 1024
+        - могут быть заняты системой. <i>Тип: <b>Integer</b></i>;<br>
+        &nbsp;&nbsp;<b><i><u>Service</u></i></b> - строка, определяющая
+        службу (<b>ftp</b>, <b>http</b>, <b>pop</b>, и т.д.), порт которой
+        будет использован. Это своеобразный справочник
+        соответствия номеров портов различным
+        стандартным протоколам. <i>Тип: <b>string</b></i>;<br>
+        </td>
+        <td>&nbsp;</td>
+        <td bgColor="#f4f4f4" vAlign="top" width="33%"><b><i><u>Open</u></i></b> -
+        Запускает сервер. По сути, эта команда идентична
+        присвоению значения <i>True</i> свойству <i>Active</i>;<br>
+        &nbsp;&nbsp;<b><i><u>Close</u></i></b> - Останавливает сервер. По
+        сути, эта команда идентична присвоению значения <i>False</i>
+        свойству <i>Active</i>.<br>
+        </td>
+        <td>&nbsp;</td>
+        <td bgColor="#f4f4f4" vAlign="top" width="33%"><b><i><u>OnClientConnect</u></i></b> -
+        возникает, когда клиент установил сокетное
+        соединение и ждет ответа сервера (<i>OnAccept</i>);<br>
+        &nbsp;&nbsp;<b><i><u>OnClientDisconnect</u></i></b> - возникает, когда
+        клиент отсоединился от сокетного канала;<br>
+        &nbsp;&nbsp;<b><i><u>OnClientError</u></i></b> - возникает, когда
+        текущая операция завершилась неудачно, т.е.
+        произошла ошибка;<br>
+        &nbsp;&nbsp;<b><i><u>OnClientRead</u></i></b> - возникает, когда
+        клиент передал берверу какие-либо данные. Доступ
+        к этим данным можно получить через пеаедаваемый
+        параметр <i>Socket: TCustomWinSocket</i>;<br>
+        &nbsp;&nbsp;<b><i><u>OnClientWrite</u></i></b> - возникает, когда
+        сервер может отправлять данные клиенту по сокету;<br>
+        &nbsp;&nbsp;<b><i><u>OnGetSocket</u></i></b> - в обработчике этого
+        события Вы можете отредактировать параметр <i>ClientSocket</i>;<br>
+        &nbsp;&nbsp;<b><i><u>OnGetThread</u></i></b> - в обработчике этого
+        события Вы можете определить уникальный процесс
+        (Thread) для каждого отдельного клиентского канала,
+        присвоив параметру <i>SocketThread</i> нужную подзадачу
+        TServerClientThread;<br>
+        &nbsp;&nbsp;<b><i><u>OnThreadStart</u></i></b>, <b><i><u>OnThreadEnd</u></i></b> -
+        возникает, когда подзадача (процесс, Thread)
+        запускается или останавливается, соответственно;<br>
+        &nbsp;&nbsp;<b><i><u>OnAccept</u></i></b> - возникает, когда сервер
+        принимает клиента или отказывает ему в
+        соединении;<br>
+        &nbsp;&nbsp;<b><i><u>OnListen</u></i></b> - возникает, когда сервер
+        переходит в режим ожидания подсоединения
+        клиентов.<br>
+        </td>
+      </tr>
+</TBODY>
+    </table>
+    <p align="center"><br>
+    </p>
+    <h3 align="center"><b>TServerSocket.Socket (TServerWinSocket)</b></h3>
+    <p>Итак, как же сервер может отсылать данные
+    клиенту? А принимать данные? В основном, если Вы
+    работаете через события <i>OnClientRead</i> и <i>OnClientWrite</i>,
+    то общаться с клиентом можно через параметр
+    ClientSocket (TCustomWinSocket). Про работу с этим классом можно
+    прочитать в статье про клиентские сокеты, т.к.
+    отправка/посылка данных через этот класс
+    аналогична - методы (Send/Receive)(Text,Buffer,Stream). Также и
+    при работе с TServerSocket.Socket. Однако, т.к. здесь мы
+    рассматриваем сервер, то следует выделить
+    некоторые полезные свойства и методы:<ul>
+      <li><b>ActiveConnections</b> (<i>Integer</i>) - количество
+        подключенных клиентов; </li>
+      <li><b>ActiveThreads</b> (<i>Integеr</i>) - количество работающих
+        процессов; </li.
+      <li><b>Connections</b> (<i>array</i>) - массив, состоящий из
+        отдельных классов TClientWinSocket для каждого
+        подключенного клиента. Например, такая команда:<br>
+        <b>ServerSocket1.Socket.Connections[0].SendText('Hello!');</b><br>
+        отсылает первому подключенному клиенту
+        сообщение 'Hello!'. Команды для работы с элементами
+        этого массива - также (Send/Receive)(Text,Buffer, Stream); </li>
+      <li><b>IdleThreads</b> (<i>Integer</i>) - количество свободных
+        процессов. Такие процессы кэшируются сервером (см.
+        <i>ThreadCacheSize</i>); </li>
+      <li><b>LocalAddress</b>, <b>LocalHost</b>, <b>LocalPort</b> - соответственно -
+        локальный IP-адрес, хост-имя, порт; </li>
+      <li><b>RemoteAddress</b>, <b>RemoteHost</b>, <b>RemotePort</b> -
+        соответственно - удаленный IP-адрес, хост-имя, порт;
+      </li>
+      <li>Методы <b>Lock</b> и <b>UnLock</b> - соответственно,
+        блокировка и разблокировка сокета. </li>
+    </ul>
+    <p align="center">&nbsp;</p>
+    <h3 align="center"><b>Практика и примеры</b></h3>
+    <p>А теперь рассмотрим вышеприведенное на
+    конкретном примере. Скачать уже готовые
+    исходники можно, щелкнув <a
+    href="http://delphi.mastak.com/articles/socksrv/srv_ex.zip">здесь</a>.</p>
+    <p>Итак, рассмотрим очень неплохой пример работы с
+    TServerSocket (этот пример - наиболее наглядное пособие
+    для изучения этого компонента). В приведенных
+    ниже исходниках демонстрируется
+    протоколирование всех важных событий сервера,
+    плюс возможность принимать и отсылать текстовые
+    сообщения:</p>
+    <table border="0" cellPadding="10" width="94%">
+<TBODY>
+      <tr>
+        <td width="100%"><h3><b>Пример 1.</b> Протоколирование и
+        изучение работы сервера, посылка/прием сообщений
+        через сокеты.</h3>
+        </td>
+      </tr>
+      <tr>
+        <td width="100%"><pre>    <font color="navy"><i>{... Здесь идет заголовок файла и определение формы TForm1 и ее экземпляра Form1}</i></font>
+
+    <font
+color="navy"><i>{Полный исходник смотри <a
+href="http://delphi.mastak.com/articles/socksrv/srv_ex.zip">здесь</a>}</i></font>
+
+    procedure TForm1.Button1Click(Sender: TObject);
+    begin
+      <font
+color="navy"><i>{Определяем порт и запускаем сервер}</i></font>
+      ServerSocket1.Port := 1025;
+      <font
+color="navy"><i>{Метод Insert вставляет строку в массив в указанную позицию}</i></font>
+      Memo2.Lines.Insert(0,'Server starting');
+      ServerSocket1.Open;
+    end;
+    
+    procedure TForm1.Button2Click(Sender: TObject);
+    begin
+      <font
+color="navy"><i>{Останавливаем сервер}</i></font>
+      ServerSocket1.Active := False;
+      Memo2.Lines.Insert(0,'Server stopped');
+    end;
+    
+    procedure TForm1.ServerSocket1Listen(Sender: TObject;
+      Socket: TCustomWinSocket);
+    begin
+      <font
+color="navy"><i>{Здесь сервер &quot;прослушивает&quot; сокет на наличие клиентов}</i></font>
+      Memo2.Lines.Insert(0,'Listening on port '+IntToStr(ServerSocket1.Port));
+    end;
+    
+    procedure TForm1.ServerSocket1Accept(Sender: TObject;
+      Socket: TCustomWinSocket);
+    begin
+      <font
+color="navy"><i>{Здесь сервер принимает клиента}</i></font>
+      Memo2.Lines.Insert(0,'Client connection accepted');
+    end;
+    
+    procedure TForm1.ServerSocket1ClientConnect(Sender: TObject;
+      Socket: TCustomWinSocket);
+    begin
+      <font
+color="navy"><i>{Здесь клиент подсоединяется}</i></font>
+      Memo2.Lines.Insert(0,'Client connected');
+    end;
+    
+    procedure TForm1.ServerSocket1ClientDisconnect(Sender: TObject;
+      Socket: TCustomWinSocket);
+    begin
+      <font
+color="navy"><i>{Здесь клиент отсоединяется}</i></font>
+      Memo2.Lines.Insert(0,'Client disconnected');
+    end;
+    
+    procedure TForm1.ServerSocket1ClientError(Sender: TObject;
+      Socket: TCustomWinSocket; ErrorEvent: TErrorEvent;
+      var ErrorCode: Integer);
+    begin
+      <font
+color="navy"><i>{Произошла ошибка - выводим ее код}</i></font>
+      Memo2.Lines.Insert(0,'Client error. Code = '+IntToStr(ErrorCode));
+    end;
+    
+    procedure TForm1.ServerSocket1ClientRead(Sender: TObject;
+      Socket: TCustomWinSocket);
+    begin
+      <font
+color="navy"><i>{От клиента получено сообщение - выводим его в Memo1}</i></font>
+      Memo2.Lines.Insert(0,'Message received from client');
+      Memo1.Lines.Insert(0,'&gt; '+Socket.ReceiveText);
+    end;
+    
+    procedure TForm1.ServerSocket1ClientWrite(Sender: TObject;
+      Socket: TCustomWinSocket);
+    begin
+      <font
+color="navy"><i>{Теперь можно слать данные в сокет}</i></font>
+      Memo2.Lines.Insert(0,'Now can write to socket');
+    end;
+    
+    procedure TForm1.ServerSocket1GetSocket(Sender: TObject; Socket: Integer;
+      var ClientSocket: TServerClientWinSocket);
+    begin
+      Memo2.Lines.Insert(0,'Get socket');
+    end;
+    
+    procedure TForm1.ServerSocket1GetThread(Sender: TObject;
+      ClientSocket: TServerClientWinSocket;
+      var SocketThread: TServerClientThread);
+    begin
+      Memo2.Lines.Insert(0,'Get Thread');
+    end;
+    
+    procedure TForm1.ServerSocket1ThreadEnd(Sender: TObject;
+      Thread: TServerClientThread);
+    begin
+      Memo2.Lines.Insert(0,'Thread end');
+    end;
+    
+    procedure TForm1.ServerSocket1ThreadStart(Sender: TObject;
+      Thread: TServerClientThread);
+    begin
+      Memo2.Lines.Insert(0,'Thread start');
+    end;
+    
+    procedure TForm1.Button3Click(Sender: TObject);
+     var i: Integer;
+    begin
+      <font
+color="navy"><i>{Посылаем ВСЕМ клиентам сообщение из Edit1}</i></font>
+      for i := 0 to ServerSocket1.Socket.ActiveConnections-1 do begin
+       ServerSocket1.Socket.Connections[i].SendText(Edit1.Text);
+      end;
+      Memo1.Lines.Insert(0,'&lt; '+Edit1.Text);
+    end;
+    </pre>
+        </td>
+      </tr>
+</TBODY>
+    </table>
+    <p>Далее мы будем рассматривать уже не примеры, а
+    приемы работы с TServerSocket.</p>
+    <p align="center">&nbsp;</p>
+    <h3 align="center"><b>Приемы работы с TServerSocket (и просто с
+    сокетами)</b></h3>
+    <h4><b>Хранение уникальных данных для каждого
+    клиента.</b></h4>
+    <p>Наверняка, если Ваш сервер будет обслуживать
+    множество клиентов, то Вам потребуется хранить
+    какую-либо информацию для каждого клиента (имя, и
+    др.), причем с привязкой этой информации к сокету
+    данного клиента. В некоторых случаях делать все
+    это вручную (привязка к handle сокета, массивы
+    клиентов, и т.д.) не очень удобно. Поэтому для
+    каждого сокета существует специальное свойство -
+    <b>Data</b>. На самом деле, Data - это всего-навсего
+    указатель. Поэтому, записывая данные клиента в
+    это свойство будьте внимательны и следуйте
+    правилам работы с указателями (выделение памяти,
+    определение типа, и т.д.)!</p>
+    <h4><b>Посылка файлов через сокет.</b></h4>
+    <p>Здесь мы рассмотрим посылку файлов через сокет
+    (по просьбе JINX-а) :-). Итак, как же послать файл по
+    сокету? Очень просто! Достаточно лишь открыть
+    этот файл как файловый поток (TFileStream) и отправить
+    его через сокет (SendStream)! Рассмотрим это на примере:</p>
+    <table border="0" cellPadding="10" width="94%">
+<TBODY>
+      <tr>
+        <td width="100%"><pre>  <font color="navy"><i>{Посылка файла через сокет}</i></font>
+  procedure SendFileBySocket(filename: string);
+   var srcfile: TFileStream;
+  begin
+    <font
+color="navy"><i>{Открываем файл filename}</i></font>
+    srcfile := TFileStream.Create(filename,fmOpenRead);
+    <font
+color="navy"><i>{Посылаем его первому подключенному клиенту}</i></font>
+    ServerSocket1.Socket.Connections[0].SendStream(srcfile);
+    <font
+color="navy"><i>{Закрываем файл}</i></font>
+    srcfile.Free;
+  end;
+</pre>
+        </td>
+      </tr>
+</TBODY>
+    </table>
+    <p>Нужно заметить, что метод <b>SendStream</b>
+    используется не только сервером, но и клиентом (<b>ClientSocket1.Socket.SendStream(srcfile)</b>)</p>
+    <h4><b>Почему несколько блоков при передаче могут
+    обьединяться в один</b></h4>
+    <p>Это тоже по просьбе JINX-а :-). За это ему огромное
+    спасибо! Итак, во-первых, надо заметить, что
+    посылаемые через сокет данные могут не только
+    объединяться в один блок, но и разъединяться по
+    нескольким блокам. Дело в том, что сокет - обычный
+    поток, но в отличие, скажем, от файлового (TFileStream),
+    он передает данные медленнее (сами понимаете -
+    сеть, ограниченный трафик, и т.д.). Именно поэтому
+    две команды:<br>
+    ServerSocket1.Socket.Connections[0].SendText('Hello, ');<br>
+    ServerSocket1.Socket.Connections[0].SendText('world!');<br>
+    совершенно идентичны одной команде:<br>
+    ServerSocket1.Socket.Connections[0].SendText('Hello, world!');</p>
+    <p>И именно поэтому, если Вы отправите через сокет
+    файл, скажем, в 100 Кб, то тому, кому Вы посылали
+    этот блок, придет несколько блоков с размерами,
+    которые зависят от трафика и загруженности линии.
+    Причем, размеры не обязательно будут одинаковыми.
+    Отсюда следует, что для того, чтобы принять файл
+    или любые другие данные большого размера, Вам
+    следует принимать блоки данных, а затем
+    объединять их в одно целое (и сохранять, например,
+    в файл). Отличным решением данной задачи является
+    тот же файловый поток - TFileStream (либо поток в памяти
+    - TMemoryStream). Принимать частички данных из сокета
+    можно через событие OnRead (OnClientRead), используя
+    универсальный метод <b>ReceiveBuf</b>. Определить размер
+    полученного блока можно методом <b>ReceiveLength</b>.
+    Также можно воспользоваться сокетным потоком (см.
+    статью про TClientSocket). А вот и небольшой примерчик (приблизительный):</p>
+    <table border="0" cellPadding="10" width="94%">
+<TBODY>
+      <tr>
+        <td width="100%"><pre>  <font color="navy"><i>{Прием файла через сокет}</i></font>
+  procedure TForm1.ClientSocket1Read(Sender: TObject;
+    Socket: TCustomWinSocket);
+   var l: Integer;
+       buf: PChar;
+       src: TFileStream;
+  begin
+    <font
+color="navy"><i>{Записываем в l размер полученного блока}</i></font>
+    l := Socket.ReceiveLength;
+    <font
+color="navy"><i>{Заказываем память для буфера}</i></font>
+    GetMem(buf,l+1);
+    <font
+color="navy"><i>{Записываем в буфер полученный блок}</i></font>
+    Socket.ReceiveBuf(buf,l);
+    <font
+color="navy"><i>{Открываем временный файл для записи}</i></font>
+    src := TFileStream.Create('myfile.tmp',fmOpenReadWrite);
+    <font
+color="navy"><i>{Ставим позицию в конец файла}</i></font>
+    src.Seek(0,soFromEnd);
+    <font
+color="navy"><i>{Записываем буфер в файл}</i></font>
+    src.WriteBuffer(buf,l);
+    <font
+color="navy"><i>{Закрываем файл}</i></font>
+    src.Free;
+    <font color="navy"><i>{Освобождаем память}</i></font>
+    FreeMem(buf);
+  end;
+</pre>
+        </td>
+      </tr>
+</TBODY>
+    </table>
+    <h4><b>Как следить за сокетом</b></h4>
+    <p>Это вопрос сложный и требует долгого
+    рассмотрения. Пока лишь замечу, что созданный
+    Вашей программой сокет Вы можете промониторить
+    всегда :-). Сокеты (как и большинство объектов в
+    Windows) имеют свой дескриптор (handle), записанный в
+    свойстве Handle. Так вот, узнав этот дескриптор Вы
+    свободно сможете управлять любым сокетом (даже
+    созданным чужой программой)! Однако, скорее всего,
+    чтобы следить за чужим сокетом, Вам придется
+    использовать исключительно функции WinAPI Sockets.</p>
+    <p align="center">&nbsp;</p>
+    <h3 align="center"><b>Эпилог</b></h3>
+    <p>В этой статье отображены основные приемы
+    работы с компонентом TServerSocket в Дельфи и несколько
+    общих приемов для обмена данными по сокетам. Если
+    у Вас есть вопросы - скидывайте их мне на E-mail: <a
+    href="mailto:snick@mailru.com">snick@mailru.com</a>, а еще лучше - пишите
+    в конференции этого сайта (Delphi. Общие вопросы),
+    чтобы и другие пользователи смогли увидеть Ваш
+    вопрос и попытаться на него ответить!</p>
+    <p><i>Карих Николай (<b>Nitro</b>).&nbsp;&nbsp;&nbsp; Московская
+    область, г.Жуковский</i><!-- RLE Banner START --></p>
+<!-- RLE Banner START -->    <p></td>
+  </tr>
+</table>
+<!--#include virtual="/ssi/bottom.html"-->

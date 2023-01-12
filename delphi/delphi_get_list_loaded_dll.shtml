@@ -1,0 +1,120 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Получение списка DLL загруженных приложением</h3>
+    <p>Автор: <a href="mailto:simon.carter@orcka.com">Simon Carter</a></p>
+    <p>Иногда бывает полезно знать какими DLL-ками
+    пользуется Ваше приложение. Давайте посмотрим
+    как это можно сделать в Win NT/2000.</p>
+    <p><b>Пример функции</b></p>
+    <p>unit ModuleProcs; <br>
+    <br>
+    interface <br>
+    <br>
+    uses Windows, Classes; <br>
+    <br>
+    type <br>
+    &nbsp;&nbsp;TModuleArray = array[0..400] of HMODULE; <br>
+    &nbsp;&nbsp;TModuleOption = (moRemovePath, moIncludeHandle); <br>
+    &nbsp;&nbsp;TModuleOptions = set of TModuleOption; <br>
+    <br>
+    function GetLoadedDLLList(sl: TStrings; <br>
+    &nbsp;&nbsp;Options: TModuleOptions = [moRemovePath]): Boolean; <br>
+    <br>
+    implementation <br>
+    <br>
+    uses SysUtils; <br>
+    <br>
+    function GetLoadedDLLList(sl: TStrings; <br>
+    &nbsp;&nbsp;Options: TModuleOptions = [moRemovePath]): Boolean; <br>
+    type <br>
+    EnumModType = function (hProcess: Longint; lphModule: TModuleArray; <br>
+    &nbsp;&nbsp;cb: DWord; var lpcbNeeded: Longint): Boolean; stdcall; <br>
+    var <br>
+    &nbsp;&nbsp;psapilib: HModule; <br>
+    &nbsp;&nbsp;EnumProc: Pointer; <br>
+    &nbsp;&nbsp;ma: TModuleArray; <br>
+    &nbsp;&nbsp;I: Longint; <br>
+    &nbsp;&nbsp;FileName: array[0..MAX_PATH] of Char; <br>
+    &nbsp;&nbsp;S: string; <br>
+    begin <br>
+    &nbsp;&nbsp;Result := False; <br>
+    <br>
+    &nbsp;&nbsp;(* Данная функция запускается только для
+    Widnows NT *) <br>
+    &nbsp;&nbsp;if Win32Platform &lt;&gt; VER_PLATFORM_WIN32_NT then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Exit; <br>
+    <br>
+    &nbsp;&nbsp;psapilib := LoadLibrary('psapi.dll'); <br>
+    &nbsp;&nbsp;if psapilib = 0 then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Exit; <br>
+    &nbsp;&nbsp;try <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;EnumProc := GetProcAddress(psapilib, 'EnumProcessModules'); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if not Assigned(EnumProc) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Exit; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;sl.Clear; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FillChar(ma, SizeOF(TModuleArray), 0); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;if EnumModType(EnumProc)(GetCurrentProcess, ma, 400, I) then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for I := 0 to 400 do <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ma[i] &lt;&gt; 0 then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FillChar(FileName, MAX_PATH,
+    0); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;GetModuleFileName(ma[i],
+    FileName, MAX_PATH); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if
+    CompareText(ExtractFileExt(FileName), '.dll') = 0 then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;begin <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;S := FileName; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if moRemovePath in
+    Options then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;S :=
+    ExtractFileName(S); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if moIncludeHandle
+    in Options then <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sl.AddObject(S,
+    TObject(ma[I])) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sl.Add(S);
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;end; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;Result := True; <br>
+    &nbsp;&nbsp;finally <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;FreeLibrary(psapilib); <br>
+    &nbsp;&nbsp;end; <br>
+    end; <br>
+    <br>
+    end. <br>
+    <br>
+    <br>
+    Для вызова приведённой функции надо сделать
+    следующее: <br>
+    <br>
+    Добавить listbox на форму (Listbox1) <br>
+    Добавить кнопку на форму (Button1) <br>
+    <br>
+    Обработчик события OnClick для кнопки будет
+    выглядеть следующим образом<br>
+    <br>
+    procedure TForm1.Button1Click(Sender: TObject); <br>
+    begin <br>
+    &nbsp;&nbsp;GetLoadedDLLList(ListBox1.Items, [moIncludeHandle, moRemovePath]); <br>
+    end; <br>
+    <br>
+    <br>
+    <br>
+    </td>
+  </tr>
+</table>
+</center></div></TBODY>
+
+
+<p align="center"><br>
+<br></p>
+<!--#include virtual="/ssi/bottom.html"-->
