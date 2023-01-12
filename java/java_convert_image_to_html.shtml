@@ -1,0 +1,208 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <p>Очень забавная программка. Конвертирует
+    изображение картинки .GIF/.JPG в HTML формат :)<br>
+    Единственный минус этого примера, какртинку 750х500
+    компьютер с конфигурацией PIII 550 и 128 оперативки
+    конвертирует 20 часов !!!!<br>
+    круто ? :)</p>
+    <p><img src="convert_image_to_html.jpg" width="443" height="352"></p>
+    <table border="0" cellpadding="0" cellspacing="0">
+      <tr>
+        <td width="750" bgcolor="#A5E4A7"><font face="Tahoma" style="font-size: 10pt" size="-1"><b>&nbsp;
+        Листинг 1</b></font></td>
+      </tr>
+    </table>
+    <pre>
+import java.awt.*;
+import java.awt.image.*;
+import java.io.*;
+import java.awt.event.*;
+
+
+public class img2html extends Frame 
+{
+	static Image im=null;
+	static int W=-1,H=-1;
+
+	public img2html()	{} 
+
+    	public static void main(String args[])
+    	{
+		String infile,outfile;
+		infile=&quot;UNSPECIFIED&quot;;
+		outfile=&quot;UNSPECIFIED&quot;;
+		boolean paramsOK=false,mode=false;
+		if (args.length &lt;= 1) {
+			usage();
+			paramsOK=false;
+		} 
+		if (args.length == 2) {
+			infile = args[0];
+			outfile = args[1];
+			paramsOK=true;
+		}
+		if (paramsOK) {
+			System.out.println(&quot;img2html :&quot;);
+			System.out.println(&quot;  image file  &quot; + infile);
+			System.out.println(&quot;  data file   &quot; + outfile);
+			img2html widow = new img2html();
+			System.out.println(&quot;img2html : Loading image file&quot;);
+			if (widow.processFile(infile)==false) {
+				System.exit(0);
+			} 			
+			System.out.println(&quot;img2html : Saving data file&quot;);
+			saveByteData(outfile,mode);
+			System.exit(0);
+		}
+    	}
+
+	public static void saveByteData(String fn,boolean i)
+	{
+		int[] grabMapXY;
+		grabMapXY		= 	new int[(W * H)];
+		int pix;
+		PixelGrabber pg = new PixelGrabber(im,0,0,W,H,grabMapXY,0,W); 			
+		// start grab
+		try {
+			pg.grabPixels();
+		} catch (InterruptedException e) {
+			System.out.println(&quot;Map grab failed : &quot; + e);
+			return;
+		}
+		if ((pg.status() &amp; ImageObserver.ABORT) != 0) {
+			System.out.println(&quot;Map grab failed !&quot;);
+			return;
+		}	
+		// need to base r on number of valid pixels
+		writeToFn(fn,&quot;&lt;HTML&gt;&quot;);
+		writeToFn(fn,&quot;&quot;);
+		writeToFn(fn,&quot;&lt;BODY&gt;&quot;);
+		writeToFn(fn,&quot;&quot;);
+		writeToFn(fn,&quot;&lt;TABLE border=0 cellspacing=0 cellpadding=0&gt;&quot;);
+		int red,green,blue,p;
+		String r,g,b;
+		Color c;
+		for (int y =0; y &lt; H; y++) {	
+			
+			writeToFn(fn,&quot;  &lt;TR&gt;&quot;);
+			for (int x =0; x &lt; W; x++) {
+				pix=grabMapXY[ y * W + x ];
+				c = new Color(pix);
+				red=c.getRed();
+				blue=c.getBlue();
+				green=c.getGreen();
+				r=Integer.toHexString(red);
+				g=Integer.toHexString(green);
+				b=Integer.toHexString(blue);
+				if (r.length()==1) { r=&quot;0&quot;+r; }
+				if (g.length()==1) { g=&quot;0&quot;+g; }
+				if (b.length()==1) { b=&quot;0&quot;+b; }
+				writeToFn(fn,&quot;    &lt;TD WIDTH=1 HEIGHT=1 BGCOLOR=#&quot; + r + g + b + &quot;&gt;&quot;, &quot; &quot; + x + &quot;,&quot; + y + &quot; - of - &quot; + W + &quot;,&quot; + H);
+				writeToFn(fn,&quot;    &lt;/TD&gt;&quot;);
+			}
+			writeToFn(fn,&quot;  &lt;/TR&gt;&quot;);
+		}
+		writeToFn(fn,&quot;&quot;);
+		writeToFn(fn,&quot;&lt;/TABLE&gt;&quot;);
+		writeToFn(fn,&quot;&quot;);
+		writeToFn(fn,&quot;&lt;/BODY&gt;&quot;);
+		writeToFn(fn,&quot;&lt;/HTML&gt;&quot;);
+	}
+
+	public static void writeToFn(String fn,String Dbytes,String status) {
+		try {
+			System.out.println(Dbytes + &quot;  pixel &quot; + status);
+			DataOutputStream dos = new DataOutputStream( new FileOutputStream(fn,true));
+			dos.writeBytes(Dbytes); // 
+			dos.writeByte(13); // line feed for each line
+           		dos.writeByte(10); // line feed for each line 
+			// close here
+			dos.close();
+     		} catch (IOException e) {
+    			System.err.println(&quot;File error: &quot; + e.getMessage());
+        	}
+	}
+
+
+	public static void writeToFn(String fn,String Dbytes) {
+		try {
+			System.out.println(Dbytes );
+			DataOutputStream dos = new DataOutputStream( new FileOutputStream(fn,true));
+			dos.writeBytes(Dbytes); // 
+			dos.writeByte(13); // line feed for each line
+           		dos.writeByte(10); // line feed for each line 
+			// close here
+			dos.close();
+     		} catch (IOException e) {
+    			System.err.println(&quot;File error: &quot; + e.getMessage());
+        	}
+	}
+
+	public boolean processFile(String fn)
+	{
+		boolean OK=false;
+		int exitcounter;
+		try {
+			im = getToolkit().getImage(fn);
+		}
+		catch (Exception e) 
+		{
+			System.out.println(&quot;1HOLY MOLY THIS NEVER HAPPENS!!!! &quot;+e);
+		} 
+		MediaTracker tracker= new MediaTracker(this);
+		tracker.addImage(im,0);
+		try {
+			tracker.waitForID(0);
+		} 
+		catch (InterruptedException e) 
+		{
+			System.out.println(&quot;2HOLY MOLY THIS NEVER HAPPENS &quot;+e);
+		} 
+		if (tracker.isErrorID(0)) {
+			System.out.println(&quot;IMAGE FILE COULD NOT BE LOADED&quot;);
+			System.out.println(fn);
+		} else {
+			exitcounter=0;
+			while ( ((W==-1)||(H==-1)) &amp;&amp; (exitcounter&lt;=16000000) ) {
+				W=im.getWidth(null);
+				H=im.getHeight(null);
+				exitcounter++;
+			}
+			if (exitcounter&gt;15999999) {
+				System.out.println(&quot;Timeout attempting to load image, is it to big?&quot;);
+			} else {
+				OK=true;
+			}
+		}
+		return(OK);
+	}
+
+
+
+	public static void usage() {
+		System.out.println(&quot;Usage:&quot;);
+		System.out.println(&quot;java img2html infile outfile &quot;);
+		System.out.println(&quot; infile  : image file .gif &quot;);
+		System.out.println(&quot; outfile : html file to be created&quot;);
+		//System.out.println(&quot; /i      : Inverse data &quot;);
+	}
+
+
+}	// end of class
+
+</pre>
+    <p><a href="convert_image_to_html.zip"><img src="winzipicon_medium.gif" width="43"
+    height="42" border="0"> <b>СКАЧАТЬ ИСХОДНИК</b>(~46Kb)</a><br>
+    <br>
+    <br>
+    <br>
+    </td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

@@ -1,0 +1,136 @@
+<!--#include virtual="/ssi/top.html"-->
+
+<p>Недавно мне досталось задание сделать
+програмку, чтобы она получала автоматически курс
+доллара ЦБ и складывала его в базу данных.<br>
+И вот как я решил эту проблеммку на Яве. Кстати
+эта программка в настоящий момент встроена в
+сервер, исходный код которого приведён чуть
+раньше, и успешно фунциклирует под моим
+наблюдением :)</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+  <tr>
+    <td width="750" bgcolor="#A5E4A7"><font face="Tahoma" style="font-size: 10pt" size="-1"><b>&nbsp;
+    Листинг 1</b></font></td>
+  </tr>
+</table>
+
+<pre>
+import java.io.*;
+import java.net.*;
+import java.util.*;
+import java.text.*;
+import java.sql.*;
+
+import ConnectManager;
+
+class Terra implements HttpConstants {
+
+  static void onRBC() throws IOException {
+
+	URL homeRBC = null;
+	DataInputStream dis = null;
+	String full = new String();
+
+	boolean cont2 = false;
+	try {
+		homeRBC = new URL(&quot;http://www.rbc.ru/out/801.csv&quot;);
+		dis = new DataInputStream(homeRBC.openStream());
+
+		String line = dis.readLine();
+		while(line != null) {
+			full += line + &quot;\n&quot;;
+			line = dis.readLine();
+		}
+		cont2 = true;
+	} catch(IOException e) {
+		System.out.println(&quot;Error for connection to RBC ...&quot;);
+	}
+	if(cont2==true) {
+		String cbr = toUnicode(full);
+		int ndx = cbr.indexOf(&quot;USD OA ?O,&quot;);
+		full = cbr.substring(ndx);
+		full = full.substring(0,31);
+
+		String cbrDate = full.substring(10);
+		cbrDate = cbrDate.substring(0,5);
+		String cbrValue = full.substring(16);
+		cbrValue = cbrValue.substring(0,7);
+
+		System.out.println(cbrDate);
+		System.out.println(cbrValue);
+
+		Connection con = ConnectManager.getConnectionToRBC();
+		try {
+			PreparedStatement logSt1 = con.prepareStatement(&quot;UPDATE rbc SET cbrValue = ? WHERE Name = 'USD'&quot;);
+			logSt1.setString(1, cbrValue);
+			int res = logSt1.executeUpdate();
+			logSt1.close();
+			PreparedStatement logSt2 = con.prepareStatement(&quot;UPDATE rbc SET cbrDate = ? WHERE Name = 'USD'&quot;);
+			logSt2.setString(1, cbrDate);
+			res = logSt2.executeUpdate();
+			logSt2.close();
+			ConnectManager.closeConnection(con);
+		} catch (SQLException ex) {
+			System.out.println(&quot;Error SQL ...&quot;);
+		}
+	}
+  }
+
+  public static void main(String[] a) throws Exception {
+	onRBC();
+  }
+}
+</pre>
+
+<table border="0" cellpadding="0" cellspacing="0">
+  <tr>
+    <td width="750" bgcolor="#A5E4A7"><font face="Tahoma" style="font-size: 10pt" size="-1"><b>&nbsp;
+    Листинг 2</b></font></td>
+  </tr>
+</table>
+
+<pre>
+import java.io.*;
+import java.util.*;
+import java.net.*;
+import java.text.*;
+import java.sql.*;
+
+public class ConnectManager {
+
+  public static Connection getConnectionToRBC() throws IOException {
+       Connection con = null;
+       Locale.setDefault(new Locale(&quot;ru&quot;,&quot;RU&quot;));
+       try {
+	Class.forName(&quot;sun.jdbc.odbc.JdbcOdbcDriver&quot;);
+	con = DriverManager.getConnection(&quot;jdbc:odbc:rbc&quot;, &quot;&quot;, &quot;&quot;);
+       } catch(Exception ex) {
+       }
+       return con;
+  }
+
+  public static void closeConnection(Connection con) throws IOException {
+       try {
+	con.close();
+       } catch (SQLException e) {
+       }
+  }
+
+  public static String toUnicode(String str) throws IOException {
+       try {
+	String charset=&quot;windows-1251&quot;;
+	byte[] buf = new byte[str.length()];
+	str.getBytes(0, str.length(), buf, 0);
+	return new String(buf);
+       } catch(Exception e) {
+	return &quot;Error toUnicode&quot;;
+       }
+  }
+}
+</pre>
+
+<p align="center">Продолжение следует ....</p>
+
+<!--#include virtual="/ssi/bottom.html"-->

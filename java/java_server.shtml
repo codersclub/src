@@ -1,0 +1,440 @@
+<!--#include virtual="/ssi/top.html"-->
+
+<p>Данный пример был взят из книги &quot;UNIX
+сервер&quot;, написанной Сергеем Дунаевым, а тот в
+свою очередь этот пример взял с сайта www.javasoft.com<br>
+На мой взгляд приведённый ниже исходный код
+вебсервера ценен как для профессионалов, так и
+для начинающих. Но в книге Сергея Дунаева
+описание исходного кода дано вкратце.</p>
+
+<p><b>Пример очень простого многопоточного
+НТТР-сервера: </b></p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+  <tr>
+    <td width="750" bgcolor="#A5E4A7"><font face="Tahoma" style="font-size: 10pt" size="-1"><b>&nbsp;
+    Листинг 1</b></font></td>
+  </tr>
+</table>
+
+<pre>
+import java.io.*;
+import java.net.*;
+import java.util.*;
+
+class WebServer implements HttpConstants {
+
+  protected static void p(String s) {
+	System.out.println(s);
+  }
+
+  protected static Properties props = new Properties();
+  static Vector threads = new Vector();
+  static File root;
+  static int port = 80;
+  static int timeout = 0;
+  static int workers = 10;
+  public static ServerSocket ss;
+
+  static void loadProps() throws IOException {
+	File f = new File(System.getProperty(&quot;user.dir&quot;)+File.separator+
+								&quot;WebServer.ini&quot;);
+	if(f.exists()) {
+		InputStream is=new BufferedInputStream(new FileInputStream(f));
+		props.load(is);
+		is.close();
+		String r = props.getProperty(&quot;root&quot;);
+		if(r != null) {
+		    root = new File(r);
+		    if(!root.exists()) {
+			throw new Error(root + &quot; doesn't exist as server root&quot;);
+		    }
+		}
+		r = props.getProperty(&quot;port&quot;);
+		if(r != null) {
+		    port = Integer.parseInt(r);
+		}
+		r = props.getProperty(&quot;timeout&quot;);
+		if(r != null) {
+		    timeout = Integer.parseInt(r);
+		}
+		r = props.getProperty(&quot;workers&quot;);
+		if(r != null) {
+		    workers = Integer.parseInt(r);
+		}
+	}
+  }
+
+  static void printProps() {
+	p(&quot;root=&quot;+root);
+	p(&quot;port=&quot;+port);
+	p(&quot;timeout=&quot;+timeout);
+	p(&quot;workers=&quot;+workers);
+  }
+
+  public static void main(String[] a) throws Exception {
+	loadProps();
+	printProps();
+	for(int i=0;i&lt;workers;i++) {
+	   Worker w=new Worker(); 
+		(new Thread(w, &quot;worker #&quot;+i)).start();
+		threads.addElement(w);
+	} 
+	ss = new ServerSocket(port); 
+	while (true) { 
+		Socket s = ss.accept(); 
+		Worker w=null; 
+		synchronized (threads) { 
+			if(threads.isEmpty()) { 
+				Worker ws = new Worker(); 
+				ws.setSocket(s); 
+				(new Thread(ws, &quot;additional worker&quot;)).start(); 
+			} else { 
+				w = (Worker) threads.elementAt(0); 
+				threads.removeElementAt(0); 
+				w.setSocket(s); 
+			} 
+		} 
+	} 
+  } 
+} 
+
+class Worker extends WebServer implements HttpConstants, Runnable { 
+	final static int BUF_SIZE=2048; 
+	static final byte[] EOL={(byte)'\r', (byte)'\n' }; 
+	/* buffer to use for requests */ 
+	byte[] buf; 
+	/* Socket to client we're handling */ 
+	private Socket s; Worker() { 
+		buf=new byte[BUF_SIZE]; 
+		s=null; 
+	} 
+
+	synchronized void setSocket(Socket s) { 
+		this.s=s; 
+		notify(); 
+	} 
+
+	public synchronized void run() { 
+		while(true) { 
+			if (s== null) { 
+				/* nothing to do */ 
+				try{ 
+					wait(); 
+				} catch (InterruptedException e) { 
+					/* should not happen */ 
+					continue; 
+				} 
+			} try { 
+				handleClient(); 
+			} catch (Exception e) { 
+				e.printStackTrace(); 
+			} 
+			/* go back in wait queue if there's fewer 
+			* than numHandler connections. */ 
+			s=null; 
+			Vector pool = WebServer.threads; 
+			synchronized (pool) { 
+				if (pool.size()&gt;= WebServer.workers) {
+					/* too many threads, exit this one */
+					return;
+				} else {
+		    		pool.addElement(this);
+				}
+	    	}
+		}
+   }
+
+
+  void handleClient() throws IOException {
+	InputStream is = new BufferedInputStream(s.getInputStream());
+	PrintStream ps = new PrintStream(s.getOutputStream());
+	/* we will only block in read for this many milliseconds
+	* before we fail with java.io.lnterruptedlOException,
+	* alt which point we will abandon the connection.
+	*/
+	s.setSoTimeout(WebServer.timeout);
+	s.setTcpNoDelay(true);
+	/* zero out the buffer from last time */
+	for(int i = 0; i &lt;BUF_SIZE; i++) {
+		buf[i]= 0; 
+	} try{ 
+		int nread = 0, r = 0; 
+outerloop: 
+		while (nread &lt; BUF_SIZE) {
+			r=is.read(buf, nread, BUF_SIZE nread); 
+			if (r== -1) { 
+				/* EOF */ 
+				return; 
+			} 
+		int i=nread; 
+		nread +=r; 
+		for (; i &lt; nread; i++) {
+			if (buf[i]== (byte)'\n' || buf[i]== (byte)'\r') { 
+				/* read one line */ 
+				break outerloop; 
+			} 
+		} 
+	} 
+	/* are we doing a GET or just a HEAD */ 
+	boolean doingGet; 
+	/* beginning of file name */ 
+	int index; 
+	if (buf[0]== (byte)'G' &amp;&amp; 
+		buf[1]== (byte)'E' &amp;&amp; 
+		buf[2]== (byte)'T' &amp;&amp; 
+		buf[3]== (byte)' ') { 
+		doingGet=true; 
+		index=4 
+	} else if (buf[0]== (byte)'H' &amp;&amp; 
+		buf[1]== (byte)'E' &amp;&amp; 
+		buf[2]== (byte)'A' &amp;&amp; 
+		buf[3]== (byte)'D' &amp;&amp; 
+		buf[4]== (byte)' ') { 
+		doingGet=false; 
+		index=5; 
+	} else { 
+		/* we don't support this method */ 
+		ps.print(&quot;HTTP/1.0 &quot; + HTTP_BAD_METHOD + 
+					&quot; unsupported method type:&quot;); 
+		ps.write(buf, 0, 5); 
+		ps.write(EOL); 
+		ps.flush(); 
+		s.close(); 
+		return; 
+	} 
+	int i = 0; 
+	/* find the file name, from: 
+	* GET /foo/bar.html HTTP/1.0 
+	* extract &quot;/foo/bar.html&quot; 
+	*/ 
+	for (i = index; i &lt; nread; i++) { 
+		if (buf[i]== (byte)' ') { 
+			break; 
+		} 
+	} 
+	String fname = (new String(buf, 0, index, 
+			i-index)).replace('/', File.separatorChar); 
+	if (fname.startsWith(File.separator)) { 
+		fname = fname.substring(1); 
+	} 
+	File targ= new File(WebServer.root, fname); 
+	if (targ.isDirectory()) { 
+		File ind = new File(targ, &quot;index.html&quot;); 
+		if (ind.exists()) { 
+			targ = ind; 
+		} 
+	} 
+	boolean OK=printHeaders(targ, ps); 
+	if (doingGet) { 
+		if (OK) { 
+			sendFile(targ, ps); 
+		} else { 
+			send404(targ, ps); 
+		} 
+	} 
+  } finally { 
+	s.close(); 
+  } 
+} 
+
+  boolean printHeaders(File targ, PrintStream ps) throws IOException { 
+	boolean ret = false; 
+	int rCode=0; 
+	if (!targ.exists()) { 
+		rCode = HTTP_NOT_FOUND; 
+		ps.print(&quot;HTTP/1.0 &quot; + HTTP_NOT_FOUND + &quot; not found&quot;); 
+		ps.write(EOL); 
+		ret = false; 
+	} else { 
+		rCode = HTTP_OK; 
+		ps.print(&quot;HTTP/1.0 &quot; + HTTP_OK + &quot; OK&quot;); 
+		ps.write(EOL); 
+		ret = true; 
+	} 
+	ps.print(&quot;Server: Simple Java&quot;); 
+	ps.write(EOL); 
+	ps.print(&quot;Date: &quot; + (new Date())); 
+	ps.write(EOL); 
+	if (ret) { 
+		if (!targ.isDirectory()) { 
+			ps.print(&quot;Content-length: &quot;+targ.length()); 
+			ps.write(EOL); 
+			ps.print(&quot;Last Modified: &quot; + (new Date(targ.lastModified()))); 
+			ps.write(EOL); 
+			String name = targ.getName(); 
+			int ind = name.lastIndexOf('.'); 
+			String ct = null; 
+			if (ind &gt; 0) {
+				ct = (String) map.get(name.substring(ind));
+	    	}
+			if (ct == null) {
+				ct = &quot;unknown/unknown&quot;;
+			}
+	    	ps.print(&quot;Content-type: &quot; + ct);
+	    	ps.write(EOL);
+		} else {
+	    	ps.print(&quot;Content-type: text/html&quot;);
+	    	ps.write(EOL);
+		}
+    }
+    return ret;
+}
+
+  void send404(File targ, PrintStream ps) throws IOException {
+	ps.write(EOL);
+	ps.write(EOL);
+	ps.println(&quot;Not Found\n\n&quot;+
+		&quot;The requested resource was not found.\n&quot;);
+    }
+
+    void sendFile(File targ, PrintStream ps) throws IOException {
+	InputStream is = null;
+	ps.write(EOL);
+	if (targ.isDirectory()) {
+	    return;
+	} else {
+	    is = new FileInputStream(targ.getAbsolutePath());
+	}
+
+	try{
+	    int n;
+	    while ((n = is.read(buf)) &gt; 0) {
+		ps.write(buf, 0, n);
+	    }
+	} finally {
+		is.close();
+	}
+    }
+
+    /* mapping of file extensions to content-types */
+    static java.util.Hashtable map = new java.util.Hashtable(); static {
+	fillMap();
+    }
+
+    static void setSuffix(String k, String v) {
+	map.put(k, v);
+    }
+
+    static void fillMap() {
+	setSuffix(&quot;&quot;, &quot;content/unknown&quot;);
+	setSuffix(&quot;.uu&quot;, &quot;application/octet-stream&quot;);
+	setSuffix(&quot;.exe&quot;, &quot;application/octet-stream&quot;);
+	setSuffix(&quot;.ps&quot;, &quot;application/postscript&quot;);
+	setSuffix(&quot;.zip&quot;, &quot;application/zip&quot;);
+	setSuffix(&quot;.sh&quot;, &quot;application/x-shar&quot;);
+	setSuffix(&quot;.tar&quot;, &quot;application/x-tar&quot;);
+	setSuffix(&quot;.snd&quot;, &quot;audio/basic&quot;);
+	setSuffix(&quot;.au&quot;, &quot;audio/basic&quot;);
+	setSuffix(&quot;.wav&quot;, &quot;audio/x-wav&quot;);
+	setSuffix(&quot;.gif&quot;, &quot;image/gif&quot;);
+	setSuffix(&quot;.jpg&quot;, &quot;image/jpeg&quot;);
+	setSuffix(&quot;.jpeg&quot;, &quot;image/jpeg&quot;);
+	setSuffix(&quot;.htm&quot;, &quot;text/html&quot;);
+	setSuffix(&quot;.html&quot;, &quot;text/html&quot;);
+	setSuffix(&quot;.text&quot;, &quot;text/plain&quot;);
+	setSuffix(&quot;.c&quot;, &quot;text/plain&quot;);
+	setSuffix(&quot;.cc&quot;, &quot;text/plain&quot;);
+	setSuffix(&quot;.c++&quot;, &quot;text/plain&quot;);
+	setSuffix(&quot;.h&quot;, &quot;text/plain&quot;);
+	setSuffix(&quot;.pi&quot;, &quot;text/plain&quot;);
+	setSuffix(&quot;.txt&quot;, &quot;text/plain&quot;);
+	setSuffix(&quot;.Java&quot;, &quot;text/plain&quot;);
+    }
+}
+
+interface HttpConstants {
+    /** 2XX: generally &quot;OK&quot; */
+    public static final int HTTP_OK = 200;
+    public static final int HTTP_CREATED = 201;
+    public static final int HTTP_ACCEPTED = 202;
+    public static final int HTTP_NOT_AUTHORITATIVE = 203;
+    public static final int HTTP_NO_CONTENT = 204;
+    public static final int HTTP_RESET = 205;
+    public static final int HTTP_PARTIAL = 206;
+
+    /** 3XX: relocation/redirect */
+    public static final int HTTP_MULT_CHOICE = 300;
+    public static final int HTTP_MOVED_PERM = 301;
+    public static final int HTTP_MOVED_TEMP = 302;
+    public static final int HTTP_SEE_OTHER = 303;
+    public static final int HTTP_NOT_MODIFIED = 304;
+    public static final int HTTP_USE_PROXY = 305;
+
+    /** 4ХХ: client error */
+    public static final int HTTP_BAD_REQUEST = 400;
+    public static final int HTTP_UNAUTHORIZED = 401;
+    public static final int HTTP_PAYMENT_REQUIRED = 402;
+    public static final int HTTP_FORBIDDEN = 403;
+    public static final int HTTP_NOT_FOUND = 404;
+    public static final int HTTP_BAD_METHOD = 405;
+    public static final int HTTP_NOT_ACCEPTABLE = 406;
+    public static final int HTTP_PROXY_AUTH = 407;
+    public static final int HTTP_CLIENT_TIMEOUT = 408;
+    public static final int HTTP_CONFLICT = 409;
+    public static final int HTTP_GONE = 410;
+    public static final int HTTP_LENGTH_REQUIRED = 411;
+    public static final int HTTP_PRECON_FAILED = 412;
+    public static final int HTTP_ENTITY_TOO_LARGE = 413;
+    public static final int HTTP_REQ_TOO_LONG = 414;
+    public static final int HTTP_UNSUPPORTED_TYPE = 415;
+
+    /**5XX: server error*/
+    public static final int HTTP_SERVER_ERROR = 500;
+    public static final int HTTP_INTERNAL_ERROR = 501;
+    public static final int HTTP_BAD_GATEWAY = 502;
+    public static final int HTTP_UNAVAILABLE = 503;
+    public static final int HTTP_GATEWAY_TIMEOUT = 504;
+    public static final int HTTP_VERSION = 505;
+}
+</pre>
+
+<p>Работоспособный исходный код можно взять <a
+href="Webserver.java">здесь</a>, а так же к серверу
+прилагается <a href="WebServer.ini">INI-файлик</a> следующего
+содержания:<br>
+</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+  <tr>
+    <td width="750" bgcolor="#A5E4A7"><font face="Tahoma" style="font-size: 10pt" size="-1"><b>&nbsp;
+    Листинг 2</b></font></td>
+  </tr>
+</table>
+
+<pre>
+root=\Wwwroot
+port=80
+workers=15
+timeout=0
+</pre>
+<b>
+
+<p>root</b> - локальный каталог, из которого Web-сервер
+берёт файлы; <br>
+<b>port</b> - номер порта, на котором сервер
+прослушивает входящие запросы; <br>
+<b>workers</b> - количество рабочих потоков в общем
+пуле; <br>
+<b>timeout</b> - определяет время в миллисекундах для
+ожидания поступающих байтов из открытого
+соединения, после которого соединение может быть
+закрыто. Значение 0 означает, что сервер будет
+ждать бесконечно долго. </p>
+
+<p>Для того чтобы этот сервер заработал,
+необходимо откомпилировать его<br>
+<b>javac Webserver.java</b><br>
+и запустить на любой машине, где имеется
+интерпретатор с Java<br>
+<b>java WebServer</b><br>
+Могу добавить, что этот сервер был мною
+откомпилирован и запущен на таких операционных
+системах как Linux Red Hat 6.2, Win95/98/NT и надеюсь, что
+может быть использован на любой платформе без
+изменения кода. </p>
+
+<p align="center">Продолжение следует ....</p>
+
+<!--#include virtual="/ssi/bottom.html"-->
