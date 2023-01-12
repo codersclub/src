@@ -1,0 +1,275 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как скрыть форму в System Tray.</h3>
+    <p>Компилятор: C++ Builder</p>
+    <p>На самом деле программа не скрывается в
+    системном трее, а просто делается невидимой и
+    помещает свою иконку рядом с системными
+    часиками. Иконка в System Tray добавляется при помощи
+    API функции <tt>Shell_NotifyIcon</tt> либо при помощи готовых
+    компонентов, а само приложение можно скрыть при
+    помощи API функции <tt>ShowWindow</tt>.</p>
+    <p>Сам код скрытия программы в системный трей
+    можно добавить в событие <tt>OnMinimize</tt> объекта <tt>TApplication</tt>
+    либо в событие <tt>OnClose</tt>, в зависимости от того
+    как Вы хотите скрывать главную форму - при
+    минимизации или при закрытии.</p>
+    <p>Ниже приведён пример, который скрывает главную
+    форму в системный трей при закрытии формы.
+    Приложение продолжает нормально работать до тех
+    пор, пока пользователь не сделает двойной клик по
+    иконке. Главная форма содержит кнопку и
+    всплывающее меню. Меню имеет всего один пункт с
+    названием. Кнопка и пункт меню unload имеют один и
+    тот же обработчик события <tt>OnClick</tt>.</p>
+    <pre><font color="navy">//-------------------------------------------------------</font>
+<font
+color="navy">// MAINFORM.H</font>
+<font color="navy">//-------------------------------------------------------</font>
+<font
+color="green">#ifndef mainformH</font>
+<font color="green">#define mainformH</font>
+<font
+color="navy">//-------------------------------------------------------</font>
+<font
+color="green">#include &lt;Classes.hpp&gt;</font>
+<font color="green">#include &lt;Controls.hpp&gt;</font>
+<font
+color="green">#include &lt;StdCtrls.hpp&gt;</font>
+<font color="green">#include &lt;Forms.hpp&gt;</font>
+<font
+color="green">#include &lt;Menus.hpp&gt;</font>
+<font color="navy">//-------------------------------------------------------</font>
+
+<font
+color="green">#define WM_TRAYNOTIFY  (WM_USER + 1001)</font>
+
+<b>class</b> TForm1 <b>:</b> <b>public</b> TForm
+<b>{</b>
+<b>__published:</b>	<font
+color="navy">// IDE-managed Components</font>
+    TPopupMenu <b>*</b>PopupMenu1<b>;</b>
+    TMenuItem <b>*</b>Unload1<b>;</b>
+    TButton <b>*</b>UnloadBtn<b>;</b>
+    <b>void</b> <b>__fastcall</b> UnloadBtnClick<b>(</b>TObject <b>*</b>Sender<b>);</b>
+    <b>void</b> <b>__fastcall</b> FormClose<b>(</b>TObject <b>*</b>Sender<b>,</b> TCloseAction <b>&amp;</b>Action<b>);</b>
+
+<b>private:</b>	<font
+color="navy">// User declarations</font>
+    Graphics<b>::</b>TIcon <b>*</b>TrayIcon<b>;</b>
+    <b>void</b> <b>__fastcall</b> WMTrayNotify<b>(</b>TMessage <b>&amp;</b>Msg<b>);</b>
+    <b>void</b> <b>__fastcall</b> RemoveIcon<b>();</b>
+    <b>void</b> <b>__fastcall</b> AddIcon<b>();</b>
+
+<b>public:</b>		<font
+color="navy">// User declarations</font>
+    <b>__fastcall</b> TForm1<b>(</b>TComponent<b>*</b> Owner<b>);</b>
+    <b>__fastcall</b> <b>~</b>TForm1<b>();</b>
+
+BEGIN_MESSAGE_MAP
+    MESSAGE_HANDLER<b>(</b>WM_TRAYNOTIFY<b>,</b>TMessage<b>,</b>WMTrayNotify<b>)</b>
+END_MESSAGE_MAP<b>(</b>TForm<b>)</b>
+<b>};</b>
+<font
+color="navy">//-------------------------------------------------------</font>
+<b>extern</b> PACKAGE TForm1 <b>*</b>Form1<b>;</b>
+<font
+color="navy">//-------------------------------------------------------</font>
+<font
+color="green">#endif</font>
+
+
+<font color="navy">//-------------------------------------------------------</font>
+<font
+color="navy">// MAINFORM.CPP</font>
+<font color="navy">//-------------------------------------------------------</font>
+<font
+color="green">#include &lt;vcl.h&gt;</font>
+<font color="green">#pragma hdrstop</font>
+
+<font
+color="navy">// Первая константа, это ID иконки. Константа char * это текст.</font>
+<font
+color="navy">// встплывающей подсказки для иконки.</font>
+<b>const</b> <b>int</b> IDC_TRAY1      <b>=</b> <font
+color="blue">1005</font><b>;</b>
+<b>const</b> <b>char</b> <b>*</b>HINT_MESSAGE <b>=</b> <font
+color="blue">&quot;Tray Hint Message&quot;</font><b>;</b>
+
+<font color="green">#include &lt;shellapi.h&gt;</font>
+<font
+color="green">#include &quot;mainform.h&quot;</font>
+<font color="navy">//-------------------------------------------------------</font>
+<font
+color="green">#pragma package(smart_init)</font>
+<font color="green">#pragma resource &quot;*.dfm&quot;</font>
+TForm1 <b>*</b>Form1<b>;</b>
+<font
+color="navy">//-------------------------------------------------------</font>
+<b>__fastcall</b> TForm1<b>::</b>TForm1<b>(</b>TComponent<b>*</b> Owner<b>)</b>
+    <b>:</b> TForm<b>(</b>Owner<b>)</b>
+<b>{</b>
+    <font
+color="navy">// Загружаем иконку из ресурсов</font>
+    TrayIcon <b>=</b> <b>new</b> Graphics<b>::</b>TIcon<b>;</b>
+    TrayIcon<b>-&gt;</b>Handle<b>=</b>LoadImage<b>(</b>HInstance<b>,</b>
+                              <font
+color="blue">&quot;LITTLEICON&quot;</font><b>,</b>
+                              IMAGE_ICON<b>,</b>
+                              <font
+color="blue">0</font><b>,</b><font color="blue">0</font><b>,</b>
+                              <font
+color="blue">0</font><b>);</b>
+
+    <font color="navy">// Добавляем иконку</font>
+    AddIcon<b>();</b>
+<b>}</b>
+<font
+color="navy">//-------------------------------------------------------</font>
+<b>__fastcall</b> TForm1<b>::~</b>TForm1<b>()</b>
+<b>{</b>
+    <font
+color="navy">// Убираем иконку из трея, и удаляем указатель</font>
+    <font
+color="navy">// TIcon, который был создан изначально.</font>
+    RemoveIcon<b>();</b>
+    <b>delete</b> TrayIcon<b>;</b>
+<b>}</b>
+<font
+color="navy">//-------------------------------------------------------</font>
+<b>void</b> <b>__fastcall</b> TForm1<b>::</b>WMTrayNotify<b>(</b>TMessage <b>&amp;</b>Msg<b>)</b>
+<b>{</b>
+    <font
+color="navy">// Параметр LPARAM указывает на тип сообщения мышки.</font>
+    <font
+color="navy">// При клике правой кнопкой, показываем меню. При двойном клике</font>
+    <font
+color="navy">// левой кнопкой, показываем форму.</font>
+    <b>switch(</b>Msg<b>.</b>LParam<b>)</b>
+    <b>{</b>
+        <b>case</b> WM_RBUTTONUP<b>:</b>
+            <font
+color="navy">// Получаем координаты курсора мышки и показываем в этом</font>
+            <font
+color="navy">// месте всплывающее меню.</font>
+            POINT WinPoint<b>;</b>
+            GetCursorPos<b>(&amp;</b>WinPoint<b>);</b>
+            SetForegroundWindow<b>(</b>Handle<b>);</b>
+            PopupMenu1<b>-&gt;</b>Popup<b>(</b>WinPoint<b>.</b>x<b>,</b>WinPoint<b>.</b>y<b>);</b>
+            PostMessage<b>(</b>Handle<b>,</b> WM_NULL<b>,</b> <font
+color="blue">0</font><b>,</b><font color="blue">0</font><b>);</b>
+            <b>break;</b>
+        <b>case</b> WM_LBUTTONDBLCLK<b>:</b>
+            Visible <b>=</b> <b>true;</b>
+            ShowWindow<b>(</b>Application<b>-&gt;</b>Handle<b>,</b> SW_SHOW<b>);</b>
+            <b>break;</b>
+    <b>}</b>
+<b>}</b>
+<font
+color="navy">//-------------------------------------------------------</font>
+<b>void</b> <b>__fastcall</b> TForm1<b>::</b>UnloadBtnClick<b>(</b>TObject <b>*</b>Sender<b>)</b>
+<b>{</b>
+    <font
+color="navy">// Завершаем приложение при нажатии на специальную кнопку</font>
+    Application<b>-&gt;</b>Terminate<b>();</b>
+<b>}</b>
+<font
+color="navy">//-------------------------------------------------------</font>
+<b>void</b> <b>__fastcall</b> TForm1<b>::</b>AddIcon<b>()</b>
+<b>{</b>
+    <font
+color="navy">// Добавляем иконку рядом с ситемными часиками</font>
+    NOTIFYICONDATA IconData<b>;</b>
+    IconData<b>.</b>cbSize <b>=</b> <b>sizeof(</b>NOTIFYICONDATA<b>);</b>
+    IconData<b>.</b>uID    <b>=</b> IDC_TRAY1<b>;</b>
+    IconData<b>.</b>hWnd   <b>=</b> Handle<b>;</b>
+    IconData<b>.</b>uFlags <b>=</b> NIF_MESSAGE<b>|</b>NIF_ICON<b>|</b>NIF_TIP<b>;</b>
+    IconData<b>.</b>uCallbackMessage <b>=</b> WM_TRAYNOTIFY<b>;</b>
+    lstrcpy<b>(</b>IconData<b>.</b>szTip<b>,</b> HINT_MESSAGE<b>);</b>
+    IconData<b>.</b>hIcon  <b>=</b> TrayIcon<b>-&gt;</b>Handle<b>;</b>
+
+    Shell_NotifyIcon<b>(</b>NIM_ADD<b>,&amp;</b>IconData<b>);</b>
+<b>}</b>
+<font
+color="navy">//-------------------------------------------------------</font>
+<b>void</b> <b>__fastcall</b> TForm1<b>::</b>RemoveIcon<b>()</b>
+<b>{</b>
+    NOTIFYICONDATA IconData<b>;</b>
+    IconData<b>.</b>cbSize <b>=</b> <b>sizeof(</b>NOTIFYICONDATA<b>);</b>
+    IconData<b>.</b>uID    <b>=</b> IDC_TRAY1<b>;</b>
+    IconData<b>.</b>hWnd   <b>=</b> Handle<b>;</b>
+    IconData<b>.</b>hIcon  <b>=</b> TrayIcon<b>-&gt;</b>Handle<b>;</b>
+
+    Shell_NotifyIcon<b>(</b>NIM_DELETE<b>,&amp;</b>IconData<b>);</b>
+<b>}</b>
+<font
+color="navy">//-------------------------------------------------------</font>
+<b>void</b> <b>__fastcall</b> TForm1<b>::</b>FormClose<b>(</b>TObject <b>*</b>Sender<b>,</b> TCloseAction <b>&amp;</b>Action<b>)</b>
+<b>{</b>
+    <font
+color="navy">// При нажатии на кнопку закрытия приложения, оно станет невидимым</font>
+    <font
+color="navy">// однако останется полностью работоспособным.</font>
+    <b>if(!</b>Application<b>-&gt;</b>Terminated<b>)</b>
+    <b>{</b>
+        ShowWindow<b>(</b>Application<b>-&gt;</b>Handle<b>,</b> SW_HIDE<b>);</b>
+        Visible <b>=</b> <b>false;</b>
+        Action <b>=</b> caNone<b>;</b>
+    <b>}</b>
+<b>}</b>
+<font
+color="navy">//-------------------------------------------------------</font>
+
+
+
+<font
+color="navy">//-------------------------------------------------------</font>
+<font
+color="navy">// TRAY.CPP Project Source</font>
+<font color="navy">//-------------------------------------------------------</font>
+<font
+color="green">#include &lt;vcl.h&gt;</font>
+<font color="green">#pragma hdrstop</font>
+USERES<b>(</b><font
+color="blue">&quot;tray.res&quot;</font><b>);</b>
+USEFORM<b>(</b><font color="blue">&quot;mainform.cpp&quot;</font><b>,</b> Form1<b>);</b>
+
+<font
+color="navy">// TrayIcons.res содержит иконку для системного трея.</font>
+USERES<b>(</b><font
+color="blue">&quot;TRAYICONS.res&quot;</font><b>);</b>
+<font color="navy">//-------------------------------------------------------</font>
+WINAPI WinMain<b>(</b>HINSTANCE<b>,</b> HINSTANCE<b>,</b> LPSTR<b>,</b> <b>int)</b>
+<b>{</b>
+    <b>try</b>
+    <b>{</b>
+        Application<b>-&gt;</b>Initialize<b>();</b>
+        Application<b>-&gt;</b>CreateForm<b>(__classid(</b>TForm1<b>),</b> <b>&amp;</b>Form1<b>);</b>
+
+        <font
+color="navy">// скрываем иконку главной формы в панели задач</font>
+        ShowWindow<b>(</b>Application<b>-&gt;</b>Handle<b>,</b>SW_HIDE<b>);</b>
+        Application<b>-&gt;</b>ShowMainForm <b>=</b> <b>false;</b>
+
+        Application<b>-&gt;</b>Run<b>();</b>
+    <b>}</b>
+    <b>catch</b> <b>(</b>Exception <b>&amp;</b>exception<b>)</b>
+    <b>{</b>
+         Application<b>-&gt;</b>ShowException<b>(&amp;</b>exception<b>);</b>
+    <b>}</b>
+    <b>return</b> <font
+color="blue">0</font><b>;</b>
+<b>}</b>
+</pre>
+    <p>&nbsp;</p>
+    <p><a href="tray1src.zip">Скачать исходник - 6 Кб</a></p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

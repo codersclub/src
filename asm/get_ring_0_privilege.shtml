@@ -1,0 +1,112 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как получить привелегию Ring 0</h3>
+    <p>Автор: <a href="mailto:gsg2000@gmx.net">The GSG®</a></p>
+    <p>Иногда это нужно для доступа к портам выше $FF, таких как IDE контроллер и т.д.</p>
+    <p>--------------------------------------------------</p>
+    <p>.386p <br>
+    .model&nbsp;&nbsp;&nbsp; flat <br>
+    .radix 16 <br>
+    <br>
+    Ring_0_CS_32 = 28 <br>
+    Ring_0_DS_32 = 30 <br>
+    <br>
+    public CALLRING0PROC <br>
+    <br>
+    _TEXT segment dword public use32 'CODE' <br>
+    <br>
+    CALLRING0PROC proc&nbsp;&nbsp;near <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;; Get the LDT's address first <br>
+    push ebp <br>
+    mov ebp,esp <br>
+    sub esp,8 <br>
+    push edi <br>
+    sgdt [ebp-8] <br>
+    mov edi,[ebp-6] <br>
+    sldt ax <br>
+    and ax,0fff8 <br>
+    movzx eax,ax <br>
+    add edi,eax <br>
+    mov eax,[edi+2] <br>
+    mov [ebp-8],eax <br>
+    mov al,[edi+7] <br>
+    mov [ebp-5],al ; EBP-8 now contains LDT's address <br>
+    mov ax,[edi] <br>
+    and al,0f8 <br>
+    movzx eax,ax <br>
+    mov [ebp-4],eax ; EBP-4 contains LDT's Limit <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;; Then allocate a descriptor <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;mov edi,[ebp-8] <br>
+    Search :cmp dword ptr [edi+eax],0 <br>
+    jne Search_Next_Desc <br>
+    cmp dword ptr [edi+eax+4],0 <br>
+    je Found_Unused_Desc <br>
+    Search_Next_Desc&nbsp;&nbsp;: <br>
+    sub ax,8 <br>
+    jns Search <br>
+    mov eax,0fffffffe ; Return -2 if error <br>
+    jmp Done <br>
+    Found_Unused_Desc : <br>
+    add edi,eax ; EDI contains the Descriptor's address <br>
+    add al,7 ; AX contains the selector <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;; Create the call gate <br>
+    mov [ebp-4],ax <br>
+    mov dword ptr [edi],offset DGROUP:Shell <br>
+    mov eax,Ring_0_CS_32+0ec000000 <br>
+    xchg eax,[edi+2] <br>
+    mov [edi+6],ax <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;; Call the gate and transfer to Shell <br>
+    call fword ptr [ebp-8] <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;; Free the selector <br>
+    mov dword ptr [edi],0 <br>
+    mov dword ptr [edi+4],0 <br>
+    Done&nbsp;&nbsp; :pop edi <br>
+    mov esp,ebp <br>
+    pop ebp <br>
+    ret 4 ; Clean up parameter <br>
+    CALLRING0PROC endp <br>
+    <br>
+    Shell proc far <br>
+    push ds <br>
+    push es <br>
+    push edi <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MOV ECX,[ESI] <br>
+    ADD ESI,4 <br>
+    push 0f12ff34f <br>
+    PUSHARG: <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;PUSH DWORD PTR [ESI] <br>
+    ADD ESI,4 <br>
+    LOOP PUSHARG <br>
+    <br>
+    mov ax,Ring_0_DS_32 <br>
+    mov ds,ax <br>
+    mov es,ax <br>
+    call dword ptr [ebp+8] <br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <br>
+    POPARG: <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;POP ESI <br>
+    CMP ESI,0f12ff34f <br>
+    JNE POPARG <br>
+    pop edi <br>
+    pop es <br>
+    pop ds <br>
+    ret <br>
+    Shell endp <br>
+    <br>
+    _TEXT ends <br>
+    <br>
+    end <br>
+    <br>
+    <br>
+    <br>
+    </td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

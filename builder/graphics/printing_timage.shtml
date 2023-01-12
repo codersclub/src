@@ -1,0 +1,172 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3 align="center">Печать TImage.</h3>
+    <p>Компилятор: C++ Builder</p>
+    <p>Самый простой способ напечатать TImage, это
+    воспользоваться методом print в TForm, которая
+    содержит только битмап. Этот способ работает,
+    однако такая картинка напечатается либо очень
+    маленькой, либо вообще не напечатается.
+    Следующий код позволяет напечатать TImage на всю
+    страницу. Так же Вы можете изменить масштаб и
+    напечатать картинку любого размера.</p>
+    <p><br>
+    Замечание: картинка должна содержать Bitmap.<br>
+    </p>
+    <pre>/*-----------------------------------------------------------------------
+Эта функция является обработчиком события OnClick для TButton, которая
+находится на TForm. На TForm также присутствует TImage с именем image.
+------------------------------------------------------------------------*/
+void __fastcall Tmain_form::print_image_btnClick(TObject *Sender)
+{
+    TPrinter *p = Printer();
+
+    // создаём в памяти dc для картинки
+    HDC h_dc = image-&gt;Picture-&gt;Bitmap-&gt;Canvas-&gt;Handle;
+    int bmp_w = image-&gt;Picture-&gt;Bitmap-&gt;Width,
+    bmp_h = image-&gt;Picture-&gt;Bitmap-&gt;Height;
+    HDC h_mem_dc = ::CreateCompatibleDC (h_dc);
+    HBITMAP h_mem_bmp = ::CreateCompatibleBitmap (h_dc, bmp_w, bmp_h);
+    HBITMAP h_old_bmp = ::SelectObject (h_mem_dc, h_mem_bmp);
+
+    // фиксируем ошибки видео драйверов
+    bool is_pal_dev = false;
+    LOGPALETTE *pal;
+    HPALETTE h_pal, h_old_pal;
+
+    if (::GetDeviceCaps (image-&gt;Canvas-&gt;Handle, RASTERCAPS) &amp; RC_PALETTE)
+    {
+        pal = static_cast<LOGPALETTE*>(malloc (sizeof (LOGPALETTE) +
+                                        (sizeof (PALETTEENTRY) * 256)));
+        memset (pal, 0, sizeof (LOGPALETTE) + (sizeof (PALETTEENTRY) * 256));
+        pal-&gt;palVersion = 0x300;
+        pal-&gt;palNumEntries = ::GetSystemPaletteEntries(image-&gt;Canvas-&gt;Handle, 0,
+                                                         256, pal-&gt;palPalEntry);
+        if (pal-&gt;palNumEntries != 0)
+        {
+            h_pal = ::CreatePalette (pal);
+            h_old_pal = ::SelectPalette (h_mem_dc, h_pal, false);
+            is_pal_dev = true;
+        }
+        else
+        {
+            free (pal);
+        }
+    }
+
+    // копируем картинку на dc в памяти
+    ::BitBlt (h_mem_dc, 0, 0, bmp_w, bmp_h, h_dc, 0, 0, SRCCOPY);
+
+    if (is_pal_dev)
+    {
+        ::SelectPalette (h_mem_dc, h_old_pal, false);
+        ::DeleteObject (h_pal);
+    }
+
+    // удаляем dc в памяти
+    ::SelectObject (h_mem_dc, h_old_bmp);
+    ::DeleteDC (h_mem_dc);
+
+    // выделяем память для структуры BITMAPIFO
+    HANDLE h_bmp_info = ::GlobalAlloc (GHND,
+                            sizeof (BITMAPINFO) + (sizeof (RGBQUAD) * 256));
+    BITMAPINFO* bmp_info = static_cast<BITMAPINFO*>(::GlobalLock (h_bmp_info));
+    //Заполняем структуру
+    memset (bmp_info, NULL, sizeof (BITMAPINFO) + (sizeof (RGBQUAD) * 255));
+    bmp_info-&gt;bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    bmp_info-&gt;bmiHeader.biPlanes = 1;
+    bmp_info-&gt;bmiHeader.biBitCount = 8;
+    bmp_info-&gt;bmiHeader.biWidth = bmp_w;
+    bmp_info-&gt;bmiHeader.biHeight = bmp_h;
+    bmp_info-&gt;bmiHeader.biCompression = BI_RGB;
+
+    // определяем размер памяти для битов
+    ::GetDIBits (h_dc, h_mem_bmp, 0, bmp_h, NULL, bmp_info, DIB_RGB_COLORS);
+
+    // Выделяем память для битов
+    HANDLE h_bits = GlobalAlloc (GHND, bmp_info-&gt;bmiHeader.biSizeImage);
+    void *bits = ::GlobalLock (h_bits);
+
+    // получаем биты
+    ::GetDIBits (h_dc, h_mem_bmp, 0, bmp_h, bits, bmp_info, DIB_RGB_COLORS);
+
+    // фиксируем ошибки видео драйверов
+    if (is_pal_dev)
+    {
+        for (int i = 0; i <pal->palNumEntries; i++)
+        {
+            bmp_info-&gt;bmiColors[i].rgbRed = pal-&gt;palPalEntry[i].peRed;
+            bmp_info-&gt;bmiColors[i].rgbGreen = pal-&gt;palPalEntry[i].peGreen;
+            bmp_info-&gt;bmiColors[i].rgbBlue = pal-&gt;palPalEntry[i].peBlue;
+        }
+        free (pal);
+    }
+
+    // начинаем печать
+    p-&gt;BeginDoc ();
+
+    // масштабируем размер печати
+    int scale_x, scale_y;
+    if (p-&gt;PageWidth <p->PageHeight)
+    {
+        scale_x = p-&gt;PageWidth;
+        scale_y = image-&gt;Picture-&gt;Height * (p-&gt;PageWidth / bmp_w);
+    }
+    else
+    {
+        scale_x = image-&gt;Picture-&gt;Width * (p-&gt;PageHeight / bmp_h);
+        scale_y = p-&gt;PageHeight;
+    }
+
+    // устанавливаем палитру печати
+    is_pal_dev = false;
+    if (::GetDeviceCaps (h_dc, RASTERCAPS) &amp; RC_PALETTE)
+    {
+        pal = static_cast<LOGPALETTE*>(malloc (sizeof (LOGPALETTE) +
+                                          (sizeof (PALETTEENTRY) * 256)));
+        memset (pal, 0, sizeof (LOGPALETTE) + (sizeof (PALETTEENTRY) * 256));
+        pal-&gt;palVersion = 0x300;
+        pal-&gt;palNumEntries = 256;
+        for (int i = 0; pal-&gt;palNumEntries; i++)
+        {
+            pal-&gt;palPalEntry[i].peRed = bmp_info-&gt;bmiColors[i].rgbRed;
+            pal-&gt;palPalEntry[i].peGreen = bmp_info-&gt;bmiColors[i].rgbGreen;
+            pal-&gt;palPalEntry[i].peBlue = bmp_info-&gt;bmiColors[i].rgbBlue;
+        }
+        h_pal = CreatePalette(pal);
+        free (pal);
+        h_old_pal = SelectPalette(p-&gt;Canvas-&gt;Handle, h_pal, false);
+        is_pal_dev = true;
+    }
+
+    // посылаем биты на принтер
+    StretchDIBits(p-&gt;Canvas-&gt;Handle, 0, 0, scale_x, scale_y,
+		0, 0, bmp_w, bmp_h, bits,bmp_info, DIB_RGB_COLORS, SRCCOPY);
+
+    // конец печати
+    p-&gt;EndDoc ();
+
+    // освобождаем ресурсы
+    ::DeleteObject (h_mem_bmp);
+    if (is_pal_dev)
+    {
+        ::SelectObject (p-&gt;Canvas-&gt;Handle, h_old_pal);
+        ::DeleteObject (h_pal);
+    }
+    ::GlobalUnlock (bits);
+    ::GlobalFree (h_bits);
+    ::GlobalUnlock (bmp_info);
+    ::GlobalFree (h_bmp_info);
+}
+</pre>
+    <p>&nbsp;</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

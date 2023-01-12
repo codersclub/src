@@ -1,0 +1,537 @@
+<html>
+<head>
+<title>Как рассчитать хэш по алгоритму MD5? - Borland C++ Builder FAQ</title>
+<link src="style.css" href='style.css' rel='stylesheet' type='text/css'>
+<meta http-equiv=Content-Type content="text/html; charset=windows-1251">
+<!-- SOURCES.RU HEADER -->
+<!--#include virtual="/ssi/top2.html"-->
+<!-- /SOURCES.RU HEADER -->
+<table width=100%>
+ <tr>
+  <td colspan=3>
+   <div class=header><font size="+1">Borland C++ Builder FAQ</font><br>
+	Составлен по материалам <a href="http://forum.sources.ru">форума</a>
+	на <a href="http://www.sources.ru">Исходниках.Ru</a></div>
+  </td>
+ </tr>
+ <tr>
+  <td width=45%></td>
+  <td width=10% valign=bottom><a href="index.html">Содержание</a></td>
+  <td width=45% align=right>Последнее обновление: 14.02.2004</strong></td>
+ </tr>
+</table>
+<hr width="90%">
+<table width="750" align="center">
+<tr><td>
+<p class=q>Как рассчитать хэш по алгоритму MD5?</p>
+<p class=ref>Автор: <strong>OlegGG</strong><br>
+Исходная ссылка: - - -</p>
+<dir>
+N-ое время назад откопал.<br>
+<br>
+Файл "md5.pas":<br>
+<pre class="code"><font color="#0000ff">{******************************************************************}
+{ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>MD5 Hashsum Evaluation Unit For Borland Delphi &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000ff">}
+{ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+{ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>Copyright © <font color="#0000ff">2002 </font>by Dimka Maslov &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000ff">}
+{ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>E<font color="#0000ff">-</font>mail<font color="#0000ff">: &nbsp;&nbsp;</font>mail@endimus<font color="#0000ff">.</font>com<font color="#0000ff">, &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+{ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>Web<font color="#0000ff">-</font>site<font color="#0000ff">: </font>http<font color="#0000ff">:</font><font color="#999999">//www.endimus.com &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+</font><font color="#0000ff">{ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+{ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>Derived from the RSA Data Security<font color="#0000ff">, </font>Inc<font color="#0000ff">. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+{ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>MD5 Message<font color="#0000ff">-</font>Digest Algorithm described in RFC <font color="#0000ff">1321 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+{ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>http<font color="#0000ff">:</font><font color="#999999">//www.faqs.org/rfcs/rfc1321.html &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+</font><font color="#0000ff">{******************************************************************}
+
+</font>unit md5<font color="#0000ff">;
+
+</font>interface
+
+uses Windows<font color="#0000ff">, </font>SysUtils<font color="#0000ff">, </font>Classes<font color="#0000ff">;
+
+</font>type
+<font color="#0000ff">{ </font>The TMD5Digest record is the type of results of
+ &nbsp;the MD5 hashsum evaluation functions<font color="#0000ff">. </font>The contents
+ &nbsp;of a record may be used as four <font color="#0000ff">32-</font>bit integer values
+ &nbsp;or as an array of <font color="#0000ff">16 </font>bytes <font color="#0000ff">}
+ </font>PMD5Digest <font color="#0000ff">= ^</font>TMD5Digest<font color="#0000ff">;
+ </font>TMD5Digest <font color="#0000ff">= </font>record
+ &nbsp;<font color="#000080">case </font>Integer of
+ &nbsp;&nbsp;<font color="#0000ff">0: (</font>A<font color="#0000ff">, </font>B<font color="#0000ff">, </font>C<font color="#0000ff">, </font>D<font color="#0000ff">: </font>LongInt<font color="#0000ff">);
+ &nbsp;&nbsp;1: (</font>v<font color="#0000ff">: </font>array <font color="#0000ff">[0..15] </font>of Byte<font color="#0000ff">);
+ </font>end<font color="#0000ff">;
+
+{ </font>The MD5String function evaluates the MD5 hashsum <font color="#000080">for
+ &nbsp;</font>a string<font color="#0000ff">. </font>The S parameter specifies a string to
+ &nbsp;evaluate hashsum <font color="#0000ff">}
+</font>function MD5String<font color="#0000ff">(</font><font color="#000080">const </font>S<font color="#0000ff">: </font>string<font color="#0000ff">): </font>TMD5Digest<font color="#0000ff">;
+
+{ </font>The MD5File function evaluates the MD5 hashsum <font color="#000080">for
+ &nbsp;</font>a file<font color="#0000ff">. </font>The FileName parameter specifies the name
+ &nbsp;of a file to evaluate hashsum <font color="#0000ff">}
+</font>function MD5File<font color="#0000ff">(</font><font color="#000080">const </font>FileName<font color="#0000ff">: </font>string<font color="#0000ff">): </font>TMD5Digest<font color="#0000ff">;
+
+{ </font>The MD5Stream function evaluates the MD5 hashsum <font color="#000080">for
+ &nbsp;</font>a stream<font color="#0000ff">. </font>The Stream parameters specifies the
+ &nbsp;TStream descendant class object to evaluate hashsum <font color="#0000ff">}
+</font>function MD5Stream<font color="#0000ff">(</font><font color="#000080">const </font>Stream<font color="#0000ff">: </font>TStream<font color="#0000ff">): </font>TMD5Digest<font color="#0000ff">;
+
+{ </font>The MD5Buffer function evaluates the MD5 hashsum <font color="#000080">for
+ &nbsp;</font>any memory buffer<font color="#0000ff">. </font>The Buffer parameters specifies a
+ &nbsp;buffer to evaluate hashsum<font color="#0000ff">. </font>The Size parameter specifies
+ &nbsp;the size <font color="#0000ff">(</font>in bytes<font color="#0000ff">) </font>of a buffer <font color="#0000ff">}
+</font>function MD5Buffer<font color="#0000ff">(</font><font color="#000080">const </font>Buffer<font color="#0000ff">; </font>Size<font color="#0000ff">: </font>Integer<font color="#0000ff">): </font>TMD5Digest<font color="#0000ff">;
+
+{ </font>The MD5DigestToStr function converts the result of
+ &nbsp;a hashsum evaluation function into a string of
+ &nbsp;hexadecimal digits <font color="#0000ff">}
+</font>function MD5DigestToStr<font color="#0000ff">(</font><font color="#000080">const </font>Digest<font color="#0000ff">: </font>TMD5Digest<font color="#0000ff">): </font>string<font color="#0000ff">;
+
+{ </font>The MD5DigestCompare function compares two
+ &nbsp;TMD5Digest record variables<font color="#0000ff">. </font>This function returns
+ &nbsp;TRUE <font color="#000080">if </font>parameters are equal or FALSE otherwise <font color="#0000ff">}
+</font>function MD5DigestCompare<font color="#0000ff">(</font><font color="#000080">const </font>Digest1<font color="#0000ff">, </font>Digest2<font color="#0000ff">: </font>TMD5Digest<font color="#0000ff">): </font>Boolean<font color="#0000ff">;
+
+</font>implementation
+
+<font color="#0000ff">{
+</font>Copyright <font color="#0000ff">(</font>C<font color="#0000ff">) 1991-2, </font>RSA Data Security<font color="#0000ff">, </font>Inc<font color="#0000ff">. </font>Created <font color="#0000ff">1991. </font>All
+rights reserved<font color="#0000ff">.
+
+</font>License to copy and use this software is granted provided that it
+is identified as the <font color="#1f6e2e">"RSA Data Security, Inc. MD5 Message-Digest
+Algorithm"</font> in all material mentioning or referencing this software
+or this function<font color="#0000ff">.
+
+</font>License is also granted to make and use derivative works provided
+that such works are identified as <font color="#1f6e2e">"derived from the RSA Data
+Security, Inc. MD5 Message-Digest Algorithm"</font> in all material
+mentioning or referencing the derived work<font color="#0000ff">.
+
+</font>RSA Data Security<font color="#0000ff">, </font>Inc<font color="#0000ff">. </font>makes no representations concerning either
+the merchantability of this software or the suitability of this
+software <font color="#000080">for </font>any particular purpose<font color="#0000ff">. </font>It is provided <font color="#1f6e2e">"as is"</font>
+without express or implied warranty of any kind<font color="#0000ff">.
+
+</font>These notices must be retained in any copies of any part of this
+documentation and<font color="#0000ff">/</font>or software<font color="#0000ff">.
+}
+
+
+</font>type
+ UINT4 <font color="#0000ff">= </font>LongWord<font color="#0000ff">;
+
+ </font>PArray4UINT4 <font color="#0000ff">= ^</font>TArray4UINT4<font color="#0000ff">;
+ </font>TArray4UINT4 <font color="#0000ff">= </font>array <font color="#0000ff">[0..3] </font>of UINT4<font color="#0000ff">;
+ </font>PArray2UINT4 <font color="#0000ff">= ^</font>TArray2UINT4<font color="#0000ff">;
+ </font>TArray2UINT4 <font color="#0000ff">= </font>array <font color="#0000ff">[0..1] </font>of UINT4<font color="#0000ff">;
+ </font>PArray16Byte <font color="#0000ff">= ^</font>TArray16Byte<font color="#0000ff">;
+ </font>TArray16Byte <font color="#0000ff">= </font>array <font color="#0000ff">[0..15] </font>of Byte<font color="#0000ff">;
+ </font>PArray64Byte <font color="#0000ff">= ^</font>TArray64Byte<font color="#0000ff">;
+ </font>TArray64Byte <font color="#0000ff">= </font>array <font color="#0000ff">[0..63] </font>of Byte<font color="#0000ff">;
+
+ </font>PByteArray <font color="#0000ff">= ^</font>TByteArray<font color="#0000ff">;
+ </font>TByteArray <font color="#0000ff">= </font>array <font color="#0000ff">[0..0] </font>of Byte<font color="#0000ff">;
+
+ </font>PUINT4Array <font color="#0000ff">= ^</font>TUINT4Array<font color="#0000ff">;
+ </font>TUINT4Array <font color="#0000ff">= </font>array <font color="#0000ff">[0..0] </font>of UINT4<font color="#0000ff">;
+
+ </font>PMD5Context <font color="#0000ff">= ^</font>TMD5Context<font color="#0000ff">;
+ </font>TMD5Context <font color="#0000ff">= </font>record
+ &nbsp;&nbsp;state<font color="#0000ff">: </font>TArray4UINT4<font color="#0000ff">;
+ &nbsp;&nbsp;</font>count<font color="#0000ff">: </font>TArray2UINT4<font color="#0000ff">;
+ &nbsp;&nbsp;</font>buffer<font color="#0000ff">: </font>TArray64Byte<font color="#0000ff">;
+ </font>end<font color="#0000ff">;
+
+</font><font color="#000080">const
+ &nbsp;</font>S11 <font color="#0000ff">= 7;
+ &nbsp;</font>S12 <font color="#0000ff">= 12;
+ &nbsp;</font>S13 <font color="#0000ff">= 17;
+ &nbsp;</font>S14 <font color="#0000ff">= 22;
+ &nbsp;</font>S21 <font color="#0000ff">= 5;
+ &nbsp;</font>S22 <font color="#0000ff">= 9;
+ &nbsp;</font>S23 <font color="#0000ff">= 14;
+ &nbsp;</font>S24 <font color="#0000ff">= 20;
+ &nbsp;</font>S31 <font color="#0000ff">= 4;
+ &nbsp;</font>S32 <font color="#0000ff">= 11;
+ &nbsp;</font>S33 <font color="#0000ff">= 16;
+ &nbsp;</font>S34 <font color="#0000ff">= 23;
+ &nbsp;</font>S41 <font color="#0000ff">= 6;
+ &nbsp;</font>S42 <font color="#0000ff">= 10;
+ &nbsp;</font>S43 <font color="#0000ff">= 15;
+ &nbsp;</font>S44 <font color="#0000ff">= 21;
+
+</font>var
+ Padding <font color="#0000ff">: </font>TArray64Byte <font color="#0000ff">=
+ (</font>$80<font color="#0000ff">, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ &nbsp;0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ &nbsp;0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+
+</font>function _F<font color="#0000ff">(</font>x<font color="#0000ff">, </font>y<font color="#0000ff">, </font>z<font color="#0000ff">: </font>UINT4<font color="#0000ff">): </font>UINT4<font color="#0000ff">;
+</font>begin
+ Result <font color="#0000ff">:= (((</font>x<font color="#0000ff">) </font>and <font color="#0000ff">(</font>y<font color="#0000ff">)) </font>or <font color="#0000ff">((</font>not x<font color="#0000ff">) </font>and <font color="#0000ff">(</font>z<font color="#0000ff">)));
+</font>end<font color="#0000ff">;
+
+</font>function _G<font color="#0000ff">(</font>x<font color="#0000ff">, </font>y<font color="#0000ff">, </font>z<font color="#0000ff">: </font>UINT4<font color="#0000ff">): </font>UINT4<font color="#0000ff">;
+</font>begin
+ Result <font color="#0000ff">:= (((</font>x<font color="#0000ff">) </font>and <font color="#0000ff">(</font>z<font color="#0000ff">)) </font>or <font color="#0000ff">((</font>y<font color="#0000ff">) </font>and <font color="#0000ff">(</font>not z<font color="#0000ff">)));
+</font>end<font color="#0000ff">;
+
+</font>function _H<font color="#0000ff">(</font>x<font color="#0000ff">, </font>y<font color="#0000ff">, </font>z<font color="#0000ff">: </font>UINT4<font color="#0000ff">): </font>UINT4<font color="#0000ff">;
+</font>begin
+ Result <font color="#0000ff">:= ((</font>x<font color="#0000ff">) </font>xor <font color="#0000ff">(</font>y<font color="#0000ff">) </font>xor <font color="#0000ff">(</font>z<font color="#0000ff">));
+</font>end<font color="#0000ff">;
+
+</font>function _I<font color="#0000ff">(</font>x<font color="#0000ff">, </font>y<font color="#0000ff">, </font>z<font color="#0000ff">: </font>UINT4<font color="#0000ff">): </font>UINT4<font color="#0000ff">;
+</font>begin
+ Result <font color="#0000ff">:= ((</font>y<font color="#0000ff">) </font>xor <font color="#0000ff">((</font>x<font color="#0000ff">) </font>or <font color="#0000ff">( </font>not z<font color="#0000ff">)));
+</font>end<font color="#0000ff">;
+
+</font>function ROTATE_LEFT<font color="#0000ff">(</font>x<font color="#0000ff">, </font>n<font color="#0000ff">: </font>UINT4<font color="#0000ff">): </font>UINT4<font color="#0000ff">;
+</font>begin
+ Result <font color="#0000ff">:= (((</font>x<font color="#0000ff">) </font>shl <font color="#0000ff">(</font>n<font color="#0000ff">)) </font>or <font color="#0000ff">((</font>x<font color="#0000ff">) </font>shr <font color="#0000ff">(32-(</font>n<font color="#0000ff">))));
+</font>end<font color="#0000ff">;
+
+</font>procedure FF<font color="#0000ff">(</font>var a<font color="#0000ff">: </font>UINT4<font color="#0000ff">; </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>x<font color="#0000ff">, </font>s<font color="#0000ff">, </font>ac<font color="#0000ff">: </font>UINT4<font color="#0000ff">);
+</font>begin
+ &nbsp;a <font color="#0000ff">:= </font>a <font color="#0000ff">+ </font>_F<font color="#0000ff">(</font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">) + </font>x <font color="#0000ff">+ </font>ac<font color="#0000ff">;
+ &nbsp;</font>a <font color="#0000ff">:= </font>ROTATE_LEFT <font color="#0000ff">(</font>a<font color="#0000ff">, </font>s<font color="#0000ff">);
+ &nbsp;</font>a <font color="#0000ff">:= </font>a <font color="#0000ff">+ </font>b<font color="#0000ff">;
+</font>end<font color="#0000ff">;
+
+</font>procedure GG<font color="#0000ff">(</font>var a<font color="#0000ff">: </font>UINT4<font color="#0000ff">; </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>x<font color="#0000ff">, </font>s<font color="#0000ff">, </font>ac<font color="#0000ff">: </font>UINT4<font color="#0000ff">);
+</font>begin
+ a <font color="#0000ff">:= </font>a <font color="#0000ff">+ </font>_G<font color="#0000ff">(</font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">) + </font>x <font color="#0000ff">+ </font>ac<font color="#0000ff">;
+ </font>a <font color="#0000ff">:= </font>ROTATE_LEFT<font color="#0000ff">(</font>a<font color="#0000ff">, </font>s<font color="#0000ff">);
+ </font>a <font color="#0000ff">:= </font>a <font color="#0000ff">+ </font>b<font color="#0000ff">;
+</font>end<font color="#0000ff">;
+
+</font>procedure HH<font color="#0000ff">(</font>var a<font color="#0000ff">: </font>UINT4<font color="#0000ff">; </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>x<font color="#0000ff">, </font>s<font color="#0000ff">, </font>ac<font color="#0000ff">: </font>UINT4<font color="#0000ff">);
+</font>begin
+ a <font color="#0000ff">:= </font>a <font color="#0000ff">+ </font>_H<font color="#0000ff">(</font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">) + </font>x <font color="#0000ff">+ </font>ac<font color="#0000ff">;
+ </font>a <font color="#0000ff">:= </font>ROTATE_LEFT<font color="#0000ff">(</font>a<font color="#0000ff">, </font>s<font color="#0000ff">);
+ </font>a <font color="#0000ff">:= </font>a <font color="#0000ff">+ </font>b<font color="#0000ff">;
+</font>end<font color="#0000ff">;
+
+</font>procedure II<font color="#0000ff">(</font>var a<font color="#0000ff">: </font>UINT4<font color="#0000ff">; </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>x<font color="#0000ff">, </font>s<font color="#0000ff">, </font>ac<font color="#0000ff">: </font>UINT4<font color="#0000ff">);
+</font>begin
+ a <font color="#0000ff">:= </font>a <font color="#0000ff">+ </font>_I<font color="#0000ff">(</font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">) + </font>x <font color="#0000ff">+ </font>ac<font color="#0000ff">;
+ </font>a <font color="#0000ff">:= </font>ROTATE_LEFT<font color="#0000ff">(</font>a<font color="#0000ff">, </font>s<font color="#0000ff">);
+ </font>a <font color="#0000ff">:= </font>a <font color="#0000ff">+ </font>b<font color="#0000ff">;
+</font>end<font color="#0000ff">;
+
+</font>procedure MD5Encode<font color="#0000ff">(</font>Output<font color="#0000ff">: </font>PByteArray<font color="#0000ff">; </font>Input<font color="#0000ff">: </font>PUINT4Array<font color="#0000ff">; </font>Len<font color="#0000ff">: </font>LongWord<font color="#0000ff">);
+</font>var
+ i<font color="#0000ff">, </font>j<font color="#0000ff">: </font>LongWord<font color="#0000ff">;
+</font>begin
+ j<font color="#0000ff">:=0;
+ </font>i<font color="#0000ff">:=0;
+ </font><font color="#000080">while </font>j <font color="#0000ff">&lt; </font>Len <font color="#000080">do &nbsp;</font>begin
+ &nbsp;output<font color="#0000ff">[</font>j<font color="#0000ff">] := </font>Byte<font color="#0000ff">(</font>input<font color="#0000ff">[</font>i<font color="#0000ff">] </font>and $ff<font color="#0000ff">);
+ &nbsp;</font>output<font color="#0000ff">[</font>j<font color="#0000ff">+1] := </font>Byte<font color="#0000ff">((</font>input<font color="#0000ff">[</font>i<font color="#0000ff">] </font>shr <font color="#0000ff">8) </font>and $ff<font color="#0000ff">);
+ &nbsp;</font>output<font color="#0000ff">[</font>j<font color="#0000ff">+2] := </font>Byte<font color="#0000ff">((</font>input<font color="#0000ff">[</font>i<font color="#0000ff">] </font>shr <font color="#0000ff">16) </font>and $ff<font color="#0000ff">);
+ &nbsp;</font>output<font color="#0000ff">[</font>j<font color="#0000ff">+3] := </font>Byte<font color="#0000ff">((</font>input<font color="#0000ff">[</font>i<font color="#0000ff">] </font>shr <font color="#0000ff">24) </font>and $ff<font color="#0000ff">);
+ &nbsp;</font>Inc<font color="#0000ff">(</font>j<font color="#0000ff">, 4);
+ &nbsp;</font>Inc<font color="#0000ff">(</font>i<font color="#0000ff">);
+ </font>end<font color="#0000ff">;
+</font>end<font color="#0000ff">;
+
+</font>procedure MD5Decode<font color="#0000ff">(</font>Output<font color="#0000ff">: </font>PUINT4Array<font color="#0000ff">; </font>Input<font color="#0000ff">: </font>PByteArray<font color="#0000ff">; </font>Len<font color="#0000ff">: </font>LongWord<font color="#0000ff">);
+</font>var
+ i<font color="#0000ff">, </font>j<font color="#0000ff">: </font>LongWord<font color="#0000ff">;
+</font>begin
+ j<font color="#0000ff">:=0;
+ </font>i<font color="#0000ff">:=0;
+ </font><font color="#000080">while </font>j <font color="#0000ff">&lt; </font>Len <font color="#000080">do </font>begin
+ &nbsp;Output<font color="#0000ff">[</font>i<font color="#0000ff">] := </font>UINT4<font color="#0000ff">(</font>input<font color="#0000ff">[</font>j<font color="#0000ff">]) </font>or <font color="#0000ff">(</font>UINT4<font color="#0000ff">(</font>input<font color="#0000ff">[</font>j<font color="#0000ff">+1]) </font>shl <font color="#0000ff">8) </font>or
+ &nbsp;&nbsp;<font color="#0000ff">(</font>UINT4<font color="#0000ff">(</font>input<font color="#0000ff">[</font>j<font color="#0000ff">+2]) </font>shl <font color="#0000ff">16) </font>or <font color="#0000ff">( </font>UINT4<font color="#0000ff">(</font>input<font color="#0000ff">[</font>j<font color="#0000ff">+3]) </font>shl <font color="#0000ff">24);
+ &nbsp;</font>Inc<font color="#0000ff">(</font>j<font color="#0000ff">, 4);
+ &nbsp;</font>Inc<font color="#0000ff">(</font>i<font color="#0000ff">);
+ </font>end<font color="#0000ff">;
+</font>end<font color="#0000ff">;
+
+</font>procedure MD5_memcpy<font color="#0000ff">(</font>Output<font color="#0000ff">: </font>PByteArray<font color="#0000ff">; </font>Input<font color="#0000ff">: </font>PByteArray<font color="#0000ff">; </font>Len<font color="#0000ff">: </font>LongWord<font color="#0000ff">);
+</font>begin
+ Move<font color="#0000ff">(</font>Input<font color="#0000ff">^, </font>Output<font color="#0000ff">^, </font>Len<font color="#0000ff">);
+</font>end<font color="#0000ff">;
+
+</font>procedure MD5_memset<font color="#0000ff">(</font>Output<font color="#0000ff">: </font>PByteArray<font color="#0000ff">; </font>Value<font color="#0000ff">: </font>Integer<font color="#0000ff">; </font>Len<font color="#0000ff">: </font>LongWord<font color="#0000ff">);
+</font>begin
+ FillChar<font color="#0000ff">(</font>Output<font color="#0000ff">^, </font>Len<font color="#0000ff">, </font>Byte<font color="#0000ff">(</font>Value<font color="#0000ff">));
+</font>end<font color="#0000ff">;
+
+</font>procedure MD5Transform<font color="#0000ff">(</font>State<font color="#0000ff">: </font>PArray4UINT4<font color="#0000ff">; </font>Buffer<font color="#0000ff">: </font>PArray64Byte<font color="#0000ff">);
+</font>var
+ a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">: </font>UINT4<font color="#0000ff">;
+ </font>x <font color="#0000ff">: </font>array<font color="#0000ff">[0..15] </font>of UINT4<font color="#0000ff">;
+</font>begin
+ a<font color="#0000ff">:=</font>State<font color="#0000ff">[0]; </font>b<font color="#0000ff">:=</font>State<font color="#0000ff">[1]; </font>c<font color="#0000ff">:=</font>State<font color="#0000ff">[2]; </font>d<font color="#0000ff">:=</font>State<font color="#0000ff">[3];
+ </font>MD5Decode<font color="#0000ff">(</font>PUINT4Array<font color="#0000ff">(</font>@x<font color="#0000ff">), </font>PByteArray<font color="#0000ff">(</font>Buffer<font color="#0000ff">), 64);
+
+ </font>FF <font color="#0000ff">(</font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>x<font color="#0000ff">[ 0], </font>S11<font color="#0000ff">, </font>$d76aa478<font color="#0000ff">);
+ </font>FF <font color="#0000ff">(</font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>x<font color="#0000ff">[ 1], </font>S12<font color="#0000ff">, </font>$e8c7b756<font color="#0000ff">);
+ </font>FF <font color="#0000ff">(</font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>x<font color="#0000ff">[ 2], </font>S13<font color="#0000ff">, </font>$242070db<font color="#0000ff">);
+ </font>FF <font color="#0000ff">(</font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>x<font color="#0000ff">[ 3], </font>S14<font color="#0000ff">, </font>$c1bdceee<font color="#0000ff">);
+ </font>FF <font color="#0000ff">(</font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>x<font color="#0000ff">[ 4], </font>S11<font color="#0000ff">, </font>$f57c0faf<font color="#0000ff">);
+ </font>FF <font color="#0000ff">(</font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>x<font color="#0000ff">[ 5], </font>S12<font color="#0000ff">, </font>$4787c62a<font color="#0000ff">);
+ </font>FF <font color="#0000ff">(</font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>x<font color="#0000ff">[ 6], </font>S13<font color="#0000ff">, </font>$a8304613<font color="#0000ff">);
+ </font>FF <font color="#0000ff">(</font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>x<font color="#0000ff">[ 7], </font>S14<font color="#0000ff">, </font>$fd469501<font color="#0000ff">);
+ </font>FF <font color="#0000ff">(</font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>x<font color="#0000ff">[ 8], </font>S11<font color="#0000ff">, </font>$698098d8<font color="#0000ff">);
+ </font>FF <font color="#0000ff">(</font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>x<font color="#0000ff">[ 9], </font>S12<font color="#0000ff">, </font>$8b44f7af<font color="#0000ff">);
+ </font>FF <font color="#0000ff">(</font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>x<font color="#0000ff">[10], </font>S13<font color="#0000ff">, </font>$ffff5bb1<font color="#0000ff">);
+ </font>FF <font color="#0000ff">(</font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>x<font color="#0000ff">[11], </font>S14<font color="#0000ff">, </font>$895cd7be<font color="#0000ff">);
+ </font>FF <font color="#0000ff">(</font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>x<font color="#0000ff">[12], </font>S11<font color="#0000ff">, </font>$6b901122<font color="#0000ff">);
+ </font>FF <font color="#0000ff">(</font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>x<font color="#0000ff">[13], </font>S12<font color="#0000ff">, </font>$fd987193<font color="#0000ff">);
+ </font>FF <font color="#0000ff">(</font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>x<font color="#0000ff">[14], </font>S13<font color="#0000ff">, </font>$a679438e<font color="#0000ff">);
+ </font>FF <font color="#0000ff">(</font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>x<font color="#0000ff">[15], </font>S14<font color="#0000ff">, </font>$49b40821<font color="#0000ff">);
+
+ </font>GG <font color="#0000ff">(</font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>x<font color="#0000ff">[ 1], </font>S21<font color="#0000ff">, </font>$f61e2562<font color="#0000ff">);
+ </font>GG <font color="#0000ff">(</font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>x<font color="#0000ff">[ 6], </font>S22<font color="#0000ff">, </font>$c040b340<font color="#0000ff">);
+ </font>GG <font color="#0000ff">(</font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>x<font color="#0000ff">[11], </font>S23<font color="#0000ff">, </font>$265e5a51<font color="#0000ff">);
+ </font>GG <font color="#0000ff">(</font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>x<font color="#0000ff">[ 0], </font>S24<font color="#0000ff">, </font>$e9b6c7aa<font color="#0000ff">);
+ </font>GG <font color="#0000ff">(</font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>x<font color="#0000ff">[ 5], </font>S21<font color="#0000ff">, </font>$d62f105d<font color="#0000ff">);
+ </font>GG <font color="#0000ff">(</font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>x<font color="#0000ff">[10], </font>S22<font color="#0000ff">, &nbsp;</font>$2441453<font color="#0000ff">);
+ </font>GG <font color="#0000ff">(</font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>x<font color="#0000ff">[15], </font>S23<font color="#0000ff">, </font>$d8a1e681<font color="#0000ff">);
+ </font>GG <font color="#0000ff">(</font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>x<font color="#0000ff">[ 4], </font>S24<font color="#0000ff">, </font>$e7d3fbc8<font color="#0000ff">);
+ </font>GG <font color="#0000ff">(</font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>x<font color="#0000ff">[ 9], </font>S21<font color="#0000ff">, </font>$21e1cde6<font color="#0000ff">);
+ </font>GG <font color="#0000ff">(</font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>x<font color="#0000ff">[14], </font>S22<font color="#0000ff">, </font>$c33707d6<font color="#0000ff">);
+ </font>GG <font color="#0000ff">(</font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>x<font color="#0000ff">[ 3], </font>S23<font color="#0000ff">, </font>$f4d50d87<font color="#0000ff">);
+
+ </font>GG <font color="#0000ff">(</font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>x<font color="#0000ff">[ 8], </font>S24<font color="#0000ff">, </font>$455a14ed<font color="#0000ff">);
+ </font>GG <font color="#0000ff">(</font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>x<font color="#0000ff">[13], </font>S21<font color="#0000ff">, </font>$a9e3e905<font color="#0000ff">);
+ </font>GG <font color="#0000ff">(</font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>x<font color="#0000ff">[ 2], </font>S22<font color="#0000ff">, </font>$fcefa3f8<font color="#0000ff">);
+ </font>GG <font color="#0000ff">(</font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>x<font color="#0000ff">[ 7], </font>S23<font color="#0000ff">, </font>$676f02d9<font color="#0000ff">);
+ </font>GG <font color="#0000ff">(</font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>x<font color="#0000ff">[12], </font>S24<font color="#0000ff">, </font>$8d2a4c8a<font color="#0000ff">);
+
+ </font>HH <font color="#0000ff">(</font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>x<font color="#0000ff">[ 5], </font>S31<font color="#0000ff">, </font>$fffa3942<font color="#0000ff">);
+ </font>HH <font color="#0000ff">(</font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>x<font color="#0000ff">[ 8], </font>S32<font color="#0000ff">, </font>$8771f681<font color="#0000ff">);
+ </font>HH <font color="#0000ff">(</font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>x<font color="#0000ff">[11], </font>S33<font color="#0000ff">, </font>$6d9d6122<font color="#0000ff">);
+ </font>HH <font color="#0000ff">(</font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>x<font color="#0000ff">[14], </font>S34<font color="#0000ff">, </font>$fde5380c<font color="#0000ff">);
+ </font>HH <font color="#0000ff">(</font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>x<font color="#0000ff">[ 1], </font>S31<font color="#0000ff">, </font>$a4beea44<font color="#0000ff">);
+ </font>HH <font color="#0000ff">(</font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>x<font color="#0000ff">[ 4], </font>S32<font color="#0000ff">, </font>$4bdecfa9<font color="#0000ff">);
+ </font>HH <font color="#0000ff">(</font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>x<font color="#0000ff">[ 7], </font>S33<font color="#0000ff">, </font>$f6bb4b60<font color="#0000ff">);
+ </font>HH <font color="#0000ff">(</font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>x<font color="#0000ff">[10], </font>S34<font color="#0000ff">, </font>$bebfbc70<font color="#0000ff">);
+ </font>HH <font color="#0000ff">(</font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>x<font color="#0000ff">[13], </font>S31<font color="#0000ff">, </font>$289b7ec6<font color="#0000ff">);
+ </font>HH <font color="#0000ff">(</font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>x<font color="#0000ff">[ 0], </font>S32<font color="#0000ff">, </font>$eaa127fa<font color="#0000ff">);
+ </font>HH <font color="#0000ff">(</font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>x<font color="#0000ff">[ 3], </font>S33<font color="#0000ff">, </font>$d4ef3085<font color="#0000ff">);
+ </font>HH <font color="#0000ff">(</font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>x<font color="#0000ff">[ 6], </font>S34<font color="#0000ff">, &nbsp;</font>$4881d05<font color="#0000ff">);
+ </font>HH <font color="#0000ff">(</font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>x<font color="#0000ff">[ 9], </font>S31<font color="#0000ff">, </font>$d9d4d039<font color="#0000ff">);
+ </font>HH <font color="#0000ff">(</font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>x<font color="#0000ff">[12], </font>S32<font color="#0000ff">, </font>$e6db99e5<font color="#0000ff">);
+ </font>HH <font color="#0000ff">(</font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>x<font color="#0000ff">[15], </font>S33<font color="#0000ff">, </font>$1fa27cf8<font color="#0000ff">);
+ </font>HH <font color="#0000ff">(</font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>x<font color="#0000ff">[ 2], </font>S34<font color="#0000ff">, </font>$c4ac5665<font color="#0000ff">);
+
+ </font>II <font color="#0000ff">(</font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>x<font color="#0000ff">[ 0], </font>S41<font color="#0000ff">, </font>$f4292244<font color="#0000ff">);
+ </font>II <font color="#0000ff">(</font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>x<font color="#0000ff">[ 7], </font>S42<font color="#0000ff">, </font>$432aff97<font color="#0000ff">);
+ </font>II <font color="#0000ff">(</font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>x<font color="#0000ff">[14], </font>S43<font color="#0000ff">, </font>$ab9423a7<font color="#0000ff">);
+ </font>II <font color="#0000ff">(</font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>x<font color="#0000ff">[ 5], </font>S44<font color="#0000ff">, </font>$fc93a039<font color="#0000ff">);
+ </font>II <font color="#0000ff">(</font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>x<font color="#0000ff">[12], </font>S41<font color="#0000ff">, </font>$655b59c3<font color="#0000ff">);
+ </font>II <font color="#0000ff">(</font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>x<font color="#0000ff">[ 3], </font>S42<font color="#0000ff">, </font>$8f0ccc92<font color="#0000ff">);
+ </font>II <font color="#0000ff">(</font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>x<font color="#0000ff">[10], </font>S43<font color="#0000ff">, </font>$ffeff47d<font color="#0000ff">);
+ </font>II <font color="#0000ff">(</font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>x<font color="#0000ff">[ 1], </font>S44<font color="#0000ff">, </font>$85845dd1<font color="#0000ff">);
+ </font>II <font color="#0000ff">(</font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>x<font color="#0000ff">[ 8], </font>S41<font color="#0000ff">, </font>$6fa87e4f<font color="#0000ff">);
+ </font>II <font color="#0000ff">(</font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>x<font color="#0000ff">[15], </font>S42<font color="#0000ff">, </font>$fe2ce6e0<font color="#0000ff">);
+ </font>II <font color="#0000ff">(</font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>x<font color="#0000ff">[ 6], </font>S43<font color="#0000ff">, </font>$a3014314<font color="#0000ff">);
+ </font>II <font color="#0000ff">(</font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>x<font color="#0000ff">[13], </font>S44<font color="#0000ff">, </font>$4e0811a1<font color="#0000ff">);
+ </font>II <font color="#0000ff">(</font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>x<font color="#0000ff">[ 4], </font>S41<font color="#0000ff">, </font>$f7537e82<font color="#0000ff">);
+ </font>II <font color="#0000ff">(</font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>x<font color="#0000ff">[11], </font>S42<font color="#0000ff">, </font>$bd3af235<font color="#0000ff">);
+ </font>II <font color="#0000ff">(</font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>x<font color="#0000ff">[ 2], </font>S43<font color="#0000ff">, </font>$2ad7d2bb<font color="#0000ff">);
+ </font>II <font color="#0000ff">(</font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>x<font color="#0000ff">[ 9], </font>S44<font color="#0000ff">, </font>$eb86d391<font color="#0000ff">);
+
+ </font>Inc<font color="#0000ff">(</font>State<font color="#0000ff">[0], </font>a<font color="#0000ff">);
+ </font>Inc<font color="#0000ff">(</font>State<font color="#0000ff">[1], </font>b<font color="#0000ff">);
+ </font>Inc<font color="#0000ff">(</font>State<font color="#0000ff">[2], </font>c<font color="#0000ff">);
+ </font>Inc<font color="#0000ff">(</font>State<font color="#0000ff">[3], </font>d<font color="#0000ff">);
+
+ </font>MD5_memset <font color="#0000ff">(</font>PByteArray<font color="#0000ff">(</font>@x<font color="#0000ff">), 0, </font>SizeOf <font color="#0000ff">(</font>x<font color="#0000ff">));
+</font>end<font color="#0000ff">;
+
+
+</font>procedure MD5Init<font color="#0000ff">(</font>var Context<font color="#0000ff">: </font>TMD5Context<font color="#0000ff">);
+</font>begin
+ FillChar<font color="#0000ff">(</font>Context<font color="#0000ff">, </font>SizeOf<font color="#0000ff">(</font>Context<font color="#0000ff">), 0);
+ </font>Context<font color="#0000ff">.</font>state<font color="#0000ff">[0] := </font>$67452301<font color="#0000ff">;
+ </font>Context<font color="#0000ff">.</font>state<font color="#0000ff">[1] := </font>$efcdab89<font color="#0000ff">;
+ </font>Context<font color="#0000ff">.</font>state<font color="#0000ff">[2] := </font>$98badcfe<font color="#0000ff">;
+ </font>Context<font color="#0000ff">.</font>state<font color="#0000ff">[3] := </font>$10325476<font color="#0000ff">;
+</font>end<font color="#0000ff">;
+
+</font>procedure MD5Update<font color="#0000ff">(</font>var Context<font color="#0000ff">: </font>TMD5Context<font color="#0000ff">; </font>Input<font color="#0000ff">: </font>PByteArray<font color="#0000ff">; </font>InputLen<font color="#0000ff">: </font>LongWord<font color="#0000ff">);
+</font>var
+ i<font color="#0000ff">, </font>index<font color="#0000ff">, </font>partLen<font color="#0000ff">: </font>LongWord<font color="#0000ff">;
+
+</font>begin
+ index <font color="#0000ff">:= </font>LongWord<font color="#0000ff">( (</font>context<font color="#0000ff">.</font>count<font color="#0000ff">[0] </font>shr <font color="#0000ff">3) </font>and $3F<font color="#0000ff">);
+ </font>Inc<font color="#0000ff">(</font>Context<font color="#0000ff">.</font>count<font color="#0000ff">[0], </font>UINT4<font color="#0000ff">(</font>InputLen<font color="#0000ff">) </font>shl <font color="#0000ff">3);
+ </font><font color="#000080">if </font>Context<font color="#0000ff">.</font>count<font color="#0000ff">[0] &lt; </font>UINT4<font color="#0000ff">(</font>InputLen<font color="#0000ff">) </font>shl <font color="#0000ff">3 </font>then Inc<font color="#0000ff">(</font>Context<font color="#0000ff">.</font>count<font color="#0000ff">[1]);
+ </font>Inc<font color="#0000ff">(</font>Context<font color="#0000ff">.</font>count<font color="#0000ff">[1], </font>UINT4<font color="#0000ff">(</font>InputLen<font color="#0000ff">) </font>shr <font color="#0000ff">29);
+ </font>partLen <font color="#0000ff">:= 64 - </font>index<font color="#0000ff">;
+ </font><font color="#000080">if </font>inputLen <font color="#0000ff">&gt;= </font>partLen then begin
+ &nbsp;MD5_memcpy<font color="#0000ff">(</font>PByteArray<font color="#0000ff">(</font>@Context<font color="#0000ff">.</font>buffer<font color="#0000ff">[</font>index<font color="#0000ff">]), </font>Input<font color="#0000ff">, </font>PartLen<font color="#0000ff">);
+ &nbsp;</font>MD5Transform<font color="#0000ff">(</font>@Context<font color="#0000ff">.</font>state<font color="#0000ff">, </font>@Context<font color="#0000ff">.</font>buffer<font color="#0000ff">);
+ &nbsp;</font>i <font color="#0000ff">:= </font>partLen<font color="#0000ff">;
+ &nbsp;</font><font color="#000080">while </font>i <font color="#0000ff">+ 63 &lt; </font>inputLen <font color="#000080">do </font>begin
+ &nbsp;&nbsp;MD5Transform<font color="#0000ff">(</font>@Context<font color="#0000ff">.</font>state<font color="#0000ff">, </font>PArray64Byte<font color="#0000ff">(</font>@Input<font color="#0000ff">[</font>i<font color="#0000ff">]));
+ &nbsp;&nbsp;</font>Inc<font color="#0000ff">(</font>i<font color="#0000ff">, 64);
+ &nbsp;</font>end<font color="#0000ff">;
+ &nbsp;</font>index <font color="#0000ff">:= 0;
+ </font>end <font color="#000080">else </font>i<font color="#0000ff">:=0;
+ </font>MD5_memcpy<font color="#0000ff">(</font>PByteArray<font color="#0000ff">(</font>@Context<font color="#0000ff">.</font>buffer<font color="#0000ff">[</font>index<font color="#0000ff">]), </font>PByteArray<font color="#0000ff">(</font>@Input<font color="#0000ff">[</font>i<font color="#0000ff">]), </font>inputLen <font color="#0000ff">- </font>i<font color="#0000ff">);
+</font>end<font color="#0000ff">;
+
+
+</font>procedure MD5Final<font color="#0000ff">(</font>var Digest<font color="#0000ff">: </font>TMD5Digest<font color="#0000ff">; </font>var Context<font color="#0000ff">: </font>TMD5Context<font color="#0000ff">);
+</font>var
+ bits<font color="#0000ff">: </font>array <font color="#0000ff">[0..7] </font>of Byte<font color="#0000ff">;
+ </font>index<font color="#0000ff">, </font>padLen<font color="#0000ff">: </font>LongWord<font color="#0000ff">;
+</font>begin
+ MD5Encode<font color="#0000ff">(</font>PByteArray<font color="#0000ff">(</font>@bits<font color="#0000ff">), </font>PUINT4Array<font color="#0000ff">(</font>@Context<font color="#0000ff">.</font>count<font color="#0000ff">), 8);
+ </font>index <font color="#0000ff">:= </font>LongWord<font color="#0000ff">( (</font>Context<font color="#0000ff">.</font>count<font color="#0000ff">[0] </font>shr <font color="#0000ff">3) </font>and $3F<font color="#0000ff">);
+ </font><font color="#000080">if </font>index <font color="#0000ff">&lt; 56 </font>then padLen <font color="#0000ff">:= 56 - </font>index <font color="#000080">else </font>padLen <font color="#0000ff">:= 120 - </font>index<font color="#0000ff">;
+ </font>MD5Update<font color="#0000ff">(</font>Context<font color="#0000ff">, </font>PByteArray<font color="#0000ff">(</font>@PADDING<font color="#0000ff">), </font>padLen<font color="#0000ff">);
+ </font>MD5Update<font color="#0000ff">(</font>Context<font color="#0000ff">, </font>PByteArray<font color="#0000ff">(</font>@Bits<font color="#0000ff">), 8);
+ </font>MD5Encode<font color="#0000ff">(</font>PByteArray<font color="#0000ff">(</font>@Digest<font color="#0000ff">), </font>PUINT4Array<font color="#0000ff">(</font>@Context<font color="#0000ff">.</font>state<font color="#0000ff">), 16);
+ </font>MD5_memset<font color="#0000ff">(</font>PByteArray<font color="#0000ff">(</font>@Context<font color="#0000ff">), 0, </font>SizeOf<font color="#0000ff">(</font>Context<font color="#0000ff">));
+</font>end<font color="#0000ff">;
+
+</font>function MD5DigestToStr<font color="#0000ff">(</font><font color="#000080">const </font>Digest<font color="#0000ff">: </font>TMD5Digest<font color="#0000ff">): </font>string<font color="#0000ff">;
+</font>var
+ i<font color="#0000ff">: </font>Integer<font color="#0000ff">;
+</font>begin
+ Result<font color="#0000ff">:=</font><font color="#1f6e2e">''</font><font color="#0000ff">;
+ </font><font color="#000080">for </font>i<font color="#0000ff">:=0 </font>to <font color="#0000ff">15 </font><font color="#000080">do </font>Result<font color="#0000ff">:=</font>Result<font color="#0000ff">+</font>IntToHex<font color="#0000ff">(</font>Digest<font color="#0000ff">.</font>v<font color="#0000ff">[</font>i<font color="#0000ff">], 2);
+</font>end<font color="#0000ff">;
+
+</font>function MD5String<font color="#0000ff">(</font><font color="#000080">const </font>S<font color="#0000ff">: </font>string<font color="#0000ff">): </font>TMD5Digest<font color="#0000ff">;
+</font>begin
+ Result<font color="#0000ff">:=</font>MD5Buffer<font color="#0000ff">(</font>PChar<font color="#0000ff">(</font>S<font color="#0000ff">)^, </font>Length<font color="#0000ff">(</font>S<font color="#0000ff">));
+</font>end<font color="#0000ff">;
+
+</font>function MD5File<font color="#0000ff">(</font><font color="#000080">const </font>FileName<font color="#0000ff">: </font>string<font color="#0000ff">): </font>TMD5Digest<font color="#0000ff">;
+</font>var
+ F<font color="#0000ff">: </font>TFileStream<font color="#0000ff">;
+</font>begin
+ F<font color="#0000ff">:=</font>TFileStream<font color="#0000ff">.</font>Create<font color="#0000ff">(</font>FileName<font color="#0000ff">, </font>fmOpenRead<font color="#0000ff">);
+ </font>try
+ &nbsp;Result<font color="#0000ff">:=</font>MD5Stream<font color="#0000ff">(</font>F<font color="#0000ff">);
+ </font>finally
+ &nbsp;F<font color="#0000ff">.</font>Free<font color="#0000ff">;
+ </font>end<font color="#0000ff">;
+</font>end<font color="#0000ff">;
+
+</font>function MD5Stream<font color="#0000ff">(</font><font color="#000080">const </font>Stream<font color="#0000ff">: </font>TStream<font color="#0000ff">): </font>TMD5Digest<font color="#0000ff">;
+</font>var
+ Context<font color="#0000ff">: </font>TMD5Context<font color="#0000ff">;
+ </font>Buffer<font color="#0000ff">: </font>array<font color="#0000ff">[0..4095] </font>of Byte<font color="#0000ff">;
+ </font>Size<font color="#0000ff">: </font>Integer<font color="#0000ff">;
+ </font>ReadBytes <font color="#0000ff">: </font>Integer<font color="#0000ff">;
+ </font>TotalBytes <font color="#0000ff">: </font>Integer<font color="#0000ff">;
+ </font>SavePos<font color="#0000ff">: </font>Integer<font color="#0000ff">;
+</font>begin
+ MD5Init<font color="#0000ff">(</font>Context<font color="#0000ff">);
+ </font>Size<font color="#0000ff">:=</font>Stream<font color="#0000ff">.</font>Size<font color="#0000ff">;
+ </font>SavePos<font color="#0000ff">:=</font>Stream<font color="#0000ff">.</font>Position<font color="#0000ff">;
+ </font>TotalBytes<font color="#0000ff">:=0;
+ </font>try
+ &nbsp;Stream<font color="#0000ff">.</font>Seek<font color="#0000ff">(0, </font>soFromBeginning<font color="#0000ff">);
+ &nbsp;</font>repeat
+ &nbsp;&nbsp;ReadBytes<font color="#0000ff">:=</font>Stream<font color="#0000ff">.</font>Read<font color="#0000ff">(</font>Buffer<font color="#0000ff">, </font>SizeOf<font color="#0000ff">(</font>Buffer<font color="#0000ff">));
+ &nbsp;&nbsp;</font>Inc<font color="#0000ff">(</font>TotalBytes<font color="#0000ff">, </font>ReadBytes<font color="#0000ff">);
+ &nbsp;&nbsp;</font>MD5Update<font color="#0000ff">(</font>Context<font color="#0000ff">, </font>@Buffer<font color="#0000ff">, </font>ReadBytes<font color="#0000ff">);
+ &nbsp;</font>until <font color="#0000ff">(</font>ReadBytes <font color="#0000ff">= 0) </font>or <font color="#0000ff">(</font>TotalBytes <font color="#0000ff">= </font>Size<font color="#0000ff">);
+ </font>finally
+ &nbsp;Stream<font color="#0000ff">.</font>Seek<font color="#0000ff">(</font>SavePos<font color="#0000ff">, </font>soFromBeginning<font color="#0000ff">);
+ </font>end<font color="#0000ff">;
+ </font>MD5Final<font color="#0000ff">(</font>Result<font color="#0000ff">, </font>Context<font color="#0000ff">);
+</font>end<font color="#0000ff">;
+
+</font>function MD5Buffer<font color="#0000ff">(</font><font color="#000080">const </font>Buffer<font color="#0000ff">; </font>Size<font color="#0000ff">: </font>Integer<font color="#0000ff">): </font>TMD5Digest<font color="#0000ff">;
+</font>var
+ Context<font color="#0000ff">: </font>TMD5Context<font color="#0000ff">;
+</font>begin
+ MD5Init<font color="#0000ff">(</font>Context<font color="#0000ff">);
+ </font>MD5Update<font color="#0000ff">(</font>Context<font color="#0000ff">, </font>PByteArray<font color="#0000ff">(</font>@Buffer<font color="#0000ff">), </font>Size<font color="#0000ff">);
+ </font>MD5Final<font color="#0000ff">(</font>Result<font color="#0000ff">, </font>Context<font color="#0000ff">);
+</font>end<font color="#0000ff">;
+
+</font>function MD5DigestCompare<font color="#0000ff">(</font><font color="#000080">const </font>Digest1<font color="#0000ff">, </font>Digest2<font color="#0000ff">: </font>TMD5Digest<font color="#0000ff">): </font>Boolean<font color="#0000ff">;
+</font>begin
+ Result<font color="#0000ff">:=</font>False<font color="#0000ff">;
+ </font><font color="#000080">if </font>Digest1<font color="#0000ff">.</font>A <font color="#0000ff">&lt;&gt; </font>Digest2<font color="#0000ff">.</font>A then Exit<font color="#0000ff">;
+ </font><font color="#000080">if </font>Digest1<font color="#0000ff">.</font>B <font color="#0000ff">&lt;&gt; </font>Digest2<font color="#0000ff">.</font>B then Exit<font color="#0000ff">;
+ </font><font color="#000080">if </font>Digest1<font color="#0000ff">.</font>C <font color="#0000ff">&lt;&gt; </font>Digest2<font color="#0000ff">.</font>C then Exit<font color="#0000ff">;
+ </font><font color="#000080">if </font>Digest1<font color="#0000ff">.</font>D <font color="#0000ff">&lt;&gt; </font>Digest2<font color="#0000ff">.</font>D then Exit<font color="#0000ff">;
+ </font>Result<font color="#0000ff">:=</font>True<font color="#0000ff">;
+</font>end<font color="#0000ff">;
+
+</font>end<font color="#0000ff">.
+</font></pre>Файл "md5.hpp":<br>
+<pre class="code"><font color="#000080">#ifndef </font>md5HPP
+<font color="#000080">#define </font>md5HPP
+
+<font color="#000080">#pragma </font>delphiheader begin
+<font color="#000080">#pragma </font>option push <font color="#0000ff">-</font>w<font color="#0000ff">-
+</font><font color="#000080">#pragma </font>option push <font color="#0000ff">-</font>Vx
+<font color="#000080">#include </font><font color="#1f6e2e">&lt;Classes.hpp&gt;</font>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#999999">// Pascal unit
+</font><font color="#000080">#include </font><font color="#1f6e2e">&lt;SysUtils.hpp&gt;</font>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#999999">// Pascal unit
+</font><font color="#000080">#include </font><font color="#1f6e2e">&lt;Windows.hpp&gt;</font>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#999999">// Pascal unit
+</font><font color="#000080">#include </font><font color="#1f6e2e">&lt;SysInit.hpp&gt;</font>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#999999">// Pascal unit
+</font><font color="#000080">#include </font><font color="#1f6e2e">&lt;System.hpp&gt;</font>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#999999">// Pascal unit
+
+//-- user supplied -----------------------------------------------------------
+
+</font>namespace Md5
+<font color="#0000ff">{
+</font><font color="#999999">//-- type declarations -------------------------------------------------------
+</font><font color="#000080">struct </font>TMD5Digest<font color="#0000ff">;
+</font><font color="#000080">typedef </font>TMD5Digest <font color="#0000ff">*</font>PMD5Digest<font color="#0000ff">;
+
+</font><font color="#000080">#pragma </font>pack<font color="#0000ff">(</font>push<font color="#0000ff">, 4)
+</font><font color="#000080">struct </font>TMD5Digest
+<font color="#0000ff">{
+&nbsp;&nbsp;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;</font>union
+&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000ff">{
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">struct 
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#0000ff">{
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>Byte v<font color="#0000ff">[16];
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;};
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">struct 
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#0000ff">{
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">int </font>A<font color="#0000ff">;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">int </font>B<font color="#0000ff">;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">int </font>C<font color="#0000ff">;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">int </font>D<font color="#0000ff">;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;};
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;};
+} ;
+</font><font color="#000080">#pragma </font>pack<font color="#0000ff">(</font>pop<font color="#0000ff">)
+
+</font><font color="#999999">//-- var, const, procedure ---------------------------------------------------
+</font><font color="#000080">extern </font>PACKAGE AnsiString __fastcall MD5DigestToStr<font color="#0000ff">(</font><font color="#000080">const </font>TMD5Digest <font color="#0000ff">&</font>Digest<font color="#0000ff">);
+</font><font color="#000080">extern </font>PACKAGE TMD5Digest __fastcall MD5String<font color="#0000ff">(</font><font color="#000080">const </font>AnsiString S<font color="#0000ff">);
+</font><font color="#000080">extern </font>PACKAGE TMD5Digest __fastcall MD5File<font color="#0000ff">(</font><font color="#000080">const </font>AnsiString FileName<font color="#0000ff">);
+</font><font color="#000080">extern </font>PACKAGE TMD5Digest __fastcall MD5Stream<font color="#0000ff">(</font><font color="#000080">const </font>Classes<font color="#0000ff">::</font>TStream<font color="#0000ff">* </font>Stream<font color="#0000ff">);
+</font><font color="#000080">extern </font>PACKAGE TMD5Digest __fastcall MD5Buffer<font color="#0000ff">(</font><font color="#000080">const void </font><font color="#0000ff">*</font>Buffer<font color="#0000ff">, </font><font color="#000080">int </font>Size<font color="#0000ff">);
+</font><font color="#000080">extern </font>PACKAGE <font color="#000080">bool </font>__fastcall MD5DigestCompare<font color="#0000ff">(</font><font color="#000080">const </font>TMD5Digest <font color="#0000ff">&</font>Digest1<font color="#0000ff">, </font><font color="#000080">const </font>TMD5Digest <font color="#0000ff">&</font>Digest2<font color="#0000ff">);
+
+}&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#999999">/* namespace Md5 */</font>
+using namespace Md5<font color="#0000ff">;
+</font><font color="#000080">#pragma </font>option pop&nbsp;&nbsp;&nbsp;&nbsp;<font color="#999999">// -w-
+</font><font color="#000080">#pragma </font>option pop&nbsp;&nbsp;&nbsp;&nbsp;<font color="#999999">// -Vx
+
+</font><font color="#000080">#pragma </font>delphiheader end<font color="#0000ff">.
+</font><font color="#999999">//-- end unit ----------------------------------------------------------------
+</font><font color="#000080">#endif
+</font></pre>Подключаем:<br>
+<pre class="code"><font color="#000080">#include </font><font color="#1f6e2e">"md5.hpp"</font>
+</pre>Используем:<br>
+<pre class="code">AnsiString hash <font color="#0000ff">= </font>MD5DigestToStr<font color="#0000ff">(</font>MD5String<font color="#0000ff">(</font><font color="#1f6e2e">"www.sources.ru"</font><font color="#0000ff">));
+</font></pre>
+<br>
+</td></tr></table>
+<!-- SOURCES.RU FOOTER -->
+<!--#include virtual="/ssi/bottom.html"-->
+<!-- /SOURCES.RU FOOTER -->

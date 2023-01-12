@@ -1,0 +1,312 @@
+<html>
+<head>
+<title>Как рассчитать хэш по алгоритму MD5? - Borland C++ Builder FAQ</title>
+<link src="style.css" href='style.css' rel='stylesheet' type='text/css'>
+<meta http-equiv=Content-Type content="text/html; charset=windows-1251">
+<!-- SOURCES.RU HEADER -->
+<!--#include virtual="/ssi/top2.html"-->
+<!-- /SOURCES.RU HEADER -->
+<table width=100%>
+ <tr>
+  <td colspan=3>
+   <div class=header><font size="+1">Borland C++ Builder FAQ</font><br>
+	Составлен по материалам <a href="http://forum.sources.ru">форума</a>
+	на <a href="http://www.sources.ru">Исходниках.Ru</a></div>
+  </td>
+ </tr>
+ <tr>
+  <td width=45%></td>
+  <td width=10% valign=bottom><a href="index.html">Содержание</a></td>
+  <td width=45% align=right>Последнее обновление: 14.02.2004</strong></td>
+ </tr>
+</table>
+<hr width="90%">
+<table width="750" align="center">
+<tr><td>
+<p class=q>Как рассчитать хэш по алгоритму MD5?</p>
+<p class=ref>Автор: <strong>OlegGG</strong><br>
+Исходная ссылка: - - -</p>
+<dir>
+<b>За алгоритм благодарность выражается Lavrik'у</b><br>
+<br>
+<pre class="code"><font color="#999999">//#include "md5.h"
+</font><font color="#000080">#include </font><font color="#1f6e2e">&lt;WINDEF.H&gt;</font>
+<font color="#000080">#include </font><font color="#1f6e2e">&lt;stdio.h&gt;</font>
+
+<font color="#000080">#ifdef </font>__alpha
+<font color="#000080">typedef unsigned int </font>UINT4<font color="#0000ff">;
+</font><font color="#000080">#else
+typedef unsigned long int </font>UINT4<font color="#0000ff">;
+</font><font color="#000080">#endif
+
+#define </font>MD5_INIT_STATE_0 <font color="#0000ff">0x67452301
+</font><font color="#000080">#define </font>MD5_INIT_STATE_1 <font color="#0000ff">0xefcdab89
+</font><font color="#000080">#define </font>MD5_INIT_STATE_2 <font color="#0000ff">0x98badcfe
+</font><font color="#000080">#define </font>MD5_INIT_STATE_3 <font color="#0000ff">0x10325476
+
+</font><font color="#000080">void </font>MD5Init<font color="#0000ff">(</font><font color="#000080">void</font><font color="#0000ff">);
+</font><font color="#000080">void </font>MD5Update<font color="#0000ff">(</font><font color="#000080">unsigned char </font><font color="#0000ff">*</font>bug<font color="#0000ff">, </font><font color="#000080">unsigned int </font>len<font color="#0000ff">);
+</font><font color="#000080">void </font>MD5Final<font color="#0000ff">(</font><font color="#000080">char</font><font color="#0000ff">* </font>cReturnStr<font color="#0000ff">);
+</font><font color="#000080">void </font>Transform<font color="#0000ff">(</font>UINT4 <font color="#0000ff">*</font>buf<font color="#0000ff">, </font>UINT4 <font color="#0000ff">*</font>in<font color="#0000ff">);
+
+</font>BYTE &nbsp;m_lpszBuffer<font color="#0000ff">[64];
+</font>ULONG m_nCount<font color="#0000ff">[2];
+</font>ULONG m_lMD5<font color="#0000ff">[4];
+
+</font><font color="#000080">static unsigned char </font>PADDING<font color="#0000ff">[64] = {
+ 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+};
+
+</font><font color="#000080">#define </font>F<font color="#0000ff">(</font>x<font color="#0000ff">, </font>y<font color="#0000ff">, </font>z<font color="#0000ff">) (((</font>x<font color="#0000ff">) & (</font>y<font color="#0000ff">)) | ((</font>~x<font color="#0000ff">) & (</font>z<font color="#0000ff">)))
+</font><font color="#000080">#define </font>G<font color="#0000ff">(</font>x<font color="#0000ff">, </font>y<font color="#0000ff">, </font>z<font color="#0000ff">) (((</font>x<font color="#0000ff">) & (</font>z<font color="#0000ff">)) | ((</font>y<font color="#0000ff">) & (</font>~z<font color="#0000ff">)))
+</font><font color="#000080">#define </font>H<font color="#0000ff">(</font>x<font color="#0000ff">, </font>y<font color="#0000ff">, </font>z<font color="#0000ff">) ((</font>x<font color="#0000ff">) ^ (</font>y<font color="#0000ff">) ^ (</font>z<font color="#0000ff">))
+</font><font color="#000080">#define </font>I<font color="#0000ff">(</font>x<font color="#0000ff">, </font>y<font color="#0000ff">, </font>z<font color="#0000ff">) ((</font>y<font color="#0000ff">) ^ ((</font>x<font color="#0000ff">) | (</font>~z<font color="#0000ff">)))
+
+</font><font color="#000080">#define </font>ROTATE_LEFT<font color="#0000ff">(</font>x<font color="#0000ff">, </font>n<font color="#0000ff">) (((</font>x<font color="#0000ff">) &lt;&lt; (</font>n<font color="#0000ff">)) | ((</font>x<font color="#0000ff">) &gt;&gt; (32-(</font>n<font color="#0000ff">))))
+
+</font><font color="#000080">#define </font>FF<font color="#0000ff">(</font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>x<font color="#0000ff">, </font>s<font color="#0000ff">, </font>ac<font color="#0000ff">) </font>\
+ <font color="#0000ff">{(</font>a<font color="#0000ff">) += </font>F <font color="#0000ff">((</font>b<font color="#0000ff">), (</font>c<font color="#0000ff">), (</font>d<font color="#0000ff">)) + (</font>x<font color="#0000ff">) + (</font>UINT4<font color="#0000ff">)(</font>ac<font color="#0000ff">); </font>\
+ &nbsp;<font color="#0000ff">(</font>a<font color="#0000ff">) = </font>ROTATE_LEFT <font color="#0000ff">((</font>a<font color="#0000ff">), (</font>s<font color="#0000ff">)); </font>\
+ &nbsp;<font color="#0000ff">(</font>a<font color="#0000ff">) += (</font>b<font color="#0000ff">); </font>\
+ <font color="#0000ff">}
+</font><font color="#000080">#define </font>GG<font color="#0000ff">(</font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>x<font color="#0000ff">, </font>s<font color="#0000ff">, </font>ac<font color="#0000ff">) </font>\
+ <font color="#0000ff">{(</font>a<font color="#0000ff">) += </font>G <font color="#0000ff">((</font>b<font color="#0000ff">), (</font>c<font color="#0000ff">), (</font>d<font color="#0000ff">)) + (</font>x<font color="#0000ff">) + (</font>UINT4<font color="#0000ff">)(</font>ac<font color="#0000ff">); </font>\
+ &nbsp;<font color="#0000ff">(</font>a<font color="#0000ff">) = </font>ROTATE_LEFT <font color="#0000ff">((</font>a<font color="#0000ff">), (</font>s<font color="#0000ff">)); </font>\
+ &nbsp;<font color="#0000ff">(</font>a<font color="#0000ff">) += (</font>b<font color="#0000ff">); </font>\
+ <font color="#0000ff">}
+</font><font color="#000080">#define </font>HH<font color="#0000ff">(</font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>x<font color="#0000ff">, </font>s<font color="#0000ff">, </font>ac<font color="#0000ff">) </font>\
+ <font color="#0000ff">{(</font>a<font color="#0000ff">) += </font>H <font color="#0000ff">((</font>b<font color="#0000ff">), (</font>c<font color="#0000ff">), (</font>d<font color="#0000ff">)) + (</font>x<font color="#0000ff">) + (</font>UINT4<font color="#0000ff">)(</font>ac<font color="#0000ff">); </font>\
+ &nbsp;<font color="#0000ff">(</font>a<font color="#0000ff">) = </font>ROTATE_LEFT <font color="#0000ff">((</font>a<font color="#0000ff">), (</font>s<font color="#0000ff">)); </font>\
+ &nbsp;<font color="#0000ff">(</font>a<font color="#0000ff">) += (</font>b<font color="#0000ff">); </font>\
+ <font color="#0000ff">}
+</font><font color="#000080">#define </font>II<font color="#0000ff">(</font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>x<font color="#0000ff">, </font>s<font color="#0000ff">, </font>ac<font color="#0000ff">) </font>\
+ <font color="#0000ff">{(</font>a<font color="#0000ff">) += </font>I <font color="#0000ff">((</font>b<font color="#0000ff">), (</font>c<font color="#0000ff">), (</font>d<font color="#0000ff">)) + (</font>x<font color="#0000ff">) + (</font>UINT4<font color="#0000ff">)(</font>ac<font color="#0000ff">); </font>\
+ &nbsp;<font color="#0000ff">(</font>a<font color="#0000ff">) = </font>ROTATE_LEFT <font color="#0000ff">((</font>a<font color="#0000ff">), (</font>s<font color="#0000ff">)); </font>\
+ &nbsp;<font color="#0000ff">(</font>a<font color="#0000ff">) += (</font>b<font color="#0000ff">); </font>\
+ <font color="#0000ff">}
+
+</font><font color="#000080">void </font>ByteToDWord<font color="#0000ff">(</font>DWORD<font color="#0000ff">* </font>Output<font color="#0000ff">, </font>ULONG<font color="#0000ff">* </font>Input<font color="#0000ff">, </font>UINT nLength<font color="#0000ff">){
+</font>UINT i<font color="#0000ff">=0;
+</font>UINT j<font color="#0000ff">=0;
+</font><font color="#000080">for </font><font color="#0000ff">(; </font>j <font color="#0000ff">&lt; </font>nLength<font color="#0000ff">; </font>i<font color="#0000ff">++, </font>j <font color="#0000ff">+= 4)
+{
+ </font>Output<font color="#0000ff">[</font>i<font color="#0000ff">] = (</font>ULONG<font color="#0000ff">)</font>Input<font color="#0000ff">[</font>j<font color="#0000ff">] &nbsp;&nbsp;| 
+ &nbsp;&nbsp;&nbsp;(</font>ULONG<font color="#0000ff">)</font>Input<font color="#0000ff">[</font>j<font color="#0000ff">+1] &lt;&lt; 8 | 
+ &nbsp;&nbsp;&nbsp;(</font>ULONG<font color="#0000ff">)</font>Input<font color="#0000ff">[</font>j<font color="#0000ff">+2] &lt;&lt; 16 | 
+ &nbsp;&nbsp;&nbsp;(</font>ULONG<font color="#0000ff">)</font>Input<font color="#0000ff">[</font>j<font color="#0000ff">+3] &lt;&lt; 24;
+}
+}
+
+</font><font color="#000080">void </font>DWordToByte<font color="#0000ff">(</font><font color="#000080">unsigned char</font><font color="#0000ff">* </font>Output<font color="#0000ff">, </font>DWORD<font color="#0000ff">* </font>Input<font color="#0000ff">, </font>UINT nLength <font color="#0000ff">){
+</font>UINT i <font color="#0000ff">= 0;
+</font>UINT j <font color="#0000ff">= 0;
+</font><font color="#000080">for </font><font color="#0000ff">(; </font>j <font color="#0000ff">&lt; </font>nLength<font color="#0000ff">; </font>i<font color="#0000ff">++, </font>j <font color="#0000ff">+= 4) 
+{
+ </font>Output<font color="#0000ff">[</font>j<font color="#0000ff">] = &nbsp;&nbsp;(</font>UCHAR<font color="#0000ff">)(</font>Input<font color="#0000ff">[</font>i<font color="#0000ff">] & 0xff);
+ </font>Output<font color="#0000ff">[</font>j<font color="#0000ff">+1] = (</font>UCHAR<font color="#0000ff">)((</font>Input<font color="#0000ff">[</font>i<font color="#0000ff">] &gt;&gt; 8) & 0xff);
+ </font>Output<font color="#0000ff">[</font>j<font color="#0000ff">+2] = (</font>UCHAR<font color="#0000ff">)((</font>Input<font color="#0000ff">[</font>i<font color="#0000ff">] &gt;&gt; 16) & 0xff);
+ </font>Output<font color="#0000ff">[</font>j<font color="#0000ff">+3] = (</font>UCHAR<font color="#0000ff">)((</font>Input<font color="#0000ff">[</font>i<font color="#0000ff">] &gt;&gt; 24) & 0xff);
+}
+}
+
+</font><font color="#000080">void </font>MD5Init <font color="#0000ff">(</font><font color="#000080">void</font><font color="#0000ff">)
+{
+ </font>memset<font color="#0000ff">(</font>m_lpszBuffer<font color="#0000ff">, 0, 64 );
+ </font>m_nCount<font color="#0000ff">[0] = </font>m_nCount<font color="#0000ff">[1] = 0;
+
+</font>m_lMD5<font color="#0000ff">[0] = </font>MD5_INIT_STATE_0<font color="#0000ff">;
+</font>m_lMD5<font color="#0000ff">[1] = </font>MD5_INIT_STATE_1<font color="#0000ff">;
+</font>m_lMD5<font color="#0000ff">[2] = </font>MD5_INIT_STATE_2<font color="#0000ff">;
+</font>m_lMD5<font color="#0000ff">[3] = </font>MD5_INIT_STATE_3<font color="#0000ff">;
+}
+
+</font><font color="#000080">void </font>MD5Update <font color="#0000ff">(</font><font color="#000080">unsigned char </font><font color="#0000ff">*</font>inBuf<font color="#0000ff">, </font><font color="#000080">unsigned int </font>inLen<font color="#0000ff">)
+{
+ </font>register <font color="#000080">int </font>i<font color="#0000ff">, </font>ii<font color="#0000ff">;
+ </font><font color="#000080">int </font>mdi<font color="#0000ff">;
+ </font>UINT4 in<font color="#0000ff">[16];
+
+ </font>mdi <font color="#0000ff">= (</font><font color="#000080">int</font><font color="#0000ff">)((</font>m_nCount<font color="#0000ff">[0] &gt;&gt; 3) & 0x3F);
+
+ </font><font color="#000080">if </font><font color="#0000ff">((</font>m_nCount<font color="#0000ff">[0] + ((</font>UINT4<font color="#0000ff">)</font>inLen <font color="#0000ff">&lt;&lt; 3)) &lt; </font>m_nCount<font color="#0000ff">[0])
+ &nbsp;&nbsp;</font>m_nCount<font color="#0000ff">[1]++;
+ </font>m_nCount<font color="#0000ff">[0] += ((</font>UINT4<font color="#0000ff">)</font>inLen <font color="#0000ff">&lt;&lt; 3);
+ </font>m_nCount<font color="#0000ff">[1] += ((</font>UINT4<font color="#0000ff">)</font>inLen <font color="#0000ff">&gt;&gt; 29);
+
+ </font><font color="#000080">while </font><font color="#0000ff">(</font>inLen<font color="#0000ff">--) {
+ &nbsp;&nbsp;</font>m_lpszBuffer<font color="#0000ff">[</font>mdi<font color="#0000ff">++] = *</font>inBuf<font color="#0000ff">++;
+
+ &nbsp;&nbsp;</font><font color="#000080">if </font><font color="#0000ff">(</font>mdi <font color="#0000ff">== 0x40) {
+ &nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">for </font><font color="#0000ff">(</font>i <font color="#0000ff">= 0, </font>ii <font color="#0000ff">= 0; </font>i <font color="#0000ff">&lt; 16; </font>i<font color="#0000ff">++, </font>ii <font color="#0000ff">+= 4)
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>in<font color="#0000ff">[</font>i<font color="#0000ff">] = (((</font>UINT4<font color="#0000ff">)</font>m_lpszBuffer<font color="#0000ff">[</font>ii<font color="#0000ff">+3]) &lt;&lt; 24) |
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(((</font>UINT4<font color="#0000ff">)</font>m_lpszBuffer<font color="#0000ff">[</font>ii<font color="#0000ff">+2]) &lt;&lt; 16) |
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(((</font>UINT4<font color="#0000ff">)</font>m_lpszBuffer<font color="#0000ff">[</font>ii<font color="#0000ff">+1]) &lt;&lt; 8) |
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;((</font>UINT4<font color="#0000ff">)</font>m_lpszBuffer<font color="#0000ff">[</font>ii<font color="#0000ff">]);
+ &nbsp;&nbsp;&nbsp;&nbsp;</font>Transform <font color="#0000ff">(</font>m_lMD5<font color="#0000ff">, </font>in<font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;</font>mdi <font color="#0000ff">= 0;
+ &nbsp;&nbsp;}
+ }
+}
+
+</font><font color="#000080">void </font>MD5Final <font color="#0000ff">(</font><font color="#000080">char</font><font color="#0000ff">* </font>cReturnStr<font color="#0000ff">)
+{
+</font><font color="#000080">unsigned char </font>bits<font color="#0000ff">[8];
+</font><font color="#000080">int </font>nIndex<font color="#0000ff">;
+</font><font color="#000080">unsigned int </font>nPadLen<font color="#0000ff">;
+</font><font color="#000080">const int </font>nMD5Size <font color="#0000ff">= 16;
+ </font><font color="#000080">unsigned char </font>lpszMD5<font color="#0000ff">[16];
+</font><font color="#000080">char </font>temp<font color="#0000ff">[2];
+</font><font color="#000080">int </font>i<font color="#0000ff">;
+
+</font>cReturnStr<font color="#0000ff">[0]=</font><font color="#1f6e2e">'\0'</font><font color="#0000ff">;
+
+</font>DWordToByte<font color="#0000ff">( </font>bits<font color="#0000ff">, </font>m_nCount<font color="#0000ff">, 8 );
+
+</font>nIndex <font color="#0000ff">= (</font><font color="#000080">int</font><font color="#0000ff">)((</font>m_nCount<font color="#0000ff">[0] &gt;&gt; 3) & 0x3f);
+</font>nPadLen <font color="#0000ff">= (</font>nIndex <font color="#0000ff">&lt; 56) ? (56 - </font>nIndex<font color="#0000ff">) : (120 - </font>nIndex<font color="#0000ff">);
+</font>MD5Update <font color="#0000ff">(</font>PADDING<font color="#0000ff">, </font>nPadLen<font color="#0000ff">);
+
+</font>MD5Update <font color="#0000ff">(</font>bits<font color="#0000ff">, 8);
+
+</font>DWordToByte<font color="#0000ff">( </font>lpszMD5<font color="#0000ff">, </font>m_lMD5<font color="#0000ff">, </font>nMD5Size <font color="#0000ff">);
+
+</font><font color="#000080">for </font><font color="#0000ff">(</font>i<font color="#0000ff">=0; </font>i <font color="#0000ff">&lt; </font>nMD5Size<font color="#0000ff">; </font>i<font color="#0000ff">++) 
+{
+
+ </font><font color="#000080">if </font><font color="#0000ff">(</font>lpszMD5<font color="#0000ff">[</font>i<font color="#0000ff">] == 0) {
+ &nbsp;</font>temp<font color="#0000ff">[0] = </font><font color="#1f6e2e">'0'</font><font color="#0000ff">;
+ &nbsp;</font>temp<font color="#0000ff">[1]=</font><font color="#1f6e2e">'0'</font><font color="#0000ff">;
+ }
+ </font><font color="#000080">else if </font><font color="#0000ff">(</font>lpszMD5<font color="#0000ff">[</font>i<font color="#0000ff">] &lt;= 15) &nbsp;{
+ &nbsp;&nbsp;&nbsp;&nbsp;</font>sprintf<font color="#0000ff">(</font>temp<font color="#0000ff">,</font><font color="#1f6e2e">"0%x"</font><font color="#0000ff">,</font>lpszMD5<font color="#0000ff">[</font>i<font color="#0000ff">]);
+ }
+ </font><font color="#000080">else </font><font color="#0000ff">{
+ &nbsp;&nbsp;&nbsp;&nbsp;</font>sprintf<font color="#0000ff">(</font>temp<font color="#0000ff">,</font><font color="#1f6e2e">"%x"</font><font color="#0000ff">,</font>lpszMD5<font color="#0000ff">[</font>i<font color="#0000ff">]);
+ }
+ &nbsp;&nbsp;</font>strcat<font color="#0000ff">(</font>cReturnStr<font color="#0000ff">,</font>temp<font color="#0000ff">);
+}
+</font>lpszMD5<font color="#0000ff">[0]=</font><font color="#1f6e2e">'\0'</font><font color="#0000ff">;
+}
+
+</font><font color="#000080">void </font>Transform<font color="#0000ff">(</font>register UINT4 <font color="#0000ff">*</font>buf<font color="#0000ff">,</font>register UINT4 <font color="#0000ff">*</font>in<font color="#0000ff">)
+{
+ </font>register UINT4 a <font color="#0000ff">= </font>buf<font color="#0000ff">[0], </font>b <font color="#0000ff">= </font>buf<font color="#0000ff">[1], </font>c <font color="#0000ff">= </font>buf<font color="#0000ff">[2], </font>d <font color="#0000ff">= </font>buf<font color="#0000ff">[3];
+
+</font><font color="#000080">#define </font>S11 <font color="#0000ff">7
+</font><font color="#000080">#define </font>S12 <font color="#0000ff">12
+</font><font color="#000080">#define </font>S13 <font color="#0000ff">17
+</font><font color="#000080">#define </font>S14 <font color="#0000ff">22
+ </font>FF <font color="#0000ff">( </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>in<font color="#0000ff">[ 0], </font>S11<font color="#0000ff">, 0xD76AA478L); 
+ </font>FF <font color="#0000ff">( </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>in<font color="#0000ff">[ 1], </font>S12<font color="#0000ff">, 0xE8C7B756L); 
+ </font>FF <font color="#0000ff">( </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>in<font color="#0000ff">[ 2], </font>S13<font color="#0000ff">, 0x242070DBL); 
+ </font>FF <font color="#0000ff">( </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>in<font color="#0000ff">[ 3], </font>S14<font color="#0000ff">, 0xC1BDCEEEL); 
+ </font>FF <font color="#0000ff">( </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>in<font color="#0000ff">[ 4], </font>S11<font color="#0000ff">, 0xF57C0FAFL); 
+ </font>FF <font color="#0000ff">( </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>in<font color="#0000ff">[ 5], </font>S12<font color="#0000ff">, 0x4787C62AL); 
+ </font>FF <font color="#0000ff">( </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>in<font color="#0000ff">[ 6], </font>S13<font color="#0000ff">, 0xA8304613L); 
+ </font>FF <font color="#0000ff">( </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>in<font color="#0000ff">[ 7], </font>S14<font color="#0000ff">, 0xFD469501L); 
+ </font>FF <font color="#0000ff">( </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>in<font color="#0000ff">[ 8], </font>S11<font color="#0000ff">, 0x698098D8L); 
+ </font>FF <font color="#0000ff">( </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>in<font color="#0000ff">[ 9], </font>S12<font color="#0000ff">, 0x8B44F7AFL); 
+ </font>FF <font color="#0000ff">( </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>in<font color="#0000ff">[10], </font>S13<font color="#0000ff">, 0xFFFF5BB1L); 
+ </font>FF <font color="#0000ff">( </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>in<font color="#0000ff">[11], </font>S14<font color="#0000ff">, 0x895CD7BEL); 
+ </font>FF <font color="#0000ff">( </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>in<font color="#0000ff">[12], </font>S11<font color="#0000ff">, 0x6B901122L); 
+ </font>FF <font color="#0000ff">( </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>in<font color="#0000ff">[13], </font>S12<font color="#0000ff">, 0xFD987193L); 
+ </font>FF <font color="#0000ff">( </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>in<font color="#0000ff">[14], </font>S13<font color="#0000ff">, 0xA679438EL); 
+ </font>FF <font color="#0000ff">( </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>in<font color="#0000ff">[15], </font>S14<font color="#0000ff">, 0x49B40821L); 
+
+</font><font color="#000080">#define </font>S21 <font color="#0000ff">5
+</font><font color="#000080">#define </font>S22 <font color="#0000ff">9
+</font><font color="#000080">#define </font>S23 <font color="#0000ff">14
+</font><font color="#000080">#define </font>S24 <font color="#0000ff">20
+ </font>GG <font color="#0000ff">( </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>in<font color="#0000ff">[ 1], </font>S21<font color="#0000ff">, 0xF61E2562L); 
+ </font>GG <font color="#0000ff">( </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>in<font color="#0000ff">[ 6], </font>S22<font color="#0000ff">, 0xC040B340L); 
+ </font>GG <font color="#0000ff">( </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>in<font color="#0000ff">[11], </font>S23<font color="#0000ff">, 0x265E5A51L); 
+ </font>GG <font color="#0000ff">( </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>in<font color="#0000ff">[ 0], </font>S24<font color="#0000ff">, 0xE9B6C7AAL); 
+ </font>GG <font color="#0000ff">( </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>in<font color="#0000ff">[ 5], </font>S21<font color="#0000ff">, 0xD62F105DL); 
+ </font>GG <font color="#0000ff">( </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>in<font color="#0000ff">[10], </font>S22<font color="#0000ff">, 0x02441453L); 
+ </font>GG <font color="#0000ff">( </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>in<font color="#0000ff">[15], </font>S23<font color="#0000ff">, 0xD8A1E681L); 
+ </font>GG <font color="#0000ff">( </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>in<font color="#0000ff">[ 4], </font>S24<font color="#0000ff">, 0xE7D3FBC8L); 
+ </font>GG <font color="#0000ff">( </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>in<font color="#0000ff">[ 9], </font>S21<font color="#0000ff">, 0x21E1CDE6L); 
+ </font>GG <font color="#0000ff">( </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>in<font color="#0000ff">[14], </font>S22<font color="#0000ff">, 0xC33707D6L); 
+ </font>GG <font color="#0000ff">( </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>in<font color="#0000ff">[ 3], </font>S23<font color="#0000ff">, 0xF4D50D87L); 
+ </font>GG <font color="#0000ff">( </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>in<font color="#0000ff">[ 8], </font>S24<font color="#0000ff">, 0x455A14EDL); 
+ </font>GG <font color="#0000ff">( </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>in<font color="#0000ff">[13], </font>S21<font color="#0000ff">, 0xA9E3E905L); 
+ </font>GG <font color="#0000ff">( </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>in<font color="#0000ff">[ 2], </font>S22<font color="#0000ff">, 0xFCEFA3F8L); 
+ </font>GG <font color="#0000ff">( </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>in<font color="#0000ff">[ 7], </font>S23<font color="#0000ff">, 0x676F02D9L); 
+ </font>GG <font color="#0000ff">( </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>in<font color="#0000ff">[12], </font>S24<font color="#0000ff">, 0x8D2A4C8AL); 
+
+</font><font color="#000080">#define </font>S31 <font color="#0000ff">4
+</font><font color="#000080">#define </font>S32 <font color="#0000ff">11
+</font><font color="#000080">#define </font>S33 <font color="#0000ff">16
+</font><font color="#000080">#define </font>S34 <font color="#0000ff">23
+ </font>HH <font color="#0000ff">( </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>in<font color="#0000ff">[ 5], </font>S31<font color="#0000ff">, 0xFFFA3942L); 
+ </font>HH <font color="#0000ff">( </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>in<font color="#0000ff">[ 8], </font>S32<font color="#0000ff">, 0x8771F681L); 
+ </font>HH <font color="#0000ff">( </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>in<font color="#0000ff">[11], </font>S33<font color="#0000ff">, 0x6D9D6122L); 
+ </font>HH <font color="#0000ff">( </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>in<font color="#0000ff">[14], </font>S34<font color="#0000ff">, 0xFDE5380CL); 
+ </font>HH <font color="#0000ff">( </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>in<font color="#0000ff">[ 1], </font>S31<font color="#0000ff">, 0xA4BEEA44L);
+ </font>HH <font color="#0000ff">( </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>in<font color="#0000ff">[ 4], </font>S32<font color="#0000ff">, 0x4BDECFA9L); 
+ </font>HH <font color="#0000ff">( </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>in<font color="#0000ff">[ 7], </font>S33<font color="#0000ff">, 0xF6BB4B60L); 
+ </font>HH <font color="#0000ff">( </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>in<font color="#0000ff">[10], </font>S34<font color="#0000ff">, 0xBEBFBC70L); 
+ </font>HH <font color="#0000ff">( </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>in<font color="#0000ff">[13], </font>S31<font color="#0000ff">, 0x289B7EC6L); 
+ </font>HH <font color="#0000ff">( </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>in<font color="#0000ff">[ 0], </font>S32<font color="#0000ff">, 0xEAA127FAL); 
+ </font>HH <font color="#0000ff">( </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>in<font color="#0000ff">[ 3], </font>S33<font color="#0000ff">, 0xD4EF3085L); 
+ </font>HH <font color="#0000ff">( </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>in<font color="#0000ff">[ 6], </font>S34<font color="#0000ff">, 0x04881D05L);
+ </font>HH <font color="#0000ff">( </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>in<font color="#0000ff">[ 9], </font>S31<font color="#0000ff">, 0xD9D4D039L); 
+ </font>HH <font color="#0000ff">( </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>in<font color="#0000ff">[12], </font>S32<font color="#0000ff">, 0xE6DB99E5L); 
+ </font>HH <font color="#0000ff">( </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>in<font color="#0000ff">[15], </font>S33<font color="#0000ff">, 0x1FA27CF8L); 
+ </font>HH <font color="#0000ff">( </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>in<font color="#0000ff">[ 2], </font>S34<font color="#0000ff">, 0xC4AC5665L); 
+
+</font><font color="#000080">#define </font>S41 <font color="#0000ff">6
+</font><font color="#000080">#define </font>S42 <font color="#0000ff">10
+</font><font color="#000080">#define </font>S43 <font color="#0000ff">15
+</font><font color="#000080">#define </font>S44 <font color="#0000ff">21
+ </font>II <font color="#0000ff">( </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>in<font color="#0000ff">[ 0], </font>S41<font color="#0000ff">, 0xF4292244L); 
+ </font>II <font color="#0000ff">( </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>in<font color="#0000ff">[ 7], </font>S42<font color="#0000ff">, 0x432AFF97L); 
+ </font>II <font color="#0000ff">( </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>in<font color="#0000ff">[14], </font>S43<font color="#0000ff">, 0xAB9423A7L); 
+ </font>II <font color="#0000ff">( </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>in<font color="#0000ff">[ 5], </font>S44<font color="#0000ff">, 0xFC93A039L); 
+ </font>II <font color="#0000ff">( </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>in<font color="#0000ff">[12], </font>S41<font color="#0000ff">, 0x655B59C3L); 
+ </font>II <font color="#0000ff">( </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>in<font color="#0000ff">[ 3], </font>S42<font color="#0000ff">, 0x8F0CCC92L); 
+ </font>II <font color="#0000ff">( </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>in<font color="#0000ff">[10], </font>S43<font color="#0000ff">, 0xFFEFF47DL); 
+ </font>II <font color="#0000ff">( </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>in<font color="#0000ff">[ 1], </font>S44<font color="#0000ff">, 0x85845DD1L); 
+ </font>II <font color="#0000ff">( </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>in<font color="#0000ff">[ 8], </font>S41<font color="#0000ff">, 0x6FA87E4FL); 
+ </font>II <font color="#0000ff">( </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>in<font color="#0000ff">[15], </font>S42<font color="#0000ff">, 0xFE2CE6E0L); 
+ </font>II <font color="#0000ff">( </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>in<font color="#0000ff">[ 6], </font>S43<font color="#0000ff">, 0xA3014314L); 
+ </font>II <font color="#0000ff">( </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>in<font color="#0000ff">[13], </font>S44<font color="#0000ff">, 0x4E0811A1L); 
+ </font>II <font color="#0000ff">( </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>in<font color="#0000ff">[ 4], </font>S41<font color="#0000ff">, 0xF7537E82L); 
+ </font>II <font color="#0000ff">( </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>in<font color="#0000ff">[11], </font>S42<font color="#0000ff">, 0xBD3AF235L); 
+ </font>II <font color="#0000ff">( </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>in<font color="#0000ff">[ 2], </font>S43<font color="#0000ff">, 0x2AD7D2BBL); 
+ </font>II <font color="#0000ff">( </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">, </font>a<font color="#0000ff">, </font>in<font color="#0000ff">[ 9], </font>S44<font color="#0000ff">, 0xEB86D391L); 
+
+ </font>buf<font color="#0000ff">[0] += </font>a<font color="#0000ff">;
+ </font>buf<font color="#0000ff">[1] += </font>b<font color="#0000ff">;
+ </font>buf<font color="#0000ff">[2] += </font>c<font color="#0000ff">;
+ </font>buf<font color="#0000ff">[3] += </font>d<font color="#0000ff">;
+}
+
+</font><font color="#000080">void </font>GetMD5<font color="#0000ff">(</font><font color="#000080">char</font><font color="#0000ff">* </font>pBuf<font color="#0000ff">, </font>UINT nLength<font color="#0000ff">,</font><font color="#000080">char</font><font color="#0000ff">* </font>cReturnStr<font color="#0000ff">){
+</font>MD5Init<font color="#0000ff">();
+</font>MD5Update<font color="#0000ff">(</font>pBuf<font color="#0000ff">, </font>nLength<font color="#0000ff">);
+</font>MD5Final<font color="#0000ff">(</font>cReturnStr<font color="#0000ff">);
+}
+</font></pre>Для удобстава можно пользоватся этой функцией:<br>
+<pre class="code">AnsiString MD5<font color="#0000ff">(</font>AnsiString in<font color="#0000ff">){</font>char out_char<font color="#0000ff">[32];
+</font>MD5_hash_calculator<font color="#0000ff">::</font>GetMD5<font color="#0000ff">(</font>in<font color="#0000ff">.</font>c_str<font color="#0000ff">(),</font>in<font color="#0000ff">.</font>Length<font color="#0000ff">(),</font>out_char<font color="#0000ff">);
+</font><font color="#000080">return </font>AnsiString<font color="#0000ff">(</font>out_char<font color="#0000ff">);}
+</font></pre>Пример использования:<br>
+<pre class="code">AnsiString in <font color="#0000ff">= (</font>InputBox<font color="#0000ff">(</font><font color="#1f6e2e">"Borland C++ Builder FAQ"</font><font color="#0000ff">, </font><font color="#1f6e2e">"Самый, самый форум: "</font><font color="#0000ff">, </font><font color="#1f6e2e">""</font><font color="#0000ff">));
+</font><font color="#000080">if </font><font color="#0000ff">(</font>MD5<font color="#0000ff">(</font>in<font color="#0000ff">) == </font><font color="#1f6e2e">"12d9e6b344f7cef712491290c67715b5"</font><font color="#0000ff">)
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>ShowMessage<font color="#0000ff">(</font><font color="#1f6e2e">"Правильно :)"</font><font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+</font></pre>
+<br>
+</td></tr></table>
+<!-- SOURCES.RU FOOTER -->
+<!--#include virtual="/ssi/bottom.html"-->
+<!-- /SOURCES.RU FOOTER -->

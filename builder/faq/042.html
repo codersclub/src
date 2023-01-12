@@ -1,0 +1,80 @@
+<html>
+<head>
+<title>Как не допустить второго запуска программы? - Borland C++ Builder FAQ</title>
+<link src="style.css" href='style.css' rel='stylesheet' type='text/css'>
+<meta http-equiv=Content-Type content="text/html; charset=windows-1251">
+<!-- SOURCES.RU HEADER -->
+<!--#include virtual="/ssi/top2.html"-->
+<!-- /SOURCES.RU HEADER -->
+<table width=100%>
+ <tr>
+  <td colspan=3>
+   <div class=header><font size="+1">Borland C++ Builder FAQ</font><br>
+	Составлен по материалам <a href="http://forum.sources.ru">форума</a>
+	на <a href="http://www.sources.ru">Исходниках.Ru</a></div>
+  </td>
+ </tr>
+ <tr>
+  <td width=45%></td>
+  <td width=10% valign=bottom><a href="index.html">Содержание</a></td>
+  <td width=45% align=right>Последнее обновление: 14.02.2004</strong></td>
+ </tr>
+</table>
+<hr width="90%">
+<table width="750" align="center">
+<tr><td>
+<p class=q>Как не допустить второго запуска программы?</p>
+<p class=ref>Автор: <strong>OlegGG</strong><br>
+Исходная ссылка: - - -</p>
+<dir>
+<b>Вариант #1</b> - Мутексы:<br>
+<br>
+В начале программы (ИМХО, лучше всего до "Application->Initialize();") пишем:<br>
+<pre class="code">hMutex <font color="#0000ff">= </font>CreateMutex<font color="#0000ff">(</font>NULL<font color="#0000ff">,</font><font color="#000080">true</font><font color="#0000ff">,</font><font color="#1f6e2e">"some_big_big_unique_mutex_name"</font><font color="#0000ff">);
+</font><font color="#000080">if </font><font color="#0000ff">(</font>GetLastError<font color="#0000ff">()==</font>ERROR_ALREADY_EXISTS<font color="#0000ff">)
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#999999">// мы уже есть - ругаемся и выходим
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>ShowMessage<font color="#0000ff">(</font><font color="#1f6e2e">"proga already loaded"</font><font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>Application<font color="#0000ff">-&gt;</font>Terminate<font color="#0000ff">();
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+</font></pre>В конце пишем:<br>
+<pre class="code">ReleaseMutex<font color="#0000ff">(</font>hMutex<font color="#0000ff">); </font><font color="#999999">// это обязательно, а то до перезагрузки прога второй раз не запустится
+</font></pre><b>Вариант #2</b> - Атомы:<br>
+<br>
+В принципе, аналогичный предыдущему вариант.<br>
+В начале программы (ИМХО, лучше всего до "Application->Initialize();") пишем:<br>
+<pre class="code">AnsiString AtomName <font color="#0000ff">= </font><font color="#1f6e2e">"some_big_big_unique_atom_name"</font><font color="#0000ff">;
+</font>ATOM Atom<font color="#0000ff">;
+
+</font><font color="#000080">if </font><font color="#0000ff">(</font>GlobalFindAtom<font color="#0000ff">(</font>AtomName<font color="#0000ff">.</font>c_str<font color="#0000ff">()) == 0)
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#999999">// создаём атом
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>Atom <font color="#0000ff">= </font>GlobalAddAtom<font color="#0000ff">(</font>AtomName<font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+</font><font color="#000080">else
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#0000ff">{
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#999999">// мы уже есть - ругаемся и выходим
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>ShowMessage<font color="#0000ff">(</font><font color="#1f6e2e">"proga already loaded"</font><font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>Application<font color="#0000ff">-&gt;</font>Terminate<font color="#0000ff">();
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+</font></pre>В конце пишем:<br>
+<pre class="code">GlobalDeleteAtom<font color="#0000ff">(</font>Atom<font color="#0000ff">); </font><font color="#999999">// это обязательно, ато до перезагрузки прога второй раз не запустится
+</font></pre><b>Вариант #3</b> - FindWindow:<br>
+<br>
+Для этого метода необходимо, чтобы главное окно вашей программы имело уникальное имя класса или заголовок.<br>
+Например, имя класса главной формы - "Tformochka". <br>
+Тогда в начале программы (ИМХО, лучше всего до "Application->Initialize();") пишем:<br>
+<br>
+<pre class="code">HWND hWnd <font color="#0000ff">= </font>FindWindow<font color="#0000ff">(</font><font color="#1f6e2e">"Tformochka"</font><font color="#0000ff">,</font>NULL<font color="#0000ff">); </font><font color="#999999">// ищем своё окно
+</font><font color="#000080">if </font><font color="#0000ff">(</font>hWnd<font color="#0000ff">!=</font>NULL<font color="#0000ff">) </font><font color="#999999">// если нашли
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#0000ff">{
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>ShowMessage<font color="#0000ff">(</font><font color="#1f6e2e">"proga already loaded"</font><font color="#0000ff">); </font><font color="#999999">// ругаемся
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>SetForegroundWindow<font color="#0000ff">(</font>hWnd<font color="#0000ff">); </font><font color="#999999">// активизируем предыдущую копию проги
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>Application<font color="#0000ff">-&gt;</font>Terminate<font color="#0000ff">(); </font><font color="#999999">// закрываемся
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#0000ff">}
+</font></pre>
+<br>
+</td></tr></table>
+<!-- SOURCES.RU FOOTER -->
+<!--#include virtual="/ssi/bottom.html"-->
+<!-- /SOURCES.RU FOOTER -->

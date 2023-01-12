@@ -1,0 +1,70 @@
+<html>
+<head>
+<title>Почему, когда я использую функцию KillProcByPid из вопроса "Как "убить" процесс, зная его pid?", некотрые процессы не "помирают"? - Borland C++ Builder FAQ</title>
+<link src="style.css" href='style.css' rel='stylesheet' type='text/css'>
+<meta http-equiv=Content-Type content="text/html; charset=windows-1251">
+<!-- SOURCES.RU HEADER -->
+<!--#include virtual="/ssi/top2.html"-->
+<!-- /SOURCES.RU HEADER -->
+<table width=100%>
+ <tr>
+  <td colspan=3>
+   <div class=header><font size="+1">Borland C++ Builder FAQ</font><br>
+	Составлен по материалам <a href="http://forum.sources.ru">форума</a>
+	на <a href="http://www.sources.ru">Исходниках.Ru</a></div>
+  </td>
+ </tr>
+ <tr>
+  <td width=45%></td>
+  <td width=10% valign=bottom><a href="index.html">Содержание</a></td>
+  <td width=45% align=right>Последнее обновление: 14.02.2004</strong></td>
+ </tr>
+</table>
+<hr width="90%">
+<table width="750" align="center">
+<tr><td>
+<p class=q>Почему, когда я использую функцию KillProcByPid из вопроса "Как "убить" процесс, зная его pid?", некотрые процессы не "помирают"?</p>
+<p class=ref>Автор: <strong>OlegGG</strong><br>
+Исходная ссылка: - - -</p>
+<dir>
+Да, такое может случиться, если попробовать "грохнуть", например, winlogon.exe.<br>
+Всё решается выполнением этой функции перед вызовом KillProcByPid:<br>
+<pre class="code"><font color="#000080">bool </font>SetDebugStatusForCurentProc<font color="#0000ff">()
+{
+</font>HANDLE hToken<font color="#0000ff">;
+</font>LUID DebugValue<font color="#0000ff">;
+</font>TOKEN_PRIVILEGES tkp<font color="#0000ff">;
+
+</font><font color="#000080">if </font><font color="#0000ff">(!</font>OpenProcessToken<font color="#0000ff">(</font>GetCurrentProcess<font color="#0000ff">(),</font>TOKEN_ADJUST_PRIVILEGES <font color="#0000ff">|
+</font>TOKEN_QUERY<font color="#0000ff">,&</font>hToken<font color="#0000ff">))
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">return false</font><font color="#0000ff">;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+
+</font><font color="#000080">if </font><font color="#0000ff">(!</font>LookupPrivilegeValue<font color="#0000ff">((</font>LPSTR<font color="#0000ff">) </font>NULL<font color="#0000ff">,</font>SE_DEBUG_NAME<font color="#0000ff">,&</font>DebugValue<font color="#0000ff">))
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">return false</font><font color="#0000ff">;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+
+</font>tkp<font color="#0000ff">.</font>PrivilegeCount <font color="#0000ff">= 1;
+</font>tkp<font color="#0000ff">.</font>Privileges<font color="#0000ff">[0].</font>Luid <font color="#0000ff">= </font>DebugValue<font color="#0000ff">;
+</font>tkp<font color="#0000ff">.</font>Privileges<font color="#0000ff">[0].</font>Attributes <font color="#0000ff">= </font>SE_PRIVILEGE_ENABLED<font color="#0000ff">;
+
+</font>AdjustTokenPrivileges<font color="#0000ff">(</font>hToken<font color="#0000ff">,</font>FALSE<font color="#0000ff">,&</font>tkp<font color="#0000ff">,</font><font color="#000080">sizeof</font><font color="#0000ff">(</font>TOKEN_PRIVILEGES<font color="#0000ff">),(</font>PTOKEN_PRIVILEGES<font color="#0000ff">)
+</font>NULL<font color="#0000ff">,(</font>PDWORD<font color="#0000ff">) </font>NULL<font color="#0000ff">);
+
+</font><font color="#000080">if </font><font color="#0000ff">(</font>GetLastError<font color="#0000ff">() != </font>ERROR_SUCCESS<font color="#0000ff">)
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">return false</font><font color="#0000ff">;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+
+</font><font color="#000080">return true</font><font color="#0000ff">;
+}
+</font></pre>PS перед тем как убивать винлогон сохраните ваши файлы<br>
+PPS если убить винлогон, будет ребут :D<br>
+PPPS за последствия я ответственности не несу!!!!!!!! :P
+<br>
+</td></tr></table>
+<!-- SOURCES.RU FOOTER -->
+<!--#include virtual="/ssi/bottom.html"-->
+<!-- /SOURCES.RU FOOTER -->

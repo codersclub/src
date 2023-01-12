@@ -1,0 +1,146 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как написать NT Сервис в C++ Builder 4</h3>
+    <p>Для создания приложения, которое является Win32
+    сервисом выберите <i>File | New</i>, а затем выберите <i>Service
+    Application</i> на странице <i>New Items</i>:</p>
+    <p align="center"><img src="bcb4-nts.gif" width="460" height="367"></p>
+    <p>В проект автоматически будет добавлена
+    глобальная переменная <i>Application</i>, которая будет
+    иметь тип <i>TServiceApplication.</i> Как только Вы создадите
+    сервисное приложение, то сразу увидите окошко,
+    которое отвечает за сервис <i>(TService)</i>. У Сервиса
+    так же есть свойства и обработчики событий,
+    которые можно настроить в Object Inspector. Как только
+    объект <i>TService</i> будет добавлен, то приложение уже
+    не сможет генерировать стандартные события и
+    оконные сообщения.</p>
+    <p><b>Пример:</b> Ниже приведён пример сервиса,
+    который имеет TServerSocket, порт которого установлен в
+    80. Так же этот пример создаёт текстовый файл в
+    директории <i>C:\Temp</i> с именем <i>WebLogxxx.log</i> (где xxx
+    это ThreadID). Каждым портом в системе может владеть
+    только одно приложение, поэтому если у Вас
+    запущен веб сервер, то необходимо его временно
+    выключить (остановить сервис).</p>
+    <p>Для просмотра результатов, запустите браузер и
+    в строке адреса наберите 'localhost' (без кавычек).
+    Браузер выдаст тайм-аут, однако теперь появится
+    файл weblogxxx.log в директории C:\temp.<ol>
+      <li>В <i>File | New</i> в диалоге <i>New Items</i> выберите <i>Service
+        Application</i>. Появится окно Service1. Из закладки Internet в
+        палитре компонентов добавьте компонент <i>ServerSocket</i>
+        в окно сервиса (Service1).</li>
+      <li>Далее добавьте в класс TService1, переменную типа <i>TMemoryStream</i>.
+        Заголовочный файл будет выглядеть следующим
+        образом:<table cellPadding="8" border="1">
+<TBODY>
+          <tr>
+            <td bgColor="#d5e6f7"><pre><i>//-----------------------------------------------------------
+#ifndef Unit1H
+#define Unit1H
+//-----------------------------------------------------------
+
+#include &lt;SysUtils.hpp&gt;
+#include &lt;Classes.hpp&gt;
+#include &lt;SvcMgr.hpp&gt;
+#include &lt;ScktComp.hpp&gt;
+//-----------------------------------------------------------</i>
+
+<b>class</b> TService1 : <b>public</b> TService
+{
+<b>__published</b>: <i>// IDE-managed Components</i>
+  TServerSocket *ServerSocket1;
+
+<b>private</b>: <i>// User declarations</i>
+  TMemoryStream *Stream; <i>// add this line here</i>
+
+<b>public</b>:  <i>// User declarations</i>
+  <b>__fastcall</b> TService1(TComponent* Owner);
+  PServiceController <b>__fastcall</b> GetServiceController(<b>void</b>);
+  <b>friend void __stdcall</b> ServiceController(<b>unsigned</b> CtrlCode);
+};
+<i>//-----------------------------------------------------------</i>
+
+<b>extern PACKAGE</b> TService1 *Service1;
+<i>//-----------------------------------------------------------</i>
+
+<i>#endif</i></pre>
+            </td>
+          </tr>
+</TBODY>
+        </table>
+      </li>
+      <li>Далее выберите компонент ServerSocket1, в Object Inspector,
+        сделайте двойной клик по событию OnClientRead и
+        добавьте следующий код в обработчик события:<table
+        cellPadding="8" border="1">
+<TBODY>
+          <tr>
+            <td bgColor="#d5e6f7"><pre><b>void</b> __fastcallTService1::ServerSocket1ClientRead(TObject
+      *Sender, TCustomWinSocket *Socket)
+{
+  <b>char *</b>Buffer = NULL;
+  <b>int</b> len = Socket-&gt;ReceiveLength();
+  <b>while</b> (len &gt; 0)
+  {
+    <b>try</b>
+    {
+      Buffer = (<b>char *</b>)<b>malloc</b>(len);
+      Socket-&gt;ReceiveBuf((<b>void *</b>)Buffer, len);
+      Stream-&gt;Write(Buffer, <b>strlen</b>(Buffer));
+    }
+    <b>__finally</b>
+    {
+      <b>free</b>(Buffer);
+    }
+    Stream-&gt;Seek(0, soFromBeginning);
+    AnsiString LogFile = <i>&quot;C:\\Temp\\WebLog&quot;</i>;
+    LogFile = LogFile + IntToStr(ServiceThread-&gt;ThreadID)
+                      + <i>&quot;.log&quot;</i>;
+    Stream-&gt;SaveToFile(LogFile);
+  }
+}</pre>
+            </td>
+          </tr>
+</TBODY>
+        </table>
+      </li>
+      <li>В заключение, выберите Service1 и добавьте
+        следующий код в обработчик события OnExecute:<table
+        cellPadding="8" border="1">
+<TBODY>
+          <tr>
+            <td bgColor="#d5e6f7"><pre><b>void __fastcall</b> TService1::Service1Execute(TService *Sender)
+{
+  Stream = <b>new</b> TMemoryStream();
+  <b>try</b>
+  {
+    ServerSocket1-&gt;Port = 80; // WWW port
+    ServerSocket1-&gt;Active = true;
+    <b>while</b> (!Terminated)
+       ServiceThread-&gt;ProcessRequests(false);
+    ServerSocket1-&gt;Active = false;
+  }
+  <b>__finally</b>
+  {
+    <b>delete</b> Stream;
+  }
+}</pre>
+            </td>
+          </tr>
+</TBODY>
+        </table>
+      </li>
+    </ol>
+    <p>&nbsp;</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

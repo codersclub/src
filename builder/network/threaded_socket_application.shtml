@@ -1,0 +1,304 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3 align="center">Создание многопотокового клиент-серверного
+    приложения в CBuilder.</h3>
+    <p>Компилятор: C++ Builder 5.x</p>
+    <p>В этой статье приводится исходный код и
+    описывается процесс создания многопотокового
+    сервера и клиентской программы.&nbsp; По запросам
+    клиента сервер создаёт потоки и ожидает
+    определённое время, ответа клиента.</p>
+    <p>Потоки создаваемые сервером, это потомки
+    TServerClientThread, поэтому мы не сможем использовать
+    объект New Thread. Вместо этого будем объявлять поток
+    вручную, наследуя его от TServerClientThread.<br>
+    &nbsp; </p>
+    <p>//--------------------------------------------------------------------------- <br>
+    // *****************&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ServerMain.cpp
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ***************** <br>
+    //--------------------------------------------------------------------------- <br>
+    //&nbsp; Requires:&nbsp;&nbsp; TServerSocket,&nbsp;&nbsp; TMemo <br>
+    #include &lt;vcl.h&gt; <br>
+    #pragma hdrstop <br>
+    #include &quot;ServerMain.h&quot; <br>
+    //--------------------------------------------------------------------------- <br>
+    #pragma package(smart_init) <br>
+    #pragma resource &quot;*.dfm&quot; <br>
+    TForm1 *Form1; <br>
+    //--------------------------------------------------------------------------- <br>
+    // Будем ждать клиента 60<br>
+    const int CLIENTWAITTIME = 60000; <br>
+    // Размер буфера для чтения/записи через сокетное
+    соединение<br>
+    const int BUFFERSIZE = 32; <br>
+    //--------------------------------------------------------------------------- </p>
+    <p>//--------------------------------------------------------------------------- <br>
+    __fastcall TForm1::TForm1(TComponent* Owner) <br>
+    &nbsp;&nbsp; : TForm(Owner) <br>
+    { <br>
+    } <br>
+    //--------------------------------------------------------------------------- </p>
+    <p>//--------------------------------------------------------------------------- <br>
+    // Вместо использования компоненты клиентского
+    сокета, который помещается на форму<br>
+    // из Палитры компонентов, поток сервер-клиент
+    должен использовать объект<br>
+    // TServerClientWinSocket, который создаётся когда ожидающий
+    сокет сервера<br>
+    // аксептит клиентское соединение.<br>
+    // Для обработки исключительных ситуаций можно
+    воспользоваться методом HandleException.<br>
+    void __fastcall TMyServerThread::ClientExecute(void) <br>
+    { <br>
+    &nbsp;&nbsp; // убеждаемся, что соединение активно<br>
+    &nbsp;&nbsp; while (!Terminated &amp;&amp; ClientSocket-&gt;Connected) <br>
+    &nbsp;&nbsp; { <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; try <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; { <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // Теперь ипользуем
+    TWinSocketStream для чтения или записи инфомации<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // через блокирующий
+    сокет<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; TWinSocketStream *pStream = new
+    TWinSocketStream(ClientSocket, CLIENTWAITTIME); </p>
+    <p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; try <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; { <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; char
+    buffer[BUFFERSIZE]; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; memset( buffer, 0,
+    sizeof(buffer) ); </p>
+    <p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // даём
+    клиенту 60 секунд для начала записи<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if
+    (pStream-&gt;WaitForData(CLIENTWAITTIME)) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; { <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if
+    (pStream-&gt;Read(buffer, sizeof(buffer)) == 0) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    // если не удаётся прочитать через 60 секунд, то
+    закрываем соединение<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    ClientSocket-&gt;Close(); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; { <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    // Клиент Серверу тестовый текст<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    Form1-&gt;Memo1-&gt;Lines-&gt;Add(AnsiString(&quot;(Client) &quot;) +AnsiString(buffer) );
+    </p>
+    <p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    // Возвращаем обратно клиенту<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    pStream-&gt;Write( buffer, sizeof(buffer)); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; } </p>
+    <p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; //
+    ... <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; //
+    Обработка запросов.<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; //
+    ... </p>
+    <p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; else <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    ClientSocket-&gt;Close(); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; __finally <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; { <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; delete pStream; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; } <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; catch (...) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; { <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; HandleException(); <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; } <br>
+    &nbsp;&nbsp; } <br>
+    } <br>
+    //--------------------------------------------------------------------------- </p>
+    <p>//--------------------------------------------------------------------------- <br>
+    void __fastcall TForm1::ServerSocket1GetThread(TObject *Sender, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; TServerClientWinSocket *ClientSocket, TServerClientThread
+    *&amp;SocketThread) <br>
+    { <br>
+    &nbsp;&nbsp; SocketThread = new TMyServerThread(false, ClientSocket); <br>
+    } <br>
+    //--------------------------------------------------------------------------- <br>
+    // ******************************************************* <br>
+    //--------------------------------------------------------------------------- <br>
+    &nbsp; <br>
+    &nbsp; </p>
+    <p>//--------------------------------------------------------------------------- <br>
+    // ******************&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ServerMain.h
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ****************** <br>
+    //--------------------------------------------------------------------------- <br>
+    //--------------------------------------------------------------------------- <br>
+    #ifndef ServerMainH <br>
+    #define ServerMainH <br>
+    //--------------------------------------------------------------------------- <br>
+    #include &lt;Classes.hpp&gt; <br>
+    #include &lt;Controls.hpp&gt; <br>
+    #include &lt;StdCtrls.hpp&gt; <br>
+    #include &lt;Forms.hpp&gt; <br>
+    #include &lt;ScktComp.hpp&gt; <br>
+    //--------------------------------------------------------------------------- <br>
+    class TForm1 : public TForm <br>
+    { <br>
+    &nbsp;&nbsp; __published: // IDE-компоненты<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; TServerSocket *ServerSocket1; <br>
+    &nbsp;&nbsp; TMemo *Memo1; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; void __fastcall ServerSocket1GetThread(TObject *Sender, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; TServerClientWinSocket *ClientSocket,
+    TServerClientThread *&amp;SocketThread); <br>
+    &nbsp;&nbsp; private:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; //
+    Пользовательские объявления<br>
+    &nbsp;&nbsp; public:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; //
+    Пользовательские объявления<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; __fastcall TForm1(TComponent* Owner); <br>
+    }; <br>
+    //--------------------------------------------------------------------------- <br>
+    extern PACKAGE TForm1 *Form1; <br>
+    //--------------------------------------------------------------------------- </p>
+    <p>//--------------------------------------------------------------------------- <br>
+    // Потоки в сервере наследуются от TServerClientThread.<br>
+    // Мы не сможем использовать объект New Thread.<br>
+    // Вместо этого будем объявлять поток вручную
+    следующим образом:<br>
+    class PACKAGE TMyServerThread : public Scktcomp::TServerClientThread <br>
+    { <br>
+    &nbsp;&nbsp; public: <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // если true, то перед тем как
+    завершить поток, устанавливаем FreeOnTerminate в false,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // и поток останется в кэше. А при
+    установке KeepInCache в false, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // после завершения выполнения
+    потока, он будет удалён.<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; __fastcall TMyServerThread(bool CreateSuspended,
+    TServerClientWinSocket* ASocket) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; :
+    Scktcomp::TServerClientThread(CreateSuspended, ASocket) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; { CreateSuspended = false;
+    KeepInCache=true; FreeOnTerminate=false; }; </p>
+    <p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // Чтобы включить этот поток,
+    переопределяем метод ClientExecute вместо Execute.<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; void __fastcall ClientExecute(void); <br>
+    }; <br>
+    //--------------------------------------------------------------------------- <br>
+    #endif <br>
+    //--------------------------------------------------------------------------- <br>
+    // ******************************************************* <br>
+    //--------------------------------------------------------------------------- <br>
+    &nbsp; <br>
+    &nbsp; </p>
+    <p>//--------------------------------------------------------------------------- <br>
+    // *****************&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ClientMain.cpp
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ***************** <br>
+    //--------------------------------------------------------------------------- <br>
+    //&nbsp; Requires:&nbsp; 2 TButtons, TMemo, TClientSocket <br>
+    #include &lt;vcl.h&gt; <br>
+    #pragma hdrstop <br>
+    #include &quot;ClientMain.h&quot; <br>
+    //--------------------------------------------------------------------------- <br>
+    #pragma package(smart_init) <br>
+    #pragma resource &quot;*.dfm&quot; <br>
+    TForm2 *Form2; <br>
+    //--------------------------------------------------------------------------- <br>
+    //--------------------------------------------------------------------------- <br>
+    __fastcall TForm2::TForm2(TComponent* Owner) <br>
+    &nbsp;&nbsp; : TForm(Owner) <br>
+    { <br>
+    } <br>
+    //--------------------------------------------------------------------------- </p>
+    <p>//--------------------------------------------------------------------------- <br>
+    void __fastcall TForm2::Button1Click(TObject *Sender) <br>
+    { <br>
+    &nbsp;&nbsp; if (ClientSocket1-&gt;Active) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ClientSocket1-&gt;Active = false; <br>
+    &nbsp;&nbsp; if (InputQuery(&quot;Computer to connect to&quot;, &quot;Address Name:&quot;,
+    Server)) <br>
+    &nbsp;&nbsp; { <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if (Server.Length() &gt; 0) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; { <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ClientSocket1-&gt;Host
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; =&nbsp; Server; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ClientSocket1-&gt;Active
+    &nbsp;&nbsp;&nbsp; =&nbsp; true; <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; } <br>
+    &nbsp;&nbsp; } <br>
+    } <br>
+    //--------------------------------------------------------------------------- </p>
+    <p>//--------------------------------------------------------------------------- <br>
+    void __fastcall TForm2::Button2Click(TObject *Sender) <br>
+    { <br>
+    &nbsp;&nbsp; ClientSocket1-&gt;Active = false; <br>
+    } <br>
+    //--------------------------------------------------------------------------- </p>
+    <p>//--------------------------------------------------------------------------- <br>
+    void __fastcall TForm2::ClientSocket1Read(TObject *Sender, TCustomWinSocket *Socket) <br>
+    { <br>
+    &nbsp;&nbsp; if (ClientSocket1-&gt;Active == true) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if (Socket-&gt;Connected == true) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Memo1-&gt;Lines-&gt;Add(
+    AnsiString(&quot;(Server) &quot;) +Socket-&gt;ReceiveText() ); <br>
+    } <br>
+    //--------------------------------------------------------------------------- </p>
+    <p>//--------------------------------------------------------------------------- <br>
+    void __fastcall TForm2::ClientSocket1Write(TObject *Sender, TCustomWinSocket *Socket) <br>
+    { <br>
+    &nbsp;&nbsp; if (ClientSocket1-&gt;Active == true) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if (Socket-&gt;Connected == true) <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Socket-&gt;SendText(&quot;This text is
+    passed to and fro&quot;); <br>
+    } <br>
+    //--------------------------------------------------------------------------- <br>
+    // ******************************************************* <br>
+    //--------------------------------------------------------------------------- <br>
+    &nbsp; <br>
+    &nbsp; </p>
+    <p>//--------------------------------------------------------------------------- <br>
+    // ******************&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ClientMain.h
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ****************** <br>
+    //--------------------------------------------------------------------------- <br>
+    //--------------------------------------------------------------------------- <br>
+    #ifndef ClientMainH <br>
+    #define ClientMainH <br>
+    //--------------------------------------------------------------------------- <br>
+    #include &lt;Classes.hpp&gt; <br>
+    #include &lt;Controls.hpp&gt; <br>
+    #include &lt;StdCtrls.hpp&gt; <br>
+    #include &lt;Forms.hpp&gt; <br>
+    #include &lt;ScktComp.hpp&gt; <br>
+    //--------------------------------------------------------------------------- <br>
+    class TForm2 : public TForm <br>
+    { <br>
+    __published: // IDE-managed Components <br>
+    &nbsp;&nbsp; TClientSocket *ClientSocket1; <br>
+    &nbsp;&nbsp; TButton *Button1; <br>
+    &nbsp;&nbsp; TButton *Button2; <br>
+    &nbsp;&nbsp; TMemo *Memo1; <br>
+    &nbsp;&nbsp; void __fastcall Button1Click(TObject *Sender); <br>
+    &nbsp;&nbsp; void __fastcall Button2Click(TObject *Sender); <br>
+    &nbsp;&nbsp; void __fastcall ClientSocket1Read(TObject *Sender, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; TCustomWinSocket *Socket); <br>
+    &nbsp;&nbsp; void __fastcall ClientSocket1Write(TObject *Sender, <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; TCustomWinSocket *Socket); <br>
+    private: // User declarations <br>
+    &nbsp;&nbsp; AnsiString Server; <br>
+    public:&nbsp; // User declarations <br>
+    &nbsp;&nbsp; __fastcall TForm2(TComponent* Owner); <br>
+    }; <br>
+    //--------------------------------------------------------------------------- <br>
+    extern PACKAGE TForm2 *Form2; <br>
+    //--------------------------------------------------------------------------- <br>
+    #endif <br>
+    //--------------------------------------------------------------------------- <br>
+    // ******************************************************* <br>
+    //--------------------------------------------------------------------------- </p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

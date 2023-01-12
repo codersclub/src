@@ -1,0 +1,93 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>јвтозаполнение в TComboBox.</h3>
+    <p> омпил€тор: C++ Builder</p>
+    <p>¬ данной статье объ€сн€етс€, как можно
+    реализовать автозаполнение в TComboBox наподобие
+    того, как это сделано в строке &quot;јдрес&quot; в
+    браузере. ƒл€ этого нам потребуетс€ перехватить
+    в TComboBox событи€ OnKeyDown и OnChange. ¬ обработчиках этих
+    событий мы будем производить поиск, замену и
+    выделение. ¬ообще-то Win32 ComboBox уже имеет
+    встроенную возможность автозаполнени€, однако
+    она не всегда включена. ƒл€ этого Win32 API имеет
+    несколько сообщений:</p>
+    <p>CB_FINDSTRING - ќсуществл€ет поиск строки, основанный
+    на чувствительном к регистру поиске первых
+    нескольких букв.</p>
+    <p>CB_FINDSTRINGEXACT - Ќаходит первую строчку в списке (list
+    box) комбобокса, котора€ удовлетвор€ет указанной
+    строке.</p>
+    <p>CB_SELECTSTRING - »щет в списке строку котора€
+    начинаетс€ с символов в указанной строке. ≈сли
+    удовлетвор€ющий пункт в списке найден, то он
+    копируетс€ в поле редактировани€.</p>
+    <p>ћы будем использовать только CB_FINDSTRING. ¬ этом
+    примере, дл€ заполнени€ списка, данные
+    загружаютс€ из таблицы customers.db из BCDEMOS, а затем
+    перехватыватс€ событи€ OnKeyDown и OnChange.</p>
+    <p>ѕеред тем, как начать поиск, CB_FINDSTRING получает в
+    первом параметре (wParam) номер пункта. “ак как мы
+    ищем по всему списку, то устанавливаем его в -1.
+    ¬торой параметр, это адрес строки дл€ поиска.</p>
+    <pre>------------- од--------------
+//cb это ComboBox
+//lastKey - приветный мембер TForm1
+
+
+__fastcall TForm1::TForm1(TComponent* Owner)
+  : TForm(Owner)
+{
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TForm1::FormCreate(TObject *Sender)
+{
+  Table1-&gt;Open(); 			//получаем данные из таблицы
+  Table1-&gt;First();
+  while (!Table1-&gt;Eof)
+  {
+    cb-&gt;Items-&gt;Add(Table1-&gt;FieldByName(&quot;Contact&quot;)-&gt;AsString);
+    Table1-&gt;Next();
+  }
+}
+//---------------------------------------------------------------------------
+void __fastcall TForm1::cbKeyDown(TObject *Sender, WORD &amp;Key,
+      TShiftState Shift)
+{
+  lastKey = Key; //получаем последнюю клавишу, нажатую в ComboBox
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TForm1::cbChange(TObject *Sender)
+{
+  String srch = cb-&gt;Text; //текст, который будем искать
+  if ((lastKey == 0x08) || (lastKey == VK_DELETE)) //если была нажата backspace
+  {						   //или delete, то выходим отсюда
+
+    lastKey = 0; 
+    return;
+  }
+  lastKey = 0;
+
+  int ix = cb-&gt;Perform(CB_FINDSTRING,-1,(LPARAM)srch.c_str()); //ищем строку в списке
+  if (ix != CB_ERR)
+  {
+    cb-&gt;ItemIndex = ix;  		//устанавливаем соответствующий текст ComboBox
+    cb-&gt;SelStart = srch.Length();
+    cb-&gt;SelLength = (cb-&gt;Text.Length()-srch.Length()); //выдел€ем соответствующий текст
+  }
+}
+//---------------------------------------------------------------------------
+</pre>
+    <p>&nbsp;</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->
