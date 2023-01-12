@@ -1,0 +1,94 @@
+<!--#include virtual="/ssi/top.html"-->
+
+<p><b>Как грохнуть процесс(в том числе системный)?</b></p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+  <tr>
+    <td width="750" bgcolor="#A5E4A7"><font face="Tahoma" style="font-size: 10pt" size="-1"><b>&nbsp;
+    Листинг 1</b></font></td>
+  </tr>
+</table>
+
+<pre>
+#include <windows.h>
+#include <stdio.h>
+#pragma hdrstop
+
+// fkill forces a kill -- it will attempt to enable SeDebugPrivilege
+// before opening its process handles, allowing it to kill processes
+// running under builtin\system (LocalSystem, to the users out there).
+
+int main( int argc, char *argv[] );
+void getDebugPriv( void );
+
+#define isBadHandle(h) ( (h) == NULL || (h) == INVALID_HANDLE_VALUE )
+#define lenof(x) ( sizeof (x) / sizeof ((x)[0]) )
+
+const int MAXPID = 1024;
+
+int main( int argc, char *argv[] )
+{
+ int pidCount, i, errors;
+ char *p;
+ HANDLE hProcess;
+ static DWORD pid[MAXPID];
+
+ // parse args, build PID list
+ errors = pidCount = 0;
+
+ for ( i = 1; i &lt;argc; i ++ )
+ {
+  if ( pidCount == lenof( pid ) ) {
+   errors ++;
+   break;
+  }
+
+  pid[pidCount] = strtol( argv[i], &amp;p, 0 );
+  if ( p == argv[i] || *p )
+   errors ++;
+  else
+   pidCount ++;
+ }
+
+ if ( errors || pidCount == 0 )
+ {
+  puts( &quot;Usage: fkill pid [...]&quot; );
+  puts( &quot;fkill tries to kill the processes specified by the PIDs. If the&quot; );
+  puts( &quot;user has debug privileges, fkill is able to kill system processes.&quot; );
+  puts( &quot;PIDs may be decimal, octal (starts with 0), or hex (starts with 0x).&quot; 
+);
+  return MAXPID + 1;
+ }
+
+ // try to acquire SeDebugPrivilege
+ getDebugPriv(); //см. faq выше
+
+ errors = 0;
+ // for each PID:
+ for ( i = 0; i &lt; pidCount; i ++ )
+ {
+  printf( &quot;pid %lu: &quot;, pid[i] );
+
+  // open process
+  hProcess = OpenProcess( PROCESS_TERMINATE, FALSE, pid[i] );
+  if ( isBadHandle( hProcess ) )
+   printf( &quot;OpenProcess() failed, err = %lu\n&quot;, GetLastError() );
+  else
+  {
+   // kill process
+   if ( ! TerminateProcess( hProcess, (DWORD) -1 ) )
+    printf( &quot;TerminateProcess() failed, err = %lu\n&quot;, GetLastError() );
+   else
+    puts( &quot;killed.&quot; );
+
+   // close handle
+   CloseHandle( hProcess );
+  }
+ }
+
+ return 0;
+}
+
+</pre>
+
+<!--#include virtual="/ssi/bottom.html"-->

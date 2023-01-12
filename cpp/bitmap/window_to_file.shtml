@@ -1,0 +1,110 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3 align="center"><font color="#a0a099">Запись изображения окна в
+    BMP файл</font></h3>
+    <hr align="center">
+    <p>Компилятор: Visual C++</p>
+    <p>Чтобы сохранить изображение окна в BMP файл,
+    необходимо нарисовать картинку на контексте
+    устройства, преобразовать битмап, связанный с DC в
+    памяти в устройство-независимый битмап, а затем
+    записать DIB в файл. Ниже преведена функция
+    WriteWindowToDIB(), в которой для решения нашей задачи
+    используются функции DDBToDIB() и WriteDIB().</p>
+    <p>Давайте разберёмся, как создаётся изображение
+    окна на контексте устройства в памяти и как
+    создаётся логическая палитра, которая отвечает
+    за изображение. Для начала создадим DC в памяти,
+    совместимый с оконным DC. Далее создадим
+    совместимый битмап, который имеет такой же
+    размер как и окно. Затем воспользуемся BitBlt(),
+    чтобы передать изображение в DC в памяти, получив
+    тем самым битмап.</p>
+    <p>Однако, это только половина работы; другая
+    половина заключается в том, чтобы получить
+    логическую палитру, которая будет
+    использоваться с битмапом. Если битмапу
+    требуется логическая палитра, и она не будет
+    доступна, то битмап не захочет правильно
+    отображаться. Воспользуемся функцией GetDeviceCaps(),
+    чтобы определить, поддерживает ли дисплей
+    манипуляции с палитрой. Далее выделяем
+    достаточное количество памяти для структуры
+    LOGPALETTE, а затем используем GetSystemPaletteEntries() чтобы
+    заполнить таблицу цветов. Теперь мы можем
+    спокойно создать логическую палитру.</p>
+    <p>В заключение используются функции DDBToDIB() и
+    WriteDIB(). Обратите внимание, что если окно частично
+    перекрывается другими окнами, то в сохранённом
+    битмапе будут содержаться части этих окон.</p>
+    <tt><tt><tt><tt><tt><font color="#990000"><p><tt>&nbsp;</p>
+    <pre><tt>BOOL WriteWindowToDIB( LPTSTR szFile, CWnd *pWnd )
+{
+	CBitmap 	bitmap;
+	CWindowDC	dc(pWnd);
+	CDC 		memDC;
+	CRect		rect;
+
+	memDC.CreateCompatibleDC(&amp;dc); 
+
+	pWnd-&gt;GetWindowRect(rect);
+
+	bitmap.CreateCompatibleBitmap(&amp;dc, rect.Width(),rect.Height() );
+	
+	CBitmap* pOldBitmap = memDC.SelectObject(&amp;bitmap);
+	memDC.BitBlt(0, 0, rect.Width(),rect.Height(), &amp;dc, 0, 0, SRCCOPY); 
+
+	//</font><font
+color="#009900">Если устройство поддерживает палитру, то создаём логическую палитру</font><font
+color="#990000">
+	CPalette pal;
+	<font color="#0000ff">if</font>( dc.GetDeviceCaps(RASTERCAPS) &amp; RC_PALETTE )
+	{
+		UINT nSize = <font
+color="#0000ff">sizeof</font>(LOGPALETTE) + (<font color="#0000ff">sizeof</font>(PALETTEENTRY) * 256);
+		LOGPALETTE *pLP = (LOGPALETTE *) <font
+color="#0000ff">new</font> BYTE[nSize];
+		pLP-&gt;palVersion = 0x300;
+
+		pLP-&gt;palNumEntries = 
+			GetSystemPaletteEntries( dc, 0, 255, pLP-&gt;palPalEntry );
+
+		// </font><font
+color="#009900">Создаём палитру</font><font color="#990000">
+		pal.CreatePalette( pLP );
+
+		<font
+color="#0000ff">delete</font>[] pLP;
+	}
+
+	memDC.SelectObject(pOldBitmap);
+
+	// </font><font
+color="#009900">Преобразуем битмап в DIB</font><font color="#990000">
+	HANDLE hDIB = DDBToDIB( bitmap, BI_RGB, &amp;pal );
+
+	<font
+color="#0000ff">if</font>( hDIB == NULL )
+		<font color="#0000ff">return</font> FALSE;
+
+	// </font><font
+color="#009900">Записываем в файл</font><font color="#990000">
+	WriteDIB( szFile, hDIB );
+
+	// </font><font
+color="#009900">Освобождаем память выделенную DDBToDIB для DIB</font><font
+color="#990000">
+	GlobalFree( hDIB );
+	<font color="#0000ff">return</font> TRUE;
+}
+</font></tt></tt></tt></tt></tt></tt></tt></pre>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

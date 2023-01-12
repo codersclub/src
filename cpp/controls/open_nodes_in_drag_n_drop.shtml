@@ -1,0 +1,249 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3 align="center"><b>Раскрытие ветвей во время
+    перетаскивания</b></h3>
+    <p>Здесь приводится пример элемента управления,
+    который раскрывает ветвь через две секунды после
+    того, как над ним завис курсор с перетаскиваемым
+    элементом.<br>
+    Члены-перемнные, которые должны быть объявлены: </p>
+    <pre><tt><b>
+        CImageList*     m_pDragImage;
+        HTREEITEM       m_htiDrag, m_htiDrop, m_htiOldDrop;
+        bool            m_bLDragging;
+        UINT            m_idTimer;
+     </b></tt></pre>
+    <p>Код включенный в обработчик <b>OnMouseMove()</b>: </p>
+    <pre><tt><b>
+if( m_idTimer &amp;&amp; hti == m_htiOldDrop )
+{
+        KillTimer( m_idTimer );
+        m_idTimer = 0;
+}
+                        
+if( !m_idTimer )
+        m_idTimer = SetTimer( 1000, 2000, NULL );
+</b></tt></pre>
+    <p>Теперь в ответе на сообщение таймера, мы
+    подсвечиваем элемент и проверяем нет ли у него
+    разветвлений. Если есть, разворачиваем их. </p>
+    <pre><tt><b>
+void CDragView::OnTimer(UINT nIDEvent) 
+{
+        if( nIDEvent == m_idTimer )
+        {
+                CTreeCtrl&amp; theTree = GetTreeCtrl();
+                HTREEITEM htiFloat = theTree.GetDropHilightItem();
+                if( htiFloat &amp;&amp; htiFloat == m_htiDrop )
+                {
+                        if( theTree.ItemHasChildren( htiFloat ) )
+                                theTree.Expand( htiFloat, TVE_EXPAND );
+                }
+        }
+
+        CTreeView::OnTimer(nIDEvent);
+}
+</b></tt></pre>
+    <p>Приведенный ниже код поможет Вам более полно
+    оценить метод: </p>
+    <pre><tt><b>
+
+void CDragView::OnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult) 
+{
+	NM_TREEVIEW* pNMTreeView = (NM_TREEVIEW*)pNMHDR;
+
+	m_htiDrag = pNMTreeView-&gt;itemNew.hItem;
+	m_htiDrop = NULL;
+
+	m_pDragImage = GetTreeCtrl().CreateDragImage( m_htiDrag );
+	if( !m_pDragImage )
+		return;
+
+	m_bLDragging = true;
+
+	CPoint pt(0,0);
+	
+	IMAGEINFO ii;
+	m_pDragImage-&gt;GetImageInfo( 0, &amp;ii );
+	pt.x = (ii.rcImage.right - ii.rcImage.left) / 2;
+	pt.y = (ii.rcImage.bottom - ii.rcImage.top) / 2;
+
+	m_pDragImage-&gt;BeginDrag( 0, pt );
+	pt = pNMTreeView-&gt;ptDrag;
+	ClientToScreen( &amp;pt );
+	m_pDragImage-&gt;DragEnter(NULL,pt);
+	
+	SetCapture();
+
+	*pResult = 0;
+}
+
+void CDragView::OnLButtonUp(UINT nFlags, CPoint point) 
+{
+	CTreeView::OnLButtonUp(nFlags, point);
+
+	if( m_bLDragging )
+	{
+		CTreeCtrl&amp; theTree = GetTreeCtrl();
+
+		m_bLDragging = false;
+
+		CImageList::DragLeave(this);
+		CImageList::EndDrag();
+
+		ReleaseCapture();
+
+		delete m_pDragImage;
+
+		theTree.SelectDropTarget(NULL);
+		m_htiOldDrop = NULL;
+
+		if( m_htiDrag == m_htiDrop )
+			return;
+
+		HTREEITEM htiParent = m_htiDrop;
+		while( (htiParent = theTree.GetParentItem(htiParent)) != NULL )
+		{
+			if( htiParent == m_htiDrag ) return;
+		}
+
+		theTree.Expand( m_htiDrop, TVE_EXPAND );
+
+		HTREEITEM htiNew = CopyBranch( m_htiDrag, m_htiDrop, TVI_LAST );
+		theTree.DeleteItem(m_htiDrag);
+		theTree.SelectItem( htiNew );
+
+		if( m_idTimer )
+		{
+			KillTimer( m_idTimer );
+			m_idTimer = 0;
+		}
+	}
+}
+
+void CDragView::OnMouseMove(UINT nFlags, CPoint point) 
+{
+	CTreeView::OnMouseMove(nFlags, point);
+
+	HTREEITEM hti;
+	UINT      flags;
+
+	if( m_bLDragging )
+	{
+		CTreeCtrl&amp; theTree = GetTreeCtrl();
+		POINT pt = point;
+		ClientToScreen( &amp;pt );
+		CImageList::DragMove(pt);
+		
+		hti = theTree.HitTest(point,&amp;flags);
+		if( hti != NULL )
+		{
+			CImageList::DragShowNolock(FALSE);
+
+			if( m_htiOldDrop == NULL )
+				m_htiOldDrop = theTree.GetDropHilightItem();
+
+			theTree.SelectDropTarget(hti);
+			
+			m_htiDrop = hti;
+			
+			if( m_idTimer &amp;&amp; hti == m_htiOldDrop )
+			{
+				KillTimer( m_idTimer );
+				m_idTimer = 0;
+			}
+			
+			if( !m_idTimer )
+				m_idTimer = SetTimer( 1000, 2000, NULL );
+
+			CImageList::DragShowNolock(TRUE);
+		}
+	}
+}
+
+HTREEITEM CDragView::CopyItem
+	(
+		HTREEITEM hti,
+		HTREEITEM htiNewParent,
+		HTREEITEM htiAfter // = TVI_LAST
+	)
+{
+	CTreeCtrl&amp; theTree = GetTreeCtrl();
+
+	TVINSERTSTRUCT insert;
+	::ZeroMemory(&amp;insert, sizeof(TVINSERTSTRUCT));
+
+	HTREEITEM htiNew = NULL;
+	CString text;
+
+	insert.item.hItem = hti;
+	insert.item.mask = TVIF_CHILDREN|TVIF_HANDLE|TVIF_IMAGE|TVIF_SELECTEDIMAGE;
+	theTree.GetItem(&amp;(insert.item));
+	text = theTree.GetItemText( hti );
+
+	insert.item.cchTextMax = text.GetLength();
+	insert.item.pszText = text.LockBuffer();
+
+	insert.hParent = htiNewParent;
+	insert.hInsertAfter = htiAfter;
+	insert.item.mask = TVIF_IMAGE|TVIF_SELECTEDIMAGE|TVIF_TEXT;
+	htiNew = theTree.InsertItem(&amp;insert);
+	text.UnlockBuffer();
+
+	theTree.SetItemData( htiNew, theTree.GetItemData( hti ) );
+	theTree.SetItemState( htiNew, theTree.GetItemState( hti,
+                            TVIS_STATEIMAGEMASK ), TVIS_STATEIMAGEMASK );
+
+	return htiNew;
+}
+
+HTREEITEM CDragView::CopyBranch
+	(
+		HTREEITEM hti,
+		HTREEITEM htiNewParent,
+		HTREEITEM htiAfter // = TVI_LAST
+	)
+{
+	CTreeCtrl&amp; theTree = GetTreeCtrl();
+
+	HTREEITEM htiChild = NULL;
+
+	HTREEITEM htiNew = CopyItem( hti, htiNewParent, htiAfter );
+	htiChild = theTree.GetChildItem( hti );
+	while( htiChild != NULL )
+	{
+		CopyBranch( htiChild, htiNew );
+		htiChild = theTree.GetNextSiblingItem( htiChild );
+	}
+
+	return htiNew;
+}
+
+void CDragView::OnDestroy() 
+{
+	CImageList* pImage = GetTreeCtrl().GetImageList( TVSIL_NORMAL );
+	delete pImage;
+
+	if( m_idTimer )
+	{
+		KillTimer( m_idTimer );
+		m_idTimer = 0;
+	}
+
+	CTreeView::OnDestroy();
+}
+</b></tt></pre>
+    <pre><tt><b>
+</b></tt></pre>
+    <p>&nbsp;</p>
+    <p align="right">Источник: <a
+    href="http://www.dol.ru/azher/proto/visual/index.html">ProtoSphere</a></p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

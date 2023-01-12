@@ -1,0 +1,413 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3 align="center"><font color="#a0a099">Рисуем объёмное RGB-распределение
+    цветной картинки, используя OpenGL </font></h3>
+    <hr>
+    <p>Авторы: <a href="mailto:magali.maziere@rd.francetelecom.fr">Pierre Alliez и
+    Magali Maziere</a>. </p>
+    <p>Цель данного примера - показать, как можно цвета
+    обыкновенной картинки разпределить в объёме (в
+    данном случае в кубе). И при всём при том сделать
+    это при помощи OpenGL :) Не знаю зачем это надо, но
+    обезьянка на рисунке красивая :)</p>
+    <p><img src="GlColor1.jpg" width="300" height="311"></p>
+    <span class="figureCaption"><p>Рисунок 1: Наша цель отобразить
+    на экране в палитре RGB цветов это 24 битное BMP
+    цветное изображение интуитивным способом. OpenGL
+    поможет нам в этом.</span> </p>
+    <p><img src="GlColor2.jpg" width="300" height="297"></p>
+    <span class="figureCaption"><p>Рисунок 2: Иллюстрирует две
+    точки обзора цветного распределения в диалоге.
+    Точка обзора изменяется левой кнопкой мышки,
+    которая позволяет вращать изображение в
+    координатах x/y, диалог может быть увеличен или
+    уменьшен и всплывающее меню позволяет загрузить
+    и просмотреть текущую картинку (Рисунок 3).</span> </p>
+    <p><img src="GlColor3.jpg" width="300" height="297"></p>
+    <span class="figureCaption"><p>Рисунок 3: Два примера цветного
+    распределения в RGB кубе, видимое под двумя
+    точками обозрения. В частности красное
+    затемнение компонуется с носовой частью бабуина,
+    показанного на рисунке 1. Облако рисуется при
+    помощи GL_POINTS.</span> </p>
+    <p><img src="GlColor4.jpg" width="441" height="448"></p>
+    <span class="figureCaption"><p>Рисунок 4: Всплывающее меню
+    позволяет загружать 24 битовую RGB картинку,
+    изменять бэкграунд OpenGL, и смотреть изображение в
+    диалоговом окне.</span> </p>
+    <h3>Инициализация движка рендеринга</h3>
+    <p>Следующие строки инициализируют движок в
+    диалоге. </p>
+    <pre><span class="codeComment">//*********************************</span>
+<span
+class="codeComment">// OnCreate </span>
+<span class="codeComment">//*********************************</span>
+int CColorDlg::OnCreate(LPCREATESTRUCT lpCreateStruct) 
+{
+ <span
+class="codeComment">// Инициализируем движок OpenGL</span>
+ HWND hWnd = GetSafeHwnd();
+ HDC hDC = ::GetDC(hWnd);
+
+ if(SetWindowPixelFormat(hDC)==FALSE)
+  return 0;
+
+ if(CreateViewGLContext(hDC)==FALSE)
+  return 0;
+
+ <span
+class="codeComment">// Линии антиалиасинга</span>
+ glEnable(GL_LINE_SMOOTH);
+ glEnable(GL_BLEND);
+ glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+ glHint(GL_LINE_SMOOTH_HINT,GL_NICEST);
+ glLineWidth(1.5); <span
+class="codeComment">// required</span>
+ glPointSize(1.0);
+ glPolygonMode(GL_FRONT,GL_LINE);
+ glPolygonMode(GL_BACK,GL_LINE);
+ glShadeModel(GL_SMOOTH);
+
+ <span
+class="codeComment">// Вычисленные списки дисплея</span>
+ BuildListCube();
+ BuildListCloud();
+
+ return 0;
+}</pre>
+    <pre><span class="codeComment">//**********************************************</span>
+<span
+class="codeComment">// OpenGL</span>
+<span class="codeComment">//**********************************************</span>
+BOOL CColorDlg::SetWindowPixelFormat(HDC hDC)
+{
+ PIXELFORMATDESCRIPTOR pixelDesc;
+
+ pixelDesc.nSize = sizeof(PIXELFORMATDESCRIPTOR);
+ pixelDesc.nVersion = 1;
+
+ pixelDesc.dwFlags = PFD_DRAW_TO_WINDOW 
+                   | PFD_SUPPORT_OPENGL 
+                   | PFD_DOUBLEBUFFER 
+                   | PFD_STEREO_DONTCARE;
+
+ pixelDesc.iPixelType = PFD_TYPE_RGBA;
+ pixelDesc.cColorBits = 32;
+ pixelDesc.cRedBits = 8;
+ pixelDesc.cRedShift = 16;
+ pixelDesc.cGreenBits = 8;
+ pixelDesc.cGreenShift = 8;
+ pixelDesc.cBlueBits = 8;
+ pixelDesc.cBlueShift = 0;
+ pixelDesc.cAlphaBits = 0;
+ pixelDesc.cAlphaShift = 0;
+ pixelDesc.cAccumBits = 64;
+ pixelDesc.cAccumRedBits = 16;
+ pixelDesc.cAccumGreenBits = 16;
+ pixelDesc.cAccumBlueBits = 16;
+ pixelDesc.cAccumAlphaBits = 0;
+ pixelDesc.cDepthBits = 32;
+ pixelDesc.cStencilBits = 8;
+ pixelDesc.cAuxBuffers = 0;
+ pixelDesc.iLayerType = PFD_MAIN_PLANE;
+ pixelDesc.bReserved = 0;
+ pixelDesc.dwLayerMask = 0;
+ pixelDesc.dwVisibleMask = 0;
+ pixelDesc.dwDamageMask = 0;
+
+ m_GLPixelIndex = ChoosePixelFormat(hDC,&amp;pixelDesc);
+ if(m_GLPixelIndex==0) <span
+class="codeComment">// выбираем default</span>
+ {
+  m_GLPixelIndex = 1;
+  if(!DescribePixelFormat(hDC,m_GLPixelIndex,
+  sizeof(PIXELFORMATDESCRIPTOR),&amp;pixelDesc))
+  return FALSE;
+ }
+
+ if(!SetPixelFormat(hDC,m_GLPixelIndex,&amp;pixelDesc))
+  return FALSE;
+
+ return TRUE;
+}
+
+<span
+class="codeComment">//*********************************</span>
+<span class="codeComment">// CreateViewGLContext </span>
+<span
+class="codeComment">//*********************************</span>
+BOOL CColorDlg::CreateViewGLContext(HDC hDC)
+{
+ m_hGLContext = wglCreateContext(hDC);
+
+ if(m_hGLContext==NULL)
+  return FALSE;
+
+ if(wglMakeCurrent(hDC,m_hGLContext)==FALSE)
+  return FALSE;
+
+ return TRUE;
+}</pre>
+    <pre><span class="codeComment">//*********************************</span>
+<span
+class="codeComment">// OnDestroy </span>
+<span class="codeComment">//*********************************</span>
+void CColorDlg::OnDestroy() 
+{
+ CDialog::OnDestroy();
+
+ if(wglGetCurrentContext() != NULL)
+  wglMakeCurrent(NULL,NULL);
+
+ if(m_hGLContext != NULL)
+ {
+  wglDeleteContext(m_hGLContext);
+  m_hGLContext = NULL;
+ }
+
+ glDeleteLists(1,2);
+}</pre>
+    <h3>РЕНДЕРИНГ</h3>
+    <p>RGB куб и облака рендерятся в двух отдельных
+    списках. Куб - всегда остаётся постоянным, в то
+    время как облако вычисляется каждый раз при
+    загрузке новой картинки. </p>
+    <pre><span class="codeComment">//*********************************</span>
+<span
+class="codeComment">// OnPaint </span>
+<span class="codeComment">//*********************************</span>
+void CColorDlg::OnPaint() 
+{
+ <span
+class="codeComment">// ** Draw scene **</span>
+ CPaintDC dc(this);
+ RenderScene();
+ SwapBuffers(dc.m_ps.hdc); <span
+class="codeComment">// двойной буфер</span>
+}</pre>
+    <pre><span class="codeComment">//*********************************</span>
+<span
+class="codeComment">// RenderScene </span>
+<span class="codeComment">//*********************************</span>
+void CColorDlg::RenderScene()
+{
+ ::glClearColor((float)GetRValue(m_BackColor)/255.0f,
+                (float)GetGValue(m_BackColor)/255.0f,
+                (float)GetBValue(m_BackColor)/255.0f,1.0f);
+ ::glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+ ::glPushMatrix();
+ ::glTranslated(0.0,0.0,-8.0);
+ ::glRotated(m_xRotate, 1.0, 0.0, 0.0);
+ ::glRotated(m_yRotate, 0.0, 1.0, 0.0);
+ ::glCallList(1); <span
+class="codeComment">// cube</span>
+ ::glCallList(2); <span class="codeComment">// clouds</span>
+ ::glPopMatrix();
+}
+
+<span
+class="codeComment">//***********************************************</span>
+<span
+class="codeComment">// BuildList</span>
+<span class="codeComment">//***********************************************</span>
+void CColorDlg::BuildListCube(BOOL list)
+{
+ GLUquadricObj* pQuadric = gluNewQuadric();
+
+ if(list)
+  ::glNewList(1,GL_COMPILE_AND_EXECUTE);
+
+ float x = m_Size;
+
+ <span
+class="codeComment">// RGB куб</span>
+ glBegin(GL_LINE_LOOP);
+  glColor3ub(0,0,0);
+  glVertex3d(-x,-x,-x);
+  glColor3ub(255,0,0);
+  glVertex3d(x,-x,-x);
+  glColor3ub(255,255,0);
+  glVertex3d(x,x,-x);
+  glColor3ub(0,255,0);
+  glVertex3d(-x,x,-x);
+ glEnd();
+
+ glBegin(GL_LINE_LOOP);
+  glColor3ub(0,0,255);
+  glVertex3d(-x,-x,x);
+  glColor3ub(255,0,255);
+  glVertex3d(x,-x,x);
+  glColor3ub(255,255,255);
+  glVertex3d(x,x,x);
+  glColor3ub(0,255,255);
+  glVertex3d(-x,x,x);
+ glEnd();
+
+ glBegin(GL_LINES);
+  glColor3ub(0,0,0);
+  glVertex3d(-x,-x,-x);
+  glColor3ub(0,0,255);
+  glVertex3d(-x,-x,x);
+  glColor3ub(255,0,0);
+  glVertex3d(x,-x,-x);
+  glColor3ub(255,0,255);
+  glVertex3d(x,-x,x);
+  glColor3ub(255,255,0);
+  glVertex3d(x,x,-x);
+  glColor3ub(255,255,255);
+  glVertex3d(x,x,x);
+  glColor3ub(0,255,0);
+  glVertex3d(-x,x,-x);
+  glColor3ub(0,255,255);
+  glVertex3d(-x,x,x);
+ glEnd();
+
+ <span
+class="codeComment">// Сферы</span>
+ glPolygonMode(GL_FRONT,GL_FILL);
+ glPolygonMode(GL_BACK,GL_FILL);
+ float radius = 0.1f;
+
+ glPushMatrix();
+ glTranslated(-m_Size,-m_Size,-m_Size);
+ glColor3ub(0,0,0);
+ gluSphere(pQuadric,radius,12,12); 
+ glPopMatrix();
+
+ glPushMatrix();
+ glTranslated(m_Size,-m_Size,-m_Size);
+ glColor3ub(255,0,0);
+ gluSphere(pQuadric,radius,12,12); 
+ glPopMatrix();
+
+ glPushMatrix();
+ glTranslated(-m_Size,m_Size,-m_Size);
+ glColor3ub(0,255,0);
+ gluSphere(pQuadric,radius,12,12); 
+ glPopMatrix();
+
+ glPushMatrix();
+ glTranslated(-m_Size,-m_Size,m_Size);
+ glColor3ub(0,0,255);
+ gluSphere(pQuadric,radius,12,12); 
+ glPopMatrix();
+
+ glPushMatrix();
+ glTranslated(m_Size,m_Size,-m_Size);
+ glColor3ub(255,255,0);
+ gluSphere(pQuadric,radius,12,12); 
+ glPopMatrix();
+
+ glPushMatrix();
+ glTranslated(-m_Size,m_Size,m_Size);
+ glColor3ub(0,255,255);
+ gluSphere(pQuadric,radius,12,12); 
+ glPopMatrix();
+
+ glPushMatrix();
+ glTranslated(m_Size,-m_Size,m_Size);
+ glColor3ub(255,0,255);
+ gluSphere(pQuadric,radius,12,12); 
+ glPopMatrix();
+
+ glPushMatrix();
+ glTranslated(m_Size,m_Size,m_Size);
+ glColor3ub(255,255,255);
+ gluSphere(pQuadric,radius,12,12); 
+ glPopMatrix();
+
+ if(list)
+  ::glEndList();
+
+ gluDeleteQuadric(pQuadric);
+}
+
+<span
+class="codeComment">//***********************************************</span>
+<span
+class="codeComment">// BuildListCloud</span>
+<span class="codeComment">//***********************************************</span>
+void CColorDlg::BuildListCloud()
+{
+ TRACE(&quot;Build list cloud...&quot;);
+
+ <span
+class="codeComment">// Область изображения</span>
+ unsigned int area = m_Image.GetWidth()
+                   * m_Image.GetHeight();
+
+ TRACE(&quot;area : %d...&quot;,area);
+
+ <span
+class="codeComment">// Необходимо, чтобы картинка была 24 бита</span>
+ if(area == 0 ||
+  m_Image.GetDepth() != 24)
+ return;
+
+ <span
+class="codeComment">// Максимум -&gt; область отчётливых цветов / 2^24</span>
+ <span
+class="codeComment">// Эта таблица занимает прилично памати, но на короткое время</span>
+ TRACE(&quot;alloc...&quot;);
+ unsigned char *pTable = new unsigned char[16777216];
+ memset(pTable,0,16777216); <span
+class="codeComment">// init 0</span>
+
+ <span class="codeComment">// Содержимое картинки</span>
+ unsigned int wb32 = m_Image.GetWidthByte32();
+ unsigned char *pData = m_Image.GetData();
+
+ <span
+class="codeComment">// Строим новый список</span>
+ TRACE(&quot;build list...&quot;);
+ int nb = 0;
+ ::glNewList(2,GL_COMPILE_AND_EXECUTE);
+ glBegin(GL_POINTS);
+ float tmp = 2.0f/255.0f*m_Size;
+ for(unsigned int j=0;j&lt;m_Image.GetHeight();j++)
+  for(unsigned int i=0;i&lt;m_Image.GetWidth();i++)
+  {
+   unsigned char b = pData[wb32*j+3*i];
+   unsigned char g = pData[wb32*j+3*i+1];
+   unsigned char r = pData[wb32*j+3*i+2];
+   if(!pTable[b*65536+g*256+r])
+   {
+    glColor3ub(r,g,b);
+    float x = -m_Size+(float)r*tmp;
+    float y = -m_Size+(float)g*tmp;
+    float z = -m_Size+(float)b*tmp;
+    glVertex3d(x,y,z);
+    pTable[b*65536+g*256+r] = 1;
+    nb++;
+   }
+  }
+ 
+ glEnd();
+ ::glEndList();
+ TRACE(&quot;%d points...&quot;,nb);
+
+ TRACE(&quot;cleanup...&quot;);
+ delete [] pTable;
+ TRACE(&quot;ok\n&quot;);
+}</pre>
+    <h3>Downloads</h3>
+    <p><a href="GlColor.zip">Скачать демонстрационный проект -
+    530 Kb</a><br>
+    <a href="GlColor_src.zip">Скачать исходник - 10 Kb</a></p>
+    <h3 align="center"><br>
+    </h3>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div></TBODY>
+
+
+<p align="center"><br>
+<br>
+</p>
+<!--#include virtual="/ssi/bottom.html"-->

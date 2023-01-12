@@ -1,0 +1,204 @@
+<!--#include virtual="/ssi/top.html"-->
+
+<p>&nbsp;</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+  <tr>
+    <td width="750" bgcolor="#A5E4A7"><font face="Tahoma" style="font-size: 10pt" size="-1"><b>&nbsp;
+    Ћистинг 1 (создаЄт в реестре NT учЄтную запись
+    сервиса) setup.cpp</b></font></td>
+  </tr>
+</table>
+
+<pre>
+include &lt;windows.h&gt;
+
+char infomes[512];
+char servicedir[MAX_PATH];
+
+int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR lpCmdLine, int nCmdShow)
+{
+	lstrcpy(infomes, &quot;Service succesful creat at path:\n&quot;);
+	lstrcpy(servicedir, &quot;%SystemRoot%\\System32\\service.exe&quot;);
+
+	SC_HANDLE scm=OpenSCManager(NULL,NULL,SC_MANAGER_CREATE_SERVICE);
+	if(scm!=NULL) {
+		SC_HANDLE svc=CreateService(scm,
+			&quot;Terra-Incognita&quot;,
+			&quot;Terra-Incognita&quot;,
+			0,
+			SERVICE_WIN32_OWN_PROCESS | SERVICE_INTERACTIVE_PROCESS,
+			SERVICE_AUTO_START,
+			SERVICE_ERROR_IGNORE,
+			servicedir,
+			NULL,
+			NULL,
+			NULL,
+			NULL,
+			NULL);
+	
+		if(svc!=NULL) {
+			CloseServiceHandle(svc);
+			strcat(infomes, servicedir);
+			MessageBox(NULL, infomes, &quot;Install&quot;, NULL);
+		}
+		CloseServiceHandle(scm);
+	}
+	else  {
+		MessageBox(NULL, &quot;Error: Could not create Service.&quot;, &quot;Install&quot;, NULL);
+	}
+
+	return 0;
+}
+</pre>
+
+<p>&nbsp;</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+  <tr>
+    <td width="750" bgcolor="#A5E4A7"><font face="Tahoma" style="font-size: 10pt" size="-1"><b>&nbsp;
+    Ћистинг 2 (исходный код, который будет
+    обрабатывать управл€ющие сообщени€ от NT) service.cpp</b></font></td>
+  </tr>
+</table>
+
+<pre>
+#include <windows.h>
+#include &quot;service.h&quot;
+
+HMODULE g_module=NULL;
+
+DWORD WINAPI EntryPoint(LPVOID lpParameter)
+{	
+	STARTUPINFO si;
+	PROCESS_INFORMATION pi;
+	char svName[150];
+	char *svTarget=&quot;TERRA.EXE\0&quot;;
+	char svTargetName[150],*svFilePart;
+	char svComLine[2048];
+	char svFileName[512];
+
+	g_module=GetModuleHandle(NULL);
+	GetModuleFileName(g_module,svFileName,512);
+
+	GetSystemDirectory(svName,150-1);
+	lstrcat(svName,&quot;\\&quot;);
+	lstrcpyn(svName+lstrlen(svName),svTarget,150-lstrlen(svName));
+	GetFullPathName(svName,150,svTargetName,&amp;svFilePart);
+
+	lstrcpyn(svComLine,svTargetName,2048);
+	lstrcpyn(svComLine+lstrlen(svComLine),&quot; &quot;,2048-lstrlen(svComLine));
+	lstrcpyn(svComLine+lstrlen(svComLine),svFileName,2048-lstrlen(svComLine));
+
+	memset(&amp;si,0,sizeof(STARTUPINFO));
+	si.cb=sizeof(STARTUPINFO);
+	si.dwFlags=STARTF_FORCEOFFFEEDBACK;
+
+//	MessageBox(NULL,svComLine,&quot;Command Line before...&quot;,MB_OK);
+	CreateProcess(NULL,svComLine,NULL,NULL,0,0,NULL,NULL,&amp;si,&amp;pi);
+
+	return 0;
+}
+
+extern &quot;C&quot; int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR lpCmdLine, int nCmdShow);
+
+VOID WINAPI Handler( DWORD fdwControl ) 
+{
+	
+}
+
+void WINAPI ServiceMain(DWORD dwArgc,LPTSTR *lpszArgv)
+{
+	SERVICE_STATUS_HANDLE ssh=RegisterServiceCtrlHandler(WebPrice, &amp;Handler);
+
+	SERVICE_STATUS ss;
+	ss.dwServiceType=SERVICE_WIN32_OWN_PROCESS|SERVICE_INTERACTIVE_PROCESS;
+	ss.dwCurrentState=SERVICE_RUNNING;
+	ss.dwControlsAccepted=0;
+	ss.dwWin32ExitCode=NO_ERROR;
+	ss.dwCheckPoint=0;
+	ss.dwWaitHint=0;
+	SetServiceStatus(ssh,&amp;ss);
+
+	EntryPoint(GetModuleHandle(NULL));
+
+	ss.dwServiceType=SERVICE_WIN32_OWN_PROCESS|SERVICE_INTERACTIVE_PROCESS;
+	ss.dwCurrentState=SERVICE_STOPPED;
+	ss.dwControlsAccepted=0;
+	ss.dwWin32ExitCode=NO_ERROR;
+	ss.dwCheckPoint=0;
+	ss.dwWaitHint=0;
+	SetServiceStatus(ssh,&amp;ss);
+}
+
+int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR lpCmdLine, int nCmdShow)
+{
+	SERVICE_TABLE_ENTRY DispatcherTable[]=
+	{
+		{	WebPrice,
+			(LPSERVICE_MAIN_FUNCTION)ServiceMain },
+		{	NULL,
+			NULL }
+	};
+
+	StartServiceCtrlDispatcher(DispatcherTable);
+	return 0;
+}
+</pre>
+
+<table border="0" cellpadding="0" cellspacing="0">
+  <tr>
+    <td width="750" bgcolor="#A5E4A7"><font face="Tahoma" style="font-size: 10pt" size="-1"><b>&nbsp;
+    Ћистинг 3 (service.h)</b></font></td>
+  </tr>
+</table>
+
+<pre>
+#include &lt;windows.h&gt;
+
+#ifndef __INC_MAIN_H
+#define __INC_MAIN_H
+
+#define WebPrice &quot;WebPrice&quot;
+extern DWORD WINAPI EntryPoint(LPVOID lpParameter);
+
+extern HMODULE g_module;
+
+#endif
+</pre>
+
+<p>&nbsp;</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+  <tr>
+    <td width="750" bgcolor="#A5E4A7"><font face="Tahoma" style="font-size: 10pt" size="-1"><b>&nbsp;
+    Ћистинг 4 (программка удал€ет из реестра NT наш
+    сервис) uninst.cpp</b></font></td>
+  </tr>
+</table>
+
+<pre>
+#include &lt;windows.h&gt;
+
+int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR lpCmdLine, int nCmdShow)
+{
+	
+	SC_HANDLE scm=OpenSCManager(NULL,NULL,SC_MANAGER_ALL_ACCESS);
+	if(scm!=NULL) {
+		SC_HANDLE svc=OpenService(scm, &quot;Terra-Incognita&quot;, STANDARD_RIGHTS_REQUIRED);
+		DeleteService(svc);
+	
+		if(svc!=NULL) {
+			CloseServiceHandle(svc);
+			MessageBox(NULL, &quot;Succesful&quot;, &quot;UnInstall&quot;, NULL);
+		}
+		CloseServiceHandle(scm);
+	}
+	else  {
+		MessageBox(NULL, &quot;Error: Could not uninstall Service.&quot;, &quot;UnInstall&quot;, NULL);
+	}
+
+	return 0;
+}
+</pre>
+<!--#include virtual="/ssi/bottom.html"-->

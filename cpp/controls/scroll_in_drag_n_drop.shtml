@@ -1,0 +1,113 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3 align="center"><b>Прокрутка во время drag'n'drop</b></h3>
+    <p>Когда мы перетаскиваем элемент вполне возможна
+    ситуация, когда цель перетаскивания не видна.
+    Иногда пользователь разворачивает ветви так, что
+    без прокрутки не обойдешся. &quot;Умные&quot;
+    приложения обходят этот барьер.<br>
+    <br>
+    <b>Шаг 1: Добавление членов-переменных в класс</b><br>
+    Мы объявляем две переменные. Одна описывает
+    таймер, другая счетчик тиков для таймера </p>
+    <pre><tt><b>
+protected:
+	UINT    m_nTimerID;
+	UINT    m_timerticks;
+</b></tt></pre>
+    <p>&nbsp;<b></p>
+    <p>Шаг 2: Установка таймера в обработчике TVN_BEGINDRAG</b>
+    <br>
+    Поместите следующий код в конец Вашего
+    обработчика (обычно это <b>OnBeginDrag()</b> ): </p>
+    <pre><tt><b>
+	// Устанавливаем таймер
+	m_nTimerID = SetTimer(1, 75, NULL);
+</b></tt></pre>
+    <p>&nbsp;<b></p>
+    <p>Шаг 3: Установка обработчика WM_TIMER </b><br>
+    По умолчанию имя функции OnTimer(). Наперво убедимся,
+    что обрабатываем правильное сообщение таймера.
+    Затем обновляем расположение перетаскиваемого
+    изображения. И тогда определяем нужна ли
+    прокрутка. Если курсор cверху / снизу края или
+    близко к краю, то вычиляем скорость прокрутки.
+    Она изменяется в зависимости от удалености
+    курсора от края элемента управления и делится на
+    6 уровней. </p>
+    <pre><tt><b>
+void CTreeCtrlX::OnTimer(UINT nIDEvent) 
+{
+	if( nIDEvent != m_nTimerID )
+	{
+		CTreeCtrl::OnTimer(nIDEvent);
+		return;
+	}
+
+	// Не имеет значения то, что мы не инициализировали m_timerticks
+	m_timerticks++;
+
+	POINT pt;
+	GetCursorPos( &amp;pt );
+	RECT rect;
+	GetClientRect( &amp;rect );
+	ClientToScreen( &amp;rect );
+
+	// Внимание: Экранные координаты используются потому что
+	// DragEnter использует окно Рабочего Стола
+	CImageList::DragMove(pt);
+
+	HTREEITEM hitem = GetFirstVisibleItem();
+
+	if( pt.y &lt; rect.top + 10 )
+	{
+		// Мы должны прокручивать
+		// Делаем это медленно, если курсор около границы
+		int slowscroll = 6 - (rect.top + 10 - pt.y) / 20;
+		if( 0 == ( m_timerticks % (slowscroll &gt; 0? slowscroll : 1) ) )
+		{
+			CImageList::DragShowNolock(FALSE);
+			SendMessage( WM_VSCROLL, SB_LINEUP);
+			SelectDropTarget(hitem);
+			m_hitemDrop = hitem;
+			CImageList::DragShowNolock(TRUE);
+		}
+	}
+	else if( pt.y &gt; rect.bottom - 10 )
+	{
+		int slowscroll = 6 - (pt.y - rect.bottom + 10 ) / 20;
+		if( 0 == ( m_timerticks % (slowscroll &gt;0? slowscroll : 1) ) )
+		{
+			CImageList::DragShowNolock(FALSE);
+			SendMessage( WM_VSCROLL, SB_LINEDOWN);
+			int nCount = GetVisibleCount();
+		for ( int i=0; i&lt;nCount; ++i)
+		hitem = GetNextVisibleItem(hitem);
+		if( hitem )			
+              	SelectDropTarget(hitem);
+		m_hitemDrop = hitem;
+            	CImageList::DragShowNolock(TRUE);
+		}
+	}
+}
+</b></tt></pre>
+    <p>&nbsp;<b></p>
+    <p>Шаг 4: Удаляем таймер, когда операция закончена </b><br>
+    Вызовите <b>KillTimer( m_nTimerID )</b>, когда операция будет
+    закончена. Потребуется включить этот код в <b>PreTranslateMessage()</b>,
+    если Вы отменяете перетаскивание с помощью
+    клавиши Esc.</p>
+    <pre><tt><b>
+</b></tt></pre>
+    <p>&nbsp;</p>
+    <p align="right">Источник: <a
+    href="http://www.dol.ru/azher/proto/visual/index.html">ProtoSphere</a></p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

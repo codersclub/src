@@ -1,0 +1,159 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3 align="center"><font color="#a0a099">Печать в OpenGL </font></h3>
+    <hr>
+    <p>Автор: <a href="mailto:leejw51@hitel.net">Jongwhan Lee</a>.</p>
+    <p><img src="printingJongwhang.png" width="300" height="225"></p>
+    <h3>Описание</h3>
+    <p>Итак, вопрос: как правильно распечатать
+    картинку, нарисованную посредствам OpenGL? Сразу
+    оговорюсь, что само изображение это картинка в
+    формате BMP. Теоретически весь процесс
+    заключается в создании битмаповского
+    изображения из картинки OpenGL, а затем распечатки
+    этой картинки на принтере. </p>
+    <p>Сперва с помощью Class Wizard создаём функцию
+    &quot;OnPrint&quot; в классе CBitmapView. </p>
+    <pre>void CBitmapView::OnPrint(CDC* pDC, CPrintInfo* pInfo) ;</pre>
+    <p>Если Вы хотите получить качественную
+    распечатанную картинку: </p>
+    <pre>double ar=(double)paper.Width()/(double)paper.Height();
+CRect gl_paper(0,0,1000*ar,1000);</pre>
+    <p>Увеличиваем размер OpenGL-евского bitmap-а. </p>
+    <pre>CRect gl_paper(0,0,2000*ar,2000);</pre>
+    <p>Если задать ещё больше размер, то
+    соответственно качество изображения будет лучше,
+    но и соответственно процессор не сможет быстро
+    справиться с этой задачей. Следующая команда
+    делает OpenGL-ский экран одинакового размера с
+    размером бумаги на принтере: </p>
+    <pre>CRect gl_paper=paper; </pre>
+    <p>Размер контекста устройства моего принтера
+    позволяет задать размер 6000*6000, но когда я делаю
+    размер GL экрана 6000 на 6000 , то мой компьютер
+    зависает. </p>
+    <pre>void CBitmapView::OnPrint(CDC* pDC, CPrintInfo* pInfo) 
+{
+ CRect paper(0,0,0,0);
+
+ <span
+class="codeComment">// получаем размер бумаги..</span>
+ if (pInfo-&gt;m_bPreview) <span
+class="codeComment">// превью ..</span>
+ {
+  PRINTDLG PrtDlg; <span class="codeComment">// Диалог вывода на печать</span>
+  if (!AfxGetApp()-&gt;GetPrinterDeviceDefaults(&amp;PrtDlg))
+  {
+   if (pDC-&gt;IsKindOf(RUNTIME_CLASS(CPreviewDC))) 
+   {
+    CPreviewDC *pPrevDC = (CPreviewDC *)pDC;
+    <span
+class="codeComment">//m_hAttribDC содержит print/fax аттрибуты ...</span>
+    paper.right = GetDeviceCaps(pPrevDC-&gt;m_hAttribDC, HORZRES);
+    paper.bottom = GetDeviceCaps(pPrevDC-&gt;m_hAttribDC, VERTRES);
+   }
+  }
+  else
+  {
+   CPrintDialog dlg(FALSE);
+   dlg.m_pd.hDevMode = PrtDlg.hDevMode;
+   dlg.m_pd.hDevNames = PrtDlg.hDevNames;
+   HDC hdc = dlg.CreatePrinterDC();
+   <span
+class="codeComment">// Получаем размер страницы принтера</span>
+   paper.right = GetDeviceCaps(hdc, HORZRES);
+   paper.bottom = GetDeviceCaps(hdc, VERTRES);
+   <span
+class="codeComment">// Освобождаем контекст устройства</span>
+   DeleteDC(hdc);
+  }
+ }
+ else { <span
+class="codeComment">// печатаем на бумагу</span>
+  paper.right = GetDeviceCaps(pDC-&gt;GetSafeHdc(), HORZRES);
+  paper.bottom = GetDeviceCaps(pDC-&gt;GetSafeHdc(), VERTRES); 
+ }
+
+ pDC-&gt;RoundRect(0,0, paper.right, paper.bottom, 10, 10);
+
+ double ar=(double)paper.Width()/(double)paper.Height();
+ CRect gl_paper(0,0,1000*ar,1000);
+ int width=((int)(gl_paper.Width()/4))*4;
+ int height=gl_paper.Height();
+ CGLPrintMan print;
+ print.EnableOpenGL(gl_paper,GetSafeHwnd(), &amp;print.m_hDC, &amp;print.m_hRC);
+
+ print.StartUpdate();
+
+ print.KeepAspectRatio(width,height);
+ glViewport(0,0,width,height);
+ glDrawBuffer(GL_FRONT);
+ print.SetViewVolume();
+ glGetIntegerv(GL_VIEWPORT, print.m_nvVP);
+
+ <span
+class="codeComment">// рисуем</span>
+ glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+ {
+  glClearColor(1,1,1,0);
+  glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT | 
+  GL_STENCIL_BUFFER_BIT);
+  glDisable(GL_LIGHTING);
+  glEnable(GL_COLOR_MATERIAL);
+  glColor3d(1,0,0);
+  glutSolidSphere(5, 20,20 );
+ }  
+
+ <span
+class="codeComment">// передаём на принтер</span>
+ {
+  HDC hdc;
+  HBITMAP bitmap;
+  hdc = CreateCompatibleDC(pDC-&gt;GetSafeHdc());
+  bitmap = CreateDIBitmap(hdc, &amp;(print.m_BitmapInfo.bmiHeader),
+  CBM_INIT,
+  (GLubyte*)print.m_pBitmapBuffer,
+  &amp;print.m_BitmapInfo,
+  DIB_RGB_COLORS);
+
+  HGDIOBJ oldbitmap = SelectObject(hdc, bitmap);
+  BOOL bRet = StretchBlt(pDC-&gt;GetSafeHdc(),
+  0,0 , <span
+class="codeComment">// смещение </span>
+  paper.Width(), paper.Height(),<span
+class="codeComment">// бумаги</span>
+  print.m_hDC,
+  0, 0,
+  print. m_BitmapInfo.bmiHeader.biWidth,
+  print.m_BitmapInfo.bmiHeader.biHeight,
+  SRCCOPY);
+  if (oldbitmap != NULL)
+  SelectObject(hdc, oldbitmap);
+  <span
+class="codeComment">// освобождаем битмап и контекст устройства битмапа</span>
+  DeleteObject(bitmap);
+  DeleteDC(hdc);
+ }
+
+ print.EndUpdate();
+ print.DisableOpenGL(GetSafeHwnd(), print.m_hDC, print.m_hRC);
+
+ CView::OnPrint(pDC, pInfo);
+}</pre>
+    <h3>Downloads</h3>
+    <p><a href="printingJongwhang.zip">Скачать исходник демо-проекта
+    - 130 Kb</a><br>
+    </p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div></TBODY>
+
+
+<p align="center"><br>
+<br></p>
+<!--#include virtual="/ssi/bottom.html"-->

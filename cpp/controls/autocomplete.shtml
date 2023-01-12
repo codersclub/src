@@ -1,0 +1,224 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3 align="center">Автозаполнение.</h3>
+    <p>Автор: <a href="http://www.dilascia.com">Paul DiLascia</a></p>
+    <p><a href="autocompl.zip">Скачать исходник к статье - 21 Кб</a> (Компилятор:
+    Visual C++ 6.0)</p>
+    <p>Каждый раз, набирая что-нибудь в строке
+    &quot;Адрес&quot; интернет эксплорера, выпадает
+    список со ссылками, удовлетворяющими тому, что Вы
+    уже набрали в адресной строке. При этом наиболее
+    удовлетворяющая ссылка уже выделена и на ней
+    достаточно нажать Enter:</p>
+    <p><img src="cfig06a.gif" width="300" height="174"> </p>
+    <p>Делается это при помощи интерфейса IAutoComplete.
+    IAutoComplete связан с IEnumString - универсальным
+    интерфайсом для получения списка строк. Дасточно
+    передать в объект IAutoComplete указатель на Ваш
+    получатель строк и дескриптор окошка
+    редактирования или выпадающего списка и он
+    сделает всё остальное самостоятельно. IAutoComplete2
+    служит для того, чтобы задать какие-либо
+    специфические опции.</p>
+    <p>Однако не всё так просто. IAutoComplete присутствует
+    только в Windows 2000. COM-объект, который содержит в
+    себе IAutoComplete (CLSID_IAutoComplete), живёт только в пятой
+    версии shell32.dll, которая поставляется с Windows 2000, но
+    никак не с Windows 95, Windows 98, или Windows NT 4.0. Поэтому,
+    чтобы автозаполнение в Вашем приложение
+    работало на всех операционках, прийдётся
+    отказаться от данной технологии.</p>
+    <p>Итак, давайте сперва посмотрим на класс CAutoComplete
+    (см. прилагаемый к статье исходник), который был
+    создан мною специально для этой цели. Никаких COM
+    или shell32.dll, а всего лишь класс и файл .cpp, которые
+    можно добавить в своё приложение или DLL и при том
+    работающих на любой версии Windows: </p>
+    <p>CAutoComplete не содержит в себе всех возможностей
+    IAutoComplete. Например, IAutoComplete имеет строку
+    форматирования, которая срабатывает при нажатии
+    пользователем Ctrl+Enter. Строка форматирования, это
+    строка sprintf, которую Windows использует для
+    трансляции пользовательского ввода. Например,
+    если строка форматирования равна
+    &quot;http://www.%s.com&quot; и пользователь ввёл &quot;woowoo&quot;,
+    то IAutoComplete подставит http://www.woowoo.com. В основном
+    такая возможность ориентирована на Internet Explorer,
+    поэтому я не стал усложнать класс CAutoComplete.</p>
+    <p>Для того, чтобы продемонстрировать работу
+    класса, я сделал небольшое тестовое приложение
+    ACTest (исходник которого тоже содержится в
+    прилагаемом архиве). ACTest это диалоговое
+    приложение, в главном диалоге которого
+    присутствует окошко редактирования, выпадающий
+    список (combobox) и два экземпляра CAutoComplete:</p>
+    <pre>
+class CMyDialog : public CDialog {
+protected:
+    CAutoComplete m_acEdit;  // для окошка редактирования
+    CAutoComplete m_acCombo; // для выпадающего списка (combobox)
+•••
+};
+</pre>
+    <p>Для использования CAutoComplete, необходимо
+    инициализировать каждый экземпляр с указателем
+    на окно (окошко редактирования или список), а
+    затем добавить несколько строк. CMyDialog делает это
+    в OnInitDialog:</p>
+    <pre>
+// в CMyDialog::OnInitDialog
+m_acCombo.Init(GetDlgItem(IDC_COMBO1));
+m_acEdit.Init(GetDlgItem(IDC_EDIT1));
+static LPCTSTR STRINGS[] = {
+    &quot;alpha&quot;,
+    &quot;alphabet&quot;,
+    •••
+    NULL
+};
+for (int i=0; STRINGS[i]; i++) {
+    m_acCombo.GetStringList().Add(STRINGS[i]);
+    m_acEdit.GetStringList().Add(STRINGS[i]);
+}
+</pre>
+    <p>С этого момента ACTest больше не использует окошко
+    редактирования или список для чего-нибудь ещё
+    (так как это всего лишь демонстрационное
+    приложение). Для получения элементов управления
+    диалога я использую CWnd::GetDlgItem. В реальном
+    приложении, вероятнее всего Вы воспользуетесь
+    членами класса m_wndEdit и m_wndCombo для передачи их
+    адресов после сабклассинга SubclassDlgItem.</p>
+    <p><img src="cfig11a.gif" width="300" height="132"></p>
+    <p>Как работает класс CAutoComplete ? Основная идея
+    заключается в том, что CAutoComplete наследуется от
+    CSubclassWnd, который позволяет различным объектам
+    перехватывать сообщения посылаемые окну. CSubclassWnd
+    работает по стандартному принципу сабклассинга
+    окон, инсталируя оконную процедуру (WindowProc). Когда
+    приложение вызывает CAutoComplete::Init, то CAutoComplete в свою
+    очередь вызывает CSubclassWnd::HookWindow, которая
+    сабкласит окно. CSubclassWnd::HookWindow &quot;присоединяет&quot;
+    (используя механизм наподобие MFC) объект CSubclassWnd к
+    окну, чтобы сообщения, адресованные окну, сперва
+    попадали в виртуальную функцию CSubclassWnd::WindowProc. В
+    CAutoComplete эта функция переопределена для обработки
+    интересующих нас сообщений:</p>
+    <pre>
+// Переопределяем CSubclassWnd::WindowProc
+LRESULT CAutoComplete::WindowProc(...)
+{
+    if (/* EN_CHANGE or CBN_EDITCHANGE */))) {
+        // try to complete
+    }
+    return CSubclassWnd::WindowProc(...);
+}
+</pre>
+    <p>Обратите внимание, что CAutoComplete это объект не
+    наследованный от CWnd. Он наследован от CSubclassWnd,
+    который в свою очередь наследуется от CObject. После
+    обработки сообщения (или не обработки), CAutoComplete
+    вызывает CSubclassWnd::WindowProc, которая передает
+    сообщение по его законному пути через
+    изначальную оконную процедуру различным картам
+    сообщений с обработчиками, ожидающими, чтобы
+    обработать это сообщение.</p>
+    <p>Дальше всё очень просто. В виртуальной функции
+    OnComplete производится сравнение того, что ввёл
+    пользователь с внутренним списком и, если по
+    необходимости корректируется вводимая
+    информация. При этом для комбобокса показывается
+    выпадающий список.</p>
+    <p>Так же присутствуют некоторые тонкости.
+    Например, когда CAutoComplete перехватывает EN_CHANGE (изменение
+    окошка редактирования) или CBN_ EDITCHANGE, то перед тем
+    как вызвать SetWindowText для помещения в окошко
+    редактирования нового текста, класс должен сам
+    отключиться. Иначе, SetWindowText сгенерирует другое
+    уведомление CHANGE и элемент управления погрязнет в
+    бесконечном цикле самосгенерированных EN_ или
+    CBN_CHANGE сообщений.</p>
+    <p>Тонкость номер два. Предположим, что
+    пользователь вводит &quot;al&quot;, которое CAutoComplete
+    дополняет до &quot;alpha&quot;, подсвечивая при этом
+    &quot;pha&quot;. Теперь пользователь нажимает Backspace,
+    чтобы удалить &quot;pha&quot;. Нам естевственно не
+    хотелось бы возвращаться назад и по-новой
+    сравнивать с alpha. Бедный пользователь так и не
+    поймёт, почему Backspace не работает. Решение
+    заключается в том, чтобы игнорировать сравнение,
+    если пользователький ввод сокращается, а не
+    увеличивается. Для этого я добавил виртуальную
+    функцию IgnoreCompletion. CAutoComplete производит
+    автодобавление только если эта функция
+    возвращает FALSE. На мой взгляд алгоритм этой
+    функции немного некорректный, поэтому я зделал
+    эту функцию виртуальной, чтобы Вы могли спосойно
+    её переопределять.</p>
+    <p>И в заключении хотелось бы привести сравнение
+    CAutoComplete с IAutoComplete. Цель приведённой таблицы не в
+    том, чтобы сравнить что лучше, а в том, чтобы
+    выбрать что нужнее:</p>
+    <table cellSpacing="0" cellPadding="3" width="481" bgColor="#336699" border="1"
+    height="424">
+<TBODY>
+      <tr>
+        <td vAlign="top" bgColor="#99ccff" width="224" height="38"><span class="clsField">CAutoComplete<br>
+        </span></td>
+        <td vAlign="top" bgColor="#99ccff" width="241" height="38"><span class="clsField">IAutoComplete<br>
+        </span></td>
+      </tr>
+      <tr>
+        <td vAlign="top" bgColor="#ffffff" width="224" height="37"><span class="clsTable">Собственный
+        механим используя C++/MFC</span></td>
+        <td vAlign="top" bgColor="#ffffff" width="241" height="37"><span class="clsTable">COM
+        объект в shell32.dll</span></td>
+      </tr>
+      <tr>
+        <td vAlign="top" bgColor="#ffffff" width="224" height="38"><span class="clsTable">Работает
+        на всех платформах Win32</span></td>
+        <td vAlign="top" bgColor="#ffffff" width="241" height="38"><span class="clsTable">только
+        Windows 2000</span></td>
+      </tr>
+      <tr>
+        <td vAlign="top" bgColor="#ffffff" width="224" height="57"><span class="clsTable">Довольно
+        просто можно изменить определённые возможности</span></td>
+        <td vAlign="top" bgColor="#ffffff" width="241" height="57"><span class="clsTable">Ничего
+        уже не изменишь</span></td>
+      </tr>
+      <tr>
+        <td vAlign="top" bgColor="#ffffff" width="224" height="57"><span class="clsTable">Не
+        имеет строки формата</span></td>
+        <td vAlign="top" bgColor="#ffffff" width="241" height="57"><span class="clsTable">Ctrl +
+        Enter строка формата типа www.%s.com</span></td>
+      </tr>
+      <tr>
+        <td vAlign="top" bgColor="#ffffff" width="224" height="38"><span class="clsTable">Не
+        поддерживает реестр<br>
+        </span></td>
+        <td vAlign="top" bgColor="#ffffff" width="241" height="38"><span class="clsTable">По
+        умолчанию строки хранит в реестре</span></td>
+      </tr>
+      <tr>
+        <td vAlign="top" bgColor="#ffffff" width="224" height="57"><span class="clsTable">Нет
+        необходимости в получателе строк (IEnumString)</span></td>
+        <td vAlign="top" bgColor="#ffffff" width="241" height="57"><span class="clsTable">Необходимо
+        использовать IEnumString </span></td>
+      </tr>
+      <tr>
+        <td vAlign="top" bgColor="#ffffff" width="224" height="38"><span class="clsTable">Вы
+        имеете полный контроль</span></td>
+        <td vAlign="top" bgColor="#ffffff" width="241" height="38"><span class="clsTable">Вы
+        ограничены тем, что поддерживается</span></td>
+      </tr>
+</TBODY>
+    </table>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

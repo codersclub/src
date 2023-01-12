@@ -1,0 +1,98 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3 align="center"><font color="#a0a099">Копируем изображение OpenGL в
+    ClipBoard. </font></h3>
+    <hr>
+    <p>Автор: <a href="mailto:pierre.alliez@cnet.francetelecom.fr">Pierre Alliez</a>.</p>
+    <p>Пример показывает, как можно скапчурить OpenGL
+    картинку и отправить её в клипборду. После этого
+    картинку можно вставить в любой графический
+    редактор. Так же не составит труда сохранить это
+    изображение как .bmp файл. Предполагается, что
+    разрешение Вашего экрана установлено в true color. </p>
+    <p><img src="snap.jpg" width="648" height="513"> </p>
+    <p><br>
+    <br>
+    <tt><font color="#900000">// Замените CRenderView Вашим
+    собственным CView-наследованным классом</font></tt> <br>
+    <tt><font color="#3333ff">void</font> CRenderView::SnapClient()</tt> <br>
+    <tt>{</tt> <br>
+    <tt>&nbsp;BeginWaitCursor();</tt> </p>
+    <p><tt><font color="#900000">&nbsp;// Получаем геометрию клиента</font></tt>
+    <br>
+    <tt>&nbsp;CRect rect;</tt> <br>
+    <tt>&nbsp;GetClientRect(&amp;rect);</tt> <br>
+    <tt>&nbsp;CSize size(rect.Width(),rect.Height());</tt> <br>
+    <tt>&nbsp;TRACE(&quot;&nbsp; client zone : (%d;%d)\n&quot;,size.cx,size.cy);</tt> <br>
+    <tt><font color="#900000">&nbsp;// Линии получились с
+    выравниванием в 32 байта, и 24 бита на пиксель</font></tt>
+    <br>
+    <tt><font color="#900000">&nbsp;// Урезаем их</font></tt> <br>
+    <tt>&nbsp;size.cx -= size.cx % 4;</tt> <br>
+    <tt>&nbsp;TRACE(&quot;&nbsp; final client zone : (%d;%d)\n&quot;,size.cx,size.cy);</tt> </p>
+    <p><tt>&nbsp;// Создаём bitmap и устанавливаем его в
+    контексте устройства</tt> <br>
+    <tt>&nbsp;CBitmap bitmap;</tt> <br>
+    <tt>&nbsp;CDC *pDC = GetDC();</tt> <br>
+    <tt>&nbsp;CDC MemDC;</tt> <br>
+    <tt>&nbsp;ASSERT(MemDC.CreateCompatibleDC(NULL));</tt> <br>
+    <tt>&nbsp;ASSERT(bitmap.CreateCompatibleBitmap(pDC,size.cx,size.cy));</tt> <br>
+    <tt>&nbsp;MemDC.SelectObject(&amp;bitmap);</tt> </p>
+    <p><tt>&nbsp;<font color="#900000">// Рассчитываем кол-во
+    необходимых байт для изображения</font></tt> <br>
+    <tt>&nbsp;<font color="#3333ff">int</font> NbBytes = 3 * size.cx * size.cy;</tt> <br>
+    <tt>&nbsp;<font color="#3333ff">unsigned</font> <font color="#3333ff">char</font>
+    *pPixelData = new unsigned char[NbBytes];</tt> </p>
+    <p><tt><font color="#900000">&nbsp;// Копируем из OpenGL</font></tt> <br>
+    <tt>&nbsp;::glReadPixels(0,0,size.cx,size.cy,GL_RGB,GL_UNSIGNED_BYTE,pPixelData);</tt> </p>
+    <p><tt><font color="#900000">&nbsp;// Заполняем заголовок</font></tt> <br>
+    <tt>&nbsp;BITMAPINFOHEADER header;</tt> <br>
+    <tt>&nbsp;header.biWidth = size.cx;</tt> <br>
+    <tt>&nbsp;header.biHeight = size.cy;</tt> <br>
+    <tt>&nbsp;header.biSizeImage = NbBytes;</tt> <br>
+    <tt>&nbsp;header.biSize = 40;</tt> <br>
+    <tt>&nbsp;header.biPlanes = 1;</tt> <br>
+    <tt>&nbsp;header.biBitCount =&nbsp; 3 * 8; // RGB</tt> <br>
+    <tt>&nbsp;header.biCompression = 0;</tt> <br>
+    <tt>&nbsp;header.biXPelsPerMeter = 0;</tt> <br>
+    <tt>&nbsp;header.biYPelsPerMeter = 0;</tt> <br>
+    <tt>&nbsp;header.biClrUsed = 0;</tt> <br>
+    <tt>&nbsp;header.biClrImportant = 0;</tt> </p>
+    <p><tt>&nbsp;// Генерируем handle</tt> <br>
+    <tt>&nbsp;HANDLE handle = (HANDLE)::GlobalAlloc (GHND,<font color="#3333ff">sizeof</font>(BITMAPINFOHEADER)
+    + NbBytes);</tt> <br>
+    <tt>&nbsp;<font color="#3333ff">if</font>(handle != NULL)</tt> <br>
+    <tt>&nbsp;{</tt> <br>
+    <tt><font color="#900000">&nbsp; // Блокируем handle</font></tt> <br>
+    <tt>&nbsp; <font color="#3333ff">char</font> *pData = (<font color="#3333ff">char</font>
+    *) ::GlobalLock((HGLOBAL)handle);</tt> <br>
+    <tt><font color="#900000">&nbsp; // Копируем заголовок и данные</font></tt>
+    <br>
+    <tt>&nbsp; memcpy(pData,&amp;header,<font color="#3333ff">sizeof</font>(BITMAPINFOHEADER));</tt>
+    <br>
+    <tt>&nbsp; memcpy(pData+<font color="#3333ff">sizeof</font>(BITMAPINFOHEADER),pPixelData,NbBytes);</tt>
+    <br>
+    <tt><font color="#900000">&nbsp; // Разблокируем</font></tt> <br>
+    <tt>&nbsp; ::GlobalUnlock((HGLOBAL)handle);</tt> </p>
+    <p><font color="#900000"><tt>// Кладём DIB в clipboard</tt></font> <br>
+    <tt>&nbsp; OpenClipboard();</tt> <br>
+    <tt>&nbsp; EmptyClipboard();</tt> <br>
+    <tt>&nbsp; SetClipboardData(CF_DIB,handle);</tt> <br>
+    <tt>&nbsp; CloseClipboard();</tt> <br>
+    <tt>&nbsp;}</tt> </p>
+    <p><tt><font color="#900000">&nbsp;// Освобождаем всё</font></tt> <br>
+    <tt>&nbsp;MemDC.DeleteDC();</tt> <br>
+    <tt>&nbsp;bitmap.DeleteObject();</tt> <br>
+    <tt>&nbsp;<font color="#3333ff">delete</font> [] pPixelData;</tt> </p>
+    <p><tt>&nbsp;EndWaitCursor();</tt> <br>
+    <tt>}</tt> <br>
+    &nbsp; <br>
+    &nbsp; </td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

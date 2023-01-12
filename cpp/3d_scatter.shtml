@@ -1,0 +1,275 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3 align="center"><font color="#a0a099">3-D Рассеивание при помощи
+    OpenGL </font></h3>
+    <hr>
+    <p>This article was contributed by <a href="mailto:wjh@st-andrews.ac.uk">William Heitler</a>.
+<!-- For which environment is this code specific??? -->    </p>
+    <p><u>Компилятор:</u> Visual C++ 6.0 </p>
+    <h3>Описание</h3>
+    <p>Пример использует OpenGL для создания 3-D
+    рассеивания, которое можно посмотреть под любым
+    углом при помощи мышки. Данные так же можно
+    просматривать в номальной проекции так и в
+    перспективной. Данные и цвет каждой точки
+    загружаются из текстового файла. При изменении
+    размера окна приложения, график тоже
+    пропорционально меняет размер. Присутствует
+    возможность выделить определённый регион точек
+    и изменить его масштаб.</p>
+    <p>Проект представляет из себя диалоговое
+    приложение MFC. В диалоге содержатся все
+    необходимые для управления элементы, а так же
+    наследованный от CWnd класс, который включает в
+    себя все возможности для рисования графики.</p>
+    <p><img src="scatter3d.gif" width="582" height="511"></p>
+    <p>На рисунке, пользователь выделил голубые точки
+    путём нажатия в секции кнопки Make. Если после
+    этого нажать Zoom, то график будет
+    перемасштабирован, чтобы показать только
+    выбранную группу точек. Чтобы облегчить
+    масштабирование по другим измерениям, можно
+    воспользоваться опцией Autoscale.</p>
+    <h3>Графические классы</h3>
+    <pre><i>class COpenGLWnd : public CWnd</i></pre>
+    <p>Это универсальный класс, основанный на CWnd, в
+    котором присутствует всё необходимое для
+    отображения OpenGL графики.</p>
+    <p>Основные, отличительные особенности этого
+    класса:<ol>
+      <li>К классу добавлена дополнительная поддержка
+        текста, при помощи функции <i>wglUseFontBitmaps</i>. Такой
+        способ намного проще, чем использование
+        собственных изображений шрифта в стандартных
+        методах OpenGL. Активировать поддержку текста можно
+        вызовом COpenGLWnd::MakeFont() в том же месте, где
+        происходит процесс инициализации. В данный
+        момент доступен только шрифт sysem, однако не
+        составляет большого труда позволить
+        пользователю выбирать любой другой шрифт. Для
+        печати текста сперва вызываем <i>glRasterPos3f </i>(для
+        установки координат вывода текста), а затем
+        COpenGLWnd::PrintString(const char* str) (для печати строки str).</li>
+      <li>Добавлена поддержка рисования GDI. Это
+        виртуальная функция COpenGLWnd::OnDrawGDI(CPaintDC *pDC) которая
+        вызывается из OnPaint, и в которую можно добавить
+        свой собственный код GDI. Я не уверен в
+        стабильности данного решения, так как
+        единственное, что я нашёл относящееся к
+        смешиванию OpenGL и GDI - это то, что это нехорошая
+        идея. Однако, этот метод работает.</li>
+      <li>Картинку можно скопировать в буфер обмена (clipboard)
+        как bitmap. </li>
+    </ol>
+    <pre><i>class CGLMouseRotate : public COpenGLWnd</i></pre>
+    <p>Класс содержит код для кнопок и мышки,
+    позволяющий вращать изображение. Флаг
+    определяет - разрешено ли вращение мышкой или нет.</p>
+    <pre><i>class CGLScatterGraph : public CGLMouseRotate</i></pre>
+    <p>Этот класс содержит необходимые функции для
+    рисования графика рассеивания.</p>
+    <p>Данные передаются в класс при помощи
+    CGLScatterGraph::SetData(int count,COLORREF col,float *pCoords, COLORREF *pColList),
+    где <i>count </i>это количество точек в графике, <i>col </i>-
+    цвет, используемый для рисования точек (используется
+    только если <i>pColList</i>==NULL), <i>pCoords</i> - указатель на
+    массив, содержащий x, y и z координаты каждой точки
+    (соответственно длина массива = count*3), и <i>pColList</i> -
+    это либо NULL, либо указатель на массив, содержащий
+    цвета для каждой точки отдельно.<br>
+    Указатели массва pCoords и pColList должны быть
+    поддержаны вызывающим классом, и не должны
+    удаляться либо выходить за пределы диапазона,
+    пока рассеивание существует, до тех пор, пока не
+    будет сделан новый вызов в SetData с count = 0.</p>
+    <pre><i>CGLSelectableScatterGraph : public CGLScatterGraph</i></pre>
+    <p>Этот класс позволяет выделять точки в графике
+    путём рисования кривой вокруг них. Вход в режим
+    выделения осуществляется при помощи
+    CGLSelectableScatterGraph::StartMakeSel(). При этом запрещается
+    возможность вращения мышкой и разрешает обычное
+    рисование мышкой. Класс содержит список CPoints
+    который описывает нарисованную пользователем
+    поверхность. Вызов функции CGLSelectableScatterGraph::CancelSel()
+    убирает выделение и разрешает вращение мышкой.</p>
+    <p>Выделение поверхности реализовано в функции
+    CGLSelectableScatterGraph::ZoomSel().</p>
+    <p>Отображение экранной поверхности в точки
+    сделано при помощи режима обратной связи в OpenGL.
+    Приведённый ниже код, демонстрирует эту
+    реализацию:</p>
+    <p>&nbsp;</p>
+    <pre>BOOL CGLSelectableScatterGraph::ZoomSel()
+{
+   int i,j,count;
+   int id=0;
+   GLint rv;
+   GLfloat token;
+   GLfloat *pBuf;
+<span
+class="codeComment">
+// m_SelPts это CArray указателей CPoints содержащий координаты
+// предыдущего ресунка, сделанного пользователем</span>
+  if (m_SelPts.GetSize()&gt;2)
+  {<span
+class="codeComment">
+  // делаем регион из selPts, требуется стандартный массив</span>
+     CPoint *pt=new CPoint[m_SelPts.GetSize()];
+     for (i=0; i&lt;m_SelPts.GetSize(); i++)
+        pt[i]=m_SelPts.GetAt(i);
+     CRgn rgn;
+     VERIFY(rgn.CreatePolygonRgn(pt,
+                                 m_SelPts.GetSize(),
+                                 ALTERNATE));
+     delete [] pt;
+<span
+class="codeComment">
+// получаем список координат при помощи режима обратной связи OpenGL
+// Верного способа для вычисления необходимого кол-ва памяти
+// для буфера обратной связи не известно, однако эксперименты показали,
+// что для рисования осей необходимо 96 значений float, + 4 float на
+// точку даёт некоторый запас, вслучае неправильного рассчёта !!</span>
+    pBuf=new GLfloat[200+m_Count*4]; <span
+class="codeComment">// m_Count = количество точек
+                                     // в графе</span>
+    BeginGLCommands(); <span
+class="codeComment">// разрешаем контекст OpenGL</span>
+    glFeedbackBuffer(200+m_Count*4,GL_3D,pBuf);
+    glRenderMode(GL_FEEDBACK);
+    EndGLCommands();<span
+class="codeComment">
+// заставляет окно перерисоваться, таким образом вызывая код рисования
+// GL и в режиме обратной связи помещает список оконных координат для
+// каждого перерисовываемого элемента в pBuf
+</span>
+    Invalidate();
+    UpdateWindow();
+    BeginGLCommands();
+    rv=glRenderMode(GL_RENDER); <span
+class="codeComment">// восстанавливаем стандартный режим
+                                // рисования GL</span>
+
+    int *pInSel=new int[m_Count]; <span
+class="codeComment">// для каждой точки будет 1 если
+// внутри и 0 если за пределами поверхности</span>
+
+GLint viewport[4];
+    glGetIntegerv(GL_VIEWPORT,viewport);<span
+class="codeComment">
+</span>
+    count=rv;
+    while (count)
+    {
+      token=pBuf[rv-count];
+      count--;
+      if (token==GL_POINT_TOKEN) <span
+class="codeComment">// игнорируем код рисования осей</span>
+      {
+         GLdouble coords[3];
+         for (j=0; j&lt;3; j++)
+         {
+           coords[j]=pBuf[rv-count];
+           count--;
+         }
+         CPoint pt;
+         pt.x=int(coords[0]);
+         pt.y=int(viewport[3]-coords[1]-1);
+         pInSel[id++]=rgn.PtInRegion(pt);
+      }
+    }
+    EndGLCommands();
+<span
+class="codeComment">
+// теперь устанавливаем масштаб по осям для рисования выделенных точек
+// (плюс все остальные в пределах осей)</span>
+    m_bAutoScaleX=m_bAutoScaleY=m_bAutoScaleZ=FALSE; <span
+class="codeComment">// выключаем
+                                                 // автомасштабирование
+// находим максимальные и минимальные значения точек в пределах
+// выделенной поверхности</span>
+    float xMax,xMin,yMax,yMin,zMax,zMin;
+    xMax=yMax=zMax=-FLT_MAX;
+    xMin=yMin=zMin=FLT_MAX;
+    <span
+class="codeComment">
+// drawCount это счётчик точек, которые были нарисованы в пределах,
+// старых осей и поэтому появились в pSelList</span>
+    int drawCount=-1; 
+    for (i=0; i&lt;m_Count; i++)
+    {<span
+class="codeComment">
+// определяем - где была нарисована точка (в старых ли осях)
+// и поэтому была помещена в список выделения (если в пределах, то 1
+// либо 0 если за пределами)</span>
+      if (!PtWithinAxes(m_pDat[i*3],m_pDat[i*3+1],m_pDat[i*3+2]))
+         continue;  <span
+class="codeComment">// игнорируем точки за пределами осей</span>
+      drawCount++;
+      if (pInSel[drawCount]==0)  <span
+class="codeComment">// игнорируем точку, так как она за
+                                 // пределами выделения</span>
+          continue;
+       xMax=max(m_pDat[i*3],xMax);
+       xMin=min(m_pDat[i*3],xMin);
+       yMax=max(m_pDat[i*3+1],yMax);
+       yMin=min(m_pDat[i*3+1],yMin);
+       zMax=max(m_pDat[i*3+2],zMax);
+       zMin=min(m_pDat[i*3+2],zMin);
+     }<span
+class="codeComment">
+// подгоняем масштаб по осям</span>
+    m_MaxX=NextAbove(xMax,5);
+    m_MinX=NextBelow(xMin,5);
+    m_MaxY=NextAbove(yMax,5);
+    m_MinY=NextBelow(yMin,5);
+    m_MaxZ=NextAbove(zMax,5);
+    m_MinZ=NextBelow(zMin,5);
+    Invalidate();
+
+    delete [] pBuf;
+    delete [] pInSel;
+    rgn.DeleteObject();
+    }
+    
+  m_bAllowMouseRotate=m_bOldAllowRotate; <span
+class="codeComment">// восстанавливаем способность
+                                         // вращения мышкой</span>
+  CancelSel();  <span
+class="codeComment">// удаляем все точки из m_SelPts, очищаем выделение</span>
+  return TRUE;
+}</pre>
+    <h3>Формат данных</h3>
+    <p>Данные можно загружать из основной программы,
+    используя кнопку Load, либо перетаскивая файл на
+    основное окно. Программа умеет считывать файлы
+    трёх форматов.</p>
+    <p>Во всех форматах каждая точка занимает
+    отдельную строку в текстовом файле.<br>
+    Формат 1: Имеет три колонки, разделённые
+    табуляцией или пробелами, содержащие координаты
+    точки x, y и z. В таком формате все точки рисуются
+    одним цветом, который установлен в программе.<br>
+    Формат 2: Имеет четыре колонки. Первые три
+    содержат координаты точки, а четвёртая имеет
+    целое значение (integer value) в диапазоне COLORREF, которая
+    является цветом точки.<br>
+    Формат 3: Имеет шесть колонок. Первые три содержат
+    координаты, а другие три содержат значения RGB (в
+    диапазоне 0-255), которые в совокупности дают цвет
+    точки.</p>
+    <p>Файлы test1.txt, test2.txt и test3.txt иллюстрирую все три
+    формата.</p>
+    <h3>Downloads</h3>
+    <p><a href="scatter3d_demo.zip">Скачать демонстрационный
+    проект - 59 Kb</a></p>
+    <p><br>
+    &nbsp; <br>
+    &nbsp; </td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

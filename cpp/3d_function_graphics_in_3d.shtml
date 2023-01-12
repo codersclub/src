@@ -1,0 +1,932 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3 align="center"><font color="#a0a099">График функции в 3D </font></h3>
+    <hr>
+    <p>Автор: <a href="mailto:a4a@rambler.ru">Alexander Chernosvitov</a>. </p>
+    <p><img src="og1.jpg" width="440" height="431"> </p>
+    <p><a href="og2.jpg" target="newFrame"><br>
+    <img src="og2.jpg" width="450"> <br>
+    <font size="3"><em>Увеличить картинку</em></font> </a></p>
+    <p><u>Совместимость:</u> VC6, NT4 SP3 </p>
+    <p>&nbsp;</p>
+    <p>Здесь представлено простое Windows приложение,
+    которое создает и отображает 3D изображение
+    (поверхность) функции, используя рендеринг OpenGL.
+    Графические данные могут быть произвольными
+    (указываются пользователем). С форматом данных
+    можно разобраться, если заглянуть в функцию
+    COGView::DefaultGraphic. При помощи данного приложения
+    удобно просматривать результаты вычислений
+    некоторых полей (например: поверхности равной
+    температуры, давление скорости или магнитная
+    плотность потока в трехмерном пространстве).
+    Изображение можно свободно вращать мышкой, опции
+    позволяют настроить желаемые параметры
+    изображения OpenGL. </p>
+    <p>Итак, запускаем MFC AppWizard, выбираем шаблон SDI и
+    называем его OG. В файл StdAfx.h необходимо поместить
+    следующие директивы, чтобы в проекте были
+    доступны библиотеки OpenGL и STL. </p>
+    <pre>#include &lt; afxdlgs.h &gt;
+#include &lt; math.h &gt;
+
+#include &lt; gl/gl.h &gt;
+#include &lt; gl/glu.h &gt;
+
+#include &lt; vector &gt;
+using namespace std;
+</pre>
+    <h3>Создаём структуру данных</h3>
+    <p>Нам понадобится хранилище для вершин
+    поверхности.Разместите следующий код в файле
+    OGView.h. Упростим изначальный код класса View, удаляя
+    некоторые функции и добавляя новые.</p>
+    <pre>class CPoint3D
+{
+public:
+   float x, y, z;
+   CPoint3D () { x=y=z=0; }
+   CPoint3D (float c1, float c2, float c3)
+   {
+      x = c1;      z = c2;      y = c3;
+   }
+   CPoint3D&amp; operator=(const CPoint3D&amp; pt)
+   {
+      x = pt.x;   z = pt.z;   y = pt.y;
+      return *this;
+   }
+   CPoint3D (const CPoint3D&amp; pt)
+   {
+      *this = pt;
+   }
+};
+
+
+class COGView : public CView
+{
+protected:
+   COGView();
+   DECLARE_DYNCREATE(COGView)
+public:
+   //======== New data
+   long   m_BkClr;    // цвет фона
+   HGLRC   m_hRC;     // контекст рендеринга OpenGL
+   HDC   m_hdc;       // контекст устройства Windows
+   GLfloat   m_AngleX;  // угол вращения (по оси X)
+   GLfloat m_AngleY;    // угол вращения (по оси Y)
+   GLfloat   m_AngleView;   // угол перспективы
+   GLfloat   m_fRangeX;     // диапазон графика (по оси X)
+   GLfloat m_fRangeY;   // диапазон графика (по оси Y)
+   GLfloat m_fRangeZ;   // диапазон графика (по оси Z)
+   GLfloat   m_dx;      // прирост смещения (по оси X)
+   GLfloat m_dy;        // прирост смещения (по оси Y)
+   GLfloat   m_xTrans;  // смещение (по оси X)
+   GLfloat m_yTrans;    // смещение (по оси Y)
+   GLfloat m_zTrans;    // смещение (по оси Z)
+   GLenum   m_FillMode; // режим заполнения полигонами
+   bool   m_bCaptured;  // флаг захвата мышки
+   bool   m_bRightButton; // флаг правой кнопки мыши
+   bool   m_bQuad;  // Флаг использования GL_QUAD (либо GL_QUAD_STRIP)
+   CPoint   m_pt;   // текущая позиция мышки
+   UINT   m_xSize;  // Текущий размер клиентского окна (по оси X)
+   UINT   m_zSize;  // Текущий размер клиентского окна
+   vector &lt; CPoint3D &gt; m_cPoints; // Graphics dimension (по оси X)
+   int   m_LightParam[11];  // 
+   CPropDlg *m_pDlg;        // 
+
+   //======== Public methods
+   COGDoc* GetDocument() 
+     { return DYNAMIC_DOWNCAST(COGDoc,m_pDocument); }
+   virtual ~COGView();
+
+   //======== New methods
+   void DrawScene();       // Подготовка и хранение изображение
+   void DefaultGraphic();  // Create and save the default plot
+   void ReadData();   // Манипуляции с файлом данных
+   bool DoRead(HANDLE hFile);   // чтение файла данных
+   //===== Берём данные из файла и помещаем в m_cPoints
+   void SetGraphPoints(BYTE* buff, DWORD nSize);
+   void SetLightParam (short lp, int nPos); // Устанавливаем параметры освещения
+   void GetLightParams(int *pPos);          // Получаем параметры освещения
+   void SetLight();            // Устанавливаем освещение
+   void SetBkColor();          // Устанавливаем цвет фона
+   void LimitAngles();         // Ограничение углов вращения
+
+   //{{AFX_VIRTUAL(COGView)
+   public:
+   virtual void OnDraw(CDC* pDC);
+   virtual BOOL PreCreateWindow(CREATESTRUCT&amp; cs);
+   //}}AFX_VIRTUAL
+protected:
+   //{{AFX_MSG(COGView)
+   //}}AFX_MSG
+   DECLARE_MESSAGE_MAP()
+};
+</pre>
+    <h3>Добавляем обработчики</h3>
+    <p>Используя ClassWizard добавляем в COGView обработчики
+    для сообщений: WM_CREATE, WM_DESTROY, WM_ERASEBKGND, WM_LBUTTONDOWN,
+    WM_LBUTTONUP, WM_MOUSEMOVE, WM_RBUTTONDOWN, WM_RBUTTONUP, WM_SIZE и WM_TIMER.
+    Добавляем в конструктор класса View инициализацию
+    контролируемых параметров. </p>
+    <pre>COGView::COGView()
+{
+   //====== Контекста пока ещё не существует
+   m_hRC = 0;
+
+   //====== Изначальный поворот изображения
+   m_AngleX = 35.f;
+   m_AngleY = 20.f;
+
+   //====== Угол проекции матрицы
+   m_AngleView = 45.f;
+
+   //====== Изначальный цвет фона
+   m_BkClr = RGB(0, 0, 96);
+
+   // Инициализируем режим заполнения точек внутренних многоугольников (четвёрок)
+   m_FillMode = GL_FILL;
+
+   //====== Изначальное создание графика
+   DefaultGraphic();
+
+   //====== Начальный сдвиг изображения
+   //====== целое и половина размера объекта
+   m_zTrans = -1.5f*m_fRangeX;
+   m_xTrans = m_yTrans = 0.f;
+
+   //== Начальный квант сдвига (для анимации вращения)
+   m_dx = m_dy = 0.f;
+
+   //====== Мышка не захвачена
+   m_bCaptured = false;
+   //====== Правая кнопка мыши не нажата
+   m_bRightButton = false;
+   //====== Для создания поверхности мы используем четвёрки
+   m_bQuad = true;
+
+   //====== Инициализация параметров освещения
+   m_LightParam[0] = 50;   // направление по оси X
+   m_LightParam[1] = 80;   // направление по оси Y
+   m_LightParam[2] = 100;  // направление по оси Z
+   m_LightParam[3] = 15;   // Отражённый свет
+   m_LightParam[4] = 70;   // Рассеянный свет
+   m_LightParam[5] = 100;  // Зеркальный свет
+   m_LightParam[6] = 100;  // Отражательность материала
+   m_LightParam[7] = 100;  // Рассеивание материала
+   m_LightParam[8] = 40;   // Зеркальность материала
+   m_LightParam[9] = 70;   // Блеск материала
+   m_LightParam[10] = 0;   // Эмиссия материала
+}
+</pre>
+    <h3>Подготовка к открытию контекста OpenGL</h3>
+    <p>Возможно Вы знаете, что для того, чтобы
+    подготовить окно для рисования в нём при помощи
+    OpenGL Вам необходимо: <ul>
+      <li>выбрать и установить формат пикселя, </li>
+      <li>получить и сохранить контекст устройства окна, </li>
+      <li>создать и сохранить контекст OpenGL, </li>
+      <li>добавить к окну стили WS_CLIPSIBLINGS | WS_CLIPCHILDREN, </li>
+      <li>убрать очистку фона перед каждой перерисовкой
+        (обработать WM_ERASEBKGND и возвращать только TRUE), </li>
+      <li>специфически обработать сообщения WM_SIZE, WM_PAINT и </li>
+      <li>освободить контексты, когда отображение будет
+        закрыто. </li>
+    </ul>
+    <p>Основные события для использования OpenGL
+    помещаются в обработчик WM_CREATE. </p>
+    <pre>int COGView::OnCreate(LPCREATESTRUCT lpCreateStruct)
+{
+   if (CView::OnCreate(lpCreateStruct) == -1)
+      return -1;
+
+   // Структура, описывающая формат
+   PIXELFORMATDESCRIPTOR pfd =   
+   {
+      sizeof(PIXELFORMATDESCRIPTOR),
+      1,         // Версия
+      PFD_DRAW_TO_WINDOW |   // Поддерживает GDI
+      PFD_SUPPORT_OPENGL |   // Поддерживает OpenGL
+      PFD_DOUBLEBUFFER,   // Используем двойную буферизацию 
+                          //     (более эффективная прорисовка)
+      PFD_TYPE_RGBA,      // No pallettes
+      24,          // Number of color planes
+                   // in each color buffer
+      24,   0,     // для компоненты Red
+      24,   0,     // для компоненты Green
+      24,   0,     // для компоненты Blue
+      24,   0,     // для компоненты Alpha
+      0,           // Number of planes
+                   // of Accumulation buffer
+      0,           // для компоненты Red
+      0,           // для компоненты Green
+      0,           // для компоненты Blue
+      0,           // для компоненты Alpha
+      32,          // Глубина Z-buffer
+      0,           // Глубина Stencil-buffer
+      0,           // Глубина Auxiliary-buffer
+      0,           // Now is ignored
+      0,           // Number of planes
+      0,           // Now is ignored
+      0,           // Цвет прозрачной маски
+      0            // Now is ignored
+   };
+
+   //====== Получаем контекст текущего окна
+   m_hdc = ::GetDC(GetSafeHwnd());
+
+   //====== Делаем запрос ближайшего совместимого формата пикселей
+   int iD = ChoosePixelFormat(m_hdc, &amp;pfd);
+   if ( !iD )
+   {
+      MessageBox(&quot;ChoosePixelFormat::Error&quot;);
+      return -1;
+   }
+
+   //====== Устанавливаем данный формат
+   if ( !SetPixelFormat (m_hdc, iD, &amp;pfd) )
+   {
+      MessageBox(&quot;SetPixelFormat::Error&quot;);
+      return -1;
+   }
+
+   //====== создаём контекст OpenGL
+   if ( !(m_hRC = wglCreateContext (m_hdc)))
+   {
+      MessageBox(&quot;wglCreateContext::Error&quot;);
+      return -1;
+   }
+
+   //====== Делаем его текущим
+   if ( !wglMakeCurrent (m_hdc, m_hRC))
+   {
+      MessageBox(&quot;wglMakeCurrent::Error&quot;);
+      return -1;
+   }
+
+   //====== Теперь можно выполнять команды OpenGL 
+   //       (т.e. вызывать функции gl***)
+   glEnable(GL_LIGHTING);      // Будет использоваться освещение
+   //====== Только один (первый) источник света
+   glEnable(GL_LIGHT0);
+   //====== Depth of the Z-buffer will be taken into account
+   glEnable(GL_DEPTH_TEST);
+   //====== Material colors will be taken into account
+   glEnable(GL_COLOR_MATERIAL);
+
+   //====== Наша функция, устанавливающая бэкграунд
+   SetBkColor();
+
+   //====== Создаём и сохраняем изображение в специальном списке 
+   //       команд OpenGL
+   DrawScene();
+   return 0;
+}
+</pre>
+    <h3>Перерисовка</h3>
+    <p>Каждый раз, когда Вы (или Windows) решаете
+    перерировать отображение, необходимо обработать
+    сообщение WM_PAINT. Принимая во внимание особенности
+    архитектуры Документ-Вид, Вы помещаете код
+    перерисовки на в OnPaint, а в функцию OnDraw. </p>
+    <pre>void COGView:: OnDraw(CDC* pDC)
+{
+   //========== Очищаем фон и Z-буфер
+   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+   //========== Очищаем моделирующую матрицу
+   glMatrixMode(GL_MODELVIEW);
+   glLoadIdentity();
+
+   //======= Первичная установка света 
+   //        (иначе он будет вращаться вместе с изображением)
+   SetLight();
+
+   //====== Изменяем порядок коэффициентов матрицы
+   glTranslatef(m_xTrans,m_yTrans,m_zTrans);  // для смещения
+   glRotatef (m_AngleX, 1.0f, 0.0f, 0.0f );   // и для вращения
+   glRotatef (m_AngleY, 0.0f, 1.0f, 0.0f );
+
+   //====== следующие координаты вершин
+   glCallList(1);
+
+   //====== Переключение между буферами 
+   //          (для отображения изменений)
+   SwapBuffers(m_hdc);
+}
+</pre>
+    <h3>Освещение</h3>
+    <p>Здесь представлен простой способ вычисления
+    цвета каждого пикселя. </p>
+    <pre>void COGView::SetLight()
+{
+   //====== При вычислении цвета каждого пикселя при помощи формулы освещения
+   //====== принимаются во внимание обе стороны поверхности
+
+   glLightModeli(GL_LIGHT_MODEL_TWO_SIDE,1);
+
+   //====== положение источника света зависит от 
+   //       размеров объекта, мастабируемого от (0,100)
+
+   float fPos[] =
+   {
+      (m_LightParam[0]-50)*m_fRangeX/100,
+      (m_LightParam[1]-50)*m_fRangeY/100,
+      (m_LightParam[2]-50)*m_fRangeZ/100,
+      1.f
+   };
+   glLightfv(GL_LIGHT0, GL_POSITION, fPos);
+
+   //====== Интенсивность отражённого света
+   float f = m_LightParam[3]/100.f;
+   float fAmbient[4] = { f, f, f, 0.f };
+   glLightfv(GL_LIGHT0, GL_AMBIENT, fAmbient);
+
+   //====== Интенсивность разброса света
+   f = m_LightParam[4]/100.f;   
+   float fDiffuse[4] = { f, f, f, 0.f };
+   glLightfv(GL_LIGHT0, GL_DIFFUSE, fDiffuse);
+
+   //====== Интенсивность зеркальности света
+   f = m_LightParam[5]/100.f;
+   float fSpecular[4] = { f, f, f, 0.f };
+   glLightfv(GL_LIGHT0, GL_SPECULAR, fSpecular);
+
+   //====== Свойства отражения поверхности материала для 
+   //       каждой компоненты света
+   f = m_LightParam[6]/100.f;
+   float fAmbMat[4] = { f, f, f, 0.f };
+   glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, fAmbMat);
+
+   f = m_LightParam[7]/100.f;
+   float fDifMat[4] = { f, f, f, 1.f };
+   glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, fDifMat);
+
+   f = m_LightParam[8]/100.f;
+   float fSpecMat[4] = { f, f, f, 0.f };
+   glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, fSpecMat);
+
+   //====== Освещённость материала
+   float fShine = 128 * m_LightParam[9]/100.f;
+   glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, fShine);
+
+   //====== Свойство световой эмиссии материала
+   f = m_LightParam[10]/100.f;
+   float fEmission[4] = { f, f, f, 0.f };
+   glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, fEmission);
+}
+</pre>
+    <p>Установка цвета фона очень проста. </p>
+    <pre>void COGView::SetBkColor()
+{
+   //====== Разделяем цвет на три составляющие
+   GLclampf red   = GetRValue(m_BkClr)/255.f,
+          green   = GetGValue(m_BkClr)/255.f,
+           blue   = GetBValue(m_BkClr)/255.f;
+   //====== Устанавливаем белый (фон) цвет
+   glClearColor (red, green, blue, 0.f);
+
+   //====== Стираем фон
+   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+}
+</pre>
+    <h3>Создание и хранение изображения</h3>
+    <p>Основные операции по созданию изображения
+    хранятся в функции DrawScene, которая создаёт и
+    хранит изображение, состоящее из координат
+    вершин. Мы предполагаем, что все координаты уже
+    размещены в STL-контейнере m_cPoints. Изображение
+    сконструировано как серия изогнутых
+    четырёхугольников (GL_QUADS) или как серия изогнутых
+    четвёрок (GL_QUAD_STRIP). Ниже мы добавим команды по
+    переключению между двумя этими режимами. Точки
+    поверхности располагаются в координатной сетке
+    (X, Z). Размер этой сетки хранится в переменных m_xSize
+    и m_zSize. Несмотря на 2-мерность сетки, мы используем
+    линейный массив (одномерный) m_cPoints или (точнее)
+    контейнер типа вектор для хранения значений
+    координат. Это съэкономит усилия при файловых
+    операциях. </p>
+    <p>Выбор 4 соседних точек одного примитива (например
+    GL_QUADS) будет сделан при помощи 4 индексов (n, i, j, k).
+    Индекс n проходит последовательно через все
+    вершины по порядку слева направо по оси X (Z=0) а
+    затем процедура повторяется (постепенно
+    увеличивая значение Z). Другие индексы
+    вычисляются относительно индекса n. Обратите
+    внимание, что только два индекса работают в
+    режиме связанных четвёрок, который включается
+    или выключается флагом m_bQuad flag.</p>
+    <pre>void COGView::DrawScene()
+{
+   //====== Создаём новый список команд OpenGL
+   glNewList(1, GL_COMPILE);
+
+   //====== Устанавливаем режим заполнения полигонами
+   glPolygonMode(GL_FRONT_AND_BACK, m_FillMode);
+
+   //====== Размеры сетки изображения
+   UINT   nx = m_xSize-1,
+      nz = m_zSize-1;
+
+   //====== Включаем режим связанных примитивов 
+   //                             (не связан)
+   if (m_bQuad)
+      glBegin (GL_QUADS);
+
+   for (UINT z=0, i=0;  z &lt; nz;  z++, i++)
+   {
+      //====== Включаем режим связанных примитивов 
+      //                                  (связан)
+      //====== The strip of connected quads begins here
+      if (!m_bQuad)
+         glBegin(GL_QUAD_STRIP);
+
+      for (UINT x=0;  x &lt; nx;  x++, i++)
+      {
+         // i, j, k, n — 4 индекса четвёрки
+         // Counter Clockwise direction
+
+         int   j = i + m_xSize, // Другие индексы вершин
+            k = j+1,
+            n = i+1;
+
+         //=== Получаем координаты четырёх вершин
+         float
+            xi = m_cPoints[i].x,
+            yi = m_cPoints[i].y,
+            zi = m_cPoints[i].z,
+
+            xj = m_cPoints[j].x,
+            yj = m_cPoints[j].y,
+            zj = m_cPoints[j].z,
+
+            xk = m_cPoints[k].x,
+            yk = m_cPoints[k].y,
+            zk = m_cPoints[k].z,
+
+            xn = m_cPoints[n].x,
+            yn = m_cPoints[n].y,
+            zn = m_cPoints[n].z,
+
+            //=== Координаты векторов линий четвёрки
+            ax = xi-xn,
+            ay = yi-yn,
+
+            by = yj-yi,
+            bz = zj-zi,
+
+            //====== Нормальные координаты вектора
+            vx = ay*bz,
+            vy = -bz*ax,
+            vz = ax*by,
+
+            //====== Нормальная длина вектора
+            v  = float(sqrt(vx*vx + vy*vy + vz*vz));
+         
+         //====== масштабирование
+         vx /= v;
+         vy /= v;
+         vz /= v;
+
+         //====== Устанавливаем нормальный вектор
+         glNormal3f (vx,vy,vz);
+
+         //===== Not connected quads branch
+         if (m_bQuad)
+         {
+            //====== Vertices are given in counter clockwise 
+            //       direction order
+            glColor3f (0.2f, 0.8f, 1.f);
+            glVertex3f (xi, yi, zi);
+            glColor3f (0.6f, 0.7f, 1.f);
+            glVertex3f (xj, yj, zj);
+            glColor3f (0.7f, 0.9f, 1.f);
+            glVertex3f (xk, yk, zk);
+            glColor3f (0.7f, 0.8f, 1.f);
+            glVertex3f (xn, yn, zn);
+         }
+         else
+         //===== Connected quads branch
+         {
+            glColor3f (0.9f, 0.9f, 1.0f);
+            glVertex3f (xi, yi, zi);
+            glColor3f (0.5f, 0.8f, 1.0f);
+            glVertex3f (xj, yj, zj);
+         }
+      }
+      //====== Закрываем блок команд GL_QUAD_STRIP
+      if (!m_bQuad)
+         glEnd();
+   }
+      //====== Закрываем блок команд GL_QUADS
+   if (m_bQuad)
+      glEnd();
+
+   //====== Закрываем список команд OpenGL
+   glEndList();
+}   
+</pre>
+    <p>Нормальные векторы должны быть правильно
+    расчитаны для каждого примитива. Иначе мы не
+    получим качественного освещения и, как следствие
+    качественного изображения.<br>
+    </p>
+    <h3>Операции с файлом</h3>
+    <p>Контейнер m_cPoints будет заполнен после того как
+    данные будут считаны из файла. Нам необходимо
+    иметь файл данных, который будет загружаться по
+    умолчанию при запуске приложения. Для этого мы
+    создаём бинарный файл и размещаем в самом начале
+    размеры сетки (m_xSize и m_zSize) , а затем значения
+    функции y = f (x, z). Перед записью в файл, все данные
+    размещены во временном буфере типа BYTE (т.е. unsigned
+    char).</p>
+    <pre>void COGView::DefaultGraphic()
+{
+   //====== Размеры сетки
+   m_xSize = m_zSize = 33;
+
+   //====== Количество граней меньше, чем количество узлов
+   UINT   nz = m_zSize - 1,
+      nx = m_xSize - 1;
+
+   // Размер файла в байта
+   DWORD nSize = 
+          m_xSize * m_zSize * sizeof(float) + 2*sizeof(UINT);
+
+   //====== Временный буфер
+   BYTE *buff = new BYTE[nSize+1];
+
+   //====== Указатель на начало буфера
+   UINT *p = (UINT*)buff;
+
+   //====== помещаем два UINT-а
+   *p++ = m_xSize;
+   *p++ = m_zSize;
+
+   //====== Изменяем тип указателя, чтобы продолжать работать
+   //       числами с плавающей точкой
+   float *pf = (float*)p;
+
+   //=== коэффициенты формулы по умолчанию
+   double   fi = atan(1.)*6,
+      kx = fi/nx,
+      kz = fi/nz;
+
+   //====== Проводим вычисления для всех узлов сетки
+   //=== вычисляем и размещаем значения функции по умолчанию
+   //                в том же буфере
+   for (UINT i=0;  i &lt; m_zSize;  i++)
+   {
+      for (UINT j=0;  j &lt; m_xSize;  j++)
+      {
+         //====== Пример функции
+         *pf++ = 
+             float (sin(kz*(i-nz/2.)) * sin(kx*(j-nx/2.)));
+      }
+   }
+
+   //=== Нам необходимо знать реальное количество байт, записанных
+   //    в файл
+   DWORD nBytes;
+
+   //=== Создаём и открываем файл данных по умолчанию (sin.dat)
+   HANDLE hFile = CreateFile(_T(&quot;sin.dat&quot;), 
+                             GENERIC_WRITE,
+                             0,0,
+                             CREATE_ALWAYS,
+                             FILE_ATTRIBUTE_NORMAL,
+                             0);
+
+   //====== Записываем содержимое буфера
+   WriteFile(hFile,(LPCVOID)buff, nSize,&amp;nBytes, 0);
+
+   //====== Закрываем файл
+   CloseHandle(hFile);
+
+   //====== Создаём и заполняем контейнер m_cPoints 
+   //                  (используя тот же буфер)
+   SetGraphPoints (buff, nSize);
+
+   //====== Освобождаем временный буфер
+   delete [] buff;
+}
+</pre>
+    <h3>Чтение данных</h3>
+    <p>Функция ReadData создаёт файловый диалог,
+    позволяющий пользователю выбрать файл данных,
+    считать данные и создать изображение.
+    Стандартный файловый диалог использует стиль
+    OFN_EXPLORER, который работает только в Windows 2000. </p>
+    <pre>void COGView::ReadData()
+{
+   //=== Здесь мы помещаем путь к файлу 
+   TCHAR szFile[MAX_PATH] = { 0 };
+
+   //====== фильтр расширений файла
+   TCHAR *szFilter =TEXT(&quot;Graphics Data Files (*.dat)\0&quot;)
+         TEXT(&quot;*.dat\0&quot;)
+         TEXT(&quot;All Files\0&quot;)
+         TEXT(&quot;*.*\0&quot;);
+
+   //====== Запрашиваем в текущей директории
+   TCHAR szCurDir[MAX_PATH];
+   ::GetCurrentDirectory(MAX_PATH-1,szCurDir);
+
+   //=== Структура, используемая стандартным файловым диалогом
+   OPENFILENAME ofn;
+   ZeroMemory(&amp;ofn,sizeof(OPENFILENAME));
+
+   //====== Параметры диалога
+   ofn.lStructSize   = sizeof(OPENFILENAME);
+   //====== Окно, которое владеет диалогом
+   ofn.hwndOwner = GetSafeHwnd();
+   ofn.lpstrFilter   = szFilter;
+   //====== Фильтры строкового индекса (начиная с 1)
+   ofn.nFilterIndex   = 1;
+   ofn.lpstrFile      = szFile;
+   ofn.nMaxFile      = sizeof(szFile);
+   //====== Заголовок диалога
+   ofn.lpstrTitle   = _T(&quot;Find a data file&quot;);
+   ofn.nMaxFileTitle = sizeof (ofn.lpstrTitle);
+   //====== Стиль диалога (только в Win2K)
+   ofn.Flags      = OFN_EXPLORER;
+
+   //====== Создаём и открываем диалог (возвращая 0 при ошибке)
+   if (GetOpenFileName(&amp;ofn))
+   {
+      // Пытаемся открыть файл (который должен существовать)
+      HANDLE hFile = CreateFile(ofn.lpstrFile, GENERIC_READ,
+            FILE_SHARE_READ, 0, OPEN_EXISTING,
+            FILE_ATTRIBUTE_NORMAL, 0);
+
+      //=== При ошибке CreateFile возвращаем -1
+      if (hFile == (HANDLE)-1)
+      {
+         MessageBox(_T(&quot;Could not open this file&quot;));
+         return;
+      }
+
+      //====== Пытаемся считать данные
+      if (!DoRead(hFile))
+         return;
+
+      //====== Создаём изображение
+      DrawScene();
+
+      //====== Перерисовываем клиентскую часть окна
+      Invalidate(FALSE);
+   }
+}
+</pre>
+    <p>Макрос TEXT эквивалентен следующей строке </p>
+    <p>TEXT(&quot;Graphics Data Files (*.dat)\0*.dat\0All Files\0*.*\0&quot;); </p>
+    <p>Фактически чтение производится в DoRead, где мы
+    запрашиваем размер файла, распределяем
+    необходимое количество памяти, а так же
+    считываем весь файл в буфер. После этого мы
+    устанавливаем контейнер точек m_cPoints при помощи
+    функции SetGraphPoints. </p>
+    <pre>bool COGView::DoRead(HANDLE hFile)
+{
+   //===== Запрашиваем размер файла
+   DWORD nSize = GetFileSize (hFile, 0);
+
+   if (nSize == 0xFFFFFFFF)
+   {
+      GetLastError();
+      MessageBox(_T(&quot;Could not get file size&quot;));
+      CloseHandle(hFile);
+      return false;
+   }
+
+   //===== Пытаемся распределить буфер
+   BYTE *buff = new BYTE[nSize+1];
+
+   if (!buff)
+   {
+      MessageBox(_T(&quot;The data file is too big&quot;));
+      CloseHandle(hFile);
+      return false;
+   }
+
+   DWORD nBytes;
+   //===== Читаем содержимое файла в буфер
+   ReadFile (hFile, buff, nSize, &amp;nBytes, 0);
+   CloseHandle(hFile);
+
+   if (nSize != nBytes)
+   {
+      MessageBox(_T(&quot;Error while reading data file&quot;));
+      return false;
+   }
+
+   //===== Устанавливаем вектор координат вершин
+   SetGraphPoints (buff, nSize);
+
+   delete [] buff;
+   return true;
+}
+
+void COGView::SetGraphPoints(BYTE* buff, DWORD nSize)
+{
+   //===== Опять используем технологию изменения 
+   //       типа указателя
+   UINT *p = (UINT*)buff;
+
+   //==== Считываем размеры сетки
+   m_xSize = *p;
+   m_zSize = *++p;
+
+   //===== Проверяем размер файла (в данном случае)
+   if (m_xSize&lt;2 || m_zSize &lt; 2 || 
+       m_xSize*m_zSize*sizeof(float) + 2 * sizeof(UINT) != nSize)
+   {
+      MessageBox(_T(&quot;Wrong data format&quot;));
+      return;
+   }
+
+   //===== Изменяем размер контейнера
+   m_cPoints.resize(m_xSize*m_zSize);
+
+   if (m_cPoints.empty())
+   {
+      MessageBox(_T(&quot;Can not allocate the data&quot;));
+      return;
+   }
+
+   //====== Изменяем тип указателя
+   float   x, z,
+      *pf   = (float*)++p,
+      fMinY = *pf,
+      fMaxY = *pf,
+      right = (m_xSize-1)/2.f,
+      left  = -right,
+      rear  = (m_zSize-1)/2.f,
+      front = -rear, 
+      range = (right + rear)/2.f;
+
+   UINT   i, j, n;
+
+   m_fRangeY = range;
+   m_fRangeX = float(m_xSize);
+   m_fRangeZ = float(m_zSize);
+
+   //===== Насколько далеко мы разместим содержимое изображения
+   m_zTrans = -1.5f * m_fRangeZ;
+
+   //===== Заполняем контейнер 3D точками
+   for (z=front, i=0, n=0;  i &lt; m_zSize;  i++, z+=1.f)
+   {
+      for (x=left, j=0;  j &lt; m_xSize;  j++, x+=1.f, n++)
+      {
+         MinMax (*pf, fMinY, fMaxY);
+         m_cPoints[n] = CPoint3D(x,z,*pf++);
+      }
+   }
+
+   //===== Масштабируем данные, чтобы они &quot;приятно&quot; смотрелись
+   float zoom = fMaxY &gt; fMinY ? range/(fMaxY-fMinY) : 1.f;
+
+   for (n=0;  n &lt; m_xSize*m_zSize;  n++)
+   {
+      m_cPoints[n].y = zoom * (m_cPoints[n].y - fMinY) - range/2.f;
+   }
+}
+</pre>
+    <h3>Манипуляции с мышкой</h3>
+    <p>Левая кнопка мыши позволяет контролировать два
+    направления вращения, а так же включать и
+    выключать режим автоматического вращения.
+    Правая же кнопка используется для перемещения по
+    оси Z, т.е. удаления или приближения графика. </p>
+    <pre>void COGView::LimitAngles()
+{
+   while (m_AngleX &lt; -360.f)
+      m_AngleX += 360.f;
+   while (m_AngleX &gt; 360.f)
+      m_AngleX -= 360.f;
+   while (m_AngleY &lt; -360.f)
+      m_AngleY += 360.f;
+   while (m_AngleY &gt; 360.f)
+      m_AngleY -= 360.f;
+}
+
+void COGView::OnLButtonDown(UINT nFlags, CPoint point)
+{
+   //====== Останавливаем вращение
+   KillTimer(1);
+
+   //====== Zero the quantums
+   m_dx = 0.f;
+   m_dy = 0.f;
+
+   //====== Захватываем сообщение мышки и направляем его 
+   //       в наше окно
+   SetCapture();
+   //====== Запоминаем захват мышки
+   m_bCaptured = true;
+   //====== и точку, в которой это произошло
+   m_pt = point;
+}
+
+void COGView::OnRButtonDown(UINT nFlags, CPoint point)
+{
+   //====== Запоминаем нажатие правой кнопки мыши
+   m_bRightButton = true;
+
+   //====== and reproduce the left button response
+   OnLButtonDown(nFlags, point);
+}
+
+void COGView::OnLButtonUp(UINT nFlags, CPoint point)
+{
+   //====== Если мы захватили мышку,
+   if (m_bCaptured)
+   {
+      //=== query the desired quantum value
+      //=== if it exeeds the sensativity threshold
+      if (fabs(m_dx) &gt; 0.5f || fabs(m_dy) &gt; 0.5f)
+         //=== Turn on the constant rotation
+         SetTimer(1,33,0);
+      else
+         //=== Выключаем константу вращения
+         KillTimer(1);
+
+      //====== Очищаем флаг захвата
+      m_bCaptured = false;
+      ReleaseCapture();
+   }
+}
+
+
+void COGView::OnRButtonUp(UINT nFlags, CPoint point) 
+{
+   m_bRightButton = m_bCaptured = false;
+   ReleaseCapture();
+}
+
+void COGView::OnMouseMove(UINT nFlags, CPoint point)
+{
+   if (m_bCaptured)
+   {
+      // Desired rotation speed components
+      m_dy = float(point.y - m_pt.y)/40.f;
+      m_dx = float(point.x - m_pt.x)/40.f;
+
+      //====== Если Ctrl была нажата
+      if (nFlags &amp; MK_CONTROL)
+      {
+         //=== сдвигаем изображение
+         m_xTrans += m_dx;
+         m_yTrans -= m_dy;
+      }
+      else
+      {
+         //====== Если нажата правая кнопка мыши
+         if (m_bRightButton)
+            //====== сдвигаем по оси z
+            m_zTrans += (m_dx + m_dy)/2.f;
+         else
+         {
+            //====== иначе мы вращаем изображение
+            LimitAngles();
+            double a = fabs(m_AngleX);
+            if (90. &lt; a &amp;&amp; a &lt; 270.)
+               m_dx = -m_dx;
+            m_AngleX += m_dy;
+            m_AngleY += m_dx;
+         }
+      }
+      //=== В любом случае сохраняем координаты
+      m_pt = point;
+      Invalidate(FALSE);
+   }
+}
+
+void COGView::OnTimer(UINT nIDEvent)
+{
+   LimitAngles();
+   //====== Увеличиваем углы
+   m_AngleX += m_dy;
+   m_AngleY += m_dx;
+   Invalidate(FALSE);
+}
+</pre>
+    <p>Управление освещением вынесено в модальный
+    диалог (см. пример.). </p>
+    <h3>Downloads</h3>
+    <p><a href="ogexe.zip">Скачать демонстрационный проект - 19
+    Kb</a><br>
+    <a href="og.zip">Скачать исходник - 30 Kb</a> </p>
+    <p><br>
+    <br>
+    </td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->
