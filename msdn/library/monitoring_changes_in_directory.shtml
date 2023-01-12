@@ -1,0 +1,92 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Отслеживание изменений в директории.</h3>
+    <p>Следующий пример отслеживает изменения
+    названия директорий, начиная с C:\. Так же пример
+    отслеживает изменения имён файлов в директории
+    C:\WINDOWS.</p>
+    <p>В примере используются две функции <a
+    href="http://msdn.microsoft.com/library/en-us/fileio/base/findfirstchangenotification.asp"><b>FindFirstChangeNotification</b></a>
+    и <a
+    href="http://msdn.microsoft.com/library/en-us/dllproc/base/waitformultipleobjects.asp"><b>WaitForMultipleObjects</b></a>
+    - первая для создания двух нотификационных
+    дескрипторов, а вторая для ожидания событий на
+    этих дескрипторах. Так же в примере используется
+    функция <a
+    href="http://msdn.microsoft.com/library/en-us/fileio/base/findnextchangenotification.asp"><b>FindNextChangeNotification</b></a>,
+    которая перезапускает процес уведомлений.</p>
+    <pre xml:space="preserve">DWORD dwWaitStatus;
+HANDLE dwChangeHandles[2];
+
+// дескриптор для отслеживания директории C:\WINDOWS на создание
+// и удаление файлов.
+
+dwChangeHandles[0] = FindFirstChangeNotification(
+    &quot;C:\\WINDOWS&quot;,                 // директория для просмотра
+    FALSE,                         // не просматривать поддиректории
+    FILE_NOTIFY_CHANGE_FILE_NAME); // отслеживать изм. имён файлов
+
+if (dwChangeHandles[0] == INVALID_HANDLE_VALUE)
+    ExitProcess(GetLastError());
+
+// дескриптор для отслеживания C:\ на создание и удаление
+// директорий.
+
+dwChangeHandles[1] = FindFirstChangeNotification(
+    &quot;C:\\&quot;,                        // директория для просмотра
+    TRUE,                          // просматривать поддиректории
+    FILE_NOTIFY_CHANGE_DIR_NAME);  // отслеживать изм. имён директорий
+
+if (dwChangeHandles[1] == INVALID_HANDLE_VALUE)
+    ExitProcess(GetLastError());
+
+// Итак, уведомления об изменениях установлены. Теперь ожидаем
+// уведомления от дескрипторов и производим необходимое обновление.
+
+while (TRUE)
+{
+
+    // Ждём уведомления.
+
+    dwWaitStatus = WaitForMultipleObjects(2, dwChangeHandles,
+        FALSE, INFINITE);
+
+    switch (dwWaitStatus)
+    {
+        case WAIT_OBJECT_0:
+
+        // В C:/WINDOWS был создан или удалён файл.
+        // Обновляем эту директорию и перезапускаем уведомление.
+
+            RefreshDirectory(&quot;C:\\WINDOWS&quot;)
+            if ( FindNextChangeNotification(
+                    dwChangeHandles[0]) == FALSE )
+                ExitProcess(GetLastError());
+            break;
+
+        case WAIT_OBJECT_0 + 1:
+
+        // В C:\ была создана или удалена директория.
+        // Обновляем дерево директории и перезапускаем уведомление.
+
+            RefreshTree(&quot;C:\\&quot;);
+            if (FindNextChangeNotification(
+                    dwChangeHandles[1]) == FALSE)
+                ExitProcess(GetLastError());
+            break;
+
+        default:
+            ExitProcess(GetLastError());
+    }
+}</pre>
+    <p><br>
+    </p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

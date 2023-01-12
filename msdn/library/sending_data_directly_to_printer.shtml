@@ -1,0 +1,83 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как отправить данные на принтер напрямую.</h3>
+    <p>Иногда, необходимо в обход драйвера посылать
+    данные на принтер напрямую. Следующий пример
+    показывает, как сделать это как для локального
+    принтера, так и для сетевого. Этот способ может
+    служить заменой последовательности PASSTHROUGH, а так
+    же метода SpoolFile.</p>
+    <pre> // Функция RawDataToPrinter - посылает бинарные данные прямо на принтер
+ // 
+ // szPrinterName: строка с именем принтера (завершается нулём)
+ // lpData:        Указатель на raw-данные
+ // dwCount        Длина lpData в байтах
+ // 
+ // Возвращает: TRUE в случае удачи, FALSE в случае ошибки.
+ // 
+BOOL RawDataToPrinter(LPSTR szPrinterName, LPBYTE lpData, DWORD dwCount)
+   {
+     HANDLE     hPrinter;
+     DOC_INFO_1 DocInfo;
+     DWORD      dwJob;
+     DWORD      dwBytesWritten;
+
+     // Необходим дескриптор принтера.
+     if( ! OpenPrinter( szPrinterName, &amp;hPrinter, NULL ) )
+       return FALSE;
+
+     // Заполняем структуру данными о документе
+     DocInfo.pDocName = &quot;My Document&quot;;
+     DocInfo.pOutputFile = NULL;
+     DocInfo.pDatatype = &quot;RAW&quot;;
+     // Информируем спулер о том, что печать документа начата.
+     if( (dwJob = StartDocPrinter( hPrinter, 1, (LPSTR)&amp;DocInfo )) == 0)
+     {
+       ClosePrinter( hPrinter );
+       return FALSE;
+     }
+     // Начало страницы.
+     if( ! StartPagePrinter( hPrinter ) )
+     {
+       EndDocPrinter( hPrinter );
+       ClosePrinter( hPrinter );
+       return FALSE;
+     }
+     // Посылаем данные на принтер.
+     if( !WritePrinter( hPrinter, lpData, dwCount, &amp;dwBytesWritten ) )
+     {
+       EndPagePrinter( hPrinter );
+       EndDocPrinter( hPrinter );
+       ClosePrinter( hPrinter );
+       return FALSE;
+     }
+     // Конец страницы.
+     if( ! EndPagePrinter( hPrinter ) )
+     {
+       EndDocPrinter( hPrinter );
+       ClosePrinter( hPrinter );
+       return FALSE;
+     }
+     // Информируем спулер о конце документа.
+     if( ! EndDocPrinter( hPrinter ) )
+      {
+        ClosePrinter( hPrinter );
+        return FALSE;
+      }
+      // Закрываем дескриптор принтера.
+      ClosePrinter( hPrinter );
+      // Проверяем правильность количества записанных байт.
+      if( dwBytesWritten != dwCount )
+        return FALSE;
+      return TRUE;
+    }</pre>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

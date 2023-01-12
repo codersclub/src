@@ -1,0 +1,87 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как получить текущие настройки принтера в MFC</h3>
+    <p>Единственный способ, получить доступ к текущим
+    настройкам принтеров, это через структуры m_hDevMode
+    и m_hDevNames хранящимися в CWinApp. Эти члены доступны
+    через структуру PRINTDLG, указатель которой
+    передаётся в функцию-член GetPrinterDeviceDefaults() класса,
+    наследованного от CWinApp. Так как возвращаемые
+    значения hDevMode и hDevNames являются переменными HGLOBAL,
+    то для того, чтобы вернуть указатель на структуры
+    необходимо вызывать ::GlobalLock(). Используя данный
+    указатель, можно извлечь информацию из структуры,
+    чтобы определить текущее состояние принтера.
+    Более подробно о содержимом этих структур можно
+    посмотреть DEVMODE и DEVNAMES в хелпе по SDK.<br>
+    <br>
+    Нижеприведённый пример является функцией-членом
+    класса, наследованного от CView, которая возвращает
+    текущий размер страницы принтера используя
+    GetDeviceCaps() на объекте CDC, созданного с установками
+    принтера:</p>
+    <h3>Пример кода</h3>
+    <pre class="CODESAMP">   /* Необходимые опции компилятора: нет
+   */ 
+
+      BOOL CMyView::GetPageSize(CSize &amp;nRetVal)
+      {
+         PRINTDLG FAR * pPrintDlg = new PRINTDLG;
+         BOOL bRet = FALSE;
+
+      // Получаем текущие установки принтера.
+
+         if(AfxGetApp()-&gt;GetPrinterDeviceDefaults(pPrintDlg))
+         {
+
+      // Получаем указатели на две структуры с установками.
+
+            DEVNAMES FAR *lpDevNames =
+            (DEVNAMES FAR *)::GlobalLock(pPrintDlg-&gt;hDevNames);
+
+            DEVMODE FAR *lpDevMode =
+            (DEVMODE FAR *)::GlobalLock(pPrintDlg-&gt;hDevMode);
+
+      // Получаем информацию о драйвере.
+
+            CString szDriver((LPTSTR)lpDevNames +
+                                 lpDevNames-&gt;wDriverOffset);
+            CString szDevice((LPTSTR)lpDevNames +
+                                 lpDevNames-&gt;wDeviceOffset);
+            CString szOutput((LPTSTR)lpDevNames +
+                                 lpDevNames-&gt;wOutputOffset);
+
+      // Создаём объект CDC согласно текущим настройкам.
+
+            CDC pDC;
+            pDC.CreateDC(szDriver, szDevice, szOutput, lpDevMode);
+
+      // Запрашиваем у объекта CDC ширину и высоту текущей страницы.
+
+            nRetVal.cx = pDC.GetDeviceCaps(HORZSIZE);
+            nRetVal.cy = pDC.GetDeviceCaps(VERTSIZE);
+
+      // Избавляемся от объекта CDC.
+
+            pDC.DeleteDC();
+
+      // Разблокируем указатели на структуры настроек.
+
+            ::GlobalUnlock(pPrintDlg-&gt;hDevNames);
+            ::GlobalUnlock(pPrintDlg-&gt;hDevMode);
+
+          bRet = TRUE;
+         }
+       delete pPrintDlg;
+       return bRet;
+   } </pre>
+    <p class="CODESAMP">&nbsp;</p>
+    <p class="CODESAMP">&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

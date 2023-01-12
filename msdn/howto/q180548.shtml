@@ -1,0 +1,309 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как программно осуществить вход в сеть в WinNT и Win95</h3>
+    <p>Иногда бывает необходимо, чтобы приложение
+    проверяло имя пользователя и пароль. Существует
+    пара способов, чтобы проделать эту операцию, в
+    зависимости от того, на какой платформе запущено
+    приложение: Windows 95 или Windows NT.<br>
+    <br>
+    В данной статье описаны все общие способы
+    проверки прав пользователя, а так же специальные
+    требования для каждого из методов.<br>
+    <br>
+    API функция LogonUser доступна и документирована
+    начиная с Windows NT 3.51, и обычно используется для
+    проверки прав пользователя. К сожалению, есть
+    некоторые ограничения на использование LogonUser.
+    Первое и самое большое ограничение, это то, что
+    процесс, вызывающий LogonUser должен иметь
+    привелегию SE_TCB_NAME. SE_TCB_NAME очень серьёзная
+    привелегия и не может предоставляться любому
+    пользователю для управлением процессом
+    авторизации. Рекомендуется вызывать LogonUser из
+    сервиса, запущенного аккаунтом системы, так как
+    системный аккаунт изначально имеет привелегию
+    SE_TCB_NAME.<br>
+    <br>
+    Другая проблема LogonUser в том, эта API не включена в
+    Windows 95.<br>
+    <br>
+    Однако, можно использовать Security Support Provider Interface
+    (SSPI) чтобы осуществить вход в сеть с поддержкой
+    авторизации. У этого метода есть преимущество,
+    так как он не требует никаких специальных
+    привелегий, а так же работает в Windows 95. Конечный
+    результат использования сервисов SSPI для
+    проверки прав пользователя идентичен вызову
+    LogonUser с типом входа LOGON32_LOGON_NETWORK. Однако, при данно
+    типе входа в сеть Вы не сможете получить доступ к
+    удалённым сетевым ресурсам. Если Ваше приложение
+    будет вызывать LogonUser с типом входа LOGON32_LOGON_INTERACTIVE,
+    то нельзя будет работать с Windows NT, поэтому в
+    данном случае применение SSPI как альтернативы для
+    входа/авторизации не подойдёт.<br>
+    <br>
+    Приведённый ниже пример, показывает, как вызвать
+    сервис SSPI для проверки прав пользователя. Это
+    всего лишь модификация примера SOCKAUTH из Platform SDK,
+    который использует сервис SSPI. Для компиляции
+    нижеприведённого кода, необходимы два модуля из
+    этого примера.<br>
+    <br>
+    Чтобы использовать этот пример в Windows 95, Вам
+    необходимо загрузить пакет SSP для Windows 95. В Windows 95
+    пакет SSP называется Secur32.dll, в отличиет от Windows NT,
+    где он называется Security.dll . Для этого необходимо в
+    SECURITY.C изменить значение константы NT_DLL_NAME.<br>
+    <br>
+    Чтобы использовать данный метод в Windows 95,
+    необходимо разрешить сервис безопасности NTLM (Control
+    Panel -&gt; Network -&gt; Access Control, а затем указав User-level (на
+    уровне пользователей)).</p>
+    <h3>Пример кода</h3>
+    <pre class="CODESAMP">   /*++
+
+   Module Name:
+
+       SSPLogon.c
+
+   Abstract:
+
+      This module implements the network logon type by
+      interfacing with the Windows NT Lan Man Security Support
+      Provider (NTLMSSP) for the purpose of validating
+      the provided users credentials.
+
+
+   Автор:
+
+      David Mowers (DaveMo) January 14, 1998
+
+   Необходимы следующие модули из примера SockAuth:
+
+      security.c (modify according to comment below)
+      collect.c
+
+   Revision History:
+
+   --*/ 
+
+   #define SECURITY_WIN32
+
+   #include &lt;windows.h&gt;
+   #include &lt;sspi.h&gt;
+
+   // 
+   // Небольшое изменение в GenClientContext, чтобы можно было
+   // передавать пользовательские данные авторизации.
+   // 
+   BOOL GenClientContext (
+      DWORD dwKey,
+      SEC_WINNT_AUTH_IDENTITY *pAuthIdentity,
+      BYTE *pIn,
+      DWORD cbIn,
+      BYTE *pOut,
+      DWORD *pcbOut,
+      BOOL *pfDone);
+
+   /*
+
+      В security.c, для функции GenClientContext,
+      сделайте следующие изменения:
+
+      ss = g_pFuncs-&gt;AcquireCredentialsHandle (
+         NULL,   // principal
+         PACKAGE_NAME,
+         SECPKG_CRED_OUTBOUND,
+         NULL,   // LOGON id
+         pAuthIdentity,   // auth data
+         NULL,   // get key fn
+         NULL,   // get key arg
+         &amp;pAS-&gt;_hcred,
+         &amp;Lifetime
+         );
+   */ 
+
+
+   static PBYTE g_pClientBuf = NULL;
+   static PBYTE g_pServerBuf = NULL;
+   static DWORD g_cbMaxMessage = 0;
+
+   BOOL
+   SSPLogonUser(
+      LPTSTR DomainName,
+      LPTSTR UserName,
+      LPTSTR Password
+      )
+   {
+
+      BOOL done = FALSE;
+      DWORD cbOut, cbIn;
+      char szUser[80];
+      DWORD cbUser = 80;
+      SEC_WINNT_AUTH_IDENTITY AuthIdentity;
+
+      if(!InitSession(0))
+      {
+         return(FALSE);
+      }
+
+      if(!InitSession(1))
+      {
+         return(FALSE);
+      }
+
+      if (!InitPackage (&amp;g_cbMaxMessage))
+      {
+         return(FALSE);
+      }
+
+      g_pClientBuf = (PBYTE) malloc(g_cbMaxMessage);
+      g_pServerBuf = (PBYTE) malloc(g_cbMaxMessage);
+
+      ZeroMemory( &amp;AuthIdentity, sizeof(AuthIdentity) );
+
+      if ( DomainName != NULL )
+      {
+         AuthIdentity.Domain = DomainName;
+         AuthIdentity.DomainLength = lstrlen(DomainName);
+      }
+
+      if ( UserName != NULL )
+      {
+         AuthIdentity.User = UserName;
+         AuthIdentity.UserLength = lstrlen(UserName);
+      }
+
+      if ( Password != NULL )
+      {
+         AuthIdentity.Password = Password;
+         AuthIdentity.PasswordLength = lstrlen(Password);
+      }
+
+   #ifdef UNICODE
+       AuthIdentity.Flags = SEC_WINNT_AUTH_IDENTITY_UNICODE;
+   #else
+      AuthIdentity.Flags = SEC_WINNT_AUTH_IDENTITY_ANSI;
+   #endif
+
+      // 
+      // Подготовка клиентского сообщения (negotiate).
+      // 
+      cbOut = g_cbMaxMessage;
+      if (!GenClientContext (
+         0,
+         &amp;AuthIdentity,
+         NULL,
+         0,
+         g_pClientBuf,
+         &amp;cbOut,
+         &amp;done))
+      {
+         return(FALSE);
+      }
+
+      cbIn = cbOut;
+      // 
+      // Подготовка сообщения сервера (challenge).
+      // 
+      cbOut = g_cbMaxMessage;
+      if (!GenServerContext (
+         1,
+         g_pClientBuf,
+         cbIn,
+         g_pServerBuf,
+         &amp;cbOut,
+         &amp;done))
+      {
+         // 
+         // Наиболее вероятный отказ: AcceptServerContext с сообщением
+         // SEC_E_LOGON_DENIED в случе неправильного имени или пароля
+         // 
+         // Неожиданный Результат: Вход будет удачным, если имя
+         // неправильно, а гостевой аккаунт присутствует в указанно
+         // домене.
+         // 
+         return(FALSE);
+      }
+
+      cbIn = cbOut;
+      // 
+      // Подготовка клиентского сообщения (authenticate).
+      // 
+      cbOut = g_cbMaxMessage;
+      if (!GenClientContext (
+         0,
+         &amp;AuthIdentity,
+         g_pServerBuf,
+         cbIn,
+         g_pClientBuf,
+         &amp;cbOut,
+         &amp;done))
+      {
+         return(FALSE);
+      }
+
+      cbIn = cbOut;
+      // 
+      // Подготовка сообщения сервера (authentication).
+      // 
+      cbOut = g_cbMaxMessage;
+      if (!GenServerContext (
+         1,
+         g_pClientBuf,
+         cbIn,
+         g_pServerBuf,
+         &amp;cbOut,
+         &amp;done))
+      {
+         return(FALSE);
+      }
+
+      TermSession(0);
+      TermSession(1);
+
+      TermPackage();
+
+      free(g_pClientBuf);
+      free(g_pServerBuf);
+
+      return(TRUE);
+   }
+
+   int main( int argc, char *argv[] )
+   {
+
+      if(argc&lt;4)
+      {
+         printf(
+            &quot;Usage: %s &lt;domain&gt; &lt;user&gt; &lt;password&gt;\n&quot;,
+            argv[0]);
+         exit(0);
+      }
+
+      if(SSPLogonUser(
+         argv[1],
+         argv[2],
+         argv[3]))
+      {
+         printf(&quot;SSP Logon Succeeded!\n&quot;);
+         exit(1);
+      }
+      else
+      {
+         printf(&quot;SSP Logon Failed!\n&quot;);
+         exit(0);
+      }
+
+   } </pre>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

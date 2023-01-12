@@ -1,0 +1,191 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как изменить размер CPropertyPages во время
+    выполнения</h3>
+    <p>Чтобы изменить размер CPropertyPages в CPropertySheet во
+    время выполнения надо:<br>
+    <br>
+    <ol>
+      <li>Наследовать класс от CPropertySheet и переопределить
+        OnInitDialog().<br>
+        <br>
+      </li>
+      <li>В OnInitDialog(), изменить размер CPropertySheet, CTabCtrl, и
+        CPropertyPage(s) при помощи MoveWindow() или SetWindowPos()<br>
+        <br>
+      </li>
+      <li>Сохранить размер и положение CPropertyPage.<br>
+        <br>
+      </li>
+      <li>Обработать TCN_SELCHANGE в CPropertySheet, и изменить размер
+        страницы.<br>
+        <br>
+      </li>
+      <li>Обработать ID_APPLY_NOW в CPropertySheet, и изменить размер
+        страницы.<br>
+        <br>
+      </li>
+    </ol>
+    <p>&nbsp;</p>
+    <p>Фактически CPropertySheet это диалог с CTabCtrl. Каждый
+    CPropertyPage это дочерний класс CPropertySheet и
+    отображается только внутри CTabCtrl. Вот почему мы
+    так же должны изменять размер CTabCtrl. Чтобы
+    получить CTabCtrl, вызовите CPropertySheet::GetTabControl(). Если Вы
+    изменяете высоту property sheet, то возможно
+    потребуется переместить кнопки окошка свойств.
+    Пример, приведённый ниже, иллюстрирует это.<br>
+    <br>
+    При первом создании, CPropertySheet запоминает размер и
+    положение своих CPropertyPages. Когда пользователь
+    выбирает другую закладку (tab), то CPropertySheet получает
+    уведомление TCN_SELCHANGE. В ответ на это CPropertySheet
+    показывает новую страницу используя размер и
+    положение, которые он запомнил при первом
+    создании. Тоже самое случается, когда
+    пользователь кликает по кнопке Apply (ID_APPLY_NOW).
+    Поэтому, чтобы потом мы могли изменить размер
+    страниц, необходимо сохранять новый размер и
+    положение.</p>
+    <h3>Пример кода</h3>
+    <pre class="CODESAMP"> /* Опции компилятора: поумолчанию
+ */ 
+
+ // Этот пример добавляет 50 пикселей к ширине и высоте каждой страницы.
+ // CMySheet наследован от CPropertySheet. m_PageRect это переменная-член
+ // класса CMySheet и имеет тип RECT. WM_RESIZEPAGE это пользовательское
+ // сообщение.
+
+ // ... прототипы, которые необходимо добавить в объявление класса
+
+ class CMySheet : public CPropertySheet
+ {
+ // ... другие члены
+
+ // ... удостоверьтесь, что эти члены присутствуют
+ protected:
+     RECT m_PageRect;
+     virtual BOOL OnNotify(WPARAM wParam, LPARAM lParam, LRESULT* pResult);
+     virtual BOOL OnInitDialog();
+     afx_msg LRESULT OnResizePage(WPARAM wParam, LPARAM lParam);
+     afx_msg void OnApplyNow();
+ };
+
+ // ... измените и/или включите функции в файл .cpp ...
+
+ #define WM_RESIZEPAGE WM_USER + 111
+
+ BEGIN_MESSAGE_MAP(CMySheet, CPropertySheet)
+     //{{AFX_MSG_MAP(CMySheet)
+     // NOTE - the ClassWizard will add and remove mapping macros here.
+
+     // ... другие сообщения
+
+     //}}AFX_MSG_MAP
+
+     // ... add the 2 following entries here
+     ON_MESSAGE (WM_RESIZEPAGE, OnResizePage)
+     ON_COMMAND (ID_APPLY_NOW, OnApplyNow)
+
+ END_MESSAGE_MAP()
+
+ BOOL CMySheet::OnInitDialog()
+ {
+     CPropertySheet::OnInitDialog();
+
+     RECT rc;
+
+     // изменяем размер окошка свойств
+     GetWindowRect (&amp;rc);
+     ScreenToClient (&amp;rc);
+     rc.right += 50;
+     rc.bottom += 50;
+     MoveWindow (&amp;rc);
+
+     // изменяем размер CTabCtrl
+     CTabCtrl* pTab = GetTabControl ();
+     ASSERT (pTab);
+     pTab-&gt;GetWindowRect (&amp;rc);
+     ScreenToClient (&amp;rc);
+     rc.right += 50;
+     rc.bottom += 50;
+     pTab-&gt;MoveWindow (&amp;rc);
+
+     // изменяем размер страницы
+     CPropertyPage* pPage = GetActivePage ();
+     ASSERT (pPage);
+     // храним размер страницы в m_PageRect
+     pPage-&gt;GetWindowRect (&amp;m_PageRect);
+     ScreenToClient (&amp;m_PageRect);
+     m_PageRect.right += 50;
+     m_PageRect.bottom += 50;
+     pPage-&gt;MoveWindow (&amp;m_PageRect);
+
+     // перемещаем кнопки OK, Cancel, и Apply
+     CWnd* pWnd = GetDlgItem(IDOK);
+     pWnd-&gt;GetWindowRect(&amp;rc);
+     rc.bottom += 50;
+     rc.top += 50;
+     ScreenToClient(&amp;rc);
+     pWnd-&gt;MoveWindow(&amp;rc);
+
+     pWnd = GetDlgItem(IDCANCEL);
+     pWnd-&gt;GetWindowRect(&amp;rc);
+     rc.bottom += 50;
+     rc.top += 50;
+     ScreenToClient(&amp;rc);
+     pWnd-&gt;MoveWindow(&amp;rc);
+
+     pWnd = GetDlgItem(ID_APPLY_NOW);
+     pWnd-&gt;GetWindowRect(&amp;rc);
+     rc.bottom += 50;
+     rc.top += 50;
+     ScreenToClient(&amp;rc);
+     pWnd-&gt;MoveWindow(&amp;rc);
+
+     CenterWindow();
+
+     return TRUE;
+ }
+
+ LONG CMySheet::OnResizePage(UINT, LONG)
+ {
+     // изменяем размер страницы используя m_PageRect,
+     // которая была установлена в OnInitDialog()
+     CPropertyPage* pPage = GetActivePage ();
+     ASSERT (pPage);
+     pPage-&gt;MoveWindow (&amp;m_PageRect);
+
+     return 0;
+ }
+
+ BOOL CMySheet::OnNotify(WPARAM wParam, LPARAM lParam, LRESULT* pResult)
+ {
+     NMHDR* pnmh = (LPNMHDR) lParam;
+
+     // окошко свойств изменяет размер страницы всякий раз, когда она
+     // активна, поэтому нам необходимо изменить её размер
+     if (TCN_SELCHANGE == pnmh-&gt;code)
+         // необходимо постить сообщения, так как размер страницы должен
+         // быть изменён после обработки TCN_SELCHANGE
+         PostMessage (WM_RESIZEPAGE);
+
+     return CPropertySheet::OnNotify(wParam, lParam, pResult);
+ }
+
+ void CMySheet::OnApplyNow()
+ {
+     // окошко изменяет размер страницы всякий раз, когда нажимается
+     // кнопка Apply, поэтому необходимо изменить её размер так, как
+     // нам надо
+     PostMessage (WM_RESIZEPAGE);
+ } </pre>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

@@ -1,0 +1,353 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как вызывать 16-битный код из 32-битного под Windows
+    95</h3>
+    <p>Возможно, Вам как разработчику, иногда
+    необходимо работать с 16-битными динамическими
+    библиотеками (DLL) из приложения Win32. Особенно это
+    важно, когда нет исходного кода DLL, которую
+    необходимо портировать в Win32. В данной статье
+    описывается механизм, при помощи которого
+    32-битные DLL могут вызывать 16-битными DLL. Этот
+    механизм называется &quot;thunk&quot; а метод,
+    включённый в Windows 95 называется &quot;flat thunk&quot;.<br>
+    <br>
+    Далее представлены три основных шага при
+    создании flat thunk:<ol>
+      <li>Создаём thunk скрипт.<br>
+      </li>
+      <li>Компилируем 32-битную DLL.<br>
+      </li>
+      <li>Компилируем 16-битную DLL.<br>
+      </li>
+    </ol>
+    <p>Flat thunk состоит из 32-битной и 16-битной DLL, которые
+    работают вместе. Приложение Win32 работает с
+    32-битной DLL, а 32-битная DLL в свою очередь вызывает
+    экспортированные функции в 16-битной DLL. Когда
+    функция в 16-битной DLL завершает выполнение, то она
+    возвращает управление обратно в 32-битную DLL,
+    которая в свою очередь возвращает управление
+    обратно в приложение Win32. 32-битные и 16-битные DLL
+    работают вызывая 32-битное и 16-битное ядро в Windows 95
+    соответственно, для обработки необходимых
+    деталей низкого уровня, чтобы создать переход от
+    32-битного в 16-битный код и обратно.<br>
+    <br>
+    Разработка нового flat thunk влечёт за собой создание
+    thunk скрипта (файл .thk). Этот скрипт создаётся при
+    помощи Thunk компилятора в файле на языке
+    ассемблера, который затем компилируется дважды;
+    по разу с каждым из флагов -DIS_32 и -DIS_16. Это
+    позволяет создать как 32-битный, так и 16-битный
+    объектные модули. Эти объектные модули компонуются
+    (линкуются) в 32-битную и 16-битную DLL-ки,
+    соответственно. Следующая схема показывает все
+    файлы, вовлечённые в процесс создания DLL:</p>
+    <pre class="FIXEDTEXT">                         +------------+
+                         | 32to16.thk |
+                         +------------+
+                               |
+                         +------------+
+                         | 32to16.asm |
+                         +------------+
+                           /         \ 
+                  -DIS_32 /           \ -DIS_16
+                        /              \ 
+                  +-----------+  +-----------+
+                  | 32THK.obj |  | 16THK.obj |
+                  +-----------+  +-----------+
+                        /                 \ 
+        +-------+    +-------+             +-------+
+        | APP32 | -&gt; | DLL32 | -- THUNK -- | DLL16 |
+        +-------+    +-------+             +-------+ </pre>
+    <h3>Инструменты, необходимые для создания Flat Thunk</h3>
+    <ul>
+      <li>Компилятор Microsoft Visual C++ версии 1.5x (16-битный) для
+        создания 16-битного thunk. 16-битный thunk, это 16-битная
+        DLL.<br>
+      </li>
+      <li>Компилятор Microsoft Visual C++ версии 2.x или выше
+        (32-битный) для создания 32-битного thunk. 32-битный thunk,
+        это 32-битная DLL.<br>
+      </li>
+      <li>Thunk компилятор (Thunk.exe) из Microsoft Win32 SDK для
+        компиляции thunk скрипта.<br>
+      </li>
+      <li>Microsoft Macro Assembler (MASM) версии 6.1 или выше для
+        трансляции выходного файла thunk компилятора на
+        языке ассемблера.<br>
+      </li>
+      <li>16-битный файл Rc.exe из директории BINW16 пакета Microsoft
+        Win32 SDK для создания 16-битной thunk DLL версии 4.0.<br>
+      </li>
+    </ul>
+    <h3>Создание Thunk скрипта</h3>
+    <p>Вам необходимо создать скрипт, который может
+    быть использован в Thunk компиляторе для создания
+    thunk. Thunk скрипт, это текстовый файл, который
+    содержит объявление типов, прототипы функций,
+    которые Вы хотите вызывать через thunk-и, а так же
+    спецификацию направления параметров для каждой
+    функции. Например, некоторые функции требуют как
+    входные так и выходные параметры, в то время, как
+    другие нуждаются только во входных параметрах.
+    Thunk скрипт использует специальный синтаксис для
+    описания, какого типа параметры будут: только
+    входные, только выходные, или как входные, так и
+    выходные.<br>
+    <br>
+    thunk скрипт для 32-&gt;16 thunk-ов начинается со
+    следующего выражения:</p>
+    <blockquote>
+      <p>enablemapdirect3216 = true; </p>
+    </blockquote>
+    <p>Thunk компилятор ожидает, что 32-битная часть thunk
+    объявлена как __stdcall, а 16-битная как __far __pascal.
+    (Объявление WINAPI заботится об обоих частях.) __cdecl и
+    __fastcall не поддерживаются Thunk компилятором.
+    Обратите внимание, что вообщето Thunk компилятор не
+    понимает ключевые слова __far, __pascal, или __stdcall;
+    однако они применены.<br>
+    <br>
+    Следующий пример показывает thunk скрипт для
+    функции, не имеющей параметров:</p>
+    <pre class="CODESAMP">   enablemapdirect3216 = true;
+
+   void MyThunk16()
+   {
+   } </pre>
+    <p>Эквивалентное объявление было бы:</p>
+    <pre class="FIXEDTEXT">   C   language:  void WINAPI MyThunk16(void);
+   C++ language:  extern &quot;C&quot; void WINAPI MyThunk16(); </pre>
+    <p>Следующий пример скрипта описывает функцию,
+    которая получает два параметра и возвращает
+    значение. Второй параметр это выходной параметр,
+    содержащий указатель, который передаётся
+    обратно в 32-битную DLL.</p>
+    <pre class="CODESAMP">   enablemapdirect3216 = true;
+
+   typedef int   BOOL;
+   typedef char *LPSTR;
+
+   BOOL MyThunk16(LPSTR lpstrInput, LPSTR lpstrOutput)
+   {
+      lpstrInput  = input;    // optional; input is default
+      lpstrOutput = output;
+   } </pre>
+    <p>Выражение &quot;lpstrOutput = output&quot; говорит Thunk
+    компилятору, что 16-битная функция возвращает
+    адрес, который должен быть конвертирован из
+    указателя selector:offset в 32-битный линейный адрес.<br>
+    <br>
+    Следующий thunk скрипт использует более сложные
+    типы параметров, такие как структуры. Данный
+    пример так же показывает, как указывать входные и
+    выходные параметры.</p>
+    <pre class="CODESAMP">   enablemapdirect1632 = true;
+
+   typedef unsigned int UINT;
+   typedef char *LPSTR;
+
+   typedef struct _POINT {
+      UINT x;
+      UINT y;
+   }POINT, *LPPOINT;
+
+   typedef struct _CIRCLE {
+      POINT center;
+      UINT  radius;
+   }CIRCLE, *LPCIRCLE;
+
+   void MyThunk32( LPCIRCLE lpCircleInOut)
+   {
+      lpCircleInOut = inout;
+   } </pre>
+    <p>Выражение &quot;lpCircleInOut = inout&quot; говорит
+    компилятору скрипта, что этот указатель будет
+    использоваться для входа и выхода. Это
+    заставляет Thunk компилятор преобразовать lpCircleInOut
+    из 32-битного линейного адреса в указатель
+    selector:offset при вызове функции и обратно в 32-битный
+    линейный адрес, когда функция возвращает
+    управление. Преобразование делает thunk, созданный
+    Thunk компилятором.</p>
+    <h3>Использование Thunk компилятора</h3>
+    <p>Параметры Thunk компилятора следующие:</p>
+    <blockquote>
+      <p>thunk.exe /options &lt;inputfile&gt; -o &lt;outputfile&gt; </p>
+    </blockquote>
+    <p>Следующая командная строка показывает, как
+    компилировать 32-&gt;16 thunk скрипт. Входным файлом
+    является thunk скрипт с именем 32to16.thk, в итоге
+    появится файл на ассемблере с именем 32to16.asm.</p>
+    <blockquote>
+      <p>thunk -t thk 32to16.thk -o 32to16.asm </p>
+    </blockquote>
+    <p>Опция &quot;-t thk&quot; указывает Thunk компилятору,
+    чтобы тот делал префикс &quot;thk_.&quot; для thunk функций
+    в ассемблерном файле. Этот префик используется
+    когда компонуется несколько thunk скриптов в пару
+    DLL, и используется при создании пары DLL, которые
+    содержат как 32-&gt;16 так и 16-&gt;32 thunk-и. Каждый thunk
+    скрипт должен иметь уникальный префикс.</p>
+    <h3>Создание 32-битной DLL</h3>
+    <ol>
+      <li>В функции DllMain Вашей 32-битной DLL, надо сделать
+        вызов функции, созданной Thunk компилятором и
+        названной thk_ThunkConnect32 для каждого случая (dwReason)
+        когда DllMain вызывается, как показано здесь
+        (&quot;thk&quot; это префикс из Thunk компилятора -t
+        параметр):<pre class="CODESAMP">      // прототип для функции в файле .obj из thunk скрипта
+      BOOL WINAPI thk_ThunkConnect32(LPSTR     lpDll16,
+                                     LPSTR     lpDll32,
+                                     HINSTANCE hDllInst,
+                                     DWORD     dwReason);
+
+      BOOL WINAPI DllMain(HINSTANCE hDLLInst,
+                          DWORD     dwReason,
+                          LPVOID    lpvReserved)
+      {
+         if (!thk_ThunkConnect32(&quot;DLL16.DLL&quot;, &quot;DLL32.DLL&quot;,
+                                 hDLLInst, dwReason))
+         {
+            return FALSE;
+         }
+         switch (dwReason)
+         {
+            case DLL_PROCESS_ATTACH:
+               break;
+
+            case DLL_PROCESS_DETACH:
+               break;
+
+            case DLL_THREAD_ATTACH:
+               break;
+
+            case DLL_THREAD_DETACH:
+               break;
+         }
+         return TRUE;
+      } </pre>
+        <p>&nbsp;</p>
+      </li>
+      <li>Включите следующие строки в секцию EXPORTS файла .def
+        32-битной DLL. Например:<pre class="CODESAMP">   thk_ThunkData32</pre>
+      </li>
+      <li>Экспортируйте функции, которые будет вызывать
+        приложение Win32. Для этого можно использовать как
+        файл .def так и ключевое слово __declspec(dllexport).
+        Убедитесь, что функции объявлены как __stdcall (или
+        WINAPI). Если 32-битная DLL написана в C++, так же
+        убедитесь, что функции определены как extern
+        &quot;C&quot;.<br>
+      </li>
+      <li>Скомпилируйте thunk скрипт как показано ниже (если
+        ещё не скомпилировали): <pre class="CODESAMP">      thunk -t thk 32to16.thk -o 32to16.asm</pre>
+      </li>
+      <li>Оттранслируйте ассемблерный файл, созданный Thunk
+        компилятором как 32-битный объектный модуль.
+        Например:<pre class="CODESAMP">      ml /DIS_32 /c /W3 /nologo /coff /Fo thk32.obj 32to16.asm</pre>
+      </li>
+      <li>Скомпонуйте ( link ) этот объектный модуль как
+        часть 32-битной DLL.<br>
+      </li>
+      <li>Скомпонуйте библиотеку Thunk32.lib как часть
+        32-битной DLL. Эта 32-битная библиотека содержится в
+        Win32 SDK.<br>
+        <br>
+      </li>
+    </ol>
+    <h3>Создание 16-битной DLL</h3>
+    <ol>
+      <li>16-битная DLL должна экспортировать функцию
+        &quot;DllEntryPoint&quot;. Эта функция должна вызывать
+        функцию thk__ThunkConnect16, созданную Thunk компилятором,
+        каждый раз, когда вызывается DllEntryPoint:<pre class="CODESAMP">      // прототип для функции в файле .obj из thunk скрипта
+      BOOL WINAPI __export thk_ThunkConnect16(LPSTR lpDll16,
+                                              LPSTR lpDll32,
+                                              WORD  hInst,
+                                              DWORD dwReason);
+
+      BOOL WINAPI __export DllEntryPoint(DWORD dwReason,
+                                         WORD  hInst,
+                                         WORD  wDS,
+                                         WORD  wHeapSize,
+                                         DWORD dwReserved1,
+                                         WORD  wReserved 2)
+      {
+         if (!thk_ThunkConnect16(&quot;DLL16.DLL&quot;,
+                                 &quot;DLL32.DLL&quot;,
+                                 hInst,
+                                 dwReason))
+         {
+            return FALSE;
+         }
+         return TRUE;
+      }</pre>
+        <p>&nbsp;</p>
+      </li>
+      <li>Добавьте следующие строки в секцию IMPORTS файла .def
+        16-битной DLL. Например:<pre class="CODESAMP">      C16ThkSL01      = KERNEL.631
+      ThunkConnect16  = KERNEL.651
+</pre>
+      </li>
+      <li>Следующие строки следует добавить в секцию EXPORTS
+        файла .def 16-битной DLL. THK_THUNKDATA16 определена в
+        объектном файле, который был оттранслирован Thunk
+        компилятором. Оба эти символа должны иметь
+        ключевое слово RESIDENTNAME, но не могут иметь любое
+        порядковое число.<pre class="CODESAMP">      THK_THUNKDATA16 @1  RESIDENTNAME
+      DllEntryPoint   @2  RESIDENTNAME
+</pre>
+      </li>
+      <li>Добавьте thunk функции к инструкции EXPORTS .def файла.
+        Убедитесь, что они определены и объявлены как __far
+        __pascal __export (или WINAPI __export). Если DLL написана в C++,
+        убедитесь, что объявили их как extern &quot;C&quot;. 32-битная
+        часть thunk будет вызывать эти функции.<br>
+      </li>
+      <li>Скомпилируйте thunk скрипт как показано ниже (если
+        ещё не скомпилировали):<pre class="CODESAMP">      thunk -t thk 32to16.thk -o 32to16.asm
+</pre>
+      </li>
+      <li>Оттранслируйте ассемблерный файл, созданный Thunk
+        компилятором как 16-битный объектный модуль.
+        Например:<pre class="CODESAMP">      ml /DIS_16 /c /W3 /nologo /Fo thk16.obj 32to16.asm
+</pre>
+      </li>
+      <li>Скомпонуйте ( link ) этот объектный модуль как
+        часть 16-битной DLL.<br>
+      </li>
+      <li>Создайте 16-bit DLL версии 4.0. Для этого используйте
+        компилятор ресурсов (Rc.exe). Вот синтаксис
+        командной строки:<blockquote>
+          <p>rc -40 &lt;DLL file&gt; </p>
+        </blockquote>
+        <p>Опция -40 доступна в Компиляторе ресурсов,
+        которы поставляется с Win32 SDK.<br>
+        <br>
+        ЗАМЕЧАНИЕ: Необходимо запускать файл Rc.exe в
+        директории BINW16, чтобы DLL была помечена как версии
+        4.0. Файл Rc.exe, который поставляется с 16-битными
+        версиями Microsoft Visual C++ не помечают DLL как версии 4.0.<br>
+        <br>
+        </p>
+      </li>
+    </ol>
+    <h2>ССЫЛКИ</h2>
+    <p>Информацию о том, как отлаживать flat thunks
+    смотрите в статье из Microsoft Knowledge Base:</p>
+    <blockquote>
+      <a href="http://support.microsoft.com/kb/133722">Q133722 Как отлаживать Flat Thunks</a>
+    </blockquote>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

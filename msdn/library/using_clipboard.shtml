@@ -1,0 +1,662 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Работа с буфером обмена.</h3>
+    <p><a name="_win32_Implementing_the_Cut_Copy_and_Paste_Commands"></a><b>Реализация
+    команд Cut, Copy, и Paste</b></p>
+    <p>В этом разделе приводится пример, реализующий
+    эти команды используя два формата буфера обмена:
+    CF_OWNERDISPLAY и CF_TEXT. Обычно, перед тем, как информация
+    будет скопирована в буфер обмена (clipboard),
+    пользователь должен выделить определённый кусок
+    текста. Для этого в приложении должны быть
+    реализованы все возможности. После того, как
+    текст будет выделен, необходимо реализовать
+    всплывающее меню по правой кнопке мыши, а так же <a
+    href="http://msdn.microsoft.com/library/en-us/winui/WinUI/WindowsUserInterface/UserInput/KeyboardAccelerators.asp">акселераторы</a>
+    к пунктам этого меню.</p>
+    <p>Чтобы сделать всплывающее меню, приложение
+    должно обработать сообщение <a
+    href="http://msdn.microsoft.com/library/en-us/winui/WinUI/WindowsUserInterface/UserInput/KeyboardAccelerators/KeyboardAcceleratorReference/KeyboardAcceleratorMessages/WM_INITMENUPOPUP.asp">WM_INITMENUPOPUP</a>:</p>
+    <pre>case WM_INITMENUPOPUP:
+    InitMenu((HMENU) wParam);
+    break;
+</pre>
+    <p>Функция InitMenu позволяет сделать определённые
+    пункты меню доступными либо недоступными
+    (серыми) и выглядит следующим образом:</p>
+    <p><b>Пример:</b></p>
+    <pre>void WINAPI InitMenu(HMENU hmenu)
+{
+    int  cMenuItems = GetMenuItemCount(hmenu);
+    int  nPos;
+    UINT id;
+    UINT fuFlags;
+    PLABELBOX pbox = (hwndSelected == NULL) ? NULL :
+        (PLABELBOX) GetWindowLong(hwndSelected, 0);
+ 
+    for (nPos = 0; nPos &lt; cMenuItems; nPos++) 
+    {
+        id = GetMenuItemID(hmenu, nPos);
+
+        switch (id)
+        {
+            case IDM_CUT:
+            case IDM_COPY:
+            case IDM_DELETE:
+                if (pbox == NULL || !pbox-&gt;fSelected)
+                    fuFlags = MF_BYCOMMAND | MF_GRAYED;
+                else if (pbox-&gt;fEdit)
+                    fuFlags = (id != IDM_DELETE &amp;&amp; pbox-&gt;ichSel
+                            == pbox-&gt;ichCaret) ?
+                        MF_BYCOMMAND | MF_GRAYED :
+                        MF_BYCOMMAND | MF_ENABLED;
+                else
+                    fuFlags = MF_BYCOMMAND | MF_ENABLED;
+
+                EnableMenuItem(hmenu, id, fuFlags);
+                break;
+
+            case IDM_PASTE:
+                if (pbox != NULL &amp;&amp; pbox-&gt;fEdit)
+                    EnableMenuItem(hmenu, id,
+                        IsClipboardFormatAvailable(CF_TEXT) ?
+                            MF_BYCOMMAND | MF_ENABLED :
+                            MF_BYCOMMAND | MF_GRAYED
+                    );
+                else
+                    EnableMenuItem(hmenu, id,
+                        IsClipboardFormatAvailable(
+                                uLabelFormat) ?
+                            MF_BYCOMMAND | MF_ENABLED :
+                            MF_BYCOMMAND | MF_GRAYED
+                    );
+
+        }
+    }
+}
+</pre>
+    <p>Далее, для того, чтобы обрабатывать команды
+    меню, необходимо добавить в приложение обработку
+    команды <a
+    href="http://msdn.microsoft.com/library/en-us/winui/WinUI/WindowsUserInterface/Resources/Menus/MenuReference/MenuMessages/WM_COMMAND.asp">WM_COMMAND</a>
+    в главную оконную процедуру:</p>
+    <p><b>Пример:</b></p>
+    <pre>case WM_COMMAND:
+    switch (LOWORD(wParam))
+    {
+        case IDM_CUT:
+            if (EditCopy())
+                EditDelete();
+            break;
+
+        case IDM_COPY:
+            EditCopy();
+            break;
+
+        case IDM_PASTE:
+            EditPaste();
+            break;
+
+        case IDM_DELETE:
+            EditDelete();
+            break;
+
+        case IDM_EXIT:
+            DestroyWindow(hwnd);
+    }
+    break;</pre>
+    <p>Для реализации команд <b>Copy</b> и <b>Cut</b>
+    используется функция EditCopy (См. <a
+    href="#_win32_Copying_Information_to_the_Clipboard" target="_self">Копирование
+    данных в буфер обмена</a>). Для реализации команды <b>Paste</b>
+    используется функция EditPaste (См. <a
+    href="#_win32_Pasting_Information_from_the_Clipboard" target="_self">Вставка
+    данных из буфера обмена</a>).</p>
+    <p><a name="_win32_Copying_Information_to_the_Clipboard"></a><b>Копирование
+    информации в буфер обмена</b></p>
+    <p>Процесс копирования информации в буфер обмена
+    осуществляется следующим образом:<ol>
+      <li>Открываем буфер обмена функцией <a
+        href="http://msdn.microsoft.com/library/en-us/winui/WinUI/WindowsUserInterface/DataExchange/Clipboard/ClipboardReference/ClipboardFunctions/OpenClipboard.asp">OpenClipboard</a>.</li>
+      <li>Очищаем буфер обмена функцией <a
+        href="http://msdn.microsoft.com/library/en-us/winui/WinUI/WindowsUserInterface/DataExchange/Clipboard/ClipboardReference/ClipboardFunctions/EmptyClipboard.asp">EmptyClipboard</a>.</li>
+      <li>Вызываем функцию <a
+        href="http://msdn.microsoft.com/library/en-us/winui/WinUI/WindowsUserInterface/DataExchange/Clipboard/ClipboardReference/ClipboardFunctions/SetClipboardData.asp">SetClipboardData</a>
+        для каждого формата буфера обмена, которые
+        поддерживает приложение.</li>
+      <li>Закрываем буфер обмена функцией <a
+        href="http://msdn.microsoft.com/library/en-us/winui/WinUI/WindowsUserInterface/DataExchange/Clipboard/ClipboardReference/ClipboardFunctions/CloseClipboard.asp">CloseClipboard</a>.</li>
+    </ol>
+    <p>Для того чтобы скопировать выделенный текст,
+    используется следующая структура:</p>
+    <pre class="clsCode" style="DISPLAY: block" AUTOHILITE="1">#define BOX_ELLIPSE  0
+#define BOX_RECT     1
+
+#define CCH_MAXLABEL 80
+#define CX_MARGIN    12
+
+typedef struct tagLABELBOX {
+    RECT rcText;    <font
+color="blue">//</font><font color="green"> координаты прямоугольника с текстом</font>
+    BOOL fSelected; <font
+color="blue">//</font><font color="green"> TRUE если выделен label</font>
+    BOOL fEdit;     <font
+color="blue">//</font><font color="green"> TRUE если текст выделен</font>
+    int nType;      <font
+color="blue">//</font><font color="green"> прямоугольное или овальное</font>
+    int ichCaret;   <font
+color="blue">//</font><font color="green"> позиция каретки</font>
+    int ichSel;     <font
+color="blue">//</font><font color="green"> with ichCaret, delimits selection</font>
+    int nXCaret;    <font
+color="blue">//</font><font color="green"> window position corresponding to ichCaret</font>
+    int nXSel;      <font
+color="blue">//</font><font color="green"> window position corresponding to ichSel</font>
+    int cchLabel;   <font
+color="blue">//</font><font color="green"> длина текста в atchLabel</font>
+    TCHAR atchLabel[CCH_MAXLABEL];
+} LABELBOX, *PLABELBOX;
+</pre>
+    <p>А вот сама функция EditCopy:</p>
+    <p><b>Пример:</b></p>
+    <pre>BOOL WINAPI EditCopy(VOID)
+{
+    PLABELBOX pbox;
+    LPTSTR  lptstrCopy;
+    HGLOBAL hglbCopy;
+    int ich1, ich2, cch;
+
+    if (hwndSelected == NULL)
+        return FALSE;
+
+    <font
+color="blue">//</font><font color="green"> Открываем буфер обмена и очищаем его.</font>
+
+    if (!OpenClipboard(hwndMain))
+        return FALSE;
+    EmptyClipboard();
+
+    <font
+color="blue">//</font><font color="green"> Получаем указатель на структуру </font>LABELBOX<font
+color="green">.</font>
+ 
+    pbox = (PLABELBOX) GetWindowLong(hwndSelected, 0);
+
+    <font
+color="blue">//</font><font color="green"> Если текст выделен, то копируем его используя формат CF_TEXT.</font>
+
+    if (pbox-&gt;fEdit)
+    {
+        if (pbox-&gt;ichSel == pbox-&gt;ichCaret)     <font
+color="blue">//</font><font color="green"> нулевая длина</font>
+        {   
+            CloseClipboard();                   <font
+color="blue">//</font><font color="green"> выделение</font>
+            return FALSE;
+        }
+ 
+        if (pbox-&gt;ichSel &lt; pbox-&gt;ichCaret)
+        {
+            ich1 = pbox-&gt;ichSel;
+            ich2 = pbox-&gt;ichCaret;
+        }
+        else
+        {
+            ich1 = pbox-&gt;ichCaret;
+            ich2 = pbox-&gt;ichSel;
+        }
+        cch = ich2 - ich1;
+
+        <font
+color="blue">//</font><font color="green"> Выделяем память для текста.</font>
+
+        hglbCopy = GlobalAlloc(GMEM_MOVEABLE,
+            (cch + 1) * sizeof(TCHAR));
+        if (hglbCopy == NULL)
+        {
+            CloseClipboard();
+            return FALSE;
+        }
+
+        <font
+color="blue">//</font><font color="green"> Блокируем хэндл и копируем текст в буфер.</font>
+ 
+        lptstrCopy = GlobalLock(hglbCopy);
+        memcpy(lptstrCopy, &amp;pbox-&gt;atchLabel[ich1],
+            cch * sizeof(TCHAR));
+        lptstrCopy[cch] = (TCHAR) 0;    <font
+color="blue">//</font><font color="green"> нулевой символ</font>
+        GlobalUnlock(hglbCopy);
+
+        <font
+color="blue">//</font><font color="green"> Помещаем хэндл в буфер обмена.</font>
+
+        SetClipboardData(CF_TEXT, hglbCopy);
+    }
+
+    <font
+color="blue">//</font><font color="green"> Если текст не выделен, то копируем весь label.</font>
+
+    else
+    {
+        <font
+color="blue">//</font><font color="green"> Сохраняем копию выделенного лабела в локальной памяти.</font>
+        <font
+color="blue">//</font><font color="green"> С ней мы будем работать и освобождать в ответ на</font>
+        <font
+color="blue">//</font><font color="green"> сообщение WM_DESTROYCLIPBOARD.</font>
+
+        pboxLocalClip = (PLABELBOX) LocalAlloc(
+            LMEM_FIXED,
+            sizeof(LABELBOX)
+        );
+        if (pboxLocalClip == NULL)
+        {
+            CloseClipboard();
+            return FALSE;
+        }
+        memcpy(pboxLocalClip, pbox, sizeof(LABELBOX));
+        pboxLocalClip-&gt;fSelected = FALSE;
+        pboxLocalClip-&gt;fEdit = FALSE;
+
+        <font
+color="blue">//</font><font color="green"> Помещаем в буфер обмена данные трёх форматов.</font>
+
+        SetClipboardData(uLabelFormat, NULL);
+        SetClipboardData(CF_OWNERDISPLAY, NULL);
+        SetClipboardData(CF_TEXT, NULL);
+    }
+
+    <font
+color="blue">//</font><font color="green"> Закрываем буфер обмена.</font>
+
+    CloseClipboard();
+
+    return TRUE;
+}
+</pre>
+    <p><a name="_win32_Pasting_Information_from_the_Clipboard"></a><b>Вставка
+    данных из буфера обмена</b></p>
+    <p>Процесс вставки информации из буфера обмена
+    осуществляется следующим образом:<ol>
+      <li>Открываем буфер обмена функцией <b>OpenClipboard</b>.</li>
+      <li>Определяем форматы данных, хранящихся в буфере
+        обмена.</li>
+      <li>Получаем хэндл данных нужного формата при
+        помощи функции <a
+        href="http://msdn.microsoft.com/library/en-us/winui/WinUI/WindowsUserInterface/DataExchange/Clipboard/ClipboardReference/ClipboardFunctions/GetClipboardData.asp">GetClipboardData</a>.</li>
+      <li>Вставляем копию данных в документ.<p>Владельцем
+        хэндла возвращённого <b>GetClipboardData</b> остаётся всё
+        ещё буфер обмена, поэтому приложение не должно
+        его освобождать.</p>
+      </li>
+      <li>Закрываем буфер обмена функцией <b>CloseClipboard</b>.</li>
+    </ol>
+    <p>Определение структуры LABELBOX:</p>
+    <pre class="clsCode" style="DISPLAY: block" AUTOHILITE="1">#define BOX_ELLIPSE  0 
+#define BOX_RECT     1 
+ 
+#define CCH_MAXLABEL 80 
+#define CX_MARGIN    12 
+ 
+typedef struct tagLABELBOX {
+    RECT rcText;    <font
+color="blue">//</font><font color="green"> координаты прямоугольника с текстом</font>
+    BOOL fSelected; <font
+color="blue">//</font><font color="green"> TRUE если будет копироваться весь label</font>
+    BOOL fEdit;     <font
+color="blue">//</font><font color="green"> TRUE если текст выделен</font>
+    int nType;      <font
+color="blue">//</font><font color="green"> прямоугольное или овальное</font>
+    int ichCaret;   <font
+color="blue">//</font><font color="green"> позиция каретки</font>
+    int ichSel;     <font
+color="blue">//</font><font color="green"> with ichCaret, delimits selection</font>
+    int nXCaret;    <font
+color="blue">//</font><font color="green"> window position corresponding to ichCaret</font>
+    int nXSel;      <font
+color="blue">//</font><font color="green"> window position corresponding to ichSel</font>
+    int cchLabel;   <font
+color="blue">//</font><font color="green"> длина текста в atchLabel</font>
+    TCHAR atchLabel[CCH_MAXLABEL];
+} LABELBOX, *PLABELBOX;
+</pre>
+    <p>Далее следует исходник функции EditPaste.</p>
+    <p><b>пример:</b></p>
+    <pre>VOID WINAPI EditPaste(VOID)
+{
+    PLABELBOX pbox;
+    HGLOBAL   hglb;
+    LPTSTR    lptstr;
+    PLABELBOX pboxCopy;
+    int cx, cy;
+    HWND hwnd;
+
+    pbox = hwndSelected == NULL ? NULL :
+        (PLABELBOX) GetWindowLong(hwndSelected, 0);
+ 
+    <font
+color="blue">//</font><font color="green"> Если приложение находится в режиме редактирования,</font>
+    <font
+color="blue">//</font><font color="green"> то получаем текст из буфера обмена.</font>
+
+    if (pbox != NULL &amp;&amp; pbox-&gt;fEdit)
+    {
+        if (!IsClipboardFormatAvailable(CF_TEXT))
+            return;
+        if (!OpenClipboard(hwndMain))
+            return;
+
+        hglb = GetClipboardData(CF_TEXT);
+        if (hglb != NULL)
+        {
+            lptstr = GlobalLock(hglb);
+            if (lptstr != NULL)
+            {
+                <font
+color="blue">//</font><font color="green"> Функция ReplaceSelection вставляет</font> текст
+                <font
+color="blue">//</font><font color="green"> и перерисовывает окно.</font>
+
+                ReplaceSelection(hwndSelected, pbox, lptstr);
+                GlobalUnlock(hglb);
+            }
+        }
+        CloseClipboard();
+
+        return;
+    }
+
+    <font
+color="blue">//</font><font color="green"> Если приложение не находится в режиме редактирования,</font>
+    <font
+color="blue">//</font><font color="green"> то создаём окно label-а.</font>
+
+    if (!IsClipboardFormatAvailable(uLabelFormat))
+        return;
+    if (!OpenClipboard(hwndMain))
+        return;
+
+    hglb = GetClipboardData(uLabelFormat);
+    if (hglb != NULL)
+    {
+        pboxCopy = GlobalLock(hglb);
+        if (pboxCopy != NULL)
+        {
+            cx = pboxCopy-&gt;rcText.right + CX_MARGIN;
+            cy = pboxCopy-&gt;rcText.top * 2 + cyText;
+
+            hwnd = CreateWindowEx(
+                WS_EX_NOPARENTNOTIFY | WS_EX_TRANSPARENT,
+                atchClassChild, NULL, WS_CHILD, 0, 0, cx, cy,
+                hwndMain, NULL, hinst, NULL
+            );
+            if (hwnd != NULL)
+            {
+                pbox = (PLABELBOX) GetWindowLong(hwnd, 0);
+                memcpy(pbox, pboxCopy, sizeof(LABELBOX));
+                ShowWindow(hwnd, SW_SHOWNORMAL);
+                SetFocus(hwnd);
+            }
+            GlobalUnlock(hglb);
+        }
+    }
+    CloseClipboard();
+}
+</pre>
+    <p><a name="_win32_Registering_a_Clipboard_Format"></a><b>Как
+    зарегистрировать формат буфера обмена</b></p>
+    <p>Для этого используется функция <a
+    href="http://msdn.microsoft.com/library/en-us/winui/WinUI/WindowsUserInterface/DataExchange/Clipboard/ClipboardReference/ClipboardFunctions/RegisterClipboardFormat.asp">RegisterClipboardFormat</a>,
+    которая обычно вызывается при инициализации
+    приложения.</p>
+    <pre><font color="blue">//</font><font color="green"> atchTemp может содержать имя формата</font>
+<font
+color="blue">//</font><font color="green"> и завершаться нулевым символом.</font>
+<font
+color="blue">//</font>
+LoadString(hinstCurrent, IDS_FORMATNAME, atchTemp,
+    sizeof(atchTemp)/sizeof(TCHAR));
+uLabelFormat = RegisterClipboardFormat(atchTemp);
+if (uLabelFormat == 0)
+    return FALSE;
+</pre>
+    <p><a name="_win32_Processing_the_WM_RENDERFORMAT_and_WM_RENDERALLFORMATS_Messages"></a><b>Обработка
+    сообщений WM_RENDERFORMAT и WM_RENDERALLFORMATS</b></p>
+    <p>Если не известно, какого формата данные будут
+    помещены в буфер обмена, то можно передать в
+    функцию <b>SetClipboardData</b> хэндл равный NULL, при этом
+    приложение сгенерирует сообщение <a
+    href="http://msdn.microsoft.com/library/en-us/winui/WinUI/WindowsUserInterface/DataExchange/Clipboard/ClipboardReference/ClipboardMessages/WM_RENDERFORMAT.asp">WM_RENDERFORMAT</a>
+    либо <a
+    href="http://msdn.microsoft.com/library/en-us/winui/WinUI/WindowsUserInterface/DataExchange/Clipboard/ClipboardReference/ClipboardMessages/WM_RENDERALLFORMATS.asp">WM_RENDERALLFORMATS</a>
+    и Вы должны позаботиться, чтобы обработать эти
+    сообщения. В данном случае перед вызовом функции <b>SetClipboardData</b>
+    нельзя открывать буфер обмена.</p>
+    <p>Сообщения <b>WM_RENDERFORMAT</b> и <b>WM_RENDERALLFORMATS</b>
+    обрабатываются следующим образом:</p>
+    <pre>case WM_RENDERFORMAT:
+    RenderFormat((UINT) wParam);
+    break;
+
+case WM_RENDERALLFORMATS:
+    RenderFormat(uLabelFormat);
+    RenderFormat(CF_TEXT);
+    break;
+</pre>
+    <p>Код функции RenderFormat представлен ниже.</p>
+    <p>Как обычно, определение структуры LABELBOX:</p>
+    <pre class="clsCode" style="DISPLAY: block" AUTOHILITE="1">#define BOX_ELLIPSE  0 
+#define BOX_RECT     1 
+ 
+#define CCH_MAXLABEL 80 
+#define CX_MARGIN    12 
+ 
+typedef struct tagLABELBOX {
+    RECT rcText;    <font
+color="blue">//</font><font color="green"> координаты прямоугольника с текстом</font>
+    BOOL fSelected; <font
+color="blue">//</font><font color="green"> TRUE если будет копироваться весь label</font>
+    BOOL fEdit;     <font
+color="blue">//</font><font color="green"> TRUE если текст выделен</font>
+    int nType;      <font
+color="blue">//</font><font color="green"> прямоугольное или овальное</font>
+    int ichCaret;   <font
+color="blue">//</font><font color="green"> позиция каретки</font>
+    int ichSel;     <font
+color="blue">//</font><font color="green"> with ichCaret, delimits selection</font>
+    int nXCaret;    <font
+color="blue">//</font><font color="green"> window position corresponding to ichCaret</font>
+    int nXSel;      <font
+color="blue">//</font><font color="green"> window position corresponding to ichSel</font>
+    int cchLabel;   <font
+color="blue">//</font><font color="green"> длина текста в atchLabel</font>
+    TCHAR atchLabel[CCH_MAXLABEL]; 
+} LABELBOX, *PLABELBOX;
+</pre>
+    <p><b>Пример:</b></p>
+    <pre>void WINAPI RenderFormat(UINT uFormat)
+{
+    HGLOBAL hglb;
+    PLABELBOX pbox;
+    LPTSTR  lptstr;
+    int cch;
+
+    if (pboxLocalClip == NULL)
+        return;
+
+    if (uFormat == CF_TEXT)
+    {
+        <font
+color="blue">//</font><font color="green"> Выделяем буфер для текста.</font>
+
+        cch = pboxLocalClip-&gt;cchLabel;
+        hglb = GlobalAlloc(GMEM_MOVEABLE,
+            (cch + 1) * sizeof(TCHAR));
+        if (hglb == NULL)
+            return;
+
+        <font
+color="blue">//</font><font color="green"> Копируем текст из pboxLocalClip.</font>
+
+        lptstr = GlobalLock(hglb);
+        memcpy(lptstr, pboxLocalClip-&gt;atchLabel,
+            cch * sizeof(TCHAR));
+        lptstr[cch] = (TCHAR) 0;
+        GlobalUnlock(hglb);
+
+        <font
+color="blue">//</font><font color="green"> Помещаем хэндл в буфер обмена.</font>
+
+        SetClipboardData(CF_TEXT, hglb);
+    }
+    else if (uFormat == uLabelFormat)
+    {
+        hglb = GlobalAlloc(GMEM_MOVEABLE, sizeof(LABELBOX));
+        if (hglb == NULL)
+            return;
+        pbox = GlobalLock(hglb);
+        memcpy(pbox, pboxLocalClip, sizeof(LABELBOX));
+        GlobalUnlock(hglb);
+
+        SetClipboardData(uLabelFormat, hglb);
+    }
+}
+</pre>
+    <p><a name="_win32_Processing_the_WM_DESTROYCLIPBOARD_Message"></a><b>Обработка
+    сообщения WM_DESTROYCLIPBOARD</b></p>
+    <p>Чтобы освободить различные ресурсы, можно
+    включить в приложение обработку сообщения <a
+    href="http://msdn.microsoft.com/library/en-us/winui/WinUI/WindowsUserInterface/DataExchange/Clipboard/ClipboardReference/ClipboardMessages/WM_DESTROYCLIPBOARD.asp">WM_DESTROYCLIPBOARD</a>.
+    Например, при копировании label-а в буфер обмена,
+    выделяется локальная память. Эту память можно
+    освободить при обработке сообщения <b>WM_DESTROYCLIPBOARD</b>.</p>
+    <pre class="clsCode" AUTOHILITE="1">case WM_DESTROYCLIPBOARD:
+    if (pboxLocalClip != NULL)
+    {
+        LocalFree(pboxLocalClip);
+        pboxLocalClip = NULL;
+    }
+    break;
+</pre>
+    <p><a name="_win32_Using_the_Owner_Display_Clipboard_Format"></a><b>Использование
+    формата буфера обмена CF_OWNERDISPLAY</b></p>
+    <p>Если Вы помещаете данные в буфер обмена,
+    используя формат CF_OWNERDISPLAY, то необходимо
+    проделать следующее:<ul>
+      <li>Обработать сообщение <a
+        href="http://msdn.microsoft.com/library/en-us/winui/WinUI/WindowsUserInterface/DataExchange/Clipboard/ClipboardReference/ClipboardMessages/WM_PAINTCLIPBOARD.asp">WM_PAINTCLIPBOARD</a>.
+        Это сообщение посылается владельцу буфера
+        обмена, когда его &quot;окно&quot; должно быть
+        перерисовано.</li>
+      <li>Обработать сообщение <a
+        href="http://msdn.microsoft.com/library/en-us/winui/WinUI/WindowsUserInterface/DataExchange/Clipboard/ClipboardReference/ClipboardMessages/WM_SIZECLIPBOARD.asp">WM_SIZECLIPBOARD</a>.
+        Это сообщение посылается владельцу буфера
+        обмена, когда размеры его &quot;окна&quot; изменились
+        либо изменилось его содержимое.<p>Обычно при этом,
+        устанавливается положение скрола и диапазон
+        скроллирования окна буфера обмена.</p>
+      </li>
+      <li>Обработать сообщения <a
+        href="http://msdn.microsoft.com/library/en-us/winui/WinUI/WindowsUserInterface/DataExchange/Clipboard/ClipboardReference/ClipboardMessages/WM_HSCROLLCLIPBOARD.asp">WM_HSCROLLCLIPBOARD</a>
+        и <a
+        href="http://msdn.microsoft.com/library/en-us/winui/WinUI/WindowsUserInterface/DataExchange/Clipboard/ClipboardReference/ClipboardMessages/WM_VSCROLLCLIPBOARD.asp">WM_VSCROLLCLIPBOARD</a>.
+        Эти сообщения посылаются владельцу буфера
+        обмена, когда &quot;окно&quot; буфера обмена было
+        проскроллировано.</li>
+      <li>Обработать сообщение <a
+        href="http://msdn.microsoft.com/library/en-us/winui/WinUI/WindowsUserInterface/DataExchange/Clipboard/ClipboardReference/ClipboardMessages/WM_ASKCBFORMATNAME.asp">WM_ASKCBFORMATNAME</a>.
+        Это сообщение посылает буфер обмена приложению,
+        чтобы узнать формат.</li>
+    </ul>
+    <p>Ниже представлена оконная процедура, с
+    обработкой этих сообщений.</p>
+    <p><b>Пример:</b></p>
+    <pre>LRESULT CALLBACK MainWindowProc(hwnd, msg, wParam, lParam)
+HWND hwnd;
+UINT msg;
+WPARAM wParam;
+LPARAM lParam;
+{
+    static RECT rcViewer;
+
+    RECT rc;
+    LPRECT lprc;
+    LPPAINTSTRUCT lpps;
+
+    switch (msg)
+    {
+        <font
+color="blue">//</font>
+        <font color="blue">//</font><font color="green"> Обрабатываем другие сообщения.</font>
+        <font
+color="blue">//</font>
+        case WM_PAINTCLIPBOARD: 
+            <font color="blue">//</font><font
+color="green"> Определяем размер лабела.</font>
+ 
+            SetRect(&amp;rc, 0, 0, 
+                pboxLocalClip-&gt;rcText.right + CX_MARGIN,
+                pboxLocalClip-&gt;rcText.top * 2 + cyText
+            );
+
+            <font
+color="blue">//</font><font color="green"> Центрируем картинку в окне буфера обмена.</font>
+
+            if (rc.right &lt; rcViewer.right)
+            {
+                rc.left = (rcViewer.right - rc.right) / 2;
+                rc.right += rc.left;
+            }
+            if (rc.bottom &lt; rcViewer.bottom)
+            {
+                rc.top = (rcViewer.bottom - rc.bottom) / 2;
+                rc.bottom += rc.top;
+            }
+
+            <font
+color="blue">//</font><font color="green"> Рисуем изображение, используя структуру PAINTSTRUCT.</font>
+
+            lpps = (LPPAINTSTRUCT) GlobalLock((HGLOBAL) lParam);
+            PaintLabel(lpps, pboxLocalClip, &amp;rc);
+            GlobalUnlock((HGLOBAL) lParam);
+            break;
+
+        case WM_SIZECLIPBOARD:
+            <font
+color="blue">//</font><font color="green"> Записываем размеры окна в статической</font>
+            <font
+color="blue">//</font><font color="green"> структуре RECT.</font>
+
+            lprc = (LPRECT) GlobalLock((HGLOBAL) lParam);
+            memcpy(&amp;rcViewer, lprc, sizeof(RECT));
+            GlobalUnlock((HGLOBAL) lParam);
+
+            <font
+color="blue">//</font><font color="green"> Устанавливаем диапазон скроллирования в ноль.</font>
+
+            SetScrollRange((HWND) wParam, SB_HORZ, 0, 0, TRUE);
+            SetScrollRange((HWND) wParam, SB_VERT, 0, 0, TRUE);
+
+            break;
+
+        case WM_ASKCBFORMATNAME:
+            LoadString(hinst, IDS_OWNERDISPLAY,
+                (LPSTR) lParam, wParam);
+            break;
+
+        default:
+            return DefWindowProc(hwnd, msg, wParam, lParam);
+    }
+    return 0;
+}
+</pre>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

@@ -1,0 +1,106 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как получить полное имя пользователя</h3>
+    <p>Рабочие станции Windows NT могут быть организованы
+    в домен, который является набором компьютеров в в
+    сети Windows NT. Администратор домена поддерживает
+    информацию об учётных записях пользователей и
+    рабочих групп.</p>
+    <p>Если Вы знаете имя пользователя и имя домена, то
+    для нахождения полного имени пользователя
+    необходимо проделать следующее:<br>
+    <br>
+    <ol>
+      <li>Преобразовать имя пользователя и имя домена в
+        Unicode, если конечно они уже не являются строками
+        Unicode. Это требование API функций LAN Менеджера,
+        которые будут использоваться в следующих шагах.<br>
+        <br>
+      </li>
+      <li>Определить имя контроллера домена (DC) для
+        данного имени домена при помощи вызова NetServerEnum().<br>
+        <br>
+      </li>
+      <li>Определить имя пользователя при помощи
+        NetUserGetInfo()<br>
+        <br>
+      </li>
+      <li>Если программа не работает со строками Unicode, то
+        преобразовать полное имя пользователя в ANSI.<br>
+        <br>
+      </li>
+    </ol>
+    <p>Код, приведённый ниже, представляет из себя
+    функцию, которая получает в первых двух
+    параметрах имя пользователя и домена, а в третьем
+    параметре возвращает полное имя пользователя.<br>
+    <br>
+    Дополнительную информацию о том, как можно
+    получить текущего пользователя и домен, можно
+    найти в статье из Microsoft Knowledge Base:</p>
+    <blockquote>
+      <a href="q111544.shtml"><p>Q111544</a> Как получить текущее имя
+      пользователя и имя домена</p>
+    </blockquote>
+    <h3>Пример кода</h3>
+    <pre class="CODESAMP">   #include &lt;windows.h&gt;
+   #include &lt;lm.h&gt;
+   #include &lt;stdio.h&gt;
+
+   /********************************************************************\ 
+   * Функция: GetFullName( char *UserName, char *Domain, char *dest );  *
+   *                                                                    *
+   * Параметры:                                                         *
+   *    UserName: имя пользователя                                      *
+   *    Domain  : домен, которому принадлежит пользователь              *
+   *    dest    : Получаемое полное имя пользователя                    *
+   *                                                                    *
+   \********************************************************************/ 
+
+   BOOL GetFullName(char *UserName, char *Domain, char *dest)
+   {
+      WCHAR  wszUserName[256];           // имя пользователя в Unicode
+      WCHAR  wszDomain[256];
+      LPBYTE ComputerName;
+
+      struct _SERVER_INFO_100 *si100;   // Структура для сервера
+      struct _USER_INFO_2 *ui;          // Структура для пользователя
+
+      // Конвертируем имя пользователя и домена из ASCII в Unicode.
+
+      MultiByteToWideChar( CP_ACP, 0, UserName,
+         strlen(UserName)+1, wszUserName, sizeof(wszUserName) );
+      MultiByteToWideChar( CP_ACP, 0, Domain,
+         strlen(Domain)+1, wszDomain, sizeof(wszDomain) );
+
+      // Получаем имя компьютера, который является контроллером домена (DC)
+      // для указанного домена.
+
+      NetGetDCName( NULL, wszDomain, &amp;ComputerName );
+
+      // Ищем пользователя в контроллере домена.
+
+      if(NetUserGetInfo( (LPWSTR) ComputerName,
+         (LPWSTR) &amp;wszUserName, 2, (LPBYTE *) &amp;ui))
+      {
+         printf( &quot;Error getting user information.\n&quot; );
+         return( FALSE );
+      }
+
+      // Преобразуем полное имя из Unicode в ASCII.
+
+      WideCharToMultiByte( CP_ACP, 0, ui-&gt;usri2_full_name,
+         -1, dest, 256, NULL, NULL );
+
+      return( TRUE );
+   } </pre>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

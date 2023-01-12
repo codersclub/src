@@ -1,0 +1,127 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Работа с подключами в реестре.</h3>
+    <p>Следующий пример демонстрирует использование
+    функций <a
+    href="http://msdn.microsoft.com/library/en-us/sysinfo/base/regqueryinfokey.asp"><b>RegQueryInfoKey</b></a>,
+    <a href="http://msdn.microsoft.com/library/en-us/sysinfo/base/regenumkeyex.asp"><b>RegEnumKeyEx</b></a>,
+    и <a href="http://msdn.microsoft.com/library/en-us/sysinfo/base/regenumvalue.asp"><b>RegEnumValue</b></a>.
+    Параметр <i>hKey</i> передаётся в каждую функцию, как
+    дескриптор открытого ключа. Этот ключ должен
+    быть открыт до того как будет вызвана функция и
+    закрыт после.</p>
+    <p>&nbsp;</p>
+    <pre>// QueryKey - Функция позволяет узнать все подключи ключа и связанные
+//    с ним значения, а затем копирует значения в пару: окошко
+//    редактирования и список.
+// hDlg - Диалоговое окно, которое содержит окошки редактирования и
+//        списки.
+// hKey - Ключ, у которого мы хотим посмотреть подключи.
+
+void QueryKey(HWND hDlg, HANDLE hKey)
+{
+    CHAR     achKey[MAX_PATH]; 
+    CHAR     achClass[MAX_PATH] = &quot;&quot;;  // буфер для имени класса
+    DWORD    cchClassName = MAX_PATH;  // размер строки класса
+    DWORD    cSubKeys;                 // количество подключей
+    DWORD    cbMaxSubKey;              // самый длинный подключ
+    DWORD    cchMaxClass;              // самая длинная строка класса
+    DWORD    cValues;              // кол-во значений для ключа
+    DWORD    cchMaxValue;          // самое длинное имя
+    DWORD    cbMaxValueData;       // самые длинные данные
+    DWORD    cbSecurityDescriptor;
+    FILETIME ftLastWriteTime;
+
+    DWORD i, j;
+    DWORD retCode, retValue;
+
+    CHAR  achValue[MAX_VALUE_NAME];
+    DWORD cchValue = MAX_VALUE_NAME;
+    CHAR  achBuff[80];
+
+    // Получаем имя класса и количество значений.
+    RegQueryInfoKey(hKey,        // дескриптор ключа
+        achClass,                // буфер для имени класса
+        &amp;cchClassName,           // размер строки класса
+        NULL,                    // зарезервировано
+        &amp;cSubKeys,               // количество подключей
+        &amp;cbMaxSubKey,            // самый длинный подключ
+        &amp;cchMaxClass,            // самая длинная строка класса
+        &amp;cValues,                // кол-во значений для этого ключа
+        &amp;cchMaxValue,            // самое длинное имя
+        &amp;cbMaxValueData,         // самые длинные данные
+        &amp;cbSecurityDescriptor,
+        &amp;ftLastWriteTime);
+
+    SetDlgItemText(hDlg, IDE_CLASS, achClass);
+    SetDlgItemInt(hDlg, IDE_CVALUES, cValues, FALSE);
+
+    SendMessage(GetDlgItem(hDlg, IDL_LISTBOX),
+        LB_ADDSTRING, 0, (LONG) &quot;..&quot;);
+
+    // Перечисление дочерних ключей идёт до тех пор, пока RegEnumKeyEx не
+    // выдаст ошибку. Затем получаем имя каждого ключа и копируем его
+    // в список.
+
+    SetCursor(LoadCursor(NULL, IDC_WAIT));
+    for (i = 0, retCode = ERROR_SUCCESS;
+            retCode == ERROR_SUCCESS; i++)
+    {
+        retCode = RegEnumKeyEx(hKey,
+                     i,
+                     achKey,
+                     MAX_PATH,
+                     NULL,
+                     NULL,
+                     NULL,
+                     &amp;ftLastWriteTime);
+        if (retCode == (DWORD)ERROR_SUCCESS)
+        {
+            SendMessage(GetDlgItem(hDlg, IDL_LISTBOX),
+                LB_ADDSTRING, 0, (LONG) achKey);
+        }
+    }
+    SetCursor(LoadCursor (NULL, IDC_ARROW));
+
+    // Получаем значения ключа.
+    SetCursor(LoadCursor(NULL, IDC_WAIT));
+
+    if (cValues)
+    {
+        for (j = 0, retValue = ERROR_SUCCESS;
+                j &lt; cValues; j++)
+        {
+            cchValue = MAX_VALUE_NAME;
+            achValue[0] = '\0';
+            retValue = RegEnumValue(hKey, j, achValue,
+                &amp;cchValue,
+                NULL,
+                NULL,    // &amp;dwType,
+                NULL,    // &amp;bData,
+                NULL);   // &amp;bcData
+
+            if (retValue == (DWORD) ERROR_SUCCESS )
+            {
+                achBuff[0] = '\0';
+
+                // Добавляем каждое значение в список.
+                if (!lstrlen(achValue))
+                    lstrcpy(achValue, &quot;&lt;NO NAME&gt;&quot;);
+                wsprintf(achBuff, &quot;%d) %s &quot;, j, achValue);
+                SendMessage(GetDlgItem(hDlg,IDL_LISTBOX2),
+                    LB_ADDSTRING, 0, (LONG) achBuff);
+            }
+        }
+
+    SetCursor(LoadCursor(NULL, IDC_ARROW));
+}</pre>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

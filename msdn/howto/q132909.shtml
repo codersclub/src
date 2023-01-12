@@ -1,0 +1,171 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как изменить стандартный диалог печати</h3>
+    <p>В статье объясняется, как можно модифицировать
+    стандартный дилог печати и использовать его в
+    приложении MFC. Настройка диалога печати, влечёт
+    за собой изменение шаблона стандартного диалога
+    печати Window, при этом, Вы можете добавлять новые
+    элементы управления и/или удалять существующие.</p>
+    <h3>Итак, по шагам</h3>
+    <ol>
+      <li>Копируем шаблон диалога PRINTDLGORD из COMMDLG.RC в .RC файл
+        приложения. (В Visual C++ 4.x и 5.0, этот блок шаблона
+        постоянно находится в файле INCLUDE\PRNSETUP.DLG). Для
+        этого сделайте:<br>
+        <br>
+        <ol type="a">
+          <li>При помощи редактора ресурсов, откройте
+            MSVC\MFC\SAMPLES\APSTUDIO\COMMDLG.RC и ресурсный файл Вашего
+            приложения. Для 32-bit Visual C++ этот файл находится в
+            \msdev\samples\mfc\general\clipart. Для Visual C++ 6.0, Вы можете найти
+            этот файл в ..\samples\vc98\mfc\general\clipart на диске MSDN,
+            который поставляется с Visual C++ 6.0.<br>
+            <br>
+            Если Вы используете Visual C++ 4.x или 5.0, то добавьте
+            строку #include &quot;windows.h&quot; в начало файла
+            INCLUDE\PRNSETUP.DLG. Сохраните и закройте файл. Откройте
+            его заново как &quot;Ресурс&quot;. (См. &quot;Open As&quot; в
+            диалоговом окне File Open.)<br>
+            <br>
+          </li>
+          <li>В окне проводника ресурсов файла &quot;from&quot;,
+            выберите ресурс диалога PRINTDLGORD (id 1538).<br>
+            <br>
+          </li>
+          <li>Если удерживать клавишу CTRL, то можно перетащить
+            ресурс в окно проводника ресурсов файла &quot;to&quot;.<br>
+            <br>
+          </li>
+        </ol>
+        <p>ЗАМЕЧАНИЕ: Если перетащить ресурс не удерживая
+        клавишу CTRL, то ресурс перемещён вместо того,
+        чтобы быть скопированным.<br>
+        <br>
+        </p>
+      </li>
+      <li>Сделайте необходимые изменения в скопированном
+        шаблоне диалога.<br>
+        <br>
+        ЗАМЕЧАНИЕ: Не один из элементов управления в
+        изначальном шаблоне диалога не должен быть
+        удалён. Удаление контролов вызовет проблемы в
+        функции DoDataExchange класса CPrintDialog. Вместо этого,
+        ненужный элемент управления надо запретить и/или
+        скрыть в переопределённой функции OnInitDialog Вашего
+        класса, наследованного от CPrintDialog.<br>
+        <br>
+      </li>
+      <li>Чтобы добавить C++ класс (скажем, CMyPrintDialog) для
+        этого шаблона диалога, воспользуйте визардом (ClassWizard).
+        Наследуйте этот новый класс от CDialog с PRINTDLGORD в
+        качестве диалогового ID. (ЗАМЕЧАНИЕ: В Visual C++ 4.x и 5.0
+        этот класс может быть наследован прямо от
+        CPrintDialog.)<br>
+        <br>
+      </li>
+      <li>Измените все ссылки с CDialog на CPrintDialog как в
+        заголовочных файлах, так и в исходниках вновь
+        созданного класса. (Если Вы наследовали свой
+        класс от CPrintDialog, то данный шаг необязателен.)<br>
+        <br>
+      </li>
+      <li>Поскольку конструктор CPrintDialog отличается от
+        CDialog, то измените конструктор CMyPrintDialog используя
+        следующий код:<br>
+        <br>
+        (ЗАМЕЧАНИЕ: Если Вы наследовали свой класс от
+        CPrintDialog, то данный шаг необязателен.) <pre class="CODESAMP">      // Заголовочный файл CMyPrintDialog
+      class CMyPrintDialog : public CPrintDialog
+      {
+      // Construction
+      public:
+
+      // Параметры следующего конструктора очень похожи на
+      // CPrintDialog. Обратите внимание на отличие второго аргумента.
+      CMyPrintDialog(BOOL bPrintSetupOnly,
+                    // TRUE для настройки печати, FALSE для диалога печати
+                       DWORD dwFlags = PD_ALLPAGES | PD_USEDEVMODECOPIES |
+                                    PD_HIDEPRINTTOFILE,
+                     // Комбинация флагов. Полное описание возможных
+                     // флагов для структуры PRINTDLG находится в
+                     // документации Windows SDK.
+                        CWnd* pParentWnd = NULL);
+
+      // Остатки объявления класса
+      ...
+
+      DECLARE_MESSAGE_MAP()
+      };
+
+      // Исходник для CMyPrintDialog
+      CMyPrintDialog::CMyPrintDialog(BOOL bPrintSetupOnly,
+        DWORD dwFlags /* = PD_ALLPAGES | PD_USEDEVMODECOPIES |
+                      PD_HIDEPRINTTOFILE */,
+        CWnd* pParentWnd /* = NULL */)
+        : CPrintDialog(bPrintSetupOnly, dwFlags, pParentWnd)
+      {
+        //{{AFX_DATA_INIT(CMyPrintDialog)
+        // NOTE: the ClassWizard will add member initialization here
+        //}}AFX_DATA_INIT
+      }
+  </pre>
+        <p><br>
+        <br>
+        </p>
+      </li>
+      <li>Измените класс, наследованный от CView (скажем,
+        CMyView) используя следующий код:<pre class="CODESAMP">      //  Исходник для вида (скажем, в myview.cpp)
+      ...
+      #include &quot;myprintd.h&quot;  // Включаем заголовочный файл CMyPrintDialog
+      ...
+
+      // Переопределяем OnPreparePrinting класса, наследованного от
+      // CView как показано ниже:
+      BOOL CMyView::OnPreparePrinting(CPrintInfo* pInfo)
+      {
+         // Удаляем объект CPrintDialog, созданный в конструкторе
+         // CPrintInfo, и подставляем его нашим диалогом печати.
+         delete pInfo-&gt;m_pPD;
+
+         // Создаём наш диалог печати.
+         pInfo-&gt;m_pPD = new CMyPrintDialog(FALSE);
+
+         // Устанавливаем диапазон страницы.
+         pInfo-&gt;m_pPD-&gt;m_pd.nMinPage = 1;      // one based page numbers
+         pInfo-&gt;m_pPD-&gt;m_pd.nMaxPage = 0xffff; // количество страниц неизвестно
+
+         // Изменяем структуру PRINTDLG, чтобы использовать наш диалог
+         // печати.
+         pInfo-&gt;m_pPD-&gt;m_pd.hInstance = AfxGetInstanceHandle();
+         pInfo-&gt;m_pPD-&gt;m_pd.lpPrintTemplateName =
+                                              MAKEINTRESOURCE(PRINTDLGORD);
+
+         // Устанавливаем флаги структуры PRINTDLG как показано ниже,
+         // иначе изменения не будут иметь эффекта
+         pInfo-&gt;m_pPD-&gt;m_pd.Flags |= PD_ENABLEPRINTTEMPLATE;
+
+         // Более подробно об этих флагах можно узнать из документации SDK
+         // по структуре PRINTDLG.
+
+         return DoPreparePrinting(pInfo);
+      } </pre>
+        <p><br>
+        <br>
+        </p>
+      </li>
+    </ol>
+    <h2>ССЫЛКИ</h2>
+    <p>Более подробную информацию о структуре PRINTDLG
+    можно получить в документации Windows SDK, а так же в
+    документации MFC можно подробнее ознакомиться с
+    OnPreparePrinting и CPrintDialog.</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

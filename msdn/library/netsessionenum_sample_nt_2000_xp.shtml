@@ -1,0 +1,138 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как узнать, кто в данный момент присоединен
+    через Сеть к машине в Windows NT/2000/XP (пример
+    использования функции NetSessionEnum)</h3>
+    <p><b>Windows NT/2000/XP:</b> Следующий пример демонстрирует,
+    как получить информацию о текущих соединениях
+    при помощи функции <b>NetSessionEnum</b>. Пример вызывает <b>NetSessionEnum</b>,
+    указывая информационный уровень 10 (<a
+    href="http://msdn.microsoft.com/library/en-us/netmgmt/ntlmapi3_7ipe.asp"><b>SESSION_INFO_10</b></a>).</p>
+    <pre>#ifndef UNICODE
+#define UNICODE
+#endif
+
+#include &lt;stdio.h&gt;
+#include &lt;assert.h&gt;
+#include &lt;windows.h&gt; 
+#include &lt;lm.h&gt;
+
+int wmain(int argc, wchar_t *argv[])
+{
+   LPSESSION_INFO_10 pBuf = NULL;
+   LPSESSION_INFO_10 pTmpBuf;
+   DWORD dwLevel = 10;
+   DWORD dwPrefMaxLen = -1;
+   DWORD dwEntriesRead = 0;
+   DWORD dwTotalEntries = 0;
+   DWORD dwResumeHandle = 0;
+   DWORD i;
+   DWORD dwTotalCount = 0;
+   LPTSTR pszServerName = NULL;
+   LPTSTR pszClientName = NULL;
+   LPTSTR pszUserName = NULL;
+   NET_API_STATUS nStatus;
+   //
+   // Проверяем аргументы командной строки.
+   //
+   if (argc &gt; 4)
+   {
+      wprintf(L&quot;Usage: %s [\\\\ServerName] [\\\\ClientName] [UserName]\n&quot;, argv[0]);
+      exit(1);
+   }
+
+   if (argc &gt;= 2)
+      pszServerName = argv[1];
+
+   if (argc &gt;= 3)
+      pszClientName = argv[2];
+
+   if (argc == 4)
+      pszUserName = argv[3];
+   //
+   // Вызываем NetSessionEnum, указывая уровень 10.
+   //
+   do // начало do
+   {
+      nStatus = NetSessionEnum(pszServerName,
+                               pszClientName,
+                               pszUserName,
+                               dwLevel,
+                               (LPBYTE*)&amp;pBuf,
+                               dwPrefMaxLen,
+                               &amp;dwEntriesRead,
+                               &amp;dwTotalEntries,
+                               &amp;dwResumeHandle);
+      //
+      // Если вызов функции был удачен,
+      //
+      if ((nStatus == NERR_Success) || (nStatus == ERROR_MORE_DATA))
+      {
+         if ((pTmpBuf = pBuf) != NULL)
+         {
+            //
+            // Получение результатов в цикле.
+            //
+            for (i = 0; (i &lt; dwEntriesRead); i++)
+            {
+               assert(pTmpBuf != NULL);
+
+               if (pTmpBuf == NULL)
+               {
+                  fprintf(stderr, &quot;An access violation has occurred\n&quot;);
+                  break;
+               }
+               //
+               // Распечатываем полученные данные. 
+               //
+               wprintf(L&quot;\n\tClient: %s\n&quot;, pTmpBuf-&gt;sesi10_cname);
+               wprintf(L&quot;\tUser:   %s\n&quot;, pTmpBuf-&gt;sesi10_username);
+               printf(&quot;\tActive: %d\n&quot;, pTmpBuf-&gt;sesi10_time);
+               printf(&quot;\tIdle:   %d\n&quot;, pTmpBuf-&gt;sesi10_idle_time);
+
+               pTmpBuf++;
+               dwTotalCount++;
+            }
+         }
+      }
+      //
+      // Иначе, выводим сообщение об ошибке.
+      //
+      else
+         fprintf(stderr, &quot;A system error has occurred: %d\n&quot;, nStatus);
+      //
+      // Освобождаем выделенную память.
+      //
+      if (pBuf != NULL)
+      {
+         NetApiBufferFree(pBuf);
+         pBuf = NULL;
+      }
+   }
+   // 
+   // Продолжаем вызывать NetSessionEnum до тех пор пока есть ещё данные.
+   // 
+   // 
+   while (nStatus == ERROR_MORE_DATA); // end do
+
+   // Снова проверяем выделенный буфер.
+   //
+   if (pBuf != NULL)
+      NetApiBufferFree(pBuf);
+   //
+   // Отображаем окончательное количество сессий.
+   //
+   fprintf(stderr, &quot;\nTotal of %d entries enumerated\n&quot;, dwTotalCount);
+
+   return 0;
+}</pre>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

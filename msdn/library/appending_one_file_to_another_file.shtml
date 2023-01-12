@@ -1,0 +1,91 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как добавить один файл к другому.</h3>
+    <p>Следующий пример добавлет один файл в конец
+    другого. Приложение открывает два файла функцией
+    <a href="http://msdn.microsoft.com/library/en-us/fileio/base/createfile.asp"><b>CreateFile</b></a>:
+    ONE.TXT открывается для чтения, а TWO.TXT - для записи.
+    Затем, содержимое ONE.TXT добавляется в конец TWO.TXT
+    путём чтения и записи блоками по 4K при помощи
+    функций <a href="http://msdn.microsoft.com/library/en-us/fileio/base/readfile.asp"><b>ReadFile</b></a>
+    и <a href="http://msdn.microsoft.com/library/en-us/fileio/base/writefile.asp"><b>WriteFile</b></a>.
+    Перед записью во второй файл, приложение
+    устанавливает указатель в файле на конец
+    функцией <a
+    href="http://msdn.microsoft.com/library/en-us/fileio/base/setfilepointer.asp"><b>SetFilePointer</b></a>
+    и блокирует область, которая будет записана
+    функцией <a
+    href="http://msdn.microsoft.com/library/en-us/fileio/base/lockfile.asp"><b>LockFile</b></a>.
+    Тем самым другим процессам будет закрыт доступ
+    во время записи. После каждой операции записи,
+    функцией <a
+    href="http://msdn.microsoft.com/library/en-us/fileio/base/unlockfile.asp"><b>UnlockFile</b></a>
+    область разблокируется.</p>
+    <p>&nbsp;</p>
+    <pre xml:space="preserve">HANDLE hFile;
+HANDLE hAppend;
+DWORD  dwBytesRead, dwBytesWritten, dwPos;
+char   buff[4096];
+
+// Открываем существующий файл.
+
+hFile = CreateFile(&quot;ONE.TXT&quot;,     // открываем ONE.TXT
+    GENERIC_READ,                 // открываем на чтение
+    0,                            // не доступен для других
+    NULL,                         // нет security
+    OPEN_EXISTING,                // только существующий файл
+    FILE_ATTRIBUTE_NORMAL,        // нормальный файл
+    NULL);                        // нет шаблона аттрибутов
+
+if (hFile == INVALID_HANDLE_VALUE)
+{
+    ErrorHandler(&quot;Could not open ONE.&quot;);  // обрабатываем ошибку
+}
+ 
+// Открываем существующий файл, либо если файл не существует,
+// то создаём новый.
+
+hAppend = CreateFile(&quot;TWO.TXT&quot;,   // открываем TWO.TXT
+    GENERIC_WRITE,                // открываем на запись
+    0,                            // не доступен для других
+    NULL,                         // нет security
+    OPEN_ALWAYS,                  // открыть или создать
+    FILE_ATTRIBUTE_NORMAL,        // нормальный файл
+    NULL);                        // нет шаблона аттрибутов
+
+if (hAppend == INVALID_HANDLE_VALUE)
+{
+    ErrorHandler(&quot;Could not open TWO.&quot;);    // обрабатываем ошибку
+}
+
+// Добавляем первый файл в конец второго.
+// Блокируем второй файл во время записи в него, чтобы другие
+// процессы в это время ничего не смогли сделать с файлом. Когда
+// запись завершена, то разблокируем файл.
+
+do
+{
+    if (ReadFile(hFile, buff, 4096, &amp;dwBytesRead, NULL))
+    {
+        dwPos = SetFilePointer(hAppend, 0, NULL, FILE_END);
+        LockFile(hAppend, dwPos, 0, dwPos + dwBytesRead, 0);
+        WriteFile(hAppend, buff, dwBytesRead,
+            &amp;dwBytesWritten, NULL);
+        UnlockFile(hAppend, dwPos, 0, dwPos + dwBytesRead, 0);
+    }
+} while (dwBytesRead == 4096);
+ 
+// Закрываем оба файла.
+
+CloseHandle(hFile);
+CloseHandle(hAppend);</pre>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

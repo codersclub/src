@@ -1,0 +1,155 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как получить список привелегий учётной записи</h3>
+    <p>Эта статья демонстрирует, как пролистать
+    привелегии, доступные процессу.</p>
+    <p>Когда пользователь запускает процесс, то этот
+    процесс получает права пользователя. Эти права,
+    унаследованные от пользователя, включая
+    привелегии учётной записи, управляют доступом к
+    системным сервисам. Чтобы получить список прав,
+    принадлежащих процессу (а соответственно и
+    текущему пользователю), проделайте следующие
+    шаги:<ol>
+      <li>Вызовите функцию <b>GetCurrentProcess</b>, для получения
+        дескриптора текущего процесса.<br>
+        <br>
+      </li>
+      <li>Вызовите функцию <b>GetProcessToken</b>, чтобы получить
+        маркёр доступа процесса.<br>
+        <br>
+      </li>
+      <li>Вызовите функцию <b>GetTokenInformation</b>, для получения
+        списка привелегий.<br>
+        <br>
+      </li>
+      <li>При помощи функций <b>LookupPrivilegeName</b> и <b>LookupPrivilegeDisplayName</b>,
+        циклически пройдитесь по списку привелегий,
+        чтобы получить текстовое название каждой
+        привелегии в списке.<br>
+        <br>
+      </li>
+    </ol>
+    <h3>Пример кода</h3>
+    <p>Следующий пример пролистывает названия
+    привелегий для текущего процесса. Имена
+    привелегий и их отображаемые эквиваленты
+    определены в заголовочном файле Winnt.h.</p>
+    <pre class="CODESAMP">#include &lt;windows.h&gt;
+#include &lt;stdio.h&gt;
+
+#define NAME_SIZE 255
+
+void main(void) {
+
+   HANDLE            hToken        = NULL;
+   DWORD             cbTokenInfo   = 0;
+   PTOKEN_PRIVILEGES ptiPrivileges = NULL;
+
+   char  szPrivilegeName[NAME_SIZE];
+   DWORD cbPrivilegeName;
+   char  szDisplayName[NAME_SIZE];
+   DWORD cbDisplayName;
+   DWORD dwLangId;
+   UINT  nIndex;
+
+   __try {
+
+
+      // Получаем дескриптор маркёра доступа процесса.
+      if (!OpenProcessToken(GetCurrentProcess(), TOKEN_READ, 
+            &amp;hToken)) {
+
+         printf(&quot;OpenProcessToken() failed.  Error %d\n&quot;, 
+               GetLastError());
+         __leave;
+      }
+
+      // Определяем требуемый размер буфера для маркёра привелегий.
+      if (GetTokenInformation(hToken, TokenPrivileges, 
+            NULL, 0, &amp;cbTokenInfo)) {
+
+         // Если длина буфера нулевая, то ошибка.
+         __leave;
+      
+      } else {
+
+         // Если длина буфера нулевая, то ошибка.
+         if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
+            printf(&quot;GetTokenInformation() failed.  Error %d\n&quot;,
+                  GetLastError());
+            __leave;
+         }
+      }
+
+      // Распределяем буфер для маркёра привелегий.
+      ptiPrivileges = (PTOKEN_PRIVILEGES) HeapAlloc(GetProcessHeap(),
+            HEAP_ZERO_MEMORY, cbTokenInfo);
+      if (!ptiPrivileges) {
+         printf(&quot;HeapAlloc() failed.  Error %d\n&quot;, GetLastError());
+         __leave;
+      }
+
+      // Получаем привелегии.
+      if (!GetTokenInformation(hToken, TokenPrivileges, 
+            ptiPrivileges, cbTokenInfo, &amp;cbTokenInfo)) {
+         
+         printf(&quot;GetTokenInformation() failed.  Error %d\n&quot;, 
+               GetLastError());
+         __leave;
+      }
+      
+      // Отображаем привелегии.
+      printf(&quot;%-32s %s\n&quot;, &quot;PRIVILEGE NAME&quot;, &quot;DISPLAY NAME&quot;);
+      printf(&quot;%-32s %s\n&quot;, &quot;--------------&quot;, &quot;------------&quot;);
+
+      // Циклически проходим по всем LUID.
+      for (nIndex = 0; nIndex &lt; ptiPrivileges-&gt;PrivilegeCount; 
+         nIndex++) {
+
+         // Получаем имя привелегии, связанное с этим LUID.
+         cbPrivilegeName = NAME_SIZE;
+         if (!LookupPrivilegeName(NULL, 
+               &amp;ptiPrivileges-&gt;Privileges[nIndex].Luid,
+               szPrivilegeName, &amp;cbPrivilegeName)) {
+         
+            printf(&quot;LookupPrivilegeName() failed.  Error %d\n&quot;,
+                  GetLastError());
+            __leave;
+         }
+
+         // Получаем отображаемое имя, связанное с этим LUID.
+         cbDisplayName = NAME_SIZE;
+         if (!LookupPrivilegeDisplayName(NULL, szPrivilegeName,
+               szDisplayName, &amp;cbDisplayName, &amp;dwLangId)) {
+            
+            printf(&quot;LookupPrivilegeDisplayName() failed.  Error %d\n&quot;,
+                  GetLastError());
+            __leave;
+         }
+
+         printf(&quot;%-32s %s\n&quot;, szPrivilegeName, szDisplayName);
+      }
+   
+   } __finally {
+
+      // Освобождаем ресурсы.
+      if (hToken)
+         CloseHandle(hToken);
+
+      if (!ptiPrivileges) 
+         HeapFree(GetProcessHeap(), 0, ptiPrivileges);
+   }
+   
+   return;
+} </pre>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

@@ -1,0 +1,741 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Использование Ловушек.</h3>
+    <p><b>Установка и удаление ловушек</b></p>
+    <p>Установить ловушку можно при помощи функции <a
+    href="setwindowshookex.shtml">SetWindowsHookEx</a>, указав при этом: 1)
+    тип ловушки; 2) диапазон её действия: на всю
+    систему (глобальная ловушка) или только на
+    текущий поток (локальная); 3) указатель на точку
+    входа в процедуру.</p>
+    <p>Если ловушка будет глобальной, то её процедуру
+    необходимо разместить в динамически загружаемой
+    библиотеке (DLL). Поэтому, перед тем, как установить
+    глобальную ловушку, приложению понадобится
+    дескриптор модуля DLL. Чтобы получить дескриптор
+    модуля DLL, необходимо воспользоваться функцией <b>LoadLibrary</b>
+    с именем DLL. После того, как дескриптор будет
+    получен, можно воспользоваться функцией <b>GetProcAddress</b>, чтобы получить указатель на
+    точку входа в процедуру ловушки. В заключение,
+    вызывается <b>SetWindowsHookEx</b>, чтобы прописать адрес
+    процедуры ловушки в цепочке ловушек. Описанная
+    последовательно выглядит следующим образом:</p>
+    <pre class="clsCode" AUTOHILITE="1">HOOKPROC hkprcSysMsg; 
+static HINSTANCE hinstDLL; 
+static HHOOK hhookSysMsg; 
+ 
+hinstDLL = LoadLibrary((LPCTSTR) &quot;c:\\windows\\sysmsg.dll&quot;); 
+hkprcSysMsg = (HOOKPROC)GetProcAddress(hinstDLL, &quot;SysMessageProc&quot;); 
+hhookSysMsg = SetWindowsHookEx(WH_SYSMSGFILTER,hkprcSysMsg,hinstDLL,0); </pre>
+    <p>Удалить локальную ловушку (удалить её адрес из
+    цепочки ловушек) можно функцией <a
+    href="unhookwindowshookex.shtml">UnhookWindowsHookEx</a>, указав ей
+    дескриптор удаляемой процедуры ловушки.</p>
+    <p>Глобальную ловушку можно тоже удалить функцией
+    <b>UnhookWindowsHookEx</b>, однако она не освобождает DLL,
+    содержащую процедуру ловушки. Причина
+    заключается в том, что глобальная ловушка
+    вызывается в контексте процесса для каждого
+    приложения, делая неявный вызов функции <b>LoadLibrary</b>
+    для всех этих процессов. Так как использовать
+    функцию <b>FreeLibrary</b>
+    для другого процесса невозможно, то освободить DLL
+    не получится. Это не страшно, так как система
+    автоматически освобождает DLL, после того, как все
+    процессы, связанные с DLL, завершатся либо будет
+    вызвана <b>FreeLibrary</b> и все процессы, которые
+    вызывают процедуру ловушки продолжат обработку
+    за пределами DLL.</p>
+    <p>Альтернативный способ установки глобальной
+    ловушки заключается в том, чтобы поместить
+    функцию установки ловушки в DLL вместе с
+    процедурой ловушки. При таком подходе,
+    приложению, которое устанавливает ловушку не
+    нужно получать дескриптор модуля DLL. Связавшись с
+    DLL, приложение получает доступ к функции
+    инталяции. Функция инсталяции может легко
+    получить дескриптор модуля DLL, а так же другие
+    значения, необходимые для вызова функции <b>SetWindowsHookEx</b>.
+    DLL так же может функцию, которая удаляет
+    процедуру глобальной ловушки; а приложение может
+    вызывать эту функцию при завершении своей работы.</p>
+    <p><b>Отслеживание системных событий</b></p>
+    <p>Следующий пример показывает как использовать
+    различные локальные ловушки, для того, чтобы
+    отслеживать при помощи каких событий система
+    взаимодействует с текущим потоком. В примере
+    используются следующие типы ловушек:<ul>
+      <li>WH_CALLWNDPROC</li>
+      <li>WH_CBT</li>
+      <li>WH_DEBUG</li>
+      <li>WH_GETMESSAGE</li>
+      <li>WH_KEYBOARD</li>
+      <li>WH_MOUSE</li>
+      <li>WH_MSGFILTER</li>
+    </ul>
+    <p>Пользователь может устанавливать или удалять
+    ловушку при помощи меню. Когда процедура ловушки
+    установлена и появляется событие, отслеживаемое
+    этой ловушкой, то процедура записывает
+    необходимую информацию в клиентскую область
+    главного окна приложения.</p>
+    <p><b>Пример</b></p>
+    <pre style="DISPLAY: block" AUTOHILITE="1">#define NUMHOOKS 7
+
+<font color="blue">//</font><font
+color="green"> Глобальные переменные</font>
+
+typedef struct _MYHOOKDATA
+{
+    int nType;
+    HOOKPROC hkprc;
+    HHOOK hhook;
+} MYHOOKDATA;
+
+MYHOOKDATA myhookdata[NUMHOOKS];
+
+LRESULT WINAPI MainWndProc(HWND hwndMain, UINT uMsg, WPARAM wParam,
+    LPARAM lParam)
+{
+    static BOOL afHooks[NUMHOOKS];
+    int index;
+    static HMENU hmenu;
+
+    switch (uMsg)
+    {
+        case WM_CREATE:
+ 
+            <font
+color="blue">//</font><font color="green"> Сохраняем дескриптор меню.</font>
+
+            hmenu = GetMenu(hwndMain);
+
+            <font
+color="blue">//</font><font color="green"> Инициализируем структуры данными ловушки. Пункты меню</font>
+            <font
+color="blue">//</font><font color="green"> определены в заголовочном файле с номерами с 0 по 6</font>
+ 
+            myhookdata[IDM_CALLWNDPROC].nType = WH_CALLWNDPROC;
+            myhookdata[IDM_CALLWNDPROC].hkprc = CallWndProc;
+            myhookdata[IDM_CBT].nType = WH_CBT;
+            myhookdata[IDM_CBT].hkprc = CBTProc;
+            myhookdata[IDM_DEBUG].nType = WH_DEBUG;
+            myhookdata[IDM_DEBUG].hkprc = DebugProc;
+            myhookdata[IDM_GETMESSAGE].nType = WH_GETMESSAGE;
+            myhookdata[IDM_GETMESSAGE].hkprc = GetMsgProc;
+            myhookdata[IDM_KEYBOARD].nType = WH_KEYBOARD;
+            myhookdata[IDM_KEYBOARD].hkprc = KeyboardProc;
+            myhookdata[IDM_MOUSE].nType = WH_MOUSE;
+            myhookdata[IDM_MOUSE].hkprc = MouseProc;
+            myhookdata[IDM_MSGFILTER].nType = WH_MSGFILTER;
+            myhookdata[IDM_MSGFILTER].hkprc = MessageProc;
+
+            <font
+color="blue">//</font><font color="green"> Выставляем все флаги массива в FALSE.</font>
+
+            memset(afHooks, FALSE, sizeof(afHooks));
+
+            return 0;
+ 
+        case WM_COMMAND:
+            switch (LOWORD(wParam))
+            {
+                 <font
+color="blue">//</font><font color="green"> Пользователь выбирает ловушку из меню.</font>
+
+                case IDM_CALLWNDPROC:
+                case IDM_CBT:
+                case IDM_DEBUG:
+                case IDM_GETMESSAGE:
+                case IDM_KEYBOARD:
+                case IDM_MOUSE:
+                case IDM_MSGFILTER:
+
+                    <font
+color="blue">//</font><font color="green"> Используем номера пунктов меню в качестве индекса</font>
+                    <font
+color="blue">//</font><font color="green"> в массиве структур с данными ловушки.</font>
+
+                    index = LOWORD(wParam); 
+
+                    <font
+color="blue">//</font><font color="green"> Если ловушка выбранного типа не установлена</font>,
+                    <font
+color="blue">//</font><font color="green"> то устанавливаем её и добавляем галочку к
+                    // соответствующему пункту меню.</font>
+
+                    if (!afHooks[index])
+                    {
+                        myhookdata[index].hhook = SetWindowsHookEx(
+                            myhookdata[index].nType,
+                            myhookdata[index].hkprc,
+                            (HINSTANCE) NULL, GetCurrentThreadId());
+                        CheckMenuItem(hmenu, index,
+                            MF_BYCOMMAND | MF_CHECKED);
+                        afHooks[index] = TRUE;
+                    }
+
+                    <font
+color="blue">//</font><font color="green"> Если ловушка выбранного типа уже установлена</font>,
+                    <font
+color="blue">//</font><font color="green"> то удаляем её и убираем галочку в соответствующем</font>
+                    <font
+color="blue">//</font><font color="green"> пункте меню.</font>
+
+                    else
+                    {
+                        UnhookWindowsHookEx(myhookdata[index].hhook);
+                        CheckMenuItem(hmenu, index,
+                            MF_BYCOMMAND | MF_UNCHECKED);
+                        afHooks[index] = FALSE;
+                    }
+
+                default:
+                    return (DefWindowProc(hwndMain, uMsg, wParam,
+                        lParam));
+            }
+            break;
+
+            <font
+color="blue">//</font>
+            <font color="blue">//</font><font color="green"> Обрабатываем другие сообщения</font>.
+            <font
+color="blue">//</font>
+
+        default:
+            return DefWindowProc(hwndMain, uMsg, wParam, lParam);
+    }
+    return NULL;
+}
+
+<font
+color="blue">/*</font><font color="green">***************************************************************
+  Процедура ловушки WH_CALLWNDPROC
+ ***************************************************************</font><font
+color="blue">*/</font>
+
+LRESULT WINAPI CallWndProc(int nCode, WPARAM wParam, LPARAM lParam)
+{
+    CHAR szCWPBuf[256];
+    CHAR szMsg[16];
+    HDC hdc;
+    static int c = 0;
+    size_t cch;
+	size_t * pcch;
+	HRESULT hResult;
+
+    if (nCode &lt; 0)  <font
+color="blue">//</font><font color="green"> не обрабатываем сообщение</font>
+        return CallNextHookEx(myhookdata[CALLWNDPROC].hhook, nCode,
+                wParam, lParam);
+
+    <font
+color="blue">//</font><font color="green"> Вызываем функцию, которая преобразует константу сообщения в</font>
+    <font
+color="blue">//</font><font color="green"> строку и копирует её буфер.</font>
+
+    LookUpTheMessage((PMSG) lParam, szMsg);
+
+    hdc = GetDC(hwndMain);
+
+    switch (nCode)
+    {
+        case HC_ACTION:
+	   hResult = StringCchPrintf(szCWPBuf, 256/sizeof(TCHAR),
+           &quot;CALLWNDPROC - tsk: %ld, msg: %s, %d times   &quot;,
+           wParam, szMsg, c++);
+	   if (FAILED(hResult))
+	     {
+	     <font
+color="blue">//</font><font color="green"> обработчик ошибки</font>
+	     }
+	   hResult = StringCchLength(szCWPBuf, 256/sizeof(TCHAR), pcch);
+	   if (FAILED(hResult))
+	     {
+	     <font
+color="blue">//</font><font color="green"> обработчик ошибки</font>
+	     }
+           TextOut(hdc, 2, 15, szCWPBuf, *pcch);
+           break;
+ 
+        default:
+            break;
+    }
+
+    ReleaseDC(hwndMain, hdc);
+    return CallNextHookEx(myhookdata[CALLWNDPROC].hhook, nCode,
+        wParam, lParam);
+} 
+
+<font
+color="blue">/*</font><font color="green">***************************************************************
+  Процедура ловушки WH_GETMESSAGE
+ ***************************************************************</font><font
+color="blue">*/</font>
+
+LRESULT CALLBACK GetMsgProc(int nCode, WPARAM wParam, LPARAM lParam)
+{
+    CHAR szMSGBuf[256];
+    CHAR szRem[16];
+    CHAR szMsg[16];
+    HDC hdc;
+    static int c = 0;
+    size_t cch;
+	size_t * pcch;
+	HRESULT hResult;
+
+    if (nCode &lt; 0) <font
+color="blue">//</font><font color="green"> не обрабатываем сообщение</font>
+        return CallNextHookEx(myhookdata[GETMESSAGE].hhook, nCode,
+            wParam, lParam);
+
+    switch (nCode)
+    {
+      case HC_ACTION:
+        switch (wParam)
+         {
+           case PM_REMOVE:
+	     hResult = StringCchCopy(szRem, 16/sizeof(TCHAR), &quot;PM_REMOVE&quot;);
+	     if (FAILED(hResult))
+		{
+		<font
+color="blue">//</font><font color="green"> обработчик ошибки</font>
+		}
+             break;
+ 
+           case PM_NOREMOVE:
+	     hResult = StringCchCopy(szRem, 16/sizeof(TCHAR), &quot;PM_NOREMOVE&quot;);
+		if (FAILED(hResult))
+		  {
+		  <font
+color="blue">//</font><font color="green"> обработчик ошибки</font>
+		  }
+                  break;
+ 
+             default:
+		hResult = StringCchCopy(szRem, 16/sizeof(TCHAR), &quot;Unknown&quot;);
+		if (FAILED(hResult))
+		  {
+		  <font
+color="blue">//</font><font color="green"> обработчик ошибки</font>
+		  }
+                break;
+         }
+
+         <font
+color="blue">//</font><font color="green"> Вызываем функцию, которая преобразует константу сообщения в</font>
+         <font
+color="blue">//</font><font color="green"> строку и копирует её буфер.</font>
+
+         LookUpTheMessage((PMSG) lParam, szMsg);
+
+         hdc = GetDC(hwndMain);
+	 hResult = StringCchPrintf(szMSGBuf, 256/sizeof(TCHAR),
+                &quot;GETMESSAGE - wParam: %s, msg: %s, %d times   &quot;,
+                szRem, szMsg, c++);
+	 if (FAILED(hResult))
+	    {
+	    <font
+color="blue">//</font><font color="green"> обработчик ошибки</font>
+	    }
+	 hResult = StringCchLength(szMSGBuf, 256/sizeof(TCHAR), pcch);
+	 if (FAILED(hResult))
+	    {
+	    <font
+color="blue">//</font><font color="green"> обработчик ошибки</font>
+	    } 
+         TextOut(hdc, 2, 35, szMSGBuf, *pcch);
+         break;
+
+        default:
+            break;
+    } 
+
+    ReleaseDC(hwndMain, hdc);
+    return CallNextHookEx(myhookdata[GETMESSAGE].hhook, nCode,
+        wParam, lParam); 
+} 
+ 
+<font
+color="blue">/*</font><font color="green">***************************************************************
+  Процедура ловушки WH_DEBUG
+ ***************************************************************</font><font
+color="blue">*/</font>
+
+LRESULT CALLBACK DebugProc(int nCode, WPARAM wParam, LPARAM lParam)
+{
+    CHAR szBuf[128];
+    HDC hdc;
+    static int c = 0;
+    size_t cch;
+	size_t * pcch;
+	HRESULT hResult;
+ 
+    if (nCode &lt; 0)  <font
+color="blue">//</font><font color="green"> не обрабатываем сообщение</font>
+        return CallNextHookEx(myhookdata[DEBUG].hhook, nCode,
+            wParam, lParam);
+
+    hdc = GetDC(hwndMain);
+
+    switch (nCode)
+    {
+      case HC_ACTION:
+	hResult = StringCchPrintf(szBuf, 128/sizeof(TCHAR),   
+                &quot;DEBUG - nCode: %d, tsk: %ld, %d times   &quot;, 
+                nCode,wParam, c++);
+	if (FAILED(hResult))
+	  {
+	  <font
+color="blue">//</font><font color="green"> обработчик ошибки</font>
+	  }
+	hResult = StringCchLength(szBuf, 128/sizeof(TCHAR), pcch);
+	if (FAILED(hResult))
+	  {
+	  <font
+color="blue">//</font><font color="green"> обработчик ошибки</font>
+	  }
+        TextOut(hdc, 2, 55, szBuf, *pcch);
+        break;
+
+      default:
+        break;
+    }
+
+    ReleaseDC(hwndMain, hdc);
+    return CallNextHookEx(myhookdata[DEBUG].hhook, nCode, wParam,
+        lParam);
+}
+ 
+<font
+color="blue">/*</font><font color="green">*************************************************************** 
+  Процедура ловушки WH_CBT
+ ***************************************************************</font><font
+color="blue">*/</font> 
+
+LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam)
+{
+    CHAR szBuf[128];
+    CHAR szCode[128];
+    HDC hdc;
+    static int c = 0;
+    size_t cch; 
+	size_t * pcch;
+	HRESULT hResult;
+
+    if (nCode &lt; 0)  <font
+color="blue">//</font><font color="green"> не обрабатываем сообщение</font>
+        return CallNextHookEx(myhookdata[CBT].hhook, nCode, wParam,
+            lParam);
+
+    hdc = GetDC(hwndMain);
+
+    switch (nCode)
+    {
+      case HCBT_ACTIVATE:
+	hResult = StringCchCopy(szCode, 128/sizeof(TCHAR), &quot;HCBT_ACTIVATE&quot;);
+	if (FAILED(hResult))
+	  {
+	  <font
+color="blue">//</font><font color="green"> обработчик ошибки</font>
+	  }
+        break;
+
+      case HCBT_CLICKSKIPPED:
+	hResult = StringCchCopy(szCode, 128/sizeof(TCHAR), &quot;HCBT_CLICKSKIPPED&quot;);
+	if (FAILED(hResult))
+	  {
+	  <font
+color="blue">//</font><font color="green"> обработчик ошибки</font>
+	  }
+        break;
+
+      case HCBT_CREATEWND:
+	hResult = StringCchCopy(szCode, 128/sizeof(TCHAR), &quot;HCBT_CREATEWND&quot;);
+	if (FAILED(hResult))
+	  {
+	  <font
+color="blue">//</font><font color="green"> обработчик ошибки</font>
+	  }
+        break;
+
+      case HCBT_DESTROYWND:
+	hResult = StringCchCopy(szCode, 128/sizeof(TCHAR), &quot;HCBT_DESTROYWND&quot;);
+	if (FAILED(hResult))
+	  {
+	  <font
+color="blue">//</font><font color="green"> обработчик ошибки</font>
+	  }
+        break;
+
+      case HCBT_KEYSKIPPED:
+	hResult = StringCchCopy(szCode, 128/sizeof(TCHAR), &quot;HCBT_KEYSKIPPED&quot;);
+	if (FAILED(hResult))
+	  {
+	 <font
+color="blue"> //</font><font color="green"> обработчик ошибки</font>
+	  }
+        break;
+
+      case HCBT_MINMAX:
+	hResult = StringCchCopy(szCode, 128/sizeof(TCHAR), &quot;HCBT_MINMAX&quot;);
+	if (FAILED(hResult))
+	  {
+	  <font
+color="blue">//</font><font color="green"> обработчик ошибки</font>
+	  }
+        break;
+
+      case HCBT_MOVESIZE:
+	hResult = StringCchCopy(szCode, 128/sizeof(TCHAR), &quot;HCBT_MOVESIZE&quot;);
+	if (FAILED(hResult))
+	  {
+	  <font
+color="blue">//</font><font color="green"> обработчик ошибки</font>
+	  }
+        break;
+
+      case HCBT_QS:
+	hResult = StringCchCopy(szCode, 128/sizeof(TCHAR), &quot;HCBT_QS&quot;);
+	if (FAILED(hResult))
+	  {
+	  <font
+color="blue">//</font><font color="green"> обработчик ошибки</font>
+	  }
+        break;
+
+      case HCBT_SETFOCUS:
+	hResult = StringCchCopy(szCode, 128/sizeof(TCHAR), &quot;HCBT_SETFOCUS&quot;);
+	if (FAILED(hResult))
+	  {
+	  <font
+color="blue">//</font><font color="green"> обработчик ошибки</font>
+	  }
+        break;
+
+      case HCBT_SYSCOMMAND:
+	hResult = StringCchCopy(szCode, 128/sizeof(TCHAR), &quot;HCBT_SYSCOMMAND&quot;);
+	if (FAILED(hResult))
+	  {
+	  <font
+color="blue">//</font><font color="green"> обработчик ошибки</font>
+	  }
+        break;
+
+      default:
+	hResult = StringCchCopy(szCode, 128/sizeof(TCHAR), &quot;Unknown&quot;);
+	if (FAILED(hResult))
+	  {
+	  <font
+color="blue">//</font><font color="green"> обработчик ошибки</font>
+	  }
+        break;
+    }
+
+    hResult = StringCchPrintf(szBuf, 128/sizeof(TCHAR),
+        &quot;CBT -  nCode: %s, tsk: %ld, %d times   &quot;,
+        szCode, wParam, c++);
+
+    if (FAILED(hResult))
+	{
+	<font
+color="blue">//</font><font color="green"> обработчик ошибки</font>
+	}
+    hResult = StringCchLength(szBuf, 128/sizeof(TCHAR), pcch);
+    if (FAILED(hResult))
+	{
+	<font
+color="blue">//</font><font color="green"> обработчик ошибки</font>
+	} 
+    TextOut(hdc, 2, 75, szBuf, *pcch);
+    ReleaseDC(hwndMain, hdc);
+    return CallNextHookEx(myhookdata[CBT].hhook, nCode, wParam, lParam);
+} 
+
+<font
+color="blue">/*</font><font color="green">***************************************************************
+  Процедура ловушки WH_MOUSE
+ ***************************************************************</font><font
+color="blue">*/</font>
+
+LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam)
+{
+    CHAR szBuf[128];
+    CHAR szMsg[16];
+    HDC hdc;
+    static int c = 0;
+    size_t cch;
+	size_t * pcch;
+	HRESULT hResult;
+
+    if (nCode &lt; 0)  <font
+color="blue">//</font><font color="green"> не обрабатываем сообщение</font>
+        return CallNextHookEx(myhookdata[MOUSE].hhook, nCode,
+            wParam, lParam);
+
+    <font
+color="blue">//</font><font color="green"> Вызываем функцию, которая преобразует константу сообщения в</font>
+    <font
+color="blue">//</font><font color="green"> строку и копирует её буфер.</font>
+
+    LookUpTheMessage((PMSG) lParam, szMsg);
+
+    hdc = GetDC(hwndMain);
+	hResult = StringCchPrintf(szBuf, 128/sizeof(TCHAR),
+        &quot;MOUSE - nCode: %d, msg: %s, x: %d, y: %d, %d times   &quot;,
+        nCode, szMsg, LOWORD(lParam), HIWORD(lParam), c++);
+	if (FAILED(hResult))
+	{
+	<font
+color="blue">//</font><font color="green"> обработчик ошибки</font>
+	}
+	hResult = StringCchLength(szBuf, 128/sizeof(TCHAR), pcch);
+	if (FAILED(hResult))
+	{
+	<font
+color="blue">//</font><font color="green"> обработчик ошибки</font>
+	}
+    TextOut(hdc, 2, 95, szBuf, *pcch);
+    ReleaseDC(hwndMain, hdc);
+    return CallNextHookEx(myhookdata[MOUSE].hhook, nCode, wParam,
+        lParam);
+}
+ 
+<font
+color="blue">/*</font><font color="green">***************************************************************
+  Процедура ловушки WH_KEYBOARD
+ ***************************************************************</font><font
+color="blue">*/</font>
+
+LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
+{
+    CHAR szBuf[128];
+    HDC hdc;
+    static int c = 0;
+    size_t cch;
+	size_t * pcch;
+	HRESULT hResult;
+
+    if (nCode &lt; 0)  <font
+color="blue">//</font><font color="green"> не обрабатываем сообщение</font>
+        return CallNextHookEx(myhookdata[KEYBOARD].hhook, nCode,
+            wParam, lParam);
+
+    hdc = GetDC(hwndMain);
+	hResult = StringCchPrintf(szBuf, 128/sizeof(TCHAR),
+           &quot;KEYBOARD - nCode: %d, vk: %d, %d times &quot;, nCode, wParam, c++);
+	if (FAILED(hResult))
+	{
+	<font
+color="blue">//</font><font color="green"> обработчик ошибки</font>
+	}
+	hResult = StringCchLength(szBuf, 128/sizeof(TCHAR), pcch);
+	if (FAILED(hResult))
+	{
+	<font
+color="blue">//</font><font color="green"> обработчик ошибки</font>
+	}
+    TextOut(hdc, 2, 115, szBuf, *pcch);
+    ReleaseDC(hwndMain, hdc);
+    return CallNextHookEx(myhookdata[KEYBOARD].hhook, nCode, wParam,
+        lParam);
+}
+ 
+<font
+color="blue">/*</font><font color="green">***************************************************************
+  Процедура ловушки WH_MSGFILTER
+ ***************************************************************</font><font
+color="blue">*/</font>
+
+LRESULT CALLBACK MessageProc(int nCode, WPARAM wParam, LPARAM lParam)
+{
+    CHAR szBuf[128];
+    CHAR szMsg[16];
+    CHAR szCode[32];
+    HDC hdc;
+    static int c = 0;
+    size_t cch;
+	size_t * pcch;
+	HRESULT hResult;
+
+    if (nCode &lt; 0)  <font
+color="blue">//</font><font color="green"> не обрабатываем сообщение</font>
+        return CallNextHookEx(myhookdata[MSGFILTER].hhook, nCode,
+            wParam, lParam);
+
+    switch (nCode)
+    {
+      case MSGF_DIALOGBOX:
+	hResult = StringCchCopy(szCode, 32/sizeof(TCHAR), &quot;MSGF_DIALOGBOX&quot;);
+	if (FAILED(hResult))
+	  {
+	  <font
+color="blue">//</font><font color="green"> обработчик ошибки</font>
+	  }
+        break;
+
+      case MSGF_MENU:
+	hResult = StringCchCopy(szCode, 32/sizeof(TCHAR), &quot;MSGF_MENU&quot;);
+	if (FAILED(hResult))
+	  {
+	  <font
+color="blue">//</font><font color="green"> обработчик ошибки</font>
+	  }
+        break;
+
+      case MSGF_SCROLLBAR:
+	hResult = StringCchCopy(szCode, 32/sizeof(TCHAR), &quot;MSGF_SCROLLBAR&quot;);
+	if (FAILED(hResult))
+	  {
+	  <font
+color="blue">//</font><font color="green"> обработчик ошибки</font>
+	  }
+        break;
+
+      default:
+	hResult = StringCchPrintf(szCode, 128/sizeof(TCHAR), &quot;Unknown: %d&quot;, nCode);
+	if (FAILED(hResult))
+	{
+	<font
+color="blue">//</font><font color="green"> обработчик ошибки</font>
+	}
+        break;
+    }
+
+    <font
+color="blue">//</font><font color="green"> Вызываем функцию, которая преобразует константу сообщения в</font>
+    <font
+color="blue">//</font><font color="green"> строку и копирует её буфер.</font>
+
+    LookUpTheMessage((PMSG) lParam, szMsg);
+
+    hdc = GetDC(hwndMain);
+	hResult = StringCchPrintf(szBuf, 128/sizeof(TCHAR),
+        &quot;MSGFILTER  nCode: %s, msg: %s, %d times    &quot;,
+        szCode, szMsg, c++);
+	if (FAILED(hResult))
+	{
+	<font
+color="blue">//</font><font color="green"> обработчик ошибки</font>
+	}
+	hResult = StringCchLength(szBuf, 128/sizeof(TCHAR), pcch);
+	if (FAILED(hResult))
+	{
+	<font
+color="blue">//</font><font color="green"> обработчик ошибки</font>
+	}
+    TextOut(hdc, 2, 135, szBuf, *pcch);
+    ReleaseDC(hwndMain, hdc);
+    return CallNextHookEx(myhookdata[MSGFILTER].hhook, nCode,
+        wParam, lParam);
+}</pre>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

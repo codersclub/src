@@ -1,0 +1,160 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Файлы в MFC (работа с классом CFile)</h3>
+    <p>( Источник <a href="http://msdn.microsoft.com">msdn.microsoft.com</a> )</p>
+    <p>В данной статье рассказывается как открывать и
+    закрывать файлы, а так же как считывать и
+    записывать в них данные. Класс <b>CFile</b>
+    обеспечивает основные бинарные оперции с
+    файлами. Классы <b>CStdioFile</b>, <b>CMemFile</b> наследованы
+    от <b>CFile</b> и используются для более специфической
+    работы с файлами.</p>
+    <h4>Открытие файлов</h4>
+    <p>В MFC процесс открытия файла состоит из двух
+    этапов.</p>
+    <p class="labelproc"><b>Для открытия файла</b><ol type="1">
+      <li>Сперва необходимо создать объект файла без
+        указания пути или флагов доступа (чтение, запись
+        и т.д.).<p>Обычно объект файла создаётся путём
+        объявления переменной типа <b>CFile</b>.</p>
+      </li>
+      <li>Далее необходимо вызвать метод <b>Open</b> для этого
+        объекта, указав путь и флаги доступа.<p>Если файл
+        был открыт успешно, то функция <b>Open</b> вернёт
+        ненулевое значение, иначе, в случае ошибки будет
+        возвращен 0 (ноль). Прототип функции <b>Open</b>
+        выглядит следующим образом:</p>
+        <pre class="code">virtual BOOL Open( LPCTSTR lpszFileName, UINT nOpenFlags,
+                             CFileException* pError = NULL );</pre>
+        <p>В параметре nOpenFlags передаются флаги доступа для
+        файла, такие как &quot;только чтение&quot; (read-only) и т.д.
+        Возможные значения флагов определены в виде
+        констант в классе <b>CFile</b>, и использовать их можно
+        с приставкой &quot;<b>CFile::</b>&quot; - например <b>CFile::modeRead</b>.
+        Для создания файла используется флаг <b>CFile::modeCreate</b>.</p>
+      </li>
+    </ol>
+    <p>Следующий пример показывает, как создать новый
+    файл с правами на чтение/запись (существующий
+    файл с таким же путём будет заменён):</p>
+    <pre class="code">char* pszFileName = &quot;c:\\test\\myfile.dat&quot;;
+CFile myFile;
+CFileException fileException;
+
+if ( !myFile.Open( pszFileName, CFile::modeCreate |   
+          CFile::modeReadWrite, &amp;fileException ) )
+{
+    TRACE( &quot;Can't open file %s, error = %u\n&quot;,
+       pszFileName, fileException.m_cause );
+}</pre>
+    <blockquote class="dtBlock">
+      <b class="le"><p>Заметка:</b>&nbsp;&nbsp;&nbsp;Данный пример
+      создаёт и открывает файл. Если возникает
+      какая-либо ошибка, то вызов <b>Open</b> может вернуть
+      объект <b>CFileException</b> в своём последнем параметре.
+      Макрос <b>TRACE</b> распечатывает как имя файла, так и
+      код, указывающий на причину ошибки. Если
+      необходимо узнать более подробно о возникшей
+      ошибке, то можно воспользоваться функцией <b>AfxThrowFileException</b>.</p>
+    </blockquote>
+    <p>&nbsp;</p>
+    <h4>Чтение и запись файлов</h4>
+    <p>Теперь давайте посмотрим, как напрямую
+    считывать и записывать в объект <b>CFile</b> (для
+    буфферизованного ввода/вывода используется
+    класс <a href="http://msdn.microsoft.com/library/en-us/vclib/html/_MFC_CArchive.asp">CArchive</a>
+    ).</p>
+    <p class="labelproc"><b>Чтобы прочитать и записать данные в
+    файл</b><ul type="disc">
+      <li>Используются методы <b>Read</b> и <b>Write</b>
+        соответственно. А так же, для перемещения
+        указателя внутри файла используется метод <b>Seek</b>.</li>
+    </ul>
+    <p><b>Read</b> имеет два параметра (первый, это
+    указатель на буфер, а второй, это количество байт,
+    которые необходимо считать) и возвращает
+    количество байт, которые были реально считаны.
+    Например, если был достигнут конец файла (end-of-file
+    (EOF)), то функция вернёт количество байт,
+    оставшихся до конца файла. Если при чтении из
+    файла произойдёт ошибка, то возникнет
+    исключительная ситуация. <b>Write</b> очень похожа на <b>Read</b>,
+    за исключением того, что не возвращает
+    количество записанных байт. Так же при
+    возникновении ошибки произойдёт исключение.
+    Следующий пример показывает, как читать и
+    записывать в объект <b>CFile</b>:</p>
+    <pre class="code">char      szBuffer[256]; 
+UINT      nActual = 0; 
+CFile myFile;
+
+myFile.Write( szBuffer, sizeof( szBuffer ) ); 
+myFile.Seek( 0, CFile::begin );
+nActual = myFile.Read( szBuffer, sizeof( szBuffer ) ); </pre>
+    <blockquote class="dtBlock">
+      <b class="le"><p>Заметка:</b>&nbsp;&nbsp;&nbsp;Исключительные
+      ситуации при операциях чтения/записи
+      обрабатываются при помощи блока <b>try</b>/<b>catch</b>.
+      Более подробно см. <a
+      href="http://msdn.microsoft.com/library/en-us/vccore/html/_core_exception_handling_topics_.28.mfc.29.asp">Обработка
+      исключений (MFC)</a>.</p>
+    </blockquote>
+    <p>&nbsp;</p>
+    <h4>Закрытие файлов</h4>
+    <p>Когда работа с файлом завершена, необходимо
+    закрыть его.</p>
+    <p class="labelproc"><b>Чтобы закрыть файл</b><ul type="disc">
+      <li>Используется метод <b>Close</b>. Эта функция
+        закрывает файл и, в случае необходимости,
+        сбрасывает в него буфер.</li>
+    </ul>
+    <p>Если Вы создали объект <strong>CFile</strong> в классе или
+    функции, то объект будет автоматически закрыт и
+    уничтожен как только выполнение кода выйдет за
+    пределы видимости объекта. Обратите внимание на
+    то, что удаление объекта <b>CFile</b> не приведёт к
+    физическому удалению файла с диска.</p>
+    <p>&nbsp;</p>
+    <h4>Получение информации о файле</h4>
+    <p><b>CFile</b> так же позволяет получить довольно
+    обширную информацию о файлах, включая
+    существование файла, дату и время создания и
+    изменения, размер и путь.</p>
+    <p class="labelproc"><b>Чтобы узнать, существует ли файл</b><ul
+    type="disc">
+      <li>Воспользуйтесь статическим методом <b>GetStatus</b>. <b>GetStatus</b>
+        вернёт 0 если файл не существует.</li>
+    </ul>
+    <p>Таким образом, можно использовать результат
+    функции <b>GetStatus</b>, чтобы определить, нужно ли
+    использовать флаг <b>CFile::modeCreate</b> при открытии
+    файла. Следующий пример демонстрирует это:</p>
+    <pre class="code">CFile theFile;
+char* szFileName = &quot;c:\\test\\myfile.dat&quot;;
+BOOL bOpenOK;
+
+CFileStatus status;
+if( CFile::GetStatus( szFileName, status ) )
+{
+    // Открываем файл не создавая его
+    bOpenOK = theFile.Open( szFileName, 
+                    CFile::modeWrite );
+}
+else
+{
+    // Создаём файл и открываем его
+    bOpenOK = theFile.Open( szFileName, 
+                    CFile::modeCreate | CFile::modeWrite );
+}</pre>
+    <p>&nbsp;</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

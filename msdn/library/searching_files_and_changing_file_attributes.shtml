@@ -1,0 +1,105 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Поиск файлов и изменение атрибутов.</h3>
+    <p>Следующий пример копирует все текстовые файлы
+    из текущей директории в новую директорию с
+    именем \TEXTRO. При необходимости, файлам в новой
+    директории присваивается атрибут &quot;только
+    чтение&quot;.</p>
+    <p>Директория \TEXTRO создаётся функцией <a
+    href="http://msdn.microsoft.com/library/en-us/fileio/base/createdirectory.asp"><b>CreateDirectory</b></a>.</p>
+    <p>Поиск всех файлов .TXT в текущей директории
+    производится функциями <a
+    href="http://msdn.microsoft.com/library/en-us/fileio/base/findfirstfile.asp"><b>FindFirstFile</b></a>
+    и <a href="http://msdn.microsoft.com/library/en-us/fileio/base/findnextfile.asp"><b>FindNextFile</b></a>.
+    Каждый файл .TXT копируется в директорию \TEXTRO.
+    После того, как файл скопирован, функция <a
+    href="http://msdn.microsoft.com/library/en-us/fileio/base/getfileattributes.asp"><b>GetFileAttributes</b></a>
+    проверяет, является ли файл только для чтения.
+    Если аттрибута &quot;только чтение&quot; у файла не
+    установлено, то приложение устанавливает этот
+    атрибут функцией <a
+    href="http://msdn.microsoft.com/library/en-us/fileio/base/setfileattributes.asp"><b>SetFileAttributes</b></a>.</p>
+    <p>После того, как все файлы .TXT из текущей
+    директории были скопированы, то хэндл поиска
+    закрывается функцией <a
+    href="http://msdn.microsoft.com/library/en-us/fileio/base/findclose.asp"><b>FindClose</b></a>.</p>
+    <pre xml:space="preserve">#include &lt;windows.h&gt;
+#include &lt;stdio.h&gt;
+
+WIN32_FIND_DATA FileData;
+HANDLE hSearch;
+DWORD dwAttrs;
+char szDirPath[] = &quot;c:\\TEXTRO\\&quot;;
+char szNewPath[MAX_PATH];
+char szHome[MAX_PATH];
+
+BOOL fFinished = FALSE;
+
+// Создаём новую директорию.
+ 
+if (!CreateDirectory(szDirPath, NULL))
+{
+    printf(&quot;Couldn't create new directory.&quot;);
+    return;
+}
+
+// Начинаем поиск файлов .TXT в текущей директории.
+ 
+hSearch = FindFirstFile(&quot;*.txt&quot;, &amp;FileData);
+if (hSearch == INVALID_HANDLE_VALUE)
+{
+    printf(&quot;No .TXT files found.&quot;);
+    return;
+}
+
+// Копируем каждый файл .TXT в новую директорию и изменяем его
+// атрибут на &quot;только чтение&quot;, если он уже не установлен.
+ 
+while (!fFinished)
+{
+    lstrcpy(szNewPath, szDirPath);
+    lstrcat(szNewPath, FileData.cFileName);
+    if (CopyFile(FileData.cFileName, szNewPath, FALSE))
+    {
+        dwAttrs = GetFileAttributes(FileData.cFileName);
+        if (!(dwAttrs &amp; FILE_ATTRIBUTE_READONLY))
+        {
+            SetFileAttributes(szNewPath,
+                dwAttrs | FILE_ATTRIBUTE_READONLY);
+        }
+    }
+    else
+    {
+        printf(&quot;Couldn't copy file.&quot;);
+        return;
+    }
+
+    if (!FindNextFile(hSearch, &amp;FileData))
+    {
+        if (GetLastError() == ERROR_NO_MORE_FILES)
+        {
+            MessageBox(hwnd, &quot;No more .TXT files.&quot;,
+                &quot;Search completed.&quot;, MB_OK);
+            fFinished = TRUE;
+        }
+        else
+        {
+            printf(&quot;Couldn't find next file.&quot;);
+            return;
+        }
+    }
+}
+
+// Закрываем хэндл поиска.
+
+FindClose(hSearch);</pre>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

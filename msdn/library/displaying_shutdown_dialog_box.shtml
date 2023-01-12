@@ -1,0 +1,120 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Показываем диалоговое окошко завершения работы системы.</h3>
+    <p><b>Только Windows NT/2000/XP:</b> Следующий завершает
+    работу системы при помощи функции <a
+    href="http://msdn.microsoft.com/library/en-us/sysinfo/base/initiatesystemshutdown.asp"><b>InitiateSystemShutdown</b></a>
+    на компьютере, на котором залогинен
+    пользователь. Сначало необходимо получить
+    привелегию SE_SHUTDOWN_NAME. Более подробно см. <a
+    href="http://msdn.microsoft.com/library/en-us/security/security/privileges.asp">Привелегии</a>.</p>
+    <p>&nbsp;</p>
+    <pre>BOOL MySystemShutdown( LPTSTR lpMsg )
+{
+   HANDLE hToken;              // дескриптор маркера процесса
+   TOKEN_PRIVILEGES tkp;       // указатель на структуру маркера
+
+   BOOL fResult;               // флаг завершения работы системы
+
+   // Чтобы получить привелегию завершения работы системы, получаем
+   // дескриптор маркера текущего процесса.
+
+   if (!OpenProcessToken(GetCurrentProcess(),
+        TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &amp;hToken))
+      return FALSE;
+
+   // Получаем LUID для привелегии завершения работы.
+
+   LookupPrivilegeValue(NULL, SE_SHUTDOWN_NAME,
+        &amp;tkp.Privileges[0].Luid);
+
+   tkp.PrivilegeCount = 1;  // будет установлена одна привелегия
+   tkp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+
+   // Получаем привелегию завершения работы для этого процесса.
+
+   AdjustTokenPrivileges(hToken, FALSE, &amp;tkp, 0,
+      (PTOKEN_PRIVILEGES) NULL, 0);
+
+   // Если не удалось получить привелегию:
+
+   if (GetLastError() != ERROR_SUCCESS)
+      return FALSE;
+
+   // Отображаем диалоговое окошко завершения работы и начинаем
+   // отсчёт.
+
+   fResult = InitiateSystemShutdown(
+      NULL,    // локальный компьютер
+      lpMsg,   // сообщение для пользователя
+      20,      // таймаут
+      FALSE,   // просить пользователя закрыть приложения ?
+      TRUE);   // Перезагрузить после завершения работы ?
+
+   if (!fResult)
+      return FALSE;
+
+   // Запрещаем привелегию завершения работы для нашего процесса.
+
+   tkp.Privileges[0].Attributes = 0;
+   AdjustTokenPrivileges(hToken, FALSE, &amp;tkp, 0,
+        (PTOKEN_PRIVILEGES) NULL, 0);
+
+   return TRUE;
+}</pre>
+    <p>Если выполнить функцию <a
+    href="http://msdn.microsoft.com/library/en-us/sysinfo/base/abortsystemshutdown.asp"><b>AbortSystemShutdown</b></a>
+    в период таймаута, указанного в <a
+    href="http://msdn.microsoft.com/library/en-us/sysinfo/base/initiatesystemshutdown.asp"><b>InitiateSystemShutdown</b></a>,
+    то завершения работы системы не произойдёт.</p>
+    <pre>BOOL PreventSystemShutdown()
+{
+   HANDLE hToken;              // дескриптор маркера процесса
+   TOKEN_PRIVILEGES tkp;       // указатель на структуру маркера
+
+   // Чтобы получить привелегию завершения работы системы, получаем
+   // дескриптор маркера текущего процесса.
+
+   if (!OpenProcessToken(GetCurrentProcess(),
+         TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &amp;hToken))
+      return FALSE;
+
+   // Получаем LUID для привелегии завершения работы.
+
+   LookupPrivilegeValue(NULL, SE_SHUTDOWN_NAME,
+         &amp;tkp.Privileges[0].Luid);
+
+   tkp.PrivilegeCount = 1;  // one privilege to set
+   tkp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+
+   // Получаем привелегию завершения работы для этого процесса.
+
+   AdjustTokenPrivileges(hToken, FALSE, &amp;tkp, 0,
+        (PTOKEN_PRIVILEGES)NULL, 0);
+
+   if (GetLastError() != ERROR_SUCCESS)
+      return FALSE;
+
+   // Предотвращаем завершение работы системы.
+
+   if ( !AbortSystemShutdown(NULL) )
+      return FALSE;
+
+   // Запрещаем привелегию завершения работы для нашего процесса.
+
+   tkp.Privileges[0].Attributes = 0;
+   AdjustTokenPrivileges(hToken, FALSE, &amp;tkp, 0,
+       (PTOKEN_PRIVILEGES) NULL, 0);
+
+   return TRUE;
+}</pre>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

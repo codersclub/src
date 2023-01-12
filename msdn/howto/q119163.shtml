@@ -1,0 +1,286 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как получить имя файла данного дескриптора
+    окна</h3>
+    <p>Чтобы найти имя файла программы, которая
+    создала данное окно в Windows, необходимо
+    воспользоваться GetWindowLong(hWnd, GWL_HINSTANCE) для
+    определения дескриптора модуля, а затем
+    GetModuleFileName() для нахождения имени файла. Данный
+    метод не работает в Windows NT так как в ней
+    дескрипторы экземпляров не авляются глобальными,
+    а уникальны для адресного пространства в котором
+    выполняется процесс.<br>
+    <br>
+    Если приложение, которое создало окно является
+    Windows приложением, то будет возвращено имя
+    &quot;ntvdm&quot;. Чтобы получить фактическое имя файла,
+    то необходимо породить приложение Win16, которое
+    будет вызывать GetModuleFileName() и передавать имя файла
+    обратно в Вашу программу при помощи какого либо
+    вида межпроцессовых взаимодействий (IPC).</p>
+    <p>Как только Вы получите дескриптор окна, то для
+    определения имени файла приложения сперва
+    воспользуемся GetWindowThreadProcessId() для нахождения
+    идентификатора (ID) процесса (PID) который создал
+    окно. Далее, используя PID, сделаем запрос в реестр,
+    в ту часть, где находятся данные о
+    производительности, связанные с процессом. Для
+    этого нам потребуется перечислить все процессы в
+    системе, сравнить каждый PID с PID процесса, который
+    мы ищем, до тех пор, пока данные процесса не будут
+    найдены. (Эти данные включают и имя процесса.)<br>
+    <br>
+    Следующий пример демонстрирует, как найти имя
+    файла Program Manager, PROGMAN.EXE, после получения
+    дескриптора окна:</p>
+    <h3>Пример кода</h3>
+    <pre class="CODESAMP">   #include &lt;windows.h&gt;
+   #include &lt;stdio.h&gt;
+   #include &lt;string.h&gt;
+
+   #define Key &quot;SOFTWARE\\Microsoft\\Windows
+   NT\\CurrentVersion\\Perflib\\009&quot;
+
+   void GetIndex( char *, char * );
+   void DisplayFilename( DWORD );
+
+   /********************************************************************\ 
+   * Function: void main( )                                             *
+   *                                                                    *
+   * Purpose : Application entry point                                  *
+   *                                                                    *
+   \********************************************************************/ 
+
+   void main( )
+   {
+      HWND                      hWnd;
+      DWORD                     dwActiveProcessId;
+
+      // Получаем дескриптор основного окна Program Manager.
+
+      hWnd = FindWindow( &quot;Progman&quot;, NULL );
+
+      // Получаем PID Program Manager.
+
+      GetWindowThreadProcessId( hWnd, &amp;dwActiveProcessId );
+
+      // Отображаем имя исполняемого файла Program Manager.
+
+      printf( &quot;Searching for filename of Program Manager...\n&quot; );
+      DisplayFilename( dwActiveProcessId );
+   }
+
+   /********************************************************************\ 
+   * Function: void DisplayFilename( DWORD )                            *
+   *                                                                    *
+   * Purpose : Display executable filename of the process whose PID     *
+   *           is passed in as a parameter.                             *
+   *                                                                    *
+   * Comment : The information is retrieved from the performance        *
+   *           data in the registry.                                    *
+   *                                                                    *
+   \********************************************************************/ 
+
+   void DisplayFilename( DWORD dwProcessId )
+   {
+      DWORD                     CurrentProcessId;
+      BOOL                      bContinue = TRUE;
+      char                      szIndex[256] = &quot;&quot;;
+      DWORD                     dwBytes = 12000;
+      DWORD                     dwProcessIdOffset;
+      int                       i;
+
+      PPERF_DATA_BLOCK          pdb;
+      PPERF_OBJECT_TYPE         pot;
+      PPERF_INSTANCE_DEFINITION pid;
+      PPERF_COUNTER_BLOCK       pcb;
+      PPERF_COUNTER_DEFINITION  pcd;
+
+      // Получаем индекс для объекта PROCESS.
+      GetIndex( &quot;Process&quot;, szIndex );
+
+      // Выделяем память для PPERF_DATA_BLOCK.
+      pdb = (PPERF_DATA_BLOCK) HeapAlloc( GetProcessHeap(),
+                                          HEAP_ZERO_MEMORY,
+                                          dwBytes);
+
+      // Получаем данные производительности.
+      while( RegQueryValueEx(HKEY_PERFORMANCE_DATA, (LPTSTR)szIndex, NULL,
+                             NULL, (LPBYTE)pdb, &amp;dwBytes) ==
+   ERROR_MORE_DATA )
+      {
+         // Увеличиваем память.
+         dwBytes += 1000;
+
+         // Распределённая память мала; перераспределяем новую память.
+         pdb = (PPERF_DATA_BLOCK) HeapReAlloc( GetProcessHeap(),
+                                               HEAP_ZERO_MEMORY,
+                                               (LPVOID)pdb,
+                                               dwBytes);
+      }
+
+      // Получаем PERF_OBJECT_TYPE.
+      pot = (PPERF_OBJECT_TYPE)((PBYTE)pdb + pdb-&gt;HeaderLength);
+
+      // Получаем объявление первого счётчика.
+      pcd = (PPERF_COUNTER_DEFINITION)((PBYTE)pot + pot-&gt;HeaderLength);
+
+      // Получаем значение индекса для ID_PROCESS.
+      szIndex[0] = '\0';
+      GetIndex( &quot;ID Process&quot;, szIndex );
+
+      for( i=0; i&lt; (int)pot-&gt;NumCounter; i++ )
+      {
+         if (pcd-&gt;CounterNameTitleIndex == (DWORD)atoi(szIndex))
+         {
+            dwProcessIdOffset = pcd-&gt;CounterOffset;
+            break;
+         }
+
+         pcd = ((PPERF_COUNTER_DEFINITION)((PBYTE)pcd + pcd-&gt;ByteLength));
+      }
+
+      // Получаем первый экземпляр объекта.
+      pid = (PPERF_INSTANCE_DEFINITION)((PBYTE)pot + pot-
+   &gt;DefinitionLength);
+
+      // Получаем имя первого процесса.
+      pcb = (PPERF_COUNTER_BLOCK) ((PBYTE)pid + pid-&gt;ByteLength );
+      CurrentProcessId = *((DWORD *) ((PBYTE)pcb + dwProcessIdOffset));
+
+      // Находим объект процесса для переданного PID, а затем
+      // печатаем его имя файла.
+
+      for( i = 1; i &lt; pot-&gt;NumInstances &amp;&amp; bContinue; i++ )
+      {
+         if( CurrentProcessId == dwProcessId )
+         {
+            printf( &quot;The filename is %ls.exe.\n&quot;,
+                    (char *) ((PBYTE)pid + pid-&gt;NameOffset) );
+            bContinue = FALSE;
+         }
+         else
+         {
+            pid = (PPERF_INSTANCE_DEFINITION) ((PBYTE)pcb + pcb-
+   &gt;ByteLength);
+            pcb = (PPERF_COUNTER_BLOCK) ((PBYTE)pid + pid-&gt;ByteLength);
+            CurrentProcessId = *((DWORD *)((PBYTE)pcb +
+   dwProcessIdOffset));
+         }
+      }
+      if( bContinue == TRUE )
+         printf( &quot;Not found.\b&quot; );
+
+      // Освобождаем распределённую память.
+      if( !HeapFree(GetProcessHeap(), 0, (LPVOID)pdb) )
+         printf( &quot;HeapFree failed in main.\n&quot; );
+
+      // Закрываем дескриптор ключа.
+      RegCloseKey( HKEY_PERFORMANCE_DATA );
+   }
+
+   /********************************************************************\ 
+   * Function: void GetIndex( char *, char * )                          *
+   *                                                                    *
+   * Purpose : Get the index for the given counter                      *
+   *                                                                    *
+   * Comment : The index is returned in the parameter szIndex           *
+   *                                                                    *
+   \********************************************************************/ 
+
+   void GetIndex( char *pszCounter, char *szIndex )
+   {
+      char*  pszBuffer;
+      char*  pszTemp;
+      char   szObject[256] = &quot;&quot;;
+      DWORD  dwBytes;
+      HANDLE hKeyIndex;
+      int    i = 0;
+      int    j = 0;
+
+      // Открываем ключ.
+      RegOpenKeyEx( HKEY_LOCAL_MACHINE,
+                    Key,
+                    0, KEY_READ,
+                    &amp;hKeyIndex );
+
+      // Получаем размер счётчика.
+      RegQueryValueEx( hKeyIndex,
+                       &quot;Counter&quot;,
+                       NULL, NULL, NULL,
+                       &amp;dwBytes );
+
+      // Распределяем память для буфера.
+      pszBuffer = (char *) HeapAlloc( GetProcessHeap(),
+                                      HEAP_ZERO_MEMORY,
+                                      dwBytes );
+
+      // Получаем заголовки и счётчики.
+      RegQueryValueEx( hKeyIndex,
+                       &quot;Counter&quot;,
+                       NULL, NULL,
+                       (LPBYTE)pszBuffer,
+                       &amp;dwBytes );
+
+      // Находим значение индекса для PROCESS.
+      pszTemp = pszBuffer;
+
+      while( i != (int)dwBytes )
+      {
+         while (*(pszTemp+i) != '\0')
+         {
+            szIndex[j] = *(pszTemp+i);
+            i++;
+            j++;
+         }
+         szIndex[j] = '\0';
+         i++;
+         j = 0;
+         while (*(pszTemp+i) != '\0')
+         {
+            szObject[j] = *(pszTemp+i);
+            i++;
+            j++;
+         }
+         szObject[j] = '\0';
+         i++;
+         j = 0;
+         if( *(pszTemp+i) == '\0' )
+            i++;
+         if( strcmp(szObject, pszCounter) == 0 )
+            break;
+      }
+
+      // Освобождаем память.
+      HeapFree( GetProcessHeap(), 0, (LPVOID)pszBuffer );
+
+      // Закрываем ключ.
+      RegCloseKey( hKeyIndex );
+   } </pre>
+    <p>&nbsp;</p>
+    <p><br>
+    </p>
+    <h2>ССЫЛКИ</h2>
+    <p>Более подробную информацию о работе с данными
+    производительности смотрите в следующих раздела:<ul>
+      <li>&quot;Win32 Programmer's Reference.&quot; <br>
+        <br>
+      </li>
+      <li>&quot;Windows NT Resource Kit,&quot; volume 3. <br>
+        <br>
+      </li>
+      <li>Исходный код PView который включён в Win32 SDK. <br>
+        <br>
+      </li>
+    </ul>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

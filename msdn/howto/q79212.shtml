@@ -1,0 +1,176 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как рисовать прозрачные битмапы.</h3>
+    <p>&quot;Прозрачной&quot; называется та часть картинки,
+    которая не изменяет содержимого экрана.
+    Например, функция <strong>DrawIcon</strong> может создавать
+    изображения с прозрачностью. Так же можно
+    добиться прозрачности при помощи функции <strong>BitBlt</strong>,
+    однако прийдётся воспользоваться
+    дополнительным кодом.<br>
+    <br>
+    Сперва необходимо получить содержимое области,
+    где будет нарисован битмап, чтобы сохранить это
+    фоновое изображение в памяти контекста
+    устройства (DC). Далее накладывается маска на
+    область фона, которая отвечает за непрозрачную
+    часть битмапа, а также на все прозрачные пиксели
+    битмапа. Потом, используется растровая операция
+    XOR, чтобы совместить битмап картинки с битмапом
+    фоновой картнки. В заключении, при помощи <strong>BitBlt</strong>,
+    совмещённая картинка помещается в DC.</p>
+    <p>Теперь более подробно рассмотрим процесс
+    рисования прозрачных битмапов:<ol>
+      <li>Создаём DC для хранения битмапа.</li>
+      <li>В DC выбираем битмап.</li>
+      <li>Создаём в памяти DC для хранения конечной
+        картинки. В него будем выводить выводить
+        конечную картинку.</li>
+      <li>Копируем часть экрана, на которое будет
+        наложена картинка в конечный DC.</li>
+      <li>Создаём &quot;маску AND&quot;, которая содержит маску
+        цветов для рисования (непрозрачная часть
+        картинки). Для этого делаем следующие шаги:<ol>
+          <li>Устанавливаем фоновый цвет в DC в цвет, который
+            будет прозрачным в картинке.</li>
+          <li>Создаём монохромный DC.</li>
+          <li>Применяем BitBlt к картинке в монохромном DC.</li>
+        </ol>
+        <p>Путём установки фонового цвета
+        удовлетворяющих пикселей в белый(1), а всех
+        остальных в чёрный(0), будет создана маска AND для
+        битмапа.</p>
+      </li>
+      <li>Используем BitBlt с растровой операцией SRCAND, чтобы
+        скопировать маску AND на конечный DC.</li>
+      <li>Используем BitBlt с растровой операцией SRCAND, чтобы
+        скопировать инверсию маски AND в DC картинки.</li>
+      <li>Используем BitBlt с растровой операцией SRCPAINT,
+        чтобы скопировать DC картинки в конечный DC.</li>
+      <li>Используем BitBlt, чтобы скопировать содержимое
+        конечного DC в соответствующую часть экрана.</li>
+    </ol>
+    <p>Следующая функция демонстрирует описанные
+    выше шаги:</p>
+    <pre>   void DrawTransparentBitmap(HDC hdc, HBITMAP hBitmap, short xStart,
+                           short yStart, COLORREF cTransparentColor)
+   {
+   BITMAP     bm;
+   COLORREF   cColor;
+   HBITMAP    bmAndBack, bmAndObject, bmAndMem, bmSave;
+   HBITMAP    bmBackOld, bmObjectOld, bmMemOld, bmSaveOld;
+   HDC        hdcMem, hdcBack, hdcObject, hdcTemp, hdcSave;
+   POINT      ptSize;
+
+   hdcTemp = CreateCompatibleDC(hdc);
+   SelectObject(hdcTemp, hBitmap);   // Выбираем битмап
+
+   GetObject(hBitmap, sizeof(BITMAP), (LPSTR)&amp;bm);
+   ptSize.x = bm.bmWidth;            // Получаем ширину битмапа
+   ptSize.y = bm.bmHeight;           // Получаем высоту битмапа
+   DPtoLP(hdcTemp, &amp;ptSize, 1);      // Конвертируем из координат
+                                     // устройства в логические
+                                     // точки
+
+   // Создаём несколько DC для хранения временных данных.
+   hdcBack   = CreateCompatibleDC(hdc);
+   hdcObject = CreateCompatibleDC(hdc);
+   hdcMem    = CreateCompatibleDC(hdc);
+   hdcSave   = CreateCompatibleDC(hdc);
+
+   // Создаём битмап для каждого DC.
+
+   // Монохромный DC
+   bmAndBack   = CreateBitmap(ptSize.x, ptSize.y, 1, 1, NULL);
+
+   // Монохромный DC
+   bmAndObject = CreateBitmap(ptSize.x, ptSize.y, 1, 1, NULL);
+
+   bmAndMem    = CreateCompatibleBitmap(hdc, ptSize.x, ptSize.y);
+   bmSave      = CreateCompatibleBitmap(hdc, ptSize.x, ptSize.y);
+
+   // В каждом DC должен быть выбран объект битмапа для хранения
+   // пикселей.
+   bmBackOld   = SelectObject(hdcBack, bmAndBack);
+   bmObjectOld = SelectObject(hdcObject, bmAndObject);
+   bmMemOld    = SelectObject(hdcMem, bmAndMem);
+   bmSaveOld   = SelectObject(hdcSave, bmSave);
+
+   // Устанавливаем режим маппинга.
+   SetMapMode(hdcTemp, GetMapMode(hdc));
+
+   // Сохраняем битмап, переданный в параметре функции, так как
+   // он будет изменён.
+   BitBlt(hdcSave, 0, 0, ptSize.x, ptSize.y, hdcTemp, 0, 0, SRCCOPY);
+
+   // Устанавливаем фоновый цвет (в исходном DC) тех частей,
+   // которые будут прозрачными.
+   cColor = SetBkColor(hdcTemp, cTransparentColor);
+
+   // Создаём маску для битмапа путём вызова BitBlt из исходного
+   // битмапа на монохромный битмап.
+   BitBlt(hdcObject, 0, 0, ptSize.x, ptSize.y, hdcTemp, 0, 0,
+          SRCCOPY);
+
+   // Устанавливаем фоновый цвет исходного DC обратно в
+   // оригинальный цвет.
+   SetBkColor(hdcTemp, cColor);
+
+   // Создаём инверсию маски.
+   BitBlt(hdcBack, 0, 0, ptSize.x, ptSize.y, hdcObject, 0, 0,
+          NOTSRCCOPY);
+
+   // Копируем фон главного DC в конечный.
+   BitBlt(hdcMem, 0, 0, ptSize.x, ptSize.y, hdc, xStart, yStart,
+          SRCCOPY);
+
+   // Накладываем маску на те места, где будет помещён битмап.
+   BitBlt(hdcMem, 0, 0, ptSize.x, ptSize.y, hdcObject, 0, 0, SRCAND);
+
+   // Накладываем маску на прозрачные пиксели битмапа.
+   BitBlt(hdcTemp, 0, 0, ptSize.x, ptSize.y, hdcBack, 0, 0, SRCAND);
+
+   // XOR-им битмап с фоном на конечном DC.
+   BitBlt(hdcMem, 0, 0, ptSize.x, ptSize.y, hdcTemp, 0, 0, SRCPAINT);
+
+   // Копируем на экран.
+   BitBlt(hdc, xStart, yStart, ptSize.x, ptSize.y, hdcMem, 0, 0,
+          SRCCOPY);
+
+   // Помещаем оригинальный битмап обратно в битмап, переданный в
+   // параметре функции.
+   BitBlt(hdcTemp, 0, 0, ptSize.x, ptSize.y, hdcSave, 0, 0, SRCCOPY);
+
+   // Удаляем битмапы из памяти.
+   DeleteObject(SelectObject(hdcBack, bmBackOld));
+   DeleteObject(SelectObject(hdcObject, bmObjectOld));
+   DeleteObject(SelectObject(hdcMem, bmMemOld));
+   DeleteObject(SelectObject(hdcSave, bmSaveOld));
+
+   // Удаляем DC из памяти.
+   DeleteDC(hdcMem);
+   DeleteDC(hdcBack);
+   DeleteDC(hdcObject);
+   DeleteDC(hdcSave);
+   DeleteDC(hdcTemp);
+   }</pre>
+    <p>Следующий пример показывает как вызывать
+    приведённую выше функцию <strong>DrawTransparentBitmap</strong>:</p>
+    <pre>   DrawTransparentBitmap(hdc,         // Конечный DC.
+
+                         hBitmap,     // Битмап, который будет нарисован.
+                         xPos,        // координата X.
+                         yPos,        // координата Y.
+                         0x00FFFFFF); // Цвет для прозрачных
+                                      // пикселей (в данном случае
+                                      // белый).</pre>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

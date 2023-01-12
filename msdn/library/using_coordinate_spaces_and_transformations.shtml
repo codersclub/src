@@ -1,0 +1,166 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Трансформация графики и работа с координатной плоскостью.</h3>
+    <p>Ниже приведён пример, который демонстрирует
+    решение следующих задач:<ul>
+      <li>Рисование графики с использованием
+        предварительно заданных значений.</li>
+      <li>Центрирование графики в клиентской области
+        приложения.</li>
+      <li>Масштабирование графики в половину
+        изначального значения.</li>
+      <li>Сдвиг на 3/4 дюйма вправо.</li>
+      <li>Поворот на 30 градусов.</li>
+      <li>Искривление по оси x.</li>
+      <li>Отражение от мнимой горизонтальной оси,
+        проведённой через центральную точку.</li>
+    </ul>
+    <p><b>Пример:</b></p>
+    <pre>void TransformAndDraw(int iTransform, HWND hWnd) 
+{
+    HDC hDC;
+    XFORM xForm;
+    RECT rect;
+
+    // Получаем дескриптор DC для окна приложения.
+
+    hDC = GetDC(hWnd);
+
+    // Устанавливаем режим маппинга в LOENGLISH. Тем самым, клиентская
+    // область перемещается из верхнего левого угла окна в нижний
+    // левый угол (так же происходит переориентация оси y,
+    // чтобы операции рисования происходили в декартовой системе
+    // координат). При этом гарантируется переносимость и сохранение
+    // размерности рисуемого объекта на любом дисплее.
+
+    SetGraphicsMode(hDC, GM_ADVANCED);
+    SetMapMode(hDC, MM_LOENGLISH);
+
+    // Устанавливаем соответствующие преобразования (основанные на
+    // выборе пользователя в меню).
+
+    switch (iTransform)
+    {
+        case SCALE:        // Масштабируем в половину начального размера
+            xForm.eM11 = (FLOAT) 0.5;
+            xForm.eM12 = (FLOAT) 0.0;
+            xForm.eM21 = (FLOAT) 0.0;
+            xForm.eM22 = (FLOAT) 0.5;
+            xForm.eDx  = (FLOAT) 0.0;
+            xForm.eDy  = (FLOAT) 0.0;
+            SetWorldTransform(hDC, &amp;xForm);
+            break;
+
+        case TRANSLATE:   // Сдвиг на 3/4 дюйма вправо.
+            xForm.eM11 = (FLOAT) 1.0;
+            xForm.eM12 = (FLOAT) 0.0;
+            xForm.eM21 = (FLOAT) 0.0;
+            xForm.eM22 = (FLOAT) 1.0;
+            xForm.eDx  = (FLOAT) 75.0;
+            xForm.eDy  = (FLOAT) 0.0;
+            SetWorldTransform(hDC, &amp;xForm);
+            break;
+
+        case ROTATE:      // Поворот на 30 градусов против часовой стрелки
+            xForm.eM11 = (FLOAT) 0.8660;
+            xForm.eM12 = (FLOAT) 0.5000;
+            xForm.eM21 = (FLOAT) -0.5000;
+            xForm.eM22 = (FLOAT) 0.8660;
+            xForm.eDx  = (FLOAT) 0.0;
+            xForm.eDy  = (FLOAT) 0.0;
+            SetWorldTransform(hDC, &amp;xForm);
+            break;
+
+        case SHEAR:       // Искривляем по оси x коэффициентом
+                          // пропорциональности 1.0.
+            xForm.eM11 = (FLOAT) 1.0;
+            xForm.eM12 = (FLOAT) 1.0;
+            xForm.eM21 = (FLOAT) 0.0;
+            xForm.eM22 = (FLOAT) 1.0;
+            xForm.eDx  = (FLOAT) 0.0;
+            xForm.eDy  = (FLOAT) 0.0;
+            SetWorldTransform(hDC, &amp;xForm);
+            break;
+
+        case REFLECT:     // Отражение по горизонтальной оси
+            xForm.eM11 = (FLOAT) 1.0;
+            xForm.eM12 = (FLOAT) 0.0;
+            xForm.eM21 = (FLOAT) 0.0;
+            xForm.eM22 = (FLOAT) -1.0;
+            xForm.eDx  = (FLOAT) 0.0;
+            xForm.eDy  = (FLOAT) 0.0;
+            SetWorldTransform(hDC, &amp;xForm);
+            break;
+
+        case NORMAL:      // Устанавливаем значения преобразования.
+            xForm.eM11 = (FLOAT) 1.0;
+            xForm.eM12 = (FLOAT) 0.0;
+            xForm.eM21 = (FLOAT) 0.0;
+            xForm.eM22 = (FLOAT) 1.0;
+            xForm.eDx  = (FLOAT) 0.0;
+            xForm.eDy  = (FLOAT) 0.0;
+            SetWorldTransform(hDC, &amp;xForm);
+            break;
+
+    }
+
+    // Ищем центральную точку клиентской области.
+ 
+    GetClientRect(hWnd, (LPRECT) &amp;rect);
+    DPtoLP(hDC, (LPPOINT) &amp;rect, 2);
+
+    // Выбираем кисть.
+
+    SelectObject(hDC, GetStockObject(HOLLOW_BRUSH));
+
+    // Рисуем внешний круг.
+
+    Ellipse(hDC, (rect.right / 2 - 100), (rect.bottom / 2 + 100),
+        (rect.right / 2 + 100), (rect.bottom / 2 - 100));
+
+    // Рисуем внутренний круг.
+
+    Ellipse(hDC, (rect.right / 2 -94), (rect.bottom / 2 + 94),
+        (rect.right / 2 + 94), (rect.bottom / 2 - 94));
+
+    // Рисуем ключ.
+
+    Rectangle(hDC, (rect.right / 2 - 13), (rect.bottom / 2 + 113),
+        (rect.right / 2 + 13), (rect.bottom / 2 + 50));
+    Rectangle(hDC, (rect.right / 2 - 13), (rect.bottom / 2 + 96),
+        (rect.right / 2 + 13), (rect.bottom / 2 + 50));
+
+    // Рисуем горизонтальные линии.
+
+    MoveToEx(hDC, (rect.right/2 - 150), (rect.bottom / 2 + 0), NULL);
+    LineTo(hDC, (rect.right / 2 - 16), (rect.bottom / 2 + 0));
+
+    MoveToEx(hDC, (rect.right / 2 - 13), (rect.bottom / 2 + 0), NULL);
+    LineTo(hDC, (rect.right / 2 + 13), (rect.bottom / 2 + 0));
+
+    MoveToEx(hDC, (rect.right / 2 + 16), (rect.bottom / 2 + 0), NULL);
+    LineTo(hDC, (rect.right / 2 + 150), (rect.bottom / 2 + 0));
+
+    // Рисуем вертикальные линии.
+
+    MoveToEx(hDC, (rect.right/2 + 0), (rect.bottom / 2 - 150), NULL);
+    LineTo(hDC, (rect.right / 2 + 0), (rect.bottom / 2 - 16));
+
+    MoveToEx(hDC, (rect.right / 2 + 0), (rect.bottom / 2 - 13), NULL);
+    LineTo(hDC, (rect.right / 2 + 0), (rect.bottom / 2 + 13));
+
+    MoveToEx(hDC, (rect.right / 2 + 0), (rect.bottom / 2 + 16), NULL);
+    LineTo(hDC, (rect.right / 2 + 0), (rect.bottom / 2 + 150));
+
+    ReleaseDC(hWnd, hDC);
+}</pre>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

@@ -1,0 +1,250 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как программно залогиниться в сеть под Win95/Win98</h3>
+    <p>В Windows 95 или Windows 98 чтобы залогиниться в сеть
+    программы могут вызывать 16-битный LAN Менеджер API
+    NetWkstaSetUID2().</p>
+    <p>Когда пользователь нажимает кнопку Cancel или
+    клавишу ESC в диалоговом окне ввода пароля для
+    входа в сеть Microsoft, то система позволяет
+    пользователю войти как неавторизованному
+    пользователю. Это позволяет проводить различную
+    локальную работу без возможности доступа к сети.
+    Чтобы получить доступ к сети, пользователю
+    необходимо завершить сеанс и залогиниться
+    заново через диалог ввода сетевого пароля.<br>
+    <br>
+    Чтобы не заставлять пользователя завершать
+    сеанс и логиниться по-новой, доступ к сети можно
+    получить при помощи функции NetWkstaSetUID2(). Функцию
+    NetWkstaSetUID2() можно импортировать из NetAPI.lib, которая
+    доступна в Windows for Workgroups SDK. Эту 16-битную функцию
+    можно вызывать только из 16-битных приложений.
+    Чтобы вызвать эту функцию из 32-битных приложений,
+    ознакомьтесь со следующей статьёй из Microsoft Knowledge
+    Base: </p>
+    <blockquote>
+      <b><a href="q155763.shtml"><p>Q155763</a></b> Как вызывать 16-битный
+      код из 32-битного под Windows 95</p>
+    </blockquote>
+    <b><p></b>&nbsp;</p>
+    <p><b>ЗАМЕЧАНИЕ:</b> Windows for Workgroups SDK больше не
+    поддерживается Microsoft</p>
+    <p>NetWkstaSetUID2() больше не используется для
+    авторизации полномочий пользователя. Функция
+    позволяет осуществить полный вход в сеть,
+    модифицируя состояние системы. Информацию об
+    авторизации можно найти в следующей статье из
+    Microsoft Knowledge Base:</p>
+    <blockquote>
+      <b><a href="q180548.shtml"><p>Q180548</a></b> Как программно
+      осуществить вход в сеть в WinNT и Win95</p>
+    </blockquote>
+    <p>&nbsp;</p>
+    <p>В Windows 95, после вызова NetWkstaSetUID2() для входа в сеть,
+    необходимо для завершения сеанса опять вызвать
+    NetWkStaSetUID2() до того, как система завершит сеанс
+    локально. Чтобы сделать это, процесс, вызывающий
+    NetWkstaSetUID2() может создать окно верхнего уровня,
+    которое будет оставаться резидентным на
+    протяжении всего сеанса. Когда пользователь
+    завершает сеанс, система посылает сообщение
+    WM_ENDSESSION всем окнам верхнего уровня. Приняв
+    сообщение WM_ENDSESSION, процесс должен вызвать
+    NetWkstaSetUID2(), чтобы разлогинится из сети. Это будет
+    означать, что пользователь разлогинился из сети
+    до того, как система завершила сеанс локально. В
+    Windows 98эта процедура необязательна.<br>
+    <br>
+    Следующий код демонстрирует использование
+    NetWkstaSetUID2() для входа в сеть и выхода из сети в Windows
+    95 и Windows 98. Это 16-битное приложение Windows, которое
+    должно быть откомпилировано в 16-битном
+    компиляторе: </p>
+    <pre class="CODESAMP">/*++
+
+      Copyright (c) 1998  Microsoft Corporation
+
+      Module Name:
+
+         Logon.c
+
+      Description:
+
+         Demonstrates use of NetWkStaSetUID2 API to log on and
+       log off of Windows 95 or Windows 98
+
+         Следующую библиотеку необходимо импортировать:
+         NetAPI.lib
+
+   --*/ 
+   #define INCL_NETWKSTA
+   #define INCL_NETERRORS
+
+   #include &lt;windows.h&gt;
+   #include &lt;lan.h&gt;
+   #include &lt;stdio.h&gt;
+   #include &lt;stdlib.h&gt;
+   #include &lt;ctype.h&gt;
+ 
+   #define BUFFSIZE 1000
+ 
+   char buffer[BUFFSIZE];
+
+
+   void Usage()
+   {
+      MessageBox(NULL,&quot;Usage: Logon &lt;UserName&gt; &lt;Domain&gt; &lt;password&gt;&quot;,
+                                                    &quot;Input Error&quot;,MB_OK);
+   
+      exit(1);
+   }
+
+   void FatalMessage(LPSTR szMessage)
+   {
+      MessageBox(NULL,szMessage,&quot;Error&quot;,MB_OK);
+      exit(1);
+   }
+
+   int PASCAL WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+                   LPSTR lpszCmdLine, int nCmdShow)    
+   {
+      char     lpszNewCmdLine[256];
+      char     szMsg[512];
+      char far *  lpszdomain;
+      char far *  lpszusername;
+      char far *  lpszpass;
+      char far *  argv[3];
+      int      i = 0;
+      int      argc = 1;
+      int      res  = 0;
+      unsigned short ta;
+      struct user_logon_info_1  *pUsrLogon  
+                           = (struct user_logon_info_1 *)  &amp;buffer;
+      struct user_logoff_info_1 *pUsrLogoff
+                           = (struct user_logoff_info_1 *) &amp;buffer;
+   
+
+      // Скопируйте командную строку в строковую переменную, а затем
+      // преобразуйте символы новой строки к верхнему регистру.
+      // Для NetWkStaSetUID2 необходимо, чтобы имя пользователя,
+      // пароль, и домен были заглавными буквами. Но это не значит,
+      // что пароли Windows NT должны быть только заглавными символами.
+      // Windows NT domains that support LAN Manager logons
+      // maintain a separate uppercase version of the Windows NT password 
+      // for logging on from Windows 3.x, Windows 95, and Windows 98 
+      // machines.
+   
+      lstrcpy(lpszNewCmdLine,lpszCmdLine);
+   
+      while (TRUE)
+      { 
+         if (lpszNewCmdLine[i] == '\0')
+            break;
+
+         lpszNewCmdLine[i] = (char)toupper(lpszNewCmdLine[i]);
+         i++;
+      }
+
+
+      // Устанавливаем указатели argv: argv[0] это первый параметр,
+      // так как имя .exe не находится в lpszCmdline.
+   
+      argv[0] = (char far *)lpszNewCmdLine;
+               
+      for (i=1;i&gt;0;i++)
+      {   
+         if (lpszNewCmdLine[i] == '\0')
+         break;
+         if (lpszNewCmdLine[i] == ' ')
+         { 
+             lpszNewCmdLine[i] = '\0';
+             // Предыдущий argc является индексом для нового argv;
+             // поэтому используем его, а затем включаем его.
+            argv[argc++] = (char far *) &amp;(lpszNewCmdLine[i+1]);
+            if (argc &gt; 3)
+               Usage();
+         }   
+      }
+
+      if (argc != 3) Usage();
+   
+      lpszusername = argv[0];
+      lpszdomain = argv[1];
+      lpszpass = argv[2];
+
+   
+      res=NetWkstaSetUID2((char far *)NULL,
+                     (char far *)lpszdomain,
+                     (char far *)lpszusername,
+                     (char far *)lpszpass,
+                     (char far *)&quot;&quot;,
+                     0,
+                     1,
+                     (char far *) buffer,
+                     sizeof(buffer),
+                     (unsigned short far *) &amp;ta);
+               
+      if((res != NERR_Success) &amp;&amp; 
+         (res != NERR_UnableToAddName_W))
+      {
+         NetWkstaSetUID2(NULL, NULL, NULL, NULL, NULL, 3, 1,
+                         (char far *) &amp;buffer, sizeof(buffer), &amp;ta);
+         wsprintf(szMsg,&quot;Logon Error: %u&quot;, res);
+           FatalMessage(szMsg);
+      }
+   
+      else
+      {
+         switch(pUsrLogon-&gt;usrlog1_code)
+         {
+         case NERR_Success:
+            wsprintf( (LPSTR)szMsg,&quot;Logon successful. Return code: %u\n&quot;
+                              &quot;Press Ok to logoff&quot;,
+                                       pUsrLogon-&gt;usrlog1_code);
+            MessageBox(NULL, szMsg, &quot;Success&quot;, MB_OK);  
+            break;
+         default:
+            /* See NETERR.H for details on return codes */  
+            NetWkstaSetUID2(NULL, NULL, NULL, NULL, NULL, 3, 1,
+                            (char far *) &amp;buffer, sizeof(buffer), &amp;ta);
+            wsprintf(szMsg, &quot;Logon Error. Return code: %u\n&quot;, res);
+            FatalMessage(szMsg);
+         }
+      } 
+
+      res = NetWkstaSetUID2(NULL, NULL, NULL, NULL, NULL, 3, 1,
+                            (char far *) &amp;buffer, sizeof(buffer), &amp;ta);
+      if((res != NERR_Success) &amp;&amp; (res != NERR_UnableToDelName_W))
+      {
+         wsprintf(szMsg,&quot;Error on logoff: %u\n&quot;, res);
+         FatalMessage(szMsg);
+      }
+      else
+      {
+         wsprintf(szMsg, &quot;Logoff successful.\n&quot;);
+         MessageBox(NULL, szMsg, &quot;Success&quot;, MB_OK);
+      }
+      return 0;
+   } </pre>
+    <p>&nbsp;</p>
+    <p><br>
+    </p>
+    <p>Для получения дополнительной информации,
+    ознакомьтесь со следующей статьёй из Microsoft Knowledge
+    Base:</p>
+    <blockquote>
+      <b><a class="LINK" href="http://support.microsoft.com/support/kb/articles/Q155/7/63.ASP"><p></a><a
+      href="q155763.shtml">Q155763</a></b> Как вызывать 16-битный код из
+      32-битного под Windows 95</p>
+    </blockquote>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

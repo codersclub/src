@@ -1,0 +1,128 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Запуск сервиса.</h3>
+    <p>Ниже представлен пример, который для запуска
+    сервиса открывает дескриптор сервиса из базы
+    сервисов, а затем передаёт его в функцию <a
+    href="startservice.shtml"><b>StartService</b></a>.
+    После запуска сервиса, пример использует
+    структуру <a
+    href="http://msdn.microsoft.com/library/en-us/dllproc/base/service_status_str.asp"><b>SERVICE_STATUS</b></a>,
+    возвращаемую функцией <a
+    href="http://msdn.microsoft.com/library/en-us/dllproc/base/queryservicestatus.asp"><b>QueryServiceStatus</b></a>,
+    чтобы получить состояние сервиса.</p>
+    <p>&nbsp;</p>
+    <pre>DWORD StartSampleService()
+{
+    SERVICE_STATUS ssStatus;
+    DWORD dwOldCheckPoint;
+    DWORD dwStartTickCount;
+    DWORD dwWaitTime;
+    DWORD dwStatus;
+
+    schService = OpenService(
+        schSCManager,          // база сервисов SCM
+        &quot;Sample_Srv&quot;,          // имя сервиса
+        SERVICE_ALL_ACCESS);
+
+    if (schService == NULL)
+    {
+        MyErrorExit(&quot;OpenService&quot;);
+    }
+
+    if (!StartService(
+            schService,  // дескриптор сервиса
+            0,           // количество аргументов
+            NULL) )      // нет аргументов
+    {
+        MyErrorExit(&quot;StartService&quot;);
+    }
+    else
+    {
+        printf(&quot;Service start pending.\n&quot;);
+    }
+
+    // Проверяем состояние сервиса до тех пор, пока он не запустится.
+
+    if (!QueryServiceStatus(
+            schService,   // дескриптор сервиса
+            &amp;ssStatus) )  // адрес структуры с информацией о сервисе
+    {
+        MyErrorExit(&quot;QueryServiceStatus&quot;);
+    }
+
+    // Сохраняем счётчик тиков и начальную точку.
+
+    dwStartTickCount = GetTickCount();
+    dwOldCheckPoint = ssStatus.dwCheckPoint;
+
+    while (ssStatus.dwCurrentState == SERVICE_START_PENDING)
+    {
+        // Не нужно ожидать дольше, чем приблизительное время,
+        // необходимое для старта. Обычно ожидать лучше всего одну
+        // десятую этого значения, но не более одно секунды
+        // и никак не более 10 секунд.
+
+        dwWaitTime = ssStatus.dwWaitHint / 10;
+
+        if( dwWaitTime &lt; 1000 )
+            dwWaitTime = 1000;
+        else if ( dwWaitTime &gt; 10000 )
+            dwWaitTime = 10000;
+
+        Sleep( dwWaitTime );
+
+        // Снова проверяем статус.
+
+        if (!QueryServiceStatus(
+                schService,   // дескриптор сервиса
+                &amp;ssStatus) )  // адрес структуры
+            break;
+
+        if ( ssStatus.dwCheckPoint &gt; dwOldCheckPoint )
+        {
+            // Сервис в процесса старта.
+
+            dwStartTickCount = GetTickCount():
+            dwOldCheckPoint = ssStatus.dwCheckPoint;
+        }
+        else
+        {
+            if(GetTickCount()-dwStartTickCount &gt; ssStatus.dwWaitHint)
+            {
+                // Время до старта не изменилось
+                break;
+            }
+        }
+    }
+
+    if (ssStatus.dwCurrentState == SERVICE_RUNNING)
+    {
+        printf(&quot;StartService SUCCESS.\n&quot;);
+        dwStatus = NO_ERROR;
+    }
+    else
+    {
+        printf(&quot;\nСервис на запущен. \n&quot;);
+        printf(&quot;  Current State: %d\n&quot;, ssStatus.dwCurrentState);
+        printf(&quot;  Exit Code: %d\n&quot;, ssStatus.dwWin32ExitCode);
+        printf(&quot;  Service Specific Exit Code: %d\n&quot;,
+            ssStatus.dwServiceSpecificExitCode);
+        printf(&quot;  Check Point: %d\n&quot;, ssStatus.dwCheckPoint);
+        printf(&quot;  Wait Hint: %d\n&quot;, ssStatus.dwWaitHint);
+        dwStatus = GetLastError();
+    }
+
+    CloseServiceHandle(schService);
+    return dwStatus;
+}</pre>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

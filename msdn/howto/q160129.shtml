@@ -1,0 +1,178 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как узнать состояние принтера, а так же заданий
+    на принтере.</h3>
+    <p>Следующий пример демонстрирует, как
+    использовать функцию <strong>EnumJobs</strong> для
+    получения структуры <strong>JOB_INFO</strong> и как
+    использовать функцию <strong>GetPrinter</strong> для
+    получения структуры <strong>PRINTER_INFO</strong>:</p>
+    <h3>Пример</h3>
+    <pre>   BOOL GetJobs(HANDLE hPrinter,      /* Дескриптор принтера. */
+        JOB_INFO_2 **ppJobInfo, /* Указатель который будем заполнять.*/ 
+        int *pcJobs,            /* Счётчик заданий. */ 
+        DWORD *pStatus)         /* Состояние очереди печати.*/ 
+
+   {
+
+   DWORD               cByteNeeded,
+                        nReturned,
+                        cByteUsed;
+    JOB_INFO_2          *pJobStorage = NULL;
+    PRINTER_INFO_2       *pPrinterInfo = NULL;
+
+   /* Получаем необходимый размер буфера. */ 
+       if (!GetPrinter(hPrinter, 2, NULL, 0, &amp;cByteNeeded))
+       {
+           if (GetLastError() != ERROR_INSUFFICIENT_BUFFER)
+               return FALSE;
+       }
+
+       pPrinterInfo = (PRINTER_INFO_2 *)malloc(cByteNeeded);
+       if (!(pPrinterInfo))
+           /* Ошибка выделения памяти. */ 
+           return FALSE;
+
+       /* Получаем информацию о принтере. */ 
+       if (!GetPrinter(hPrinter,
+               2,
+               (LPSTR)pPrinterInfo,
+               cByteNeeded,
+               &amp;cByteUsed))
+       {
+           /* Ошибка доступа к принтеру. */ 
+           free(pPrinterInfo);
+           pPrinterInfo = NULL;
+           return FALSE;
+       }
+
+       /* Получаем необходимы размер для заданий. */ 
+       if (!EnumJobs(hPrinter,
+               0,
+               pPrinterInfo-&gt;cJobs,
+               2,
+               NULL,
+               0,
+               (LPDWORD)&amp;cByteNeeded,
+               (LPDWORD)&amp;nReturned))
+       {
+           if (GetLastError() != ERROR_INSUFFICIENT_BUFFER)
+           {
+               free(pPrinterInfo);
+               pPrinterInfo = NULL;
+               return FALSE;
+           }
+       }
+
+       pJobStorage = (JOB_INFO_2 *)malloc(cByteNeeded);
+       if (!pJobStorage)
+       {
+           /* Ошибка выделения памяти для информации о заданиях. */ 
+           free(pPrinterInfo);
+           pPrinterInfo = NULL;
+           return FALSE;
+       }
+
+       ZeroMemory(pJobStorage, cByteNeeded);
+
+       /* Получаем список заданий. */ 
+       if (!EnumJobs(hPrinter,
+               0,
+               pPrinterInfo-&gt;cJobs,
+               2,
+               (LPBYTE)pJobStorage,
+               cByteNeeded,
+               (LPDWORD)&amp;cByteUsed,
+               (LPDWORD)&amp;nReturned))
+       {
+           free(pPrinterInfo);
+           free(pJobStorage);
+           pJobStorage = NULL;
+           pPrinterInfo = NULL;
+           return FALSE;
+       }
+
+       /*
+        *  Возвращаем информацию.
+        */ 
+       *pcJobs = nReturned;
+       *pStatus = pPrinterInfo-&gt;Status;
+       *ppJobInfo = pJobStorage;
+       free(pPrinterInfo);
+
+       return TRUE;
+
+   }
+
+   BOOL IsPrinterError(HANDLE hPrinter)
+   {
+
+       JOB_INFO_2  *pJobs;
+       int         cJobs,
+                   i;
+       DWORD       dwPrinterStatus;
+
+       /*
+        *  Получаем информацию о состоянии очереди принтера и
+        *  заданиях в очереди принтера.
+        */ 
+       if (!GetJobs(hPrinter, &amp;pJobs, &amp;cJobs, &amp;dwPrinterStatus))
+           return FALSE;
+
+       /*
+        *  Если на принтере ошибка, то возвращаем ошибку.
+        */ 
+       if (dwPrinterStatus &amp;
+           (PRINTER_STATUS_ERROR |
+           PRINTER_STATUS_PAPER_JAM |
+           PRINTER_STATUS_PAPER_OUT |
+           PRINTER_STATUS_PAPER_PROBLEM |
+           PRINTER_STATUS_OUTPUT_BIN_FULL |
+           PRINTER_STATUS_NOT_AVAILABLE |
+           PRINTER_STATUS_NO_TONER |
+           PRINTER_STATUS_OUT_OF_MEMORY |
+           PRINTER_STATUS_OFFLINE |
+           PRINTER_STATUS_DOOR_OPEN))
+       {
+           return TRUE;
+       }
+
+       /*
+        *  Находим задание в очереди, которое печатается.
+        */ 
+       for (i=0; i &lt; cJobs; i++)
+       {
+           if (pJobs[i].Status &amp; JOB_STATUS_PRINTING)
+           {
+               /*
+                *  Если задание в состоянии ошибки,
+                *  то возвращаем ошибку.
+                */ 
+               if (pJobs[i].Status &amp;
+                   (JOB_STATUS_ERROR |
+                   JOB_STATUS_OFFLINE |
+                   JOB_STATUS_PAPEROUT |
+                   JOB_STATUS_BLOCKED_DEVQ))
+               {
+                   return TRUE;
+               }
+           }
+       }
+
+       /*
+        *  Ошибок на принтере нет.
+        */ 
+       return FALSE;
+
+   }</pre>
+    <p>&nbsp;</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

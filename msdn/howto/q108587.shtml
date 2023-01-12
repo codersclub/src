@@ -1,0 +1,154 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как получить текущий CDocument или CView из любого
+    места программы</h3>
+    <p>В приложениях MFC очень часто бывает необходимо
+    получить указатель на активный документ или Вид
+    из любого места программы. Например, иногда
+    полезно иметь доступ к документу из диалогового
+    окна. В данной статье обсуждаются простейшие
+    методы того, как это сделать используя связи
+    между объектами MFC и основной архитектурой MFC.</p>
+    <p>Как уже упоминалось, один из случаев, когда
+    может потребоваться указатель на текущий
+    активный Вид или документ, это модальное или
+    немодальное диалоговое окно. Вообще-то,
+    диалоговое окно должно быть создано классом Вида,
+    так Вид имеет прямое отношение к
+    пользовательскому интерфесу приложения.<br>
+    <br>
+    Так как класс Вид создаёт диалоговое окно, то он
+    может передать диалоговому окну указатель на
+    самого себя либо на активный документ [полученный
+    функцией GetActiveDocument()]. Это можно сделать через
+    конструктор диалога либо через другую функцию-член.
+    Для модальных диалогов, Вид также может помещать
+    данные из диалогового окна в документ когда DoModal()
+    возвращает управление.<br>
+    <br>
+    Чтобы получить указатель на текущий активный
+    документ из любого места программы, добавьте
+    статическую функцию-член в Ваш класс,
+    наследованный от CDocument как показано ниже:<br>
+    <br>
+    В заголовочном файле документа, добавляем
+    статическую функцию GetDoc():</p>
+    <pre class="CODESAMP">   // Заголовочный файл документа
+   class CMyDoc : public CDocument
+   {
+      ...
+      public:
+      static CMyDoc * GetDoc();
+      ...
+   }; </pre>
+    <p>Для однодокументного приложения (SDI), добавляем
+    следующий код функции CMyDoc::GetDoc():</p>
+    <pre class="CODESAMP">   // файл исходника SDI документа
+   CMyDoc * CMyDoc::GetDoc()
+   {
+      CFrameWnd * pFrame = (CFrameWnd *)(AfxGetApp()-&gt;m_pMainWnd);
+      return (CMyDoc *) pFrame-&gt;GetActiveDocument();
+   } </pre>
+    <p>Для многодокументного приложения (MDI), код
+    функции CMyDoc::GetDoc() будет выглядеть следующим
+    образом:</p>
+    <pre class="CODESAMP">   CMyDoc * CMyDoc::GetDoc()
+   {
+      CMDIChildWnd * pChild =
+          ((CMDIFrameWnd*)(AfxGetApp()-&gt;m_pMainWnd))-&gt;MDIGetActive();
+
+      if ( !pChild )
+          return NULL;
+
+      CDocument * pDoc = pChild-&gt;GetActiveDocument();
+
+      if ( !pDoc )
+         return NULL;
+
+      // Ошибка, если документ неправильного типа
+      if ( ! pDoc-&gt;IsKindOf( RUNTIME_CLASS(CMyDoc) ) )
+         return NULL;
+
+      return (CMyDoc *) pDoc;
+   } </pre>
+    <p>Чтобы получить указатель на текущий активный
+    Вид из любого места программы, добавьте
+    статическую функцию-член в Ваш класс,
+    наследованный от CView как показано ниже:<br>
+    <br>
+    В заголовочном файле Вида добавляем статическую
+    функцию GetView():</p>
+    <pre class="CODESAMP">   // Заголовочный файл Вида
+   class CMyView
+   {
+      ...
+      public:
+      static CMyView * GetView();
+      ...
+   }; </pre>
+    <p>Для SDI приложения тело функции CMyView::GetView() будет
+    выглядеть следующим образом:</p>
+    <pre class="CODESAMP">   // View implementation file
+   CMyView * CMyView::GetView()
+   {
+      CFrameWnd * pFrame = (CFrameWnd *)(AfxGetApp()-&gt;m_pMainWnd);
+
+      CView * pView = pFrame-&gt;GetActiveView();
+
+      if ( !pView )
+         return NULL;
+
+      // Ошибка, если Вид неправильного типа
+      // (это может случиться с окнами разделителями (splitter windows),
+      // либо с дополнительными Видами в одном документе
+      if ( ! pView-&gt;IsKindOf( RUNTIME_CLASS(CMyView) ) )
+         return NULL;
+
+      return (CMyView *) pView;
+   } </pre>
+    <p>Для многодокументного приложения (MDI), код
+    функции CMyView::GetView() будет выглядеть следующим
+    образом:</p>
+    <pre class="CODESAMP">   // MDI view implementation file
+   CMyView * CMyView::GetView()
+   {
+      CMDIChildWnd * pChild =
+          ((CMDIFrameWnd*)(AfxGetApp()-&gt;m_pMainWnd))-&gt;MDIGetActive();
+
+      if ( !pChild )
+          return NULL;
+
+      CView * pView = pChild-&gt;GetActiveView();
+
+      if ( !pView )
+         return NULL;
+
+      // Ошибка, если Вид неправильного типа
+      if ( ! pView-&gt;IsKindOf( RUNTIME_CLASS(CMyView) ) )
+         return NULL;
+
+      return (CMyView *) pView;
+   } </pre>
+    <p>Теперь, из любого места Вашей программы где
+    включён заголовочный файл документа или Вида
+    можно вызвать:</p>
+    <pre class="CODESAMP">   CMyDoc::GetDoc(); </pre>
+    <blockquote>
+      <p>- Или - </p>
+    </blockquote>
+    <pre class="CODESAMP">   CMyView::GetView(); </pre>
+    <p>чтобы получить указатель на текущий активный
+    документ или Вид соответственно. Если нет
+    ниодного активного документа или Вида, то эти
+    функции вернут NULL. Получив такой указатель, Вы
+    можете обращаться к членам Вашего нового класса.</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

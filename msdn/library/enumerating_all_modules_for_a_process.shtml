@@ -1,0 +1,94 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Перечисление всех модулей для процесса</h3>
+    <p>Чтобы определить, каким процессом была
+    загружена определённая DLL, необходимо
+    перечислить модули для каждого процесса. Для
+    получения всех модулей для текущего процесса в
+    системе можно воспользоваться функцией <b>EnumProcessModules</b>.</p>
+    <p>&nbsp;</p>
+    <pre xml:space="preserve">#include &lt;windows.h&gt;
+#include &lt;stdio.h&gt;
+#include &quot;psapi.h&quot;
+
+void PrintModules( DWORD processID )
+{
+    HMODULE hMods[1024];
+    HANDLE hProcess;
+    DWORD cbNeeded;
+    unsigned int i;
+
+    // печатаем идентификатор процесса.
+
+    printf( &quot;\nProcess ID: %u\n&quot;, processID );
+
+    // Получаем список всех модулей в этом процессе.
+
+    hProcess = OpenProcess(  PROCESS_QUERY_INFORMATION |
+                                    PROCESS_VM_READ,
+                                    FALSE, processID );
+    if (NULL == hProcess)
+        return;
+
+    if( EnumProcessModules(hProcess, hMods, sizeof(hMods), &amp;cbNeeded))
+    {
+        for ( i = 0; i &lt; (cbNeeded / sizeof(HMODULE)); i++ )
+        {
+            char szModName[MAX_PATH];
+
+            // Получаем полный путь файла модуля.
+
+            if ( GetModuleFileNameEx( hProcess, hMods[i], szModName,
+                                      sizeof(szModName)))
+            {
+                // Печатаем имя модуля и значение его дескриптора.
+
+                printf(&quot;\t%s (0x%08X)\n&quot;, szModName, hMods[i] );
+            }
+        }
+    }
+
+    CloseHandle( hProcess );
+}
+
+void main( )
+{
+    // Пелучаем список идентификаторов процессов.
+
+    DWORD aProcesses[1024], cbNeeded, cProcesses;
+    unsigned int i;
+
+    if ( !EnumProcesses( aProcesses, sizeof(aProcesses), &amp;cbNeeded ) )
+        return;
+
+    // Вычисляем количество полученных идентификаторов процессов.
+
+    cProcesses = cbNeeded / sizeof(DWORD);
+
+    // Печатаем имена модулей для каждого процесса.
+
+    for ( i = 0; i &lt; cProcesses; i++ )
+        PrintModules( aProcesses[i] );
+}</pre>
+    <p>Основная функция получает список процессов при
+    помощи <b>EnumProcesses</b>. Для каждого процесса,
+    основная функция вызывает PrintModules, передавая в
+    неё идентификатор процесса. PrintModules в свою
+    очередь, для получения дескриптора процесса
+    вызывает <b>OpenProcess</b>. Если при выполнении <b>OpenProcess</b>
+    возникла ошибка, то выводится только
+    идентификатор процесса. В заключение, чтобы
+    получить имена модулей, PrintModules вызывает функцию <a
+    href="getmodulefilenameex.shtml"><b>GetModuleFileNameEx</b></a> для каждого
+    модуля.</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

@@ -1,0 +1,277 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h2>Как получать и обновлять текстовые поля в SQL
+    Server при помощи ADO</h2>
+    <p>В этой статье описывается механизм получения и
+    изменения больших текстовых полей (Binary Large
+    Objects/BLOBS) с использованием ActiveX Data Objects (ADO).
+    Делается это с участием методов <b>GetChunk </b>и <b>AppendChunk
+    </b>в поле RecordSet объекта ADODB.</p>
+    <h3>Пошаговое создание приложения</h3>
+    <ol>
+      <li>Открываем новый проект. Form1 создаётся
+        автоматически.<br>
+        <br>
+      </li>
+      <li>В меню <b>Project </b>кликните <b>References</b>, и выберите
+        Microsoft ActiveX Data Objects Library.<br>
+        <br>
+      </li>
+      <li>Добавьте новый стандартный модуль в Ваш проект,
+        и поместите в него следующий код:<br>
+        <br>
+        <pre class="kbcode">   Global cn As ADODB.Connection
+   Global cmd1 As ADODB.Command
+   Global rsset As ADODB.Recordset
+
+   Const BLOCKSIZE As Long = 4096
+
+   Public Sub ColumnToFile(Col As ADODB.Field, DiskFile As String)
+    'Получаем данные из базы данных и помещаем их во временный файл
+    'на жёстком диске.
+    'Размер блока определён в переменной BLOCKSIZE (4096).
+
+   Dim NumBlocks As Long  'Количество блоков.
+   Dim LeftOver As Long   '# символов оставшихся после последнего целого блока.
+   Dim strData As String
+   Dim DestFileNum As Long
+   Dim I As Long
+   Dim ColSize As Long
+
+   'Убеждаемся, что мы не в пустой записи (recordset).
+    If Not rsset.EOF And Not rsset.BOF Then
+    ColSize = Col.ActualSize
+
+   'Если filelength &gt; 0, то файл существует.
+   ' Очищаем его содержимое.
+    If Len(Dir$(DiskFile)) &gt; 0 Then
+      Kill DiskFile
+    End If
+
+    DestFileNum = FreeFile
+    Open DiskFile For Binary As DestFileNum
+    NumBlocks = ColSize \ BLOCKSIZE
+    LeftOver = ColSize Mod BLOCKSIZE
+
+    'Теперь записываем данные в файл блоками.
+     For I = 1 To NumBlocks
+     strData = String(BLOCKSIZE, 0)
+     strData = Col.GetChunk(BLOCKSIZE)
+     Put DestFileNum, , strData
+     Next I
+     strData = String(LeftOver, 0)
+     strData = Col.GetChunk(LeftOver)
+     Put DestFileNum, , strData
+
+     Close DestFileNum
+     End If
+      End Sub
+
+     Sub FileToColumn(Col As ADODB.Field, DiskFile As String)
+     'Берём данные из временного файла и записываем их в базу данных.
+
+       Dim strData As String
+       Dim NumBlocks As Long
+       Dim FileLength As Long
+       Dim LeftOver As Long
+       Dim SourceFile As Long
+       Dim I As Long
+
+       SourceFile = FreeFile
+       Open DiskFile For Binary Access Read As SourceFile
+       FileLength = LOF(SourceFile)
+       If FileLength = 0 Then
+        Close SourceFile
+        MsgBox DiskFile &amp; &quot; Empty or Not Found.&quot;
+       Else
+        NumBlocks = FileLength \ BLOCKSIZE
+        LeftOver = FileLength Mod BLOCKSIZE
+        Col.AppendChunk Null
+        strData = String(BLOCKSIZE, 0)
+        For I = 1 To NumBlocks
+         Get SourceFile, , strData
+         Col.AppendChunk strData
+        Next I
+        strData = String(LeftOver, 0)
+        Get SourceFile, , strData
+        Col.AppendChunk strData
+        rsset.Update
+        Close SourceFile
+       End If
+      End Sub
+
+      Public Sub FileToForm(DiskFile As String, SomeControl As Control)
+       'Получаем данные из временного файла и помещаем их в контрол.
+
+       Dim SourceFile As Long
+       Dim FileLength As Long
+       Dim strData As String
+
+       SourceFile = FreeFile
+       Open DiskFile For Binary Access Read As SourceFile
+       FileLength = LOF(SourceFile)
+       If FileLength = 0 Then
+        Close SourceFile
+        MsgBox DiskFile &amp; &quot; Empty or Not Found.&quot;
+       Else
+        strData = String(FileLength, 0)
+        Get SourceFile, , strData
+        SomeControl.Text = strData
+        Close SourceFile
+       End If
+      End Sub
+
+      Sub FormToFile(DiskFile As String, SomeControl As Control)
+       'Сохраняем данные из формы во временный файл на диске.
+
+       Dim DestinationFile As Long
+       Dim FileLength As Long
+       Dim strData As String
+
+       If Len(Dir$(DiskFile)) &gt; 0 Then
+        Kill DiskFile
+       End If
+       DestinationFile = FreeFile
+       Open DiskFile For Binary As DestinationFile
+       strData = SomeControl.Text
+       Put DestinationFile, , strData
+       Close DestinationFile
+      End S
+ub
+</pre>
+      </li>
+      <li>Подготовим форму Form1:<br>
+        <br>
+        <ol type="a">
+          <li>Добавьте элемент управления <b>RichTextBox</b>, и
+            установите его свойство <b>Name </b>в &quot;rtbText.&quot;<br>
+            <br>
+          </li>
+          <li>Добавьте элемент управления <b>CommandButton</b>, и
+            установите его свойство <b>Name </b>в &quot;cmdPrev&quot;, а
+            свойство <b>Caption </b>в &quot;Prev.&quot;<br>
+            <br>
+          </li>
+          <li>Добавьте элемент управления <b>CommandButton</b>, и
+            установите его свойство <b>Name </b>в &quot;cmdNext&quot;, а
+            свойство <b>Caption </b>в &quot;Next.&quot;<br>
+            <br>
+          </li>
+          <li>Добавьте элемент управления <b>CommandButton</b>, и
+            установите его свойство <b>Name </b>в &quot;cmdSave&quot;, а
+            свойство <b>Caption </b>в &quot;Update.&quot;<br>
+            <br>
+          </li>
+        </ol>
+      </li>
+      <li>Вставьте следующий код в форму:<br>
+        <br>
+        <pre class="kbcode">   Option Explicit
+
+   Dim DiskFile As String
+
+      Private Sub cmdNext_Click()
+       If (rsset.RecordCount &gt; 0) And (Not rsset.EOF) Then
+        rsset.MoveNext
+        If Not rsset.EOF Then
+         rtbText.Text = &quot;&quot;
+         ColumnToFile rsset.Fields(&quot;pr_info&quot;), DiskFile
+         FileToForm DiskFile, rtbText
+        Else
+         rsset.MoveLast
+        End If
+       End If
+      End Sub
+
+      Private Sub cmdPrev_Click()
+       If (rsset.RecordCount &gt; 0) And (Not rsset.BOF) Then
+        rsset.MovePrevious
+        If Not rsset.BOF Then
+         rtbText.Text = &quot;&quot;
+         ColumnToFile rsset.Fields(&quot;pr_info&quot;), DiskFile
+         FileToForm DiskFile, rtbText
+        Else
+         rsset.MoveFirst
+        End If
+       End If
+      End Sub
+
+      Private Sub cmdSave_Click()
+       FormToFile DiskFile, rtbText
+       FileToColumn rsset.Fields(&quot;pr_info&quot;), DiskFile
+      End Sub
+
+      Private Sub Form_Activate()
+       rtbText.Text = &quot;&quot;
+       If rsset.RecordCount &gt; 0 Then
+        rsset.MoveFirst
+        ColumnToFile rsset.Fields(&quot;pr_info&quot;), DiskFile
+        FileToForm DiskFile, rtbText
+       End If
+      End Sub
+
+      Private Sub Form_Load()
+
+       Dim ConnectString As String
+       Dim anerror As ADODB.Error
+       Dim Sql As String
+
+       On Error GoTo handler
+
+       DiskFile = App.Path &amp; &quot;\BLOB.txt&quot;
+
+       'Устанавите строку коннекта на Ваш SQL server.
+       ConnectString = _
+       &quot;Driver={SQL SERVER};Server=&lt;yourserver&gt;;Database=pubs;UID=sa;pwd=;&quot;
+       Sql = &quot;SELECT pr_info FROM pub_info;&quot;
+       Set cn = New ADODB.Connection
+       cn.ConnectionString = ConnectString
+       cn.Open
+       Set rsset = New ADODB.Recordset
+       rsset.Open Sql, cn, adOpenKeyset, adLockOptimistic, adCmdText
+      Exit Sub
+
+      handler:
+       For Each anerror In cn.Errors
+        Debug.Print anerror.Number &amp; &quot;:  &quot; &amp; anerror.Description &amp; _
+        &quot; - &quot; &amp; anerror.SQLState
+       Next anerror
+      End S
+ub
+</pre>
+      </li>
+      <li>Измените ServerName в connectstring на имя Вашего сервера.<br>
+        <br>
+      </li>
+      <li>Запустите проект. <b>RichTextBox </b>будет содержать
+        первую запись из базы данных.<br>
+        <br>
+      </li>
+      <li>Кликните <b>Next </b>. В <b>RichTextBox </b>появится следующая
+        запись. Кнопка <b>Next </b>вызывает метод <b>MoveNext</b>, а
+        затем методы <b>ColumnToFile </b>и <b>FileToForm</b>.<br>
+        <br>
+      </li>
+      <li>Кликните <b>Prev </b>. В <b>RichTextBox </b>появится
+        предыдущая запись. Кнопка <b>Prev </b>вызывает метод <b>MovePrevious</b>,
+        а затем методы <b>ColumnToFile </b>и <b>FileToForm</b>.<br>
+        <br>
+      </li>
+      <li>Наберите какой-нибудь текст в текстовом поле и
+        нажмите <b>Update </b>- содержимое текстового поля
+        запишется в текущую запись. Кнопка <b>Update </b>вызывает
+        методы <b>FormToFile </b>и <b>FileToColumn</b>, который в свою
+        очередь вызывают метод <b>Update</b>.<br>
+        <br>
+      </li>
+    </ol>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

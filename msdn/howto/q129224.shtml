@@ -1,0 +1,143 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как убрать системное меню из приложения
+    свёрнутого в иконку</h3>
+    <p>Существуют два метода, которые позволяют
+    убрать системное меню, которое появляется при
+    клике пользователем по приложению, свёрнутому в
+    иконку:<br>
+    <br>
+    <ol>
+      <li>Переопределить функцию основного фрейма окна
+        PreCreateWindow, чтобы удалить WS_SYSMENU из оконных стилей.
+        Однако, данный метод убирает системное меню
+        когда приложение находится в нормальном
+        состоянии.<br>
+        <br>
+      </li>
+      <li>Переопределить метод основного фрейма окна OnSize
+        и включить или исключить стиль WS_SYSMENU окна
+        основного фрейма в зависимости от действий
+        пользователя. Данный способ позволяет убрать
+        системное меню когда приложение свёрнуто в
+        иконку и добавить системное меню, когда
+        приложение восстановлено.<br>
+        <br>
+      </li>
+    </ol>
+    <h3>Первый метод</h3>
+    <p>Чтобы полностью убрать системное меню из
+    приложения, переопределяем метод основного
+    фрейма окна PreCreateWindow как показано ниже:</p>
+    <pre class="CODESAMP">   BOOL CMainFrame::PreCreateWindow(CREATESTRUCT &amp;amp; cs)
+   {
+           // Вызываем PreCreateWindow из базового класса, и в следующей
+           // строке заменяем CMDIFrameWnd на CFrameWnd для SDI приложения
+
+           if (!CMDIFrameWnd::PreCreateWindow(cs))
+                return FALSE;
+
+          // Убираем бит стиля системного меню из окна
+
+           cs.style &amp;= ~WS_SYSMENU;
+           return TRUE;
+   } </pre>
+    <h3>Второй метод</h3>
+    <p>Следующие шаги и фрагменты кода показывают, как
+    убрать системное меню когда приложение свёрнуто
+    в иконку и вернуть системное меню, когда
+    приложение восстановлено.<br>
+    <br>
+    <ol>
+      <li>В объявлении класса CMainFrame объявляем public
+        переменную типа BOOLEAN. Эта переменная определяет,
+        разрешено системное меню или нет:<pre class="CODESAMP">      // В SDI приложении CMainFrame наследуется от CFrameWnd
+
+      class CMainFrame : public CMDIFrameWnd
+      {
+      public:
+         BOOL sys_menu_enabled;
+             .
+             .  // Остальные объявления класса
+             .
+      } </pre>
+        <p><br>
+        <br>
+        </p>
+      </li>
+      <li>Изменяем конструктор CMainFrame, чтобы
+        инициализировать переменную sys_menu_enabled в TRUE:<pre
+        class="CODESAMP">      CMainFrame::CMainFrame()
+      {
+        //поумолчанию системное меню разрешено
+        sys_menu_enabled = TRUE;
+             .
+             .  // обычный код конструктора, если он есть
+             .
+      } </pre>
+        <p><br>
+        <br>
+        </p>
+      </li>
+      <li>Воспользуемся визардом (Class Wizard), чтобы создать
+        обработчик сообщения WM_SIZE для класса CMainFrame и
+        добавим следующий код в обработчик сообщения
+        CMainFrame::OnSize:<pre class="CODESAMP">      void CMainFrame::OnSize(UINT nType, int cx, int cy)
+      {
+        // объявляем локальную переменную для хранения стиля окна
+
+           long window_style;
+
+        //вызываем функцию OnSize базового класса,
+        //если SDI приложение вызывает CFrameWnd::OnSize()
+
+        CMDIFrameWnd::OnSize(nType, cx, cy);
+
+        //если пользователь минимизирует приложение
+
+        if (nType == SIZE_MINIMIZED)
+        {
+             // Получаем стиль основного фрейма окна
+              window_style = GetWindowLong(m_hWnd, GWL_STYLE);
+
+             //Убираем системное меню из оконного стиля
+              window_style &amp;= ~WS_SYSMENU;
+
+             //переключаем булевую переменную, чтобы запретить системное меню
+              sys_menu_enabled = FALSE;
+
+             //Устанавливаем атрибуты стиля для основного фрейма окна
+             SetWindowLong(m_hWnd, GWL_STYLE, window_style);
+        }
+        else
+        {
+             //если пользователь восстанавливает приложение
+             //и его системное меню запрещено,
+             if ((nType == SIZE_RESTORED) || nType == SIZE_MAXIMIZED) &amp;&amp;
+                (!sys_menu_enabled))
+             {
+                 window_style = GetWindowLong(m_hWnd, GWL_STYLE);
+
+               //Добавляем системное меню к стилю окна
+                 window_style |= WS_SYSMENU;
+
+              //переключаем булевую переменную, чтобы разрешить системное меню
+                sys_menu_enabled = TRUE;
+
+                SetWindowLong(m_hWnd, GWL_STYLE, window_style);
+                SendMessage(WM_NCACTIVATE,TRUE);
+             }
+         }
+      } </pre>
+      </li>
+    </ol>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

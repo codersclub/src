@@ -1,0 +1,217 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как добавлять записи и редактировать данные в
+    ячейке DBGrid</h3>
+    <p>В этой статье описывается, как программно
+    редактировать данные и добавлять новые записив в
+    элемент управления DBGrid. Вы можете изменить
+    содержимое ячейки и эти изменения мгновенно
+    отобразяться на экране, однако, эти изменения не
+    будут записаны в базу данных, связанную с DBGrid.
+    Поэму, чтобы изменения записывались в базу
+    данных, нам прийдётся редактировать основной
+    набор записей.</p>
+    <p>Следующий пример создаёт простую базу данных,
+    содержащую одну таблицу с четырьмя полями и
+    пятью записями. Каждая запись, это номер в поле.<br>
+    <br>
+    Когда Вы кликаете по ячейке, то данные из этой
+    ячеки отображаются в TextBox. При изменении
+    содержимого этой ячейки, изменения отображаются
+    в DBGrid. Однако, если выполнить метод UpdateControls, то
+    изменения исчезают из ячейки, указывая на то, что
+    база данных не обновилась. Поэтому, для того,
+    чтобы изменения в TextBox были занесены в базу,
+    необходимо кликнуть по кнопке Update Recordset. Кнопка
+    Update Recordset обновляет основной набор записей
+    элемента управления Data. Так как DBGrid связан с Data,
+    то изменения автоматически добавятся в DBGrid.<br>
+    </p>
+    <h3>Создание приложения </h3>
+    <p>Следующий пример демонстрирует, как
+    редактировать содержимое ячейки DBGrid:<br>
+    <ol>
+      <li>Запустите Visual Basic. Далее в меню File кликните New
+        Project. Добавьте элементы управления Data, DBGrid,
+        &nbsp; TextBox, и три кнопки. Установите следующие
+        свойства для каждого элемента управления:<pre
+        class="kbpre">   Control       Default Name       Property       Value
+   -----------------------------------------------------
+
+   DBGrid        DBGrid1            DataSource     Data1
+</pre>
+        <p><br>
+        <br>
+        </p>
+      </li>
+      <li>Скопируйте следующий код в Form1:<pre class="kbcode">      Option Explicit
+      Dim rs1 As Recordset
+      Dim db As Database
+      Dim td As TableDef
+      Dim fl As Field
+      Dim igRow As Integer, igColumn As Integer
+      Dim iFields As Integer, iRecords As Integer
+      Dim vargBookmark As Variant
+
+      Private Sub Command1_Click()
+         ' Кнопка Create Database: Нажатием этой кнопки Вы создаёте
+         ' базу данных с четырьмя полями и пятью записями.
+
+         Set db = CreateDatabase(&quot;C:\test.mdb&quot;, dbLangGeneral)
+         Set td = db.CreateTableDef(&quot;Table1&quot;)
+
+         ' После того как база создана, необходимо добавить в неё поля.
+         For iFields = 1 To 4 ' Последнюю цифру можно изменить на то кол-во
+                              ' полей, которое Вам нужно в базе данных.
+            Set fl = td.CreateField(&quot;Field &quot; &amp; CStr(iFields), dbText)
+            td.Fields.Append fl
+         Next iFields
+
+         db.TableDefs.Append td
+
+         ' Теперь необходимо добавить несколько записей.
+         Set rs1 = db.OpenRecordset(&quot;Table1&quot;, dbOpenTable)
+         For iRecords = 1 To 5  'Для каждой строки
+            rs1.AddNew          'Добавляем новую запись
+
+            For iFields = 1 To 4        ' Для каждого поля в записи,
+               rs1(&quot;Field &quot; &amp; CStr(iFields)) = CStr(iFields) 'добавляем число.
+            Next iFields
+
+         rs1.Update
+         Next iRecords
+
+         ' Закрываем recordset и базу данных.
+         rs1.Close
+         db.Close
+
+         ' Заполняем DBGrid содержимым Recordset.
+         Set db = OpenDatabase(&quot;C:\test.mdb&quot;)
+         Set rs1 = db.OpenRecordset(&quot;Select * from Table1&quot;)
+         Set Data1.Recordset = rs1
+
+         Command1.Visible = False
+         Command2.Visible = True
+         Command4.Visible = True
+      End Sub
+
+      Private Sub Command2_Click()
+         ' Кнопка Update Database: Нажатием этой кнопки, мы сохраняем
+         ' содержимое текстового поля в базе данных. Если содержимое
+         ' recordset изменилось, то после выполнения метода Update оно
+         ' будет сохранено в базе данных.
+
+         Data1.Recordset.Edit
+         Data1.Recordset.Fields(igColumn) = Text1.Text
+         Data1.Recordset.Update
+      End Sub
+
+      Private Sub Command3_Click()
+         ' Кнопка Update DBGrid: Нажатием этой кнопки мы выполняем метод
+         ' UpdateControls в элементе управления Data, чтобы
+         ' продемонстрировать, что изменения в ячейке DBGrid не сохраняются
+         ' в базе данных.
+
+         Data1.UpdateControls
+      End Sub
+
+      Private Sub Command4_Click()
+         ' Кнопка Add New Record: Нажатием этой кнопки, мы добавляем новые
+         ' записи в набор записей (recordset).
+
+         ' Устанавливаем свойства DBGrid и Data, чтобы дать возможность
+         ' добавлять новые записи.
+         DBGrid1.AllowAddNew = True
+         Data1.EOFAction = vbAddNew
+         Data1.Recordset.MoveLast
+         Data1.Recordset.MoveNext
+         DBGrid1.Row = DBGrid1.VisibleRows - 1
+         Data1.Recordset.AddNew
+         For iFields = 1 To 4    ' Для каждого поля в записи,
+                                 ' добавляем содержимое текстового поля.
+            Data1.Recordset(&quot;Field &quot; &amp; CStr(iFields)) = Text1.Text
+         Next iFields
+         Data1.Recordset.Update
+
+      End Sub
+
+      Private Sub DBGrid1_Change()
+         Command3.Visible = True
+      End Sub
+
+      Private Sub DBGrid1_MouseUp(Button As Integer, Shift As Integer, _
+                                  X As Single, Y As Single)
+         Command2.Visible = True
+         igColumn = DBGrid1.ColContaining(X)
+         igRow = DBGrid1.RowContaining(Y)
+         vargBookmark = DBGrid1.RowBookmark(igRow)
+
+         Text1.Text = DBGrid1.Columns(igColumn).CellValue(vargBookmark)
+
+      End Sub
+
+      Private Sub Form_Load()
+         Command1.Visible = False
+         Command2.Visible = False
+         Command3.Visible = False
+         Command4.Visible = False
+         Command1.Caption = &quot;Create Database&quot;
+         Command2.Caption = &quot;Update Database&quot;
+         Command3.Caption = &quot;Update DBGrid&quot;
+         Command4.Caption = &quot;Add New Record&quot;
+
+         ' Если база данных не существует,
+         ' то показываем кнопку Create Database
+         If Dir(&quot;C:\test.mdb&quot;) = &quot;&quot; Then
+            Command1.Visible = True
+         Else
+            ' Открываем существующую базу данных.
+            Set db = OpenDatabase(&quot;C:\test.mdb&quot;)
+            Set rs1 = db.OpenRecordset(&quot;Select * from Table1&quot;)
+            Set Data1.Recordset = rs1
+            Command4.Visible = True
+         End If
+
+      End Sub
+
+      Private Sub Text1_Change()
+         Command2.Visible = True
+      End Sub
+</pre>
+        <p><br>
+        <br>
+        </p>
+      </li>
+    </ol>
+    <h3>Запуск примера</h3>
+    <ol>
+      <li>В меню Run кликните Start или нажмите F5.<br>
+        <br>
+      </li>
+      <li>Кликните на ячейку в DBGrid и измените её
+        содержимое. Кликните по кнопке Update DBGrid. Убедитесь,
+        что Ваше изменение исчезло из DBGrid. Клик по пустой
+        области DBGrid приведёт к ошибке 6148 - Неправильный
+        номер строки.<br>
+        <br>
+      </li>
+      <li>Кликните по ячейке. Обратите внимание, что
+        содержимое ячейки появилось в TextBox. Измените
+        содержимое TextBox а затем кликните кнопку Update Recordset.
+        Теперь Ваши изменения появятся в DBGrid.<br>
+        <br>
+      </li>
+      <li>Для добавления новой записи в DBGrid кликните по
+        кнопке Add New Records. Содержимое текстового поля (text box)
+        будет добавлено, как новая запись.</li>
+    </ol>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

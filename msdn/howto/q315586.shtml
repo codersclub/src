@@ -1,0 +1,181 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как в Visual Basic 6.0 работать с реестром на
+    удалённом компьютере</h3>
+    <p>В этой статье объясняется, как в приложении Visual
+    Basic получить доступ к реестру на удалённой машине
+    с использованием API функций. Данная технология
+    работает в операционных системах Windows XP, Windows 2000,
+    или Windows NT 4.0.<br>
+    <br>
+    <b>Замечание</b>: Для того, чтобы получить доступ к
+    реестру в этих ОС, необходимо запустить
+    приложение с правами на чтение реестра.</p>
+    <h3>Создание демонстрационного приложения</h3>
+    <ol>
+      <li>Запустите Visual Basic 6.0, и создайте стандартный
+        проект EXE.<br>
+        <br>
+      </li>
+      <li>Кликните правой кнопкой мыши по форме, а затем
+        по <b>View Code </b>в меню <b>Shortcut</b>. Добавьте следующее
+        выражение в начало кода:<br>
+        <br>
+        <pre class="CODESAMP">Option Explicit </pre>
+      </li>
+      <li>Объявите константы, чтобы использовать их для
+        доступа к реестру:<br>
+        <br>
+        <pre class="CODESAMP">Private Const HKEY_CLASSES_ROOT = &amp;H80000000
+Private Const HKEY_CURRENT_USER = &amp;H80000001
+Private Const HKEY_LOCAL_MACHINE = &amp;H80000002
+Private Const HKEY_USERS = &amp;H80000003
+
+Private Const KEY_QUERY_VALUE = &amp;H1
+Private Const KEY_SET_VALUE = &amp;H2
+Private Const KEY_ALL_ACCESS = &amp;H3F
+
+Private Const REG_SZ  As Long = 1
+Private Const ERROR_SUCCESS = 0&amp; </pre>
+      </li>
+      <li>Так же нам потребуется объявить следующие
+        функции работы с реестром:<br>
+        <br>
+        <pre class="CODESAMP">Private Declare Function RegConnectRegistry Lib &quot;advapi32.dll&quot; _
+Alias &quot;RegConnectRegistryA&quot; _
+    (ByVal lpMachineName As String, _
+     ByVal hKey As Long, _
+     phkResult As Long) As Long
+
+Private Declare Function RegCloseKey Lib &quot;advapi32.dll&quot; _
+    (ByVal hKey As Long) As Long
+
+Private Declare Function RegOpenKeyEx Lib &quot;advapi32.dll&quot; _
+Alias &quot;RegOpenKeyExA&quot; _
+    (ByVal hKey As Long, _
+     ByVal lpSubKey As String, _
+     ByVal ulOptions As Long, _
+     ByVal samDesired As Long, _
+     phkResult As Long) As Long
+   
+Private Declare Function RegQueryValueExString Lib &quot;advapi32.dll&quot; _
+Alias &quot;RegQueryValueExA&quot; _
+    (ByVal hKey As Long, _
+     ByVal lpValueName As String, _
+     ByVal lpReserved As Long, _
+     lpType As Long, _
+     ByVal lpData As String, _
+     lpcbData As Long) As Long </pre>
+      </li>
+      <li>Ещё нам потребуется глобальная переменная:<br>
+        <br>
+        <pre class="CODESAMP">Private hRemoteReg As Long </pre>
+      </li>
+      <li>Добавьте следующий код в обработчик события
+        Form_Load. Этот код вызывает функцию <b>RegConnectRegistry </b>для
+        присоединения к удалённому реестру. Замените
+        параметр <b>\\RemoteMachineName </b>на имя компьютера, к
+        реестру которого хотите получить доступ:<br>
+        <br>
+        <pre class="CODESAMP">Private Sub Form_Load()
+    Dim lRet As Long
+    
+    'Connect to the remote registry 
+    lRet = RegConnectRegistry(&quot;\\RemoteMachineName&quot;, _
+                              HKEY_LOCAL_MACHINE, _
+                              hRemoteReg)
+    
+    If (lRet = ERROR_SUCCESS) Then
+        MsgBox &quot;Successfully connected to remote registry&quot;
+    Else
+        MsgBox &quot;Error:&quot; &amp; Err.LastDllError
+        Unload Me
+        Exit Sub
+    End If
+End Sub </pre>
+      </li>
+      <li>Следующий код нужно добавить в обработчик
+        события Form_Unload:<br>
+        <br>
+        <pre class="CODESAMP">Private Sub Form_Unload(Cancel As Integer)
+    Dim lRet As Long
+    If hRemoteReg &lt;&gt; 0 Then
+        lRet = RegCloseKey(hRemoteReg)
+    End If
+End Sub </pre>
+      </li>
+      <li>В дизайнере формы (Form Designer) добавьте на форму
+        элемент управления <b>Command</b>. Поумолчанию ему
+        будет присвоено имя <b>Command1</b>.<br>
+        <br>
+      </li>
+      <li>Чтобы создать обработчик события для кнопки
+        сделайте двойной клик по <b>Command1</b>. И добавьте
+        следующий код в функцию обработчика:<br>
+        <br>
+        <pre class="CODESAMP">Private Sub Command1_Click()
+    Dim lRetVal As Long
+    Dim hKey As Long
+    Dim sValue As String
+    
+    lRetVal = RegOpenKeyEx(hRemoteReg, _
+        &quot;HARDWARE\DESCRIPTION\System&quot;, 0, KEY_QUERY_VALUE, hKey)
+    If lRetVal &lt;&gt; ERROR_SUCCESS Then
+        MsgBox &quot;Cannot open key&quot;
+    Else
+        sValue = String(255, &quot; &quot;)
+        lRetVal = RegQueryValueExString(hKey, _
+            &quot;SystemBIOSVersion&quot;, 0&amp;, REG_SZ, sValue, 255)
+        If lRetVal &lt;&gt; ERROR_SUCCESS Then
+            MsgBox &quot;Cannot query value&quot;
+        Else
+            MsgBox sValue
+        End If
+        lRetVal = RegCloseKey(hKey)
+        If lRetVal &lt;&gt; ERROR_SUCCESS Then
+            MsgBox &quot;Cannot close key&quot;
+        End If
+    End If
+End Sub </pre>
+      </li>
+    </ol>
+    <p>&nbsp;</p>
+    <h3>Проверка</h3>
+    <ol>
+      <li>Для компиляции и запуска проекта нажмите F5.<br>
+        <br>
+      </li>
+      <li>Появившееся диалоговое окошечко
+        свидетельствует о том, что подключение к
+        удалённому реестру прошло успешно. Нажмите <b>OK</b>.<br>
+        <br>
+        Появится главная форма приложения.<br>
+        <br>
+      </li>
+      <li>Кликните по <b>Command1</b>. Будет показано значение,
+        которое хранится в удалённом реестре по
+        следующему адресу:<br>
+        <br>
+        <blockquote>
+          <p>HKEY_LOCAL_MACHINE\HARDWARE\DESCRIPTION\System\SystemBIOSVersion </p>
+        </blockquote>
+      </li>
+      <li>Для проверки правильности этого значения,
+        запустите на удалённой машине regedit.exe. В редакторе
+        реестра (Registry Editor), кликните <b>Find </b>в меню <b>Edit</b>.
+        Наберите <b>SystemBIOSVersion </b>, а затем кликните <b>Find Next</b>.
+        После короткой паузы редактор реестра покажет
+        значение в этом ключе; сравните это значение с
+        тем, которое появилось в Вашем приложении.</li>
+    </ol>
+    <p>&nbsp;</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

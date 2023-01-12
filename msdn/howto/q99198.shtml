@@ -1,0 +1,170 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как отобразить текущее время в панели CStatusBar</h3>
+    <p>Нижеприведённый текст описывает создание MFC
+    приложения, у которого в панели статуса
+    отображается текущее время.<br>
+    <br>
+    Итак, пять основных шагов:<br>
+    <br>
+    <ol>
+      <li>Используйте App Studio, либо Resource View в Visual C++ версий
+        старше 4.0, для редактирования таблицы строк
+        приложения. Добавьте новую строку в сегмент,
+        объявленный как ID_INDICATOR_NUM и т.д.; например,
+        создайте новую строку с идентификатором
+        ID_INDICATOR_TIME. Задайте её содержимое как 00:00. Status Bar
+        использует указанное начальное значение, чтобы
+        вычислить размер панели. Приложение может
+        динамически изменять размер панели при помощи
+        функции CStatusBar::SetPaneInfo(). В Visual C++ версий до 4.0,
+        закройте App Studio чтобы сохранить файл .RC. В Visual C++
+        версии 4.0 и выше, воспользуйтесь меню File чтобы
+        сохранить (Save) и закрыть (Close) ресурс таблицы строк.<br>
+        <br>
+      </li>
+      <li>Отредактируйте файл MAINFRM.CPP. Объект CStatusBar
+        создаёт строку состояния используя данные из
+        массива indicators[] в последовательном порядке.
+        Добавьте индикатор ID_INDICATOR_TIME в массив в желаемое
+        место.<br>
+        <br>
+        Если Вы откомпилируете программу на данной
+        стадии, то в статус баре появится новая панель, но
+        в ней не будет никакого текста.<br>
+        <br>
+      </li>
+      <li>Добавьте следующую строку в карту сообщений для
+        объекта CMainFrame (строку следуюет добавить за
+        пределами комментариев AFX_MSG_MAP):<pre class="CODESAMP">      ON_UPDATE_COMMAND_UI(ID_INDICATOR_TIME, OnUpdateTime) </pre>
+        <p>Так как ID_INDICATOR_TIME является идентификатором (ID),
+        а не объектом, то Вам не удастся для этой цели
+        воспользоваться Class Wizard.<br>
+        <br>
+        </p>
+      </li>
+      <li>В файле MAINFRM.CPP создайте функцию наподобие
+        следующей:<pre class="CODESAMP">      void CMainFrame::OnUpdateTime(CCmdUI *pCmdUI)
+      {
+         CTime t = CTime::GetCurrentTime();
+         char szTime[6];
+         int nHour = t.GetHour();
+         int nMinute = t.GetMinute();
+
+         // Часы считаются до 12 вместо 24
+         if (nHour &gt; 12)
+            nHour = nHour - 12;
+
+         wsprintf(szTime, &quot;%i:%02i&quot;, nHour, nMinute);
+
+         // Теперь устанавливаем текст в панели.
+         m_wndStatusBar.SetPaneText(
+               m_wndStatusBar.CommandToIndex(ID_INDICATOR_TIME),
+               LPCSTR(szTime));
+         pCmdUI-&gt;Enable();
+      } </pre>
+        <p>Приложение вызывает эту функцию только однажды,
+        во время простоя. Каждый раз, чтобы очистить свою
+        очередь сообщений, приложение посылает
+        сообщение WM_IDLEUPDATECMDUI (новое время простоя). Более
+        подробную информаю о времени простоя (idle time),
+        смотрите в описании функции CWinApp::OnIdle() в &quot;Class
+        Library Reference, Volume 1.&quot; Чтобы разрешить данную
+        команду в пользовательском интерфейсе,
+        приложение должно вызвать функцию pCmdUI-&gt;Enable(),
+        иначе наша панель будет присутствовать с строке
+        состояния, однако текст не будет в ней
+        отображаться.<br>
+        <br>
+        Если откомпилировать программу на данной стадии,
+        то в панели на статус баре появится текущее время.
+        Однако, есть небольшая проблемка. Так как
+        приложение вызывает UI Command Handler только раз, во
+        время простоя, то что произойдёт, если
+        пользователь будет постоянно работать с
+        приложением? Приложение не сможет обновить время
+        до тех пор, пока не получит сообщения об очистке
+        очереди (новое время простоя (idle time)). В следующем
+        шаге эта проблема решается.<br>
+        <br>
+        </p>
+      </li>
+      <li>Самый простой способ заключается в том, чтобы
+        бовить таймер, который будет генерировать
+        сообщение. Добавьте следующее выражение в
+        функцию CMainFrame::OnCreate():<pre class="CODESAMP">      m_wndStatusBar.SetTimer(1, 1000, NULL); </pre>
+        <p>Событие CWnd::SetTimer() каждую секунду генерирует
+        сообщение в очереди приложения. Даже если
+        пользователь не взаимодействует с приложением,
+        очередь очищается после обработки события
+        таймера, и приложение обновляет панель времени в
+        своём status bar. Вызов KillTimer() должен происходить
+        после того, как окно разрушено.<br>
+        <br>
+        </p>
+      </li>
+    </ol>
+    <p>Однако, те шаги, которые мы использовали для
+    обычного MFC приложения не годятся, если в
+    качестве окна, будет использоваться модальный
+    диалог. Причина заключается в том, что у такого
+    диалога цикл сообщений не включает в себя вызовы
+    для обработки времени простоя и функция OnUpdateTime
+    никогда не будет вызвана. Поэтому, в данном
+    случае, нам прийдётся отказаться от
+    использования очереди сообщений.<br>
+    <br>
+    <ol>
+      <li>Начните с кода, приведённого выше.<br>
+        <br>
+      </li>
+      <li>В mainfrm.h, в объявление класса CMainFrame добавьте
+        следующее.<pre class="CODESAMP">     UINT m_nIDTimer;
+     static VOID __export CALLBACK TimerProc(HWND hwnd, UINT uMsg,
+        UINT uIDEvent, DWORD dwTime); </pre>
+        <p>ЗАМЕЧАНИЕ: В Win32, ключевое слово &quot;__export&quot;
+        является устаревшим и в Visual C++ версии 4.0 и выше
+        будет генерироваться предупреждение C4236. Чтобы
+        избежать этого, просто удалите это ключевое
+        слово.<br>
+        <br>
+        </p>
+      </li>
+      <li>В mainfrm.cpp, меняем вызов SetTimer() в CMainFrame::OnCreate() на:<pre
+        class="CODESAMP">      m_nIDTimer = ::SetTimer(NULL, 0, 1000, TimerProc); </pre>
+        <p><br>
+        <br>
+        </p>
+      </li>
+      <li>Добавляем процедуру таймера:<pre class="CODESAMP">      VOID __export CALLBACK CMainFrame::TimerProc(HWND hwnd, UINT uMsg,
+         UINT uIDEvent, DWORD dwTime)
+      {
+         CMainFrame *pMainWnd = (CMainFrame *)AfxGetApp()-&gt;m_pMainWnd;
+         ASSERT(uIDEvent == pMainWnd-&gt;m_nIDTimer);
+
+         CCmdUI cui;
+         cui.m_nID = ID_INDICATOR_TIME;
+         cui.m_nIndex = 4;
+         cui.m_pMenu = NULL;
+         cui.m_pOther = &amp;pMainWnd-&gt;m_wndStatusBar;
+
+         pMainWnd-&gt;OnUpdateTime(&amp;cui);
+      } </pre>
+        <p><br>
+        <br>
+        </p>
+      </li>
+      <li>В деструкторе используем:<pre class="CODESAMP">      ::KillTimer(NULL, m_nIDTimer); </pre>
+        <p><br>
+        </p>
+      </li>
+    </ol>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

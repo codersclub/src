@@ -1,0 +1,98 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как узнать имя файла по его хэндлу.</h3>
+    <p>Следующий пример позволяет получить имя файла
+    по его хэндлу путём создания обекта маппинга
+    файла. Так же в примере распечатывается полный
+    путь файла, включая букву диска.</p>
+    <p>&nbsp;</p>
+    <pre xml:space="preserve">BOOL 
+GetFilenameFromHandle(HANDLE hFile) {
+
+  BOOL bSuccess = FALSE;
+  TCHAR* pszFilename[MAX_PATH+1];
+  uint uMaxLenDest = 0;
+
+  // Получаем размер файла.
+  DWORD dwFileSizeHi = 0;
+  DWORD dwFileSizeLo = GetFileSize(hFile, &amp;dwFileSizeHi);
+
+  // Делаем мапинг файла.
+  HANDLE hFileMap = CreateFileMapping(hFile,
+                                      NULL,
+                                      PAGE_READONLY,
+                                      0,
+                                      dwFileSizeLo,
+                                      NULL);
+
+  if (hFileMap) {
+    // Маппинг для получения имени файла.
+    void* pMem = MapViewOfFile(hFileMap, FILE_MAP_READ, 0, 0, 1);
+
+    if (pMem) {
+      if (GetMappedFileName (GetCurrentProcess(),
+                             pMem,
+                             pszFilename,
+                             MAX_PATH)) {
+
+        // Переводим путь с именем устройства в букву диска
+        TCHAR szTemp[512];
+        *szTemp = NULL;
+
+        if (GetLogicalDriveStrings(MAX_ARRAY_ITEMS(szTemp)-1,
+                                   szTemp)) {
+          TCHAR szName[MAX_PATH];
+          TCHAR szDrive[3] = TEXT(&quot; :&quot;);
+          BOOL bFound = FALSE;
+          TCHAR* p = szTemp;
+
+          do {
+            // Копируем букву диска во временную строку,
+            // удаляя обратный слэш.
+            *szDrive = *p;
+
+            // Проверяем каждое имя устройства.
+            if (QueryDosDevice(szDrive, szName, 
+                               MAX_ARRAY_ITEMS(szName))) {
+              uint uNameLen = _tcslen(szName);
+
+              // Если больше, чем длина имени файла, то не удовлетворяет
+              if (uNameLen &lt; uMaxLenDest) {
+                bFound = _tcsnicmp(pszFilename, szName, uNameLen) 
+                                    == 0;
+
+                if (bFound) {
+                  // Заново создаём pszFilename используя szTemp и
+                  // заменяем путь устройства нашим DOS-путём.
+                  TCHAR szTempFile[MAX_PATH];
+                  _stprintf(szTempFile,
+                            TEXT(&quot;%s%s&quot;),
+                            szDrive,
+                            pszFilename+uNameLen);
+                  stringCopy(pszFilename, szTempFile, uMaxLenDest);
+                }
+              }
+            }
+
+            // Переходим к следующему нулевому символу.
+            while (*p++);
+          } while (!bFound &amp;&amp; *p); // в конце строки
+        }
+      }
+      bSuccess = TRUE;
+      if (!UnmapViewOfFile(pMem)) assert(0);
+    } 
+
+    if (!CloseHandle(hFileMap)) assert(0);
+  }
+  return(bSuccess);
+}</pre>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

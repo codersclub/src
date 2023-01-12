@@ -1,0 +1,124 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как узнать, кто в данный момент присоединен
+    через Сеть к машине в Windows 95/98/Me (пример
+    использования функции NetSessionEnum)</h3>
+    <p><b>Windows 95/98/Me: </b>Следующий пример демонстрирует,
+    как пролистать текущие сессии на данной машине
+    при помощи функции <a
+    href="http://msdn.microsoft.com/library/en-us/netmgmt/ntlmapi2_26r1.asp"><b>NetSessionEnum</b></a>.</p>
+    <p>Пример распределяет необходимую память для
+    получения 20-ти структур <a
+    href="http://msdn.microsoft.com/library/en-us/netmgmt/ntlmapi3_7jsi.asp"><b>session_info_50</b></a>.
+    Если размер выделенной памяти недостаточен, то
+    программа предупредит о наличии большего
+    количества подключений. В заключении, программа
+    освобождает распределённую память.</p>
+    <pre>#include &lt;stdio.h&gt;
+#include &lt;assert.h&gt;
+#include &lt;windows.h&gt; 
+#include &lt;svrapi.h&gt;
+
+const short MAX_ENTRIES = 20;
+
+int main(int argc, char FAR * argv[])
+{
+   char FAR * pszServerName = NULL;
+   short nLevel = 50;
+   struct session_info_50* pBuf = NULL;
+   struct session_info_50* pTmpBuf = NULL;
+   short cbBuffer;
+   short nEntriesRead = 0;
+   short nTotalEntries = 0;
+   short nTotalCount = 0;
+   int i;
+   NET_API_STATUS nStatus;
+   //
+   // Для локального компьютера ServerName должно быть NULL.
+   //
+   if (argc &gt; 2)
+   {
+      printf(&quot;Usage: %s [\\\\ServerName]\n&quot;, argv[0]);
+      exit(1);
+   }
+
+   if (argc == 2)
+      pszServerName = argv[1];
+
+   cbBuffer = MAX_ENTRIES * sizeof(struct session_info_50);
+   //
+   // Распределяем память, требуюмую, для получения 20-ти
+   //  структур session_info_50.
+   //
+   pBuf = malloc(cbBuffer);
+
+   if (pBuf == NULL)
+      printf(&quot;No memory\n&quot;);
+
+   // Вызываем функцию NetSessionEnum для получения списка подключений
+   //  указывая информационный уровень 50.
+   //
+   nStatus = NetSessionEnum(pszServerName,
+                            nLevel,
+                            (char FAR *)pBuf,
+                            cbBuffer,
+                            &amp;nEntriesRead,
+                            &amp;nTotalEntries);
+   //
+   // получаем результаты в цикле; обрабатываем ошибки.
+   //
+   if ((nStatus == NERR_Success) || (nStatus == ERROR_MORE_DATA))
+   {
+      if ((pTmpBuf = pBuf) != NULL)
+      {
+         for (i = 0; (i &lt; nEntriesRead); i++)
+         {
+            assert(pTmpBuf != NULL);
+
+            if (pTmpBuf == NULL)
+            {
+               fprintf(stderr, &quot;An access violation has occurred\n&quot;);
+               break;
+            }
+            //
+            // Отображаем информацию по каждому соединению.
+            //
+            printf(&quot;\n\tClient: %s\n&quot;, pTmpBuf-&gt;sesi50_cname);
+            printf(&quot;\tUser:   %s\n&quot;, pTmpBuf-&gt;sesi50_username);
+            printf(&quot;\tActive: %d\n&quot;, pTmpBuf-&gt;sesi50_time);
+            printf(&quot;\tIdle:   %d\n&quot;, pTmpBuf-&gt;sesi50_idle_time);
+            printf(&quot;\tKey:   %d\n&quot;, pTmpBuf-&gt;sesi50_key);
+
+            pTmpBuf++;
+            nTotalCount++;
+         }
+      }
+   }
+   else
+      fprintf(stderr, &quot;A system error has occurred: %d\n&quot;, nStatus);
+   //
+   // Отображаем предупреждение, если буфер не достаточен
+   //  для хранения всех полученных данных.
+   //
+   if ((nEntriesRead &lt; nTotalEntries) || (nStatus == ERROR_MORE_DATA))
+      fprintf(stderr, &quot;Not all entries have been enumerated\n&quot;);
+   //
+   // Освобождаем выделенную память.
+   //
+   if (pBuf != NULL)
+      free(pBuf);
+
+   fprintf(stderr, &quot;\nTotal of %d entries enumerated\n&quot;, nTotalCount);
+
+   return 0;
+}</pre>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

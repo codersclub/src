@@ -1,0 +1,160 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как узнать версию Windows.</h3>
+    <p>Для определения версии текущей запущенной
+    операционной системы можно воспользоваться
+    функцией <a
+    href="http://msdn.microsoft.com/library/en-us/sysinfo/base/getversionex.asp"><b>GetVersionEx</b></a>.</p>
+    <p>&nbsp;</p>
+    <pre xml:space="preserve">#include &lt;windows.h&gt;
+#include &lt;stdio.h&gt;
+
+#define BUFSIZE 80
+
+BOOL DisplaySystemVersion()
+{
+   OSVERSIONINFOEX osvi;
+   BOOL bOsVersionInfoEx;
+
+ //Пытаемся вызвать GetVersionEx используя структуру OSVERSIONINFOEX.
+ //В случае ошибки пытаемся проделать тоже самое со структурой OSVERSIONINFO.
+
+   ZeroMemory(&amp;osvi, sizeof(OSVERSIONINFOEX));
+   osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEX);
+
+   if( !(bOsVersionInfoEx = GetVersionEx ((OSVERSIONINFO *) &amp;osvi)) )
+   {
+      // Если OSVERSIONINFOEX не работает, то используем OSVERSIONINFO.
+      osvi.dwOSVersionInfoSize = sizeof (OSVERSIONINFO);
+      if (! GetVersionEx ( (OSVERSIONINFO *) &amp;osvi) )
+         return FALSE;
+   }
+
+   switch (osvi.dwPlatformId)
+   {
+      // Проверяем семейство Windows NT.
+      case VER_PLATFORM_WIN32_NT:
+
+      // Проверяем версию продукта.
+
+         if ( osvi.dwMajorVersion &lt;= 4 )
+            printf(&quot;Microsoft Windows NT &quot;);
+
+         if ( osvi.dwMajorVersion == 5 &amp;&amp; osvi.dwMinorVersion == 0 )
+            printf (&quot;Microsoft Windows 2000 &quot;);
+
+
+         if( bOsVersionInfoEx )  // Используем информацию из GetVersionEx.
+         { 
+         // Проверяем тип рабочей станции.
+            if ( osvi.wProductType == VER_NT_WORKSTATION )
+            {
+               if ( osvi.dwMajorVersion == 5 &amp;&amp; osvi.dwMinorVersion == 1 )
+                  printf (&quot;Microsoft Windows XP &quot;);
+
+               if( osvi.wSuiteMask &amp; VER_SUITE_PERSONAL )
+                  printf ( &quot;Home Edition &quot; );
+               else
+                  printf ( &quot;Professional &quot; );
+            }
+
+         // Проверяем тип сервера.
+            else if ( osvi.wProductType == VER_NT_SERVER )
+            {
+               if ( osvi.dwMajorVersion == 5 &amp;&amp; osvi.dwMinorVersion == 2 )
+                  printf (&quot;Microsoft Windows .NET &quot;);
+
+               if( osvi.wSuiteMask &amp; VER_SUITE_DATACENTER )
+                  printf ( &quot;DataCenter Server &quot; );
+               else if( osvi.wSuiteMask &amp; VER_SUITE_ENTERPRISE )
+                  if( osvi.dwMajorVersion == 4 )
+                     printf (&quot;Advanced Server &quot; );
+                  else
+                     printf ( &quot;Enterprise Server &quot; );
+               else if ( osvi.wSuiteMask == VER_SUITE_BLADE )
+                  printf ( &quot;Web Server &quot; );
+               else
+                  printf ( &quot;Server &quot; );
+            }
+         }
+         else   // Для ранних версий Windows NT используем реестр.
+         {
+            HKEY hKey;
+            char szProductType[BUFSIZE];
+            DWORD dwBufLen=BUFSIZE;
+            LONG lRet;
+
+            lRet = RegOpenKeyEx( HKEY_LOCAL_MACHINE,
+               &quot;SYSTEM\\CurrentControlSet\\Control\\ProductOptions&quot;,
+               0, KEY_QUERY_VALUE, &amp;hKey );
+            if( lRet != ERROR_SUCCESS )
+                return FALSE;
+
+            lRet = RegQueryValueEx( hKey, &quot;ProductType&quot;, NULL, NULL,
+               (LPBYTE) szProductType, &amp;dwBufLen);
+            if( (lRet != ERROR_SUCCESS) || (dwBufLen &gt; BUFSIZE) )
+                return FALSE;
+
+            RegCloseKey( hKey );
+
+            if ( lstrcmpi( &quot;WINNT&quot;, szProductType) == 0 )
+               printf( &quot;Professional &quot; );
+            if ( lstrcmpi( &quot;LANMANNT&quot;, szProductType) == 0 )
+               printf( &quot;Server &quot; );
+            if ( lstrcmpi( &quot;SERVERNT&quot;, szProductType) == 0 )
+               printf( &quot;Advanced Server &quot; );
+         }
+
+      // Отображаем версию, service pack (если есть), и номер билда.
+
+         if ( osvi.dwMajorVersion &lt;= 4 )
+         {
+            printf (&quot;version %d.%d %s (Build %d)\n&quot;,
+               osvi.dwMajorVersion,
+               osvi.dwMinorVersion,
+               osvi.szCSDVersion,
+               osvi.dwBuildNumber &amp; 0xFFFF);
+         }
+         else
+         { 
+            printf (&quot;%s (Build %d)\n&quot;,
+               osvi.szCSDVersion,
+               osvi.dwBuildNumber &amp; 0xFFFF);
+         }
+         break;
+
+      // Проверяем семейство Windows 95.
+      case VER_PLATFORM_WIN32_WINDOWS:
+
+         if (osvi.dwMajorVersion == 4 &amp;&amp; osvi.dwMinorVersion == 0)
+         {
+             printf (&quot;Microsoft Windows 95 &quot;);
+             if ( osvi.szCSDVersion[1] == 'C' || osvi.szCSDVersion[1] == 'B' )
+                printf(&quot;OSR2 &quot; );
+         } 
+
+         if (osvi.dwMajorVersion == 4 &amp;&amp; osvi.dwMinorVersion == 10)
+         {
+             printf (&quot;Microsoft Windows 98 &quot;);
+             if ( osvi.szCSDVersion[1] == 'A' )
+                printf(&quot;SE &quot; );
+         } 
+
+         if (osvi.dwMajorVersion == 4 &amp;&amp; osvi.dwMinorVersion == 90)
+         {
+             printf (&quot;Microsoft Windows Millennium Edition &quot;);
+         } 
+         break;
+   }
+   return TRUE; 
+}</pre>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

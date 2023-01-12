@@ -1,0 +1,125 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как создать приложение MFC, которое не имеет
+    строки меню</h3>
+    <p>Для большинства приложений Windows, меню является
+    частью пользовательского интерфейса. Меню
+    играет важную роль в управлении программой.
+    Однако, необязательно, чтобы каждое приложение
+    Windows содержало строку меню. В этой статье как раз
+    и описывается, как создать MFC приложение без меню.</p>
+    <p>В приложениях, сгенерированных визардом,
+    ресурс IDR_MAINFRAME это стандартный ресурс меню как
+    для приложений SDI так и для MDI. В приложении SDI
+    ресурс меню только один. MDI приложения содержать
+    дополнительные меню для дочерних окон. Такие
+    ресурсы меню обычно называются IDR_xxxTYPE, где xxx
+    связан с типом соответствующего документа. Таким
+    образом, создание MDI приложения без меню не такая
+    уж простая задача в отличие от SDI приложения. В
+    основном, Вам прийдётся изменять все функции,
+    связанные с загрузкой и переключением менюшек.</p>
+    <h3>Шаги по созданию SDI приложения не имеющего меню</h3>
+    <ol>
+      <li>При помощи визарда сгенерируйте SDI приложение.
+        Не удаляйте ресурс меню IDR_MAINFRAME. Если же у Вас
+        приложение сгенерированное без участия визарда
+        то, соответственно не удаляйте основной ресурс,
+        отвечающий за меню. Оставить ресурс меню
+        необходимо чтобы избежать ошибок в коде MFC.<br>
+        <br>
+      </li>
+      <li>Чтобы основное окно приложения не имело
+        полоски, необходимо удалить уже загруженное меню
+        и установить в функции CFrameWnd::PreCreateWindow() поле hMenu
+        структуры CREATESTRUCT в NULL:<pre class="CODESAMP">      BOOL CMainFrame::PreCreateWindow(CREATESTRUCT&amp; cs)
+      {
+         if(cs.hMenu!=NULL)
+         {
+             ::DestroyMenu(cs.hMenu);      // удаляем меню, если загружено
+             cs.hMenu = NULL;              // для этого окна меню нет
+         }
+
+         return CFrameWnd::PreCreateWindow(cs);
+      } </pre>
+        <p><br>
+        <br>
+        </p>
+      </li>
+    </ol>
+    <h3>Шаги по созданию MDI приложения не имеющего меню</h3>
+    <ol>
+      <li>При помощи визарда сгенерируйте MDI приложение.
+        Не удаляйте ресурс меню IDR_MAINFRAME. Если же у Вас
+        приложение сгенерированное без участия визарда
+        то, соответственно не удаляйте основной ресурс,
+        отвечающий за меню. Оставить ресурс меню
+        необходимо чтобы избежать ошибок в коде MFC.<br>
+        <br>
+      </li>
+      <li>Удалите ресурсы меню, связанные с дочерними
+        окнами MDI (IDR_xxxTYPE). Они не будут использоваться.
+        Таким образом мы избежим утечки памяти.<br>
+        <br>
+      </li>
+      <li>В классе CMainFrame переопределите функцию
+        PreCreateWindow():<pre class="CODESAMP">      BOOL CMainFrame::PreCreateWindow(CREATESTRUCT&amp; cs)
+      {
+         if(cs.hMenu!=NULL)
+         {
+             ::DestroyMenu(cs.hMenu);      // удаляем меню, если загружено
+             cs.hMenu = NULL;              // для этого окна меню нет
+         }
+
+         return CMDIFrameWnd::PreCreateWindow(cs);
+      } </pre>
+        <p><br>
+        <br>
+        </p>
+      </li>
+      <li>Измените код, отвечающий за переключение меню
+        путём переопределения методов LoadFrame() и OnCreateClient()
+        класса CMainFrame. Это необходимо, так как MFC уже
+        загрузило менюшки автоматически. Следующий код
+        показывает как это сделать:<pre class="CODESAMP">      // Переопределённые объявления методов для CMainFrame
+
+      BOOL LoadFrame( UINT nIDResource,
+             DWORD dwDefaultStyle = WS_OVERLAPPEDWINDOW | FWS_ADDTOTITLE,
+             CWnd* pParentWnd = NULL, CCreateContext* pContext = NULL );
+      BOOL CMainFrame::OnCreateClient(LPCREATESTRUCT lpcs,
+             CCreateContext* /*pContext*/);
+
+      // Переопределённые объявления методов для CMainFrame
+
+      BOOL CMainFrame::LoadFrame(UINT nIDResource, DWORD dwDefaultStyle,
+             CWnd* pParentWnd, CCreateContext* pContext)
+      {
+          return CFrameWnd::LoadFrame(nIDResource,dwDefaultStyle,
+              pParentWnd,pContext);
+      }
+
+      BOOL CMainFrame::OnCreateClient(LPCREATESTRUCT lpcs,
+              CCreateContext* /*pContext*/)
+      {
+          return CreateClient(lpcs,NULL);
+      } </pre>
+        <p><br>
+        <br>
+        </p>
+      </li>
+    </ol>
+    <p><b>&nbsp;</p>
+    <p>ОБРАТИТЕ ВНИМАНИЕ</b>: Вместо вызова базового
+    класса (CMDIFrameWnd) в переопределённой LoadFrame, мы
+    вызываем&nbsp; CFrameWnd, тем самым избегая кода,
+    который работает с менюшками в MDI приложении.</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

@@ -1,0 +1,165 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Функция GetAdaptersInfo.</h3>
+    <p>Функция <a><b>GetNetworkParams</b></a> позволяет узнать
+    сетевые настройки сетевой карты локального
+    компьютера.</p>
+    <p><strong>Внимание:</strong> Для использования этой
+    функции необходимо, чтобы был установлен Platform SDK!</p>
+    <pre><b>DWORD</b> <b>GetAdaptersInfo(</b>
+  <b>P<!---->IP_ADAPTER_INFO</b> <i>pAdapterInfo</i><b>,
+</b>  <b>P<!---->ULONG</b> <i>pOutBufLen</i><b>
+);</b>
+</pre>
+    <p><b>Параметры</b><dl>
+      <dt><i>pAdapterInfo</i></dt>
+      <dd>Указатель на буфер, в который записывается
+        список структур <a
+        href="http://msdn.microsoft.com/library/en-us/iphlp/iphlp/ip_adapter_info.asp"><b>IP_ADAPTER_INFO</b></a>.</dd>
+      <dt><i>pOutBufLen</i></dt>
+      <dd>Указатель на переменную <b>ULONG</b>, которая
+        содержит размер, требуемый для буфера <i>pAdapterInfo</i>.
+        Если этого размера недостаточно для хранения
+        информации, то <b>GetAdaptersInfo</b> заносит в эту
+        переменную требуемый размер, и возвращает код
+        ошибки ERROR_BUFFER_OVERFLOW.</dd>
+    </dl>
+    <p><b>Возвращаемые значения</b></p>
+    <p>В случае успеха, функция вернёт ERROR_SUCCESS.</p>
+    <p>В случае ошибки, функция вернёт одно из
+    следующих значений:</p>
+    <p>&nbsp;</p>
+    <table border="1" cellspacing="0">
+<TBODY>
+      <tr>
+        <th bgcolor="#C0C0C0">Значение</th>
+        <th bgcolor="#C0C0C0">Описание</th>
+      </tr>
+      <tr>
+        <td width="40%">ERROR_BUFFER_OVERFLOW</td>
+        <td width="60%">Размер буфера, указанный в переменной <i>pOutBufLen</i>
+        недостаточен для хранения информации. Параметр <i>pOutBufLen</i>
+        указывает на требуемый размер.</td>
+      </tr>
+      <tr>
+        <td width="40%">ERROR_INVALID_PARAMETER</td>
+        <td width="60%">Параметр <i>pOutBufLen</i> равен NULL, либо
+        вызывающий процесс не имеет прав на
+        запись/чтение в памяти по адресу <i>pOutBufLen,</i> либо
+        вызывающий процесс не имеет прав на запись в
+        памяти по адресу <i>pAdapterInfo</i>.</td>
+      </tr>
+      <tr>
+        <td width="40%">ERROR_NO_DATA</td>
+        <td width="60%">No adapter information exists for the local computer.</td>
+      </tr>
+      <tr>
+        <td width="40%">ERROR_NOT_SUPPORTED</td>
+        <td width="60%"><a><b>GetAdaptersInfo</b></a> не поддерживается
+        данной операционной системой.</td>
+      </tr>
+      <tr>
+        <td width="40%">другое</td>
+        <td width="60%">В случае ошибки, воспользуйтесь
+        функцией <a
+        href="http://msdn.microsoft.com/library/en-us/debug/base/formatmessage.asp"><b>FormatMessage</b></a>
+        для получения подробной строки об ошибке.</td>
+      </tr>
+</TBODY>
+    </table>
+    <p><br>
+    </p>
+    <p><b>Замечания</b></p>
+    <p>Функции <a><b>GetAdaptersInfo</b></a> и <a
+    href="http://msdn.microsoft.com/library/en-us/iphlp/iphlp/getinterfaceinfo.asp"><b>GetInterfaceInfo</b></a>
+    не возвращают информации об интерфейсе нулевого
+    кольца (loopback interface).</p>
+    <p><b>Пример использования</b></p>
+    <pre>#include &lt;stdio.h&gt;
+#include &lt;windows.h&gt;
+#include &lt;iphlpapi.h&gt;
+
+main() {
+   
+   IP_ADAPTER_INFO * AdapterInfo;
+   ULONG    ulOutBufLen;
+   DWORD    dwRetVal;
+   IP_ADDR_STRING * pIPAddr;
+
+ AdapterInfo = (IP_ADAPTER_INFO *) GlobalAlloc(GPTR,sizeof(IP_ADAPTER_INFO));
+ ulOutBufLen = sizeof(IP_ADAPTER_INFO);
+   
+   if( ERROR_BUFFER_OVERFLOW == GetAdaptersInfo(AdapterInfo, &amp;ulOutBufLen)) {
+      GlobalFree( AdapterInfo );
+      AdapterInfo = (IP_ADAPTER_INFO *) GlobalAlloc(GPTR, ulOutBufLen );
+   }
+
+   if ( dwRetVal = GetAdaptersInfo( AdapterInfo, &amp;ulOutBufLen ) ) {
+    printf(&quot;Call to GetAdaptersInfo failed. Return Value: %08x\n&quot;, dwRetVal);
+   }
+   else {
+      printf(&quot;Adapter Description: %s\n&quot;, AdapterInfo-&gt;Description);
+
+      printf(&quot;IP Address(s):\n&quot; );
+      printf(&quot;\t%s\n&quot;, AdapterInfo-&gt;IpAddressList.IpAddress.String );
+      
+      pIPAddr = AdapterInfo-&gt;IpAddressList.Next;
+      while (pIPAddr) {
+         printf(&quot;\t%s\n&quot;, pIPAddr-&gt;IpAddress.String);
+         pIPAddr = pIPAddr-&gt;Next;
+      }
+
+	  printf(&quot;Default gateway(s):\n&quot; );
+      printf(&quot;\t%s\n&quot;, AdapterInfo-&gt;GatewayList.IpAddress.String );
+      
+      pIPAddr = AdapterInfo-&gt;GatewayList.Next;
+      while ( pIPAddr ) {
+         printf( &quot;\t%s\n&quot;, pIPAddr -&gt;IpAddress.String );
+         pIPAddr = pIPAddr -&gt;Next;
+      }
+
+	  if(AdapterInfo-&gt;DhcpEnabled == 1) {
+		 printf(&quot;DHCP Server(s):\n&quot; );
+		 printf(&quot;\t%s\n&quot;, AdapterInfo-&gt;DhcpServer.IpAddress.String );
+      
+		 pIPAddr = AdapterInfo-&gt;DhcpServer.Next;
+		 while ( pIPAddr ) {
+			printf( &quot;\t%s\n&quot;, pIPAddr -&gt;IpAddress.String );
+			pIPAddr = pIPAddr -&gt;Next;
+		 }
+	  }
+	  else {
+		 printf(&quot;DHCP Disabled\n&quot;);
+	  }
+
+	  if(AdapterInfo-&gt;HaveWins == TRUE) {
+		 printf(&quot;Primary WINS Server(s):\n&quot; );
+		 printf(&quot;\t%s\n&quot;, AdapterInfo-&gt;PrimaryWinsServer.IpAddress.String );
+      
+		 pIPAddr = AdapterInfo-&gt;PrimaryWinsServer.Next;
+		 while ( pIPAddr ) {
+			printf( &quot;\t%s\n&quot;, pIPAddr -&gt;IpAddress.String );
+			pIPAddr = pIPAddr -&gt;Next;
+		 }
+	  }
+	  else {
+		  printf(&quot;Adapter not used WINS servers\n&quot; );
+	  }
+   }
+   exit( 0 );
+}</pre>
+    <p>&nbsp;</p>
+    <p><b>Дополнительная информация</b></p>
+    <p><b>Windows NT/2000/XP: </b>Включена в Windows 2000 и выше.<br>
+    <b>Windows 95/98/Me: </b>Включена в Windows 98 и выше.<br>
+    <b>Заголовок: </b>Объявлена в Iphlpapi.h.<br>
+    <b>Библиотека: </b>Iphlpapi.lib.</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

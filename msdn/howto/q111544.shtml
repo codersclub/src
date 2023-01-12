@@ -1,0 +1,141 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как получить текущее имя пользователя и имя
+    домена в Windows NT</h3>
+    <p>Иногда приложению требуется знать имя
+    пользователя и имя домена для текущего потока.
+    Эта статья демонстрирует, как сделать это в Windows NT
+    при помощи security функций в Win32 Application Programming Interface
+    (API).</p>
+    <p>До Windows NT, считалось, что поток запускается под
+    учётной записью пользователя, залогинившегося в
+    интерактивном режим. Однако, Windows NT позволяет
+    потокам запускаться под разными учётными
+    записями. Например, поток, запущенный как сервис,
+    имеет имя домена AUTHORITY и имя пользователя SYSTEM, Это
+    значит, что сервисы запускаются с правами
+    системы.<br>
+    <br>
+    Если необходимо получить как имя пользователя
+    так и имя домена для текущего потока, то сначала,
+    при помощи функции <b>GetTokenInformation</b> надо
+    распаковать пользовательский идентификатор (SID)
+    из потока. А затем вызвать функцию <b>LookupAccountSid</b>,
+    чтобы получить имя учётной записи и имя домена,
+    связанные с этим SID. Нижеприведённый пример,
+    демонстрирует данную технологию.<br>
+    <br>
+    32-битные функции, упомянутые выше не доступны в
+    Microsoft Windows 95 или Microsoft Windows 98. Чтобы получить имя и
+    домен залогинившегося пользователя в Windows 95 или
+    Windows 98, Вам необходимо вызвать функцию 16-битного
+    LAN Менеджера. Как это делается, можно узнать в
+    статье из Microsoft Knowledge Base:</p>
+    <blockquote>
+      <a href="q155698.shtml"><p>Q155698</a> Как получить текущее имя
+      пользователя и домена в Windows 95 и Windows 98</p>
+    </blockquote>
+    <p><b>&nbsp;</p>
+    <p>ЗАМЕЧАНИЕ</b>: Если требуется только имя
+    пользователя, то можно использовать функцию <b>GetUserName</b>,
+    которая прекрасно работает в Windows 95, Windows 98, Windows NT,
+    и Windows 2000.</p>
+    <h3>Пример кода</h3>
+    <p>Следующий пример демонстрирует, как программно
+    получить имя пользователя и имя домена в Windows NT:</p>
+    <pre class="CODESAMP">//**********************************************************************
+// 
+//  ФУНКЦИЯ:     GetCurrentUserAndDomain - это функция, определяющая
+//                имя пользователя и имя домена учётной записи,
+//                связанной с вызывающим потоком.
+// 
+//  ПАРАМЕТРЫ:   szUser - буфер, который получает имя пользователя
+//                pcchUser - размер szUser в символах
+//                szDomain - буфер, принимающий имя домена
+//                pcchDomain - размер szDomain в символах
+// 
+//  ВОЗВРАЩАЕМЫЕ ЗНАЧЕНИЯ: TRUE если функция выполнена успешно. Иначе, FALSE
+//                и GetLastError() вернёт код ошибки.
+// 
+//                Если любой из буферов слишком маленький, то
+//                GetLastError() вернёт ERROR_INSUFFICIENT_BUFFER,
+//                а pcchUser и pcchDomain будут откорректированы в
+//                соответствии с требуемыми размерами.
+// 
+//**********************************************************************
+
+BOOL GetCurrentUserAndDomain(PTSTR szUser, PDWORD pcchUser, 
+      PTSTR szDomain, PDWORD pcchDomain) {
+
+   BOOL         fSuccess = FALSE;
+   HANDLE       hToken   = NULL;
+   PTOKEN_USER  ptiUser  = NULL;
+   DWORD        cbti     = 0;
+   SID_NAME_USE snu;
+
+   __try {
+
+      // Получаем маркёр доступа вызывающего потока.
+      if (!OpenThreadToken(GetCurrentThread(), TOKEN_QUERY, TRUE,
+            &amp;hToken)) {
+
+         if (GetLastError() != ERROR_NO_TOKEN)
+            __leave;
+
+         // Если маркёра потока не существует, то запрашиваем маркёр процесса.
+         if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, 
+               &amp;hToken))
+            __leave;
+      }
+
+      // Получаем размер информации о пользователе в маркёре.
+      if (GetTokenInformation(hToken, TokenUser, NULL, 0, &amp;cbti)) {
+
+         // Если длина буфера равна нулю, то ошибка.
+         __leave;
+   
+      } else {
+
+         // Если длина буфера равна нулю, то ошибка.
+         if (GetLastError() != ERROR_INSUFFICIENT_BUFFER)
+            __leave;
+      }
+
+      // Распределяем буфер для информации о пользователе в маркёре.
+      ptiUser = (PTOKEN_USER) HeapAlloc(GetProcessHeap(), 0, cbti);
+      if (!ptiUser)
+         __leave;
+
+      // Получаем информацию о пользователе из маркёра.
+      if (!GetTokenInformation(hToken, TokenUser, ptiUser, cbti, &amp;cbti))
+         __leave;
+
+      // Получаем имя пользователя и имя домена по пользовательскому SID.
+      if (!LookupAccountSid(NULL, ptiUser-&gt;User.Sid, szUser, pcchUser, 
+            szDomain, pcchDomain, &amp;snu))
+         __leave;
+      
+      fSuccess = TRUE;
+
+   } __finally {
+
+      // Освобождаем ресурсы.
+      if (hToken)
+         CloseHandle(hToken);
+
+      if (ptiUser)
+         HeapFree(GetProcessHeap(), 0, ptiUser);
+   }
+
+   return fSuccess;
+} </pre>
+    <p>&nbsp;</p>
+    <p class="CODESAMP">&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

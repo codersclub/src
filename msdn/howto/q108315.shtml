@@ -1,0 +1,110 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3> ак сохранить MDI окно всегда поверх остальных</h3>
+    <p>ѕроблема в том, что не существует стилей дл€
+    того, чтобы вновь создаваемое MDI окно было всегда
+    поверх остальных MDI окон. ќднако, существуют два
+    способа решени€ данной задачи:<ul>
+      <li>ќбработать сообщение WM_WINDOWPOSCHANGED и вызвать
+        SetWindowPos() чтобы изменить Z-пор€док окна.<br>
+        <br>
+      </li>
+      <li>—оздать таймер дл€ MDI окон и сбросить Z-пор€док
+        окна при обработке сообщени€ WM_TIMER.<br>
+        <br>
+      </li>
+    </ul>
+    <p>MDICREATESTRUCT имеет поле &quot;style&quot;, которое может
+    быть установлено со стил€ми дл€ нового MDI окна.
+    –асширенные стили, такие как WS_EX_TOPMOST, не доступны
+    дл€ MDI окон. Ёто поле в структуре MDICREATESTRUCT
+    передаЄтс€ в CreateWindowEx() в параметре dwStyle. ѕоле dwExStyle
+    установлено в 0L. ƒва метода, показанные ниже, не
+    могут быть использованы в одно и тоже врем€ в
+    одном приложении.<br>
+    <br>
+    ѕервый метод: ќбрабатываем сообщение WM_WINDOWPOSCHANGED
+    и вызываем SetWindowPos() чтобы изменить Z-пор€док окна.</p>
+    <h3>ѕример кода</h3>
+    <pre class="CODESAMP">   LRESULT CALLBACK MdiWndProc (HWND hWnd, UINT message, WPARAM wParam,
+                       LPARAM lParam)
+   {
+       static HWND hWndAlwaysOnTop = 0;
+       switch (message)
+        {
+        case WM_CREATE :
+            if (!hWndAlwaysOnTop)
+             {
+             SetWindowText (hWnd, &quot;Always On Top Window&quot;);
+             hWndAlwaysOnTop = hWnd;
+             }
+               break;
+        case WM_WINDOWPOSCHANGED :
+            if (hWndAlwaysOnTop)
+             {
+             WINDOWPOS FAR* pWP = (WINDOWPOS FAR*)lParam;
+             if (pWP-&gt;hwnd != hWndAlwaysOnTop)
+                 SetWindowPos (hWndAlwaysOnTop, HWND_TOP, 0, 0, 0, 0,
+                         SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
+             }
+            break;
+        // 
+        // «десь обрабатываютс€ остальные сообщени€.
+        // 
+        case WM_CLOSE :
+            if (hWndAlwaysOnTop == hWnd)
+             hWndAlwaysOnTop = NULL;
+        default :
+            return DefMDIChildProc (hWnd, message, wParam, lParam);
+        }
+       return 0L;
+   } </pre>
+    <p>¬торой метод: ”станавливаем таймер дл€ MDI окон и
+    сбрасываем Z-пор€док окна при обработке
+    сообщени€ WM_TIMER.</p>
+    <h3>ѕример кода</h3>
+    <pre class="CODESAMP">   LRESULT CALLBACK MdiWndProc (HWND hWnd, UINT message, WPARAM wParam,
+                       LPARAM lParam)
+   {
+       static HWND hWndAlwaysOnTop = 0;
+       switch (message)
+        {
+        case WM_CREATE :
+            SetTimer (hWnd, 1, 200, NULL);
+            if (!hWndAlwaysOnTop)
+             {
+             SetWindowText (hWnd, &quot;Always On Top Window&quot;);
+             hWndAlwaysOnTop = hWnd;
+             }
+               break;
+        case WM_TIMER :
+            if (hWndAlwaysOnTop)
+             {
+             SetWindowPos (hWndAlwaysOnTop, HWND_TOP, 0, 0, 0, 0,
+                        SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
+             }
+            break;
+        case WM_DESTROY:
+            KillTimer (hWnd, 1) ;
+            break;
+        // 
+        // «десь обрабатываютс€ остальные сообщени€.
+        // 
+        case WM_CLOSE :
+            if (hWndAlwaysOnTop == hWnd)
+             hWndAlwaysOnTop = NULL;
+        default :
+            return DefMDIChildProc (hWnd, message, wParam, lParam);
+        }
+       return 0L;
+   } </pre>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

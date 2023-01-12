@@ -1,0 +1,90 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как правильно работать с API функциями Win32 Spooler</h3>
+    <p>Данный набор API функций Win32 спулера занимается в
+    основном заполнением массива структур. Однако,
+    структуры обычно включают в себя указатели на
+    строки либо на другие данные. Эти посторонние
+    данные также должны быть сохранены в
+    возвращаемой памяти, соответственно они
+    добавляются в конец массива. Поэтому, простого
+    объявления массива таких структур в стеке будет
+    недостаточно, чтобы хранить всю информацию,
+    которую возвращают данные API функции.</p>
+    <p>Итак, речь идёт о функциях: <b>EnumForms()</b>, <b>EnumJobs()</b>,
+    <b>EnumMonitors()</b>, <b>EnumPorts()</b>, <b>EnumPrinterDrivers()</b>, <b>EnumPrinters()</b>,
+    и <b>EnumPrintProcessors()</b>. Кстати, функции <b>GetJob()</b>, <b>GetPrinter()</b>,
+    и <b>DocumentProperties()</b> требуют идентичной обработки.
+    Каждую функцию необходимо вызывать дважды.
+    Первый вызов предназначен для определения
+    необходимого размера буфера, а последующий вызов
+    необходим для передачи указателя на динамически
+    распределённый буфер достаточного размера. Код,
+    представленный ниже, является консольным
+    приложением, и демонстрирует использование
+    функции <b>EnumJobs()</b>:</p>
+    <pre class="CODESAMP">   BOOL ListJobsForPrinter( LPTSTR szPrinterName )
+   {
+
+   HANDLE         hPrinter;
+   DWORD          dwNeeded, dwReturned, i;
+   JOB_INFO_1     *pJobInfo;
+
+   // Нам понадобится дескриптор принтера, поэтому откроем его
+   if( ! OpenPrinter( szPrinterName, &amp;hPrinter, NULL ) )
+     return FALSE;
+
+   // Сперва вызовем EnumJobs() чтобы определить, сколько нам потребуется
+   // памяти
+   if( ! EnumJobs( hPrinter, 0, 0xFFFFFFFF, 1, NULL, 0, &amp;dwNeeded,
+                   &amp;dwReturned ) )
+   {
+     // В любом случае надо обработать ошибку нехватки памяти
+     if( GetLastError() != ERROR_INSUFFICIENT_BUFFER )
+     {
+       ClosePrinter( hPrinter );
+       return FALSE;
+     }
+   }
+   // Распределяем достаточное количество памяти для структуры JOB_INFO_1
+   // плюс дополнительные данные - dwNeeded из предыдущего вызова
+   // говорит нам, какой объём необходим
+   if( (pJobInfo = (JOB_INFO_1 *)malloc( dwNeeded )) == NULL )
+   {
+     ClosePrinter( hPrinter );
+     return FALSE;
+   }
+   // Вызываем EnumJobs() снова, заполняя тем самым структуры
+   if( ! EnumJobs( hPrinter, 0, 0xFFFFFFFF, 1, (LPBYTE)pJobInfo,
+                   dwNeeded, &amp;dwNeeded, &amp;dwReturned ) )
+   {
+     ClosePrinter( hPrinter );
+     free( pJobInfo );
+     return FALSE;
+   }
+   // Больше дескриптор принтера нам не нужен, поэтому закрываем его
+   ClosePrinter( hPrinter );
+
+   // dwReturned говорит нам, сколько текущих заданий
+   // Просто отображаем количество найденных заданий
+   printf( &quot;%d jobs\n&quot;, dwReturned );
+   // Проще сделать это в цикле и пройтись по каждому заданию
+   for(i=0;i&lt;dwReturned;i++)
+   {
+     // pJobInfo[i] это структура JOB_INFO_1 для данного задания
+     printf( &quot;[%d] [%s]\n&quot;, pJobInfo[i].JobId, pJobInfo[i].pDocument );
+   }
+
+   // Очищаем
+   free( pJobInfo );
+   return TRUE;
+ } </pre>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

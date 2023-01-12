@@ -1,0 +1,253 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Создание MFC Property Sheet изменяемого размера</h3>
+    <p>Иногда для приложения требуется большей
+    гибкости в использовании property sheet, чем может
+    предоставить Microsoft Foundation Classes (MFC). В данной статье,
+    демонстрируются шаги, по созданию класса property
+    sheet, который так же содержит полоску меню.</p>
+    <p>Приведённые ниже инструкции, показывают, как
+    добавить новый класс property sheet в существующий
+    проект MFC и настроить окошко, обработав запросы
+    на изменение размера, а так же добавив меню. В
+    галвной роли будет выступать класс, <i>CMyPropertySheet</i>,
+    который можно использовать для воплощения
+    нашего замысла. Этот класс мог бы стать достойной
+    заменой&nbsp; для MFC-шного <b>CPropertySheet</b> так как
+    обеспечивает дополнительную функциональность,
+    описанную выше.<br>
+    <br>
+    <ol>
+      <li>В проекте, основанном на MFC, добавление нового
+        property sheet осуществляется при помощи галереи
+        компонентов. Для этого в меню <b>Project</b> кликните на
+        <b>Add to project</b>, а затем на <b>Component and Controls</b>. В
+        появившемся диалоговом окошке сделайте двойной
+        щелчёк на папку &quot;Components&quot;, а затем выберите <b>Property
+        Sheet</b>.<br>
+        <br>
+      </li>
+      <li>Для того, чтобы сделать рамку изменяемого
+        размера, необходимо переопределить <b>DoModal()</b> и
+        создать <b>callback</b> функцию, которая установит
+        соответствующие стили для окошка свойств (property
+        sheet). Поэтому, необходимо добавить следующие две
+        функции (как в заголовочном файле, так и в файле
+        исходника для класса CMyPropertySheet.):<br>
+        <br>
+        <ul>
+          <li>Статическая callback функция окошка свойств, <b>XmnPropSheetCallback()</b>:<br>
+            <br>
+            <pre class="CODESAMP">// Эта функция должна быть STATIC.
+//Callback позволяет нам установить стили окна поумолчанию
+//    для property sheet
+int CALLBACK CMyPropertySheet::XmnPropSheetCallback(HWND hWnd,
+                                        UINT message, LPARAM lParam)
+{
+   extern int CALLBACK AfxPropSheetCallback(HWND, UINT message, LPARAM lParam);
+   // XMN: Вызывает MFC-шный callback
+   int nRes = AfxPropSheetCallback(hWnd, message, lParam);
+
+   switch (message)
+   {
+   case PSCB_PRECREATE:
+      // Устанавливаем наши собственные стили окна
+      ((LPDLGTEMPLATE)lParam)-&gt;style |= (DS_3DLOOK | DS_SETFONT
+         | WS_THICKFRAME | WS_SYSMENU | WS_POPUP | WS_VISIBLE | WS_CAPTION);
+      break;
+   }
+   return nRes;
+}
+  </pre>
+          </li>
+          <li>Переопределение <b>DoModal()</b>:<br>
+            <br>
+            <pre class="CODESAMP">// Переопределение DoModal() позволяет нам перехватить наш callback
+//    при создании окошка свойств
+int CMyPropertySheet::DoModal() 
+{
+   // Ловушка в коде создания property sheet
+   AFX_OLDPROPSHEETHEADER* psh = GetPropSheetHeader();
+   psh-&gt;dwFlags |= PSH_USECALLBACK;
+   psh-&gt;pfnCallback = XmnPropSheetCallback;
+   return CPropertySheet::DoModal();
+} </pre>
+          </li>
+        </ul>
+      </li>
+      <li>Теперь мы имеем property sheet, размеры которого можно
+        изменять при помощи мышки. Чтобы добавить меню,
+        Вам необходимо переопределить <b>OnInitDialog()</b>. В
+        меню <b>View</b> выберите <b>Class Wizard</b>, затем в
+        диалоговом окне <b>Class Wizard</b> выберите проект и
+        класс для property sheet. Далее в выпадающем списке <b>Messages</b>
+        выберите пункт <b>OnInitDialog</b>. Приведённый ниже код,
+        показывает, как должно выглядеть
+        переопределение <b>OnInitDialog()</b>:<br>
+        <br>
+        <pre class="CODESAMP">BOOL CMyPropertySheet::OnInitDialog() 
+{
+   BOOL bResult = CPropertySheet::OnInitDialog();
+    
+   // Добавляем новое меню
+   CMenu *pMenu = new CMenu; pMenu-&gt;LoadMenu(IDR_PS_MENU);
+   SetMenu(pMenu);
+
+   // Корректируем размер propsheet под новое меню
+   CRect r;  GetWindowRect(&amp;r);
+   r.bottom += GetSystemMetrics(SM_CYMENU);
+   MoveWindow(r);
+
+   return bResult;
+} </pre>
+      </li>
+      <li>Теперь нам необходимо обеспечить политику
+        изменения размеров. Наиболее правильный способ
+        сделать это, заключается в том, чтобы изменить
+        размеры внедрённого контрола tab в соответствии с
+        запросом на изменение размеров и перемещая
+        кнопки, присутствующие на окне. Для этого
+        проделаем следующее:<br>
+        <br>
+        <ol type="a">
+          <li>В класс <i>CMyPropertySheet</i> добавьте следующие
+            переменные:<br>
+            <pre class="CODESAMP">protected:
+   BOOL   m_bNeedInit;
+   CRect  m_rCrt;
+   int    m_nMinCX;
+   int    m_nMinCY; </pre>
+          </li>
+          <li>Инициализируйте эти переменные и установите
+            m_bNeedInit в TRUE в конструкторе <i>CMyPropertySheet</i>:<br>
+            <br>
+            <pre class="CODESAMP">CMyPropertySheet::CMyPropertySheet(CWnd* pWndParent)
+	 : CPropertySheet(IDS_PROPSHT_CAPTION, pWndParent) 	 
+	 , m_bNeedInit(TRUE)
+	 , m_nMinCX(0)
+	 , m_nMinCY(0)
+
+{
+   AddPage(&amp;m_Page1);
+   AddPage(&amp;m_Page2);
+
+} </pre>
+          </li>
+          <li>Добавьте следующие строки в конец <b>OnInitDialog()</b>:<br>
+            <br>
+            <pre class="CODESAMP">BOOL CMyPropertySheet::OnInitDialog() 
+{
+   // ...
+   // Инициализируем m_nMinCX/Y
+   m_nMinCX = r.Width();
+   m_nMinCY = r.Height();
+   // After this point we allow resize code to kick in
+   m_bNeedInit = FALSE;
+   GetClientRect(&amp;m_rCrt);
+
+   return bResult;
+} </pre>
+          </li>
+          <li>Делаем обработчики для события WM_SIZE. Для этого в
+            меню <b>View</b> кликаем <b>Class Wizard</b>, а затем в
+            диалоговом окошке <b>Class Wizard</b> выбираем проект и
+            класс окна свойств (property sheet). Далее, в выпадающем
+            списке <b>Messages</b> выбираем пункт <b>WM_SIZE</b>. Ниже
+            показана реализаци обработчика сообщения:<br>
+            <br>
+            <pre class="CODESAMP">// Обрабатываем событие WM_SIZE путём изменения размера контрола tab
+//    и перемещая все кнопки на property sheet.
+void CMyPropertySheet::OnSize(UINT nType, int cx, int cy) 
+{
+   CRect r1; 
+   CPropertySheet::OnSize(nType, cx, cy);
+
+   if (m_bNeedInit)
+      return;
+
+   CTabCtrl *pTab = GetTabControl();
+   ASSERT(NULL != pTab &amp;&amp; IsWindow(pTab-&gt;m_hWnd));
+    
+   int dx = cx - m_rCrt.Width();
+   int dy = cy - m_rCrt.Height();
+   GetClientRect(&amp;m_rCrt);
+
+   HDWP hDWP = ::BeginDeferWindowPos(5);
+
+   pTab-&gt;GetClientRect(&amp;r1); 
+   r1.right += dx; r1.bottom += dy;
+   ::DeferWindowPos(hDWP, pTab-&gt;m_hWnd, NULL,
+                    0, 0, r1.Width(), r1.Height(),
+                    SWP_NOACTIVATE|SWP_NOMOVE|SWP_NOZORDER);
+
+   // Перемещаем все кнопки с нижних правых сторон
+   for (CWnd *pChild = GetWindow(GW_CHILD);
+        pChild != NULL;
+        pChild = pChild-&gt;GetWindow(GW_HWNDNEXT))
+   {
+      if (pChild-&gt;SendMessage(WM_GETDLGCODE) &amp; DLGC_BUTTON)
+      {
+         pChild-&gt;GetWindowRect(&amp;r1); ScreenToClient(&amp;r1); 
+         r1.top += dy; r1.bottom += dy; r1.left+= dx; r1.right += dx;
+         ::DeferWindowPos(hDWP, pChild-&gt;m_hWnd, NULL,
+                          r1.left, r1.top, 0, 0,
+                          SWP_NOACTIVATE|SWP_NOSIZE|SWP_NOZORDER);
+      }
+      // Ресайзим всё остальное...
+      else
+      {
+         pChild-&gt;GetClientRect(&amp;r1); 
+	 r1.right += dx; r1.bottom += dy;
+	 ::DeferWindowPos(hDWP, pChild-&gt;m_hWnd, NULL, 0, 0,
+                      r1.Width(), r1.Height(),
+                      SWP_NOACTIVATE|SWP_NOMOVE|SWP_NOZORDER);
+      }
+
+   }
+
+   ::EndDeferWindowPos(hDWP);
+} </pre>
+          </li>
+          <li>В заключении, Вам необходимо создать обработчик
+            сообщения WM_GETMINMAXINFO. Для этого в меню <b>View</b>
+            кликаем <b>Class Wizard</b>, а затем в диалоговом окошке <b>Class
+            Wizard</b> выбираем проект и класс окна свойств (property
+            sheet). Далее, в выпадающем списке <b>Messages</b> выбираем
+            пункт <b>WM_GETMINMAXINFO</b>. Ниже приведена реализация
+            обработчика WM_GETMINMAXINFO:<br>
+            <br>
+            <pre class="CODESAMP">void CMyPropertySheet::OnGetMinMaxInfo(MINMAXINFO FAR* lpMMI) 
+{
+   CPropertySheet::OnGetMinMaxInfo(lpMMI);
+   lpMMI-&gt;ptMinTrackSize.x = m_nMinCX;
+   lpMMI-&gt;ptMinTrackSize.y = m_nMinCY;
+} </pre>
+          </li>
+        </ol>
+        <p><br>
+        <br>
+        </p>
+      </li>
+    </ol>
+    <h2>ССЫЛКИ</h2>
+    <p>Для получения дополнительной информации, можно
+    посмотреть следующие статьи из Microsoft Knowledge Base:</p>
+    <blockquote>
+      <a href="q143291.shtml"><p>Q143291</a> Как изменить размер CPropertyPages
+      во время выполнения</p>
+    </blockquote>
+    <blockquote>
+      <a href="q146916.shtml"><p>Q146916</a> Как создать
+      немодальный CPropertySheet со стандартными
+      кнопками</p>
+    </blockquote>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

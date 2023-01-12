@@ -1,0 +1,129 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>»зменение конфигурации сервиса.</h3>
+    <p>ƒл€ изменени€ параметров установленного
+    сервиса используютс€ две функции <a
+    href="http://msdn.microsoft.com/library/en-us/dllproc/base/changeserviceconfig.asp"><b>ChangeServiceConfig</b></a>
+    и <a href="http://msdn.microsoft.com/library/en-us/dllproc/base/changeserviceconfig2.asp"><b>ChangeServiceConfig2</b></a>.
+    Ќиже приведЄн пример, в котором сперва
+    происходит попытка заблокировать базу данных,
+    чтобы предотвратить запуск сервиса, пока его
+    параметры будут измен€тьс€. ≈сли блокировка базы
+    данных происходит удачно, то открываетс€ сервис (получаем
+    его дескриптор), измен€етс€ его конфигураци€,
+    разблокируетс€ база данных, а затем дескриптор
+    сервиса закрываетс€. ≈сли заблокировать базу
+    данных не получаетс€, то вызываетс€ функци€ <a
+    href="http://msdn.microsoft.com/library/en-us/dllproc/base/queryservicelockstatus.asp"><b>QueryServiceLockStatus</b></a>,
+    чтобы получить информацию о блокировке.</p>
+    <p>&nbsp;</p>
+    <pre>VOID ReconfigureSampleService(BOOL fDisable, LPSTR lpDesc)
+{
+    SC_LOCK sclLock;
+    LPQUERY_SERVICE_LOCK_STATUS lpqslsBuf;
+    SERVICE_DESCRIPTION sdBuf;
+    DWORD dwBytesNeeded, dwStartType;
+
+    // Ќеобходимо заблокировать базу перед изменением настроек сервиса.
+
+    sclLock = LockServiceDatabase(schSCManager);
+
+    // ≈сли база не блокируетс€, то выводим отчЄт.
+
+    if (sclLock == NULL)
+    {
+        // ¬ыходим, если база не заблокирована другим процессом.
+
+        if (GetLastError() != ERROR_SERVICE_DATABASE_LOCKED)
+            MyErrorExit(&quot;LockServiceDatabase&quot;);
+
+        // ¬ыдел€ем буфер дл€ детальной информации о блокировке.
+
+        lpqslsBuf = (LPQUERY_SERVICE_LOCK_STATUS) LocalAlloc(
+            LPTR, sizeof(QUERY_SERVICE_LOCK_STATUS)+256);
+        if (lpqslsBuf == NULL)
+            MyErrorExit(&quot;LocalAlloc&quot;);
+
+        // ѕолучаем и распечатываем состо€ние блокировки.
+
+        if (!QueryServiceLockStatus(
+            schSCManager,
+            lpqslsBuf,
+            sizeof(QUERY_SERVICE_LOCK_STATUS)+256,
+            &amp;dwBytesNeeded) )
+            MyErrorExit(&quot;QueryServiceLockStatus&quot;);
+
+        if (lpqslsBuf-&gt;fIsLocked)
+            printf(&quot;Locked by: %s, duration: %d seconds\n&quot;,
+                lpqslsBuf-&gt;lpLockOwner,
+                lpqslsBuf-&gt;dwLockDuration);
+        else
+            printf(&quot;No longer locked\n&quot;);
+
+        LocalFree(lpqslsBuf);
+        MyErrorExit(&quot;Could not lock database&quot;);
+    }
+
+    // Ѕаза заблокирована, поэтому смело можно вносить изменени€.
+
+    // ќткрываем дескриптор сервиса.
+
+    schService = OpenService(
+        schSCManager,           // база данных SCManager
+        &quot;Sample_Srv&quot;,           // им€ сервиса
+        SERVICE_CHANGE_CONFIG); // надо только изменить
+    if (schService == NULL)
+        MyErrorExit(&quot;OpenService&quot;);
+
+    dwStartType = (fDisable) ? SERVICE_DISABLED :
+                            SERVICE_DEMAND_START;
+
+    // ¬носим изменени€.
+
+    if (! ChangeServiceConfig(
+        schService,        // дескриптор сервиса
+        SERVICE_NO_CHANGE, // тип сервиса: нет изменений
+        dwStartType,       // мен€ем тип запуска сервиса
+        SERVICE_NO_CHANGE, // контроль ошибок: нет изменений
+        NULL,              // путь сервиса: нет изменений
+        NULL,              // принадлежность к группе: нет изменений
+        NULL,              // --&quot;&quot;--: нет изменений
+        NULL,              // зависимости: нет изменений
+        NULL,              // им€ аккаунта: нет изменений
+        NULL,              // пароль: нет изменений
+        NULL) )            // отображаемое им€: нет изменений
+    {
+        MyErrorExit(&quot;ChangeServiceConfig&quot;);
+    }
+    else
+        printf(&quot;ChangeServiceConfig SUCCESS\n&quot;);
+
+    sdBuf.lpDescription = lpDesc;
+
+    if( !ChangeServiceConfig2(
+        schService,                // дескриптор сервиса
+        SERVICE_CONFIG_DESCRIPTION // измен€ем: описание
+        &amp;sdBuf) )                  // значение: новое описание
+    {
+        MyErrorExit(&quot;ChangeServiceConfig2&quot;);
+    }
+    else
+        printf(&quot;ChangeServiceConfig2 SUCCESS\n&quot;);
+
+    // –азблокируем базу данных.
+ 
+    UnlockServiceDatabase(sclLock);
+
+    // «акрываем дескриптор сервиса.
+
+    CloseServiceHandle(schService);
+}</pre>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

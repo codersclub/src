@@ -1,0 +1,170 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как программно изменить сетевой пароль под
+    Windows 95</h3>
+    <p>Существует несколько методов смены доменного
+    пароля в Windows 95. Каждый из них обладает своими
+    преимуществами и недостатками. В данной статье
+    детально описываются два метода.</p>
+    <h3>Первый метод</h3>
+    <p>Для смены паролей можно динамически загрузить
+    32-битную API функцию PwdChangePassword() из Mpr.dll. Однако, при
+    этом будет показан стандартное диалоговое окно,
+    предлагающее пользователю ввести пароль. Если
+    Вам необходимо, чтобы приложение имело свой
+    интерфейс для смены пароля, то данная функция не
+    подойдёт.<br>
+    <br>
+    ЗАМЕЧАНИЕ: PwdChangePassword(), это единственный
+    интерфейс, который позволяет менять как пароль
+    Windows, так и сетевой пароль.<br>
+    <br>
+    Следующий код демонстрирует использование
+    PwdChangePassword.</p>
+    <h3>Пример кода</h3>
+    <pre class="CODESAMP">   //////////////////////////////////// 
+   #include &lt;windows.h&gt;
+   #include &lt;stdio.h&gt;
+   #include &quot;pwdspi.h&quot;  // Найдите его в июльском 96 DDK иначе сделайте
+                        // следующие объявления
+
+   #ifndef PS_SYNCMASTERPWD //если pwdspi.h не присутствует
+   #define PS_SYNCMASTERPWD         0x03
+   #define PS_SYNCMASTERPWD_OFF     0x00
+   #define PS_SYNCMASTERPWD_ON      0x01
+
+   // Объявление функции PwdChangePassword и вспомогательной структуры для
+   // Windows 95. Вспомогательная структура (так же содержащаяся в pwdspi.h)
+   typedef struct _CHANGEPWDINFO{
+      LPTSTR lpUsername;
+      LPTSTR lpPassword;
+      DWORD cbPassword;
+   } CHANGEPWDINFO, FAR *LPCHANGEPWDINFO;
+   #endif
+
+   // Объявления функции:
+   typedef DWORD
+    (APIENTRY *LPPwdChangePassword)(LPCTSTR,HWND,DWORD,LPCHANGEPWDINFO);
+   typedef DWORD (APIENTRY *LPPwdSetPasswordStatus)(LPCSTR,DWORD,DWORD);
+
+   // Функция для отображения сообщения об ошибке
+   void DisplayError(char *pszAPI);
+
+   void main()
+   {
+   CHANGEPWDINFO   s = {NULL,NULL,0}; // инициализируем пустую структуру.
+   LPPwdChangePassword sPwdChangePassword;
+   LPPwdSetPasswordStatus sPwdSetPasswordStatus;
+   DWORD   res = 0;
+   DWORD   cbUserName = 250;
+   HINSTANCE   lib = LoadLibrary(&quot;MPR.DLL&quot;);
+
+   if (lib == NULL)
+        DisplayError(&quot;LoadLibrary&quot;);
+
+   // Чтобы синхронизировать сетевой пароль с паролем, нам необходимо
+   // вызвать PwdSetPasswordStatus. Синхронизируя сетевой пароль, мы
+   // освобождаем себя от необходимости изменять каждый пароль в отдельности.
+   // Информация о сетевых провайдерах находится в реестре по адресу:
+   // HKLM/System\CurrentControlSet\Control\PwdProvider
+
+   // Получаем адрес функции PwdGetPasswordStatus
+   sPwdSetPasswordStatus =
+      (LPPwdSetPasswordStatus) GetProcAddress(lib,&quot;PwdSetPasswordStatusA&quot;);
+   if (sPwdSetPasswordStatus == NULL)
+      DisplayError(&quot;GetProcAddress&quot;);
+
+   res = sPwdSetPasswordStatus(&quot;MSNP32&quot;, // имя провайдера пароля
+                               PS_SYNCMASTERPWD,
+                               PS_SYNCMASTERPWD_ON
+                               );
+   if (res != WN_SUCCESS)
+        DisplayError(&quot;PwdSetPasswordStatus&quot;);
+
+   // Нужно получить адрес PwdChangePasswordA, так как в Windows 95 мы
+   // мы используем ascii версию экспортированной функции
+   sPwdChangePassword =
+      (LPPwdChangePassword) GetProcAddress(lib,&quot;PwdChangePasswordA&quot;);
+
+   // Вызываем sPwdChangePassword, указывая NULL в качестве сетевого
+   // провайдера. Это заставит windows изменить несетевой пароль а заодно
+   // и все синхронизированные с ним пароли.
+   res = sPwdChangePassword(    NULL, // Сетевой провайдер
+                                GetDesktopWindow(), //Окно для диалога
+                                0,  // Флаги не указываем
+                                &amp;s  // Адрес структуры CHANGEPWDINFO
+                                );
+   if (res != WN_SUCCESS)
+        DisplayError(&quot;PwdChangePassword&quot;);
+
+   FreeLibrary(lib);
+   printf(&quot;Password = %s\n&quot;,s.lpPassword);
+
+   return;
+   }
+
+   void DisplayError(char *pszAPI)
+   {
+   LPVOID lpvMessageBuffer;
+
+   FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER|FORMAT_MESSAGE_FROM_SYSTEM,
+                 NULL, GetLastError(),
+                 MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                 (LPTSTR)&amp;lpvMessageBuffer, 0, NULL);
+
+   //... теперь отображаем эту строку
+   printf(&quot;ERROR: API        = %s.\n&quot;, pszAPI);
+   printf(&quot;       error code = %d.\n&quot;, GetLastError());
+   printf(&quot;       message    = %s.\n&quot;, (char *)lpvMessageBuffer);
+
+   // Освобождаем буфер, распределённый системой
+   LocalFree(lpvMessageBuffer);
+   ExitProcess(GetLastError());
+   } </pre>
+    <h3>Второй метод</h3>
+    <p>Относительно простой способ смены паролей под
+    Windows 95, заключается в том, чтобы иметь серверный
+    процесс, запущенный на Windows NT server, который создаёт
+    named pipe, к которому может приконнектиться клиент
+    Windows 95. Windows NT Server вызывает API функцию
+    ImpersonateNamedPipeClient() и получает доменное имя и имя
+    пользователя Windows 95 как описано в следующей
+    статье:</p>
+    <blockquote>
+      <a href="q155698.shtml"><p>Q155698</a> Как получить текущее имя
+      пользователя и имя домена</p>
+    </blockquote>
+    <p>Затем клиент Windows 95 посылает информацию о
+    пароле процессу Windows NT который затем может
+    вызвать функцию NetUserChangePassword(). Недостаток этого
+    метода состоит в том, что необходимо иметь
+    запущенный процесс Windows NT Server, а затем отправлять
+    пароль через сеть с определённой долей риска.
+    Чтобы увеличить уровень безопасности, можно
+    зашифровать пароль перед отправкой его по сети.
+    Кроме того, данный метод позволяет изменить
+    только сетевой пароль, но никак не пароль входа в
+    Windows. Это значит, Пароль Windows и сетевой пароль не
+    синхронизированы. В результате, пользователь
+    должен вводить оба пароля при входе в Windows 95.<br>
+    <br>
+    ЗАМЕЧАНИЕ: Вы не должны использовать 16-битную
+    функцию NetUserChangePassword() сетевого менеджера. Эта
+    функция конвертирует все символы пароля в
+    верхний регистр а затем отправляет комбинацию
+    имени пользователя и пароля через сеть в
+    незашифрованном виде (в виде чистого текста). Это
+    не только определённый риск для безопасности
+    пароля, но не возможности вдальнейнейшем
+    пользоваться паролем из-за смени всех символов
+    на верхний регистр.</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

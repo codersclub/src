@@ -1,0 +1,148 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как получить текущее имя пользователя и домена
+    в Windows 95 и Windows 98</h3>
+    <p>Эта статья описывает, как программно получить
+    имя пользователя и имя домена для интерактивно
+    залогинившегося пользователя в Windows 95 и Windows 98,
+    которое возможно только при использовании
+    16-битной функции <b>NetWkstaGetInfo</b> LAN менеджера.</p>
+    <p>В Windows 95 нет 32-битной функции для получения как
+    имени пользователя так и имени домена, связанных
+    с залогинившимся пользователем. Однако, эти
+    значения можно получить при помощи 16-битной
+    функции LAN Менеджера <b>NetWkstaGetInfo</b> на info-level 10. Эта
+    функция экспортируется 16-битной библиотекой
+    Netapi.dll. Заголовочные файлы, а так же библиотеки,
+    связанные с функциями 16-битного LAN Менеджера
+    можно найти в Windows for Workgroups Software Development Kit (SDK).<br>
+    <br>
+    <b>ЗАМЕЧАНИЕ:</b> Windows for Workgroups SDK больше не
+    поддерживается Майкрософтом, поэтому получить
+    данный SDK будет проблематично. Но всё же те, у кого
+    этот SDK имеется могут воспользоваться
+    нижеприведённым кодом.</p>
+    <b><p>ЗАМЕЧАНИЕ</b>: Если Вам необходимо получить
+    только имя пользователя, то можно
+    воспользоваться 32-битной функцией <b>GetUserName</b>
+    которая присутствует в Windows 95, Windows 98, Microsoft Windows NT,
+    и Microsoft Windows 2000.</p>
+    <h3>Пример кода</h3>
+    <p>Следующий пример демонстрирует, как программно
+    получить имя пользователя и имя домена в Windows 95 и
+    98 при помощи функции <b>NetWkstaGetInfo</b>. Так как функция
+    <b>NetWkstaGetInfo</b> является 16-битной, то данный пример
+    должен быть откомпилирован при помощи 16-битного
+    компилятора:</p>
+    <pre class="CODESAMP">#include &lt;windows.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;netcons.h&gt;
+#include &lt;wksta.h&gt;
+#include &lt;neterr.h&gt;
+
+//**********************************************************************
+// 
+//  FUNCTION:     GetCurrentUserAndDomain - This function looks up
+//                the user name and domain name for the user account
+//                associated with the calling thread.
+// 
+//  PARAMETERS:   szUser - a buffer that receives the user name
+//                pcchUser - the size, in characters, of szUser
+//                szDomain - a buffer that receives the domain name
+//                pcchDomain - the size, in characters, of szDomain
+// 
+//  RETURN VALUE: NERR_Success if the function succeeds. Otherwise, the
+//                function returns a network error code from neterr.h.
+// 
+//                If either of the supplied buffers are too small, the
+//                function will return NERR_BufTooSmall and pcchUser and
+//                pcchDomain will be adjusted to reflect the required
+//                buffer sizes.
+// 
+//**********************************************************************
+
+unsigned short GetCurrentUserAndDomain(char* szUser, int* pcchUser, 
+      char* szDomain, int* pcchDomain) {
+
+   unsigned short iNetErr;
+
+   struct wksta_info_10 far* pwi10 = NULL;
+   unsigned short cbwi10 = 0;
+
+   int iDomainLen;
+   int iUserLen;
+
+   // Запрашиваем требуемый объём буфера для информации об учётной записи.
+   iNetErr = NetWkstaGetInfo(NULL, 10, (char far*) pwi10, cbwi10,
+         &amp;cbwi10);
+
+   // Нулевая длина буфера сигнализирует об ошибке.
+   if (iNetErr != NERR_BufTooSmall)
+      return iNetErr;
+
+   // Выделяем буфер для информации об учётной записи.
+   pwi10 = (struct wksta_info_10 far*) malloc(cbwi10);
+   if (pwi10 == NULL)
+      return NERR_ProgNeedsExtraMem;
+
+   // Получаем информацию об учётной записи.
+   iNetErr = NetWkstaGetInfo(NULL, 10, (char far*) pwi10, cbwi10,
+         &amp;cbwi10);
+   if (iNetErr == NERR_Success) {
+
+      // Если возможно, то копируем имя пользователя в буфер.
+      iUserLen = strlen(pwi10-&gt;wki10_username) + 1;
+      if (iUserLen &lt; *pcchUser)
+         strcpy(szUser, pwi10-&gt;wki10_username);
+      else 
+         iNetErr = NERR_BufTooSmall;
+
+      // Устанавливаем требуемый размер буфера.
+      *pcchUser = iUserLen;
+
+      // Если возможно, то копируем имя домена в буфер.
+      iDomainLen = strlen(pwi10-&gt;wki10_logon_domain) + 1;
+      if (iDomainLen &lt; *pcchDomain)
+         strcpy(szDomain, pwi10-&gt;wki10_logon_domain);
+      else
+         iNetErr = NERR_BufTooSmall;
+
+      // Устанавливаем требуемый размер буфера.
+      *pcchDomain = iDomainLen;
+   }
+
+   // Освобождаем выделенный буфер.
+   free(pwi10);
+
+   return iNetErr;
+} </pre>
+    <p>&nbsp;</p>
+    <h2>ССЫЛКИ</h2>
+    <p>В Windows NT и Windows 2000, для получения имени
+    пользователя и домена вызывающий поток может
+    использовать 32-битные функции. Дополнительную
+    информацию по этому поводу можно прочитать в
+    статье из Microsoft Knowledge Base:</p>
+    <blockquote>
+      <a href="q111544.shtml"><p>Q111544</a> Как получить текущее имя
+      пользователя и имя домена в Windows NT</p>
+    </blockquote>
+    <p>Пример данной статьи должен быть скомпилирован
+    16-битным компилятором. Либо вызывать 16-битные
+    функции из 32-битного приложения при помощи
+    механихма под названием &quot;thunking&quot;. Подробнее об
+    этом можно прочитать в статье из Microsoft Knowledge Base:</p>
+    <blockquote>
+      <a href="q155763.shtml"><p>Q155763</a> Как вызывать 16-битный код из
+      32-битного под Windows 95</p>
+    </blockquote>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

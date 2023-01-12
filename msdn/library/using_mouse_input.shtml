@@ -1,0 +1,832 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Работа с мышкой.</h3>
+    <p>Содержание:<ul>
+      <li><a href="#tracking_cursor" target="_self">Отслеживание курсора
+        мышки</a></li>
+      <li><a href="#drawing_lines" target="_self">Рисование линий при
+        помощи мышки</a></li>
+      <li><a href="#processing_dblclick" target="_self">Обработка двойного
+        щелчка</a></li>
+      <li><a href="#selecting_text" target="_self">Выделение строки текста</a></li>
+      <li><a href="#using_wheel" target="_self">Использование колеса мышки
+        в документах с встраиваемыми объектами</a></li>
+      <li><a href="#retrieving_wheel_scroll" target="_self">Получаем количество
+        строк, проскроллированных колесом мышки</a></li>
+    </ul>
+    <p><a name="tracking_cursor"></a><b>Отслеживание курсора мышки</b></p>
+    <p>Частенько приложению требуется знать
+    координаты курсора мышки. Обычно, это
+    графические программы, которые отслеживают
+    координаты курсора во время рисования
+    какого-нибудь рисунка. Так же отслеживать
+    положение мышки необходимо приложениям
+    работающим с текстом для возможности выделения
+    блоков текста.</p>
+    <p>Для того, чтобы отслеживать курсор мышки,
+    обычно необходимо обработать три сообщения <a
+    href="http://msdn.microsoft.com/library/en-us/winui/WinUI/WindowsUserInterface/UserInput/MouseInput/MouseInputReference/MouseInputMessages/WM_LBUTTONDOWN.asp">WM_LBUTTONDOWN</a>,
+    <a
+    href="http://msdn.microsoft.com/library/en-us/winui/WinUI/WindowsUserInterface/UserInput/MouseInput/MouseInputReference/MouseInputMessages/WM_MOUSEMOVE.asp">WM_MOUSEMOVE</a>,
+    и <a
+    href="http://msdn.microsoft.com/library/en-us/winui/WinUI/WindowsUserInterface/UserInput/MouseInput/MouseInputReference/MouseInputMessages/WM_LBUTTONUP.asp">WM_LBUTTONUP</a>.
+    Как правило, отслеживание курсора начинается с
+    поступления сообщения <b>WM_LBUTTONDOWN</b>, в параметре <i>lParam</i>
+    которого записаны координаты курсора. Далее
+    начинается сам процесс отслеживания путём
+    обработки потока сообщений <b>WM_MOUSEMOVE</b> которые
+    постит само окно при перемещении мышки.
+    Поступление сообщения <b>WM_LBUTTONUP</b> сигнализирует
+    об окончании процесса отслеживания.</p>
+    <p>Так же можно использовать функцию <a
+    href="http://msdn.microsoft.com/library/en-us/winui/WinUI/WindowsUserInterface/UserInput/MouseInput/MouseInputReference/MouseInputFunctions/TrackMouseEvent.asp">TrackMouseEvent</a>,
+    чтобы заставить систему посылать другие
+    сообщения необходимые для отслеживания курсора.
+    Сообщение <a
+    href="http://msdn.microsoft.com/library/en-us/winui/WinUI/WindowsUserInterface/UserInput/MouseInput/MouseInputReference/MouseInputMessages/WM_MOUSEHOVER.asp">WM_MOUSEHOVER</a>
+    посылается системой когда мышка попадает в
+    клиентскую область, а сообщение <a
+    href="http://msdn.microsoft.com/library/en-us/winui/WinUI/WindowsUserInterface/UserInput/MouseInput/MouseInputReference/MouseInputMessages/WM_MOUSELEAVE.asp">WM_MOUSELEAVE</a>
+    - когда курсор покидает клиентскую область.
+    Соответственно, сообщения <a
+    href="http://msdn.microsoft.com/library/en-us/winui/WinUI/WindowsUserInterface/UserInput/MouseInput/MouseInputReference/MouseInputMessages/WM_NCMOUSEHOVER.asp">WM_NCMOUSEHOVER</a>
+    и <a
+    href="http://msdn.microsoft.com/library/en-us/winui/WinUI/WindowsUserInterface/UserInput/MouseInput/MouseInputReference/MouseInputMessages/WM_NCMOUSELEAVE.asp">WM_NCMOUSELEAVE</a>
+    отвечают за неклиентскую область.</p>
+    <p><a name="drawing_lines"></a><b>Рисование линий при помощи
+    мышки</b></p>
+    <p>В данном разделе статьи представлена часть
+    кода оконной процедуры, которая позволяет
+    пользователю рисовать линии в клиентской
+    области окна путём перетаскивания мышки.</p>
+    <p>Когда оконная процедура получает сообщение <b>WM_LBUTTONDOWN</b>,
+    то происходит захват мышки и сохранение
+    координат курсора, используя их как начальную
+    точку линии. При этом используется функция <a
+    href="http://msdn.microsoft.com/library/en-us/winui/WinUI/WindowsUserInterface/Resources/Cursors/CursorReference/CursorFunctions/ClipCursor.asp">ClipCursor</a>,
+    чтобы ограничить перемещение курсора клиентской
+    областью в процессе рисования.</p>
+    <p>В течение первого сообщения <b>WM_MOUSEMOVE</b> оконная
+    процедура рисует линию от начальной точки до
+    текущей позиции курсора. В течение последующих
+    сообщений <b>WM_MOUSEMOVE</b>, оконная процедура стирает
+    предыдущую линию путём рисования повёрх неё
+    линии инверсного цвета. Затем снова рисуется
+    линия от начальной точки до текущих координат
+    курсора.</p>
+    <p>Поступление сообщения <b>WM_LBUTTONUP</b>
+    сигнализирует об окончании рисования. Оконная
+    процедура освобождает захват мышки и снимает
+    ограничение движения мышки клиентской областью.</p>
+    <p><b>Пример:</b></p>
+    <pre>LRESULT APIENTRY MainWndProc(HWND hwndMain, UINT uMsg,
+                                   WPARAM wParam, LPARAM lParam)
+{
+    HDC hdc;                       <font
+color="blue">//</font><font color="green"> дескриптор контекста устройства</font>
+    RECT rcClient;                 <font
+color="blue">//</font><font color="green"> прямоугольник клиентской области</font>
+    POINT ptClientUL;              <font
+color="blue">//</font><font color="green"> верхний левый угол клиент.области</font>
+    POINT ptClientLR;              <font
+color="blue">//</font><font color="green"> нижний правый угол клиент.области</font>
+    static POINTS ptsBegin;        <font
+color="blue">//</font><font color="green"> начальная точка</font>
+    static POINTS ptsEnd;          <font
+color="blue">//</font><font color="green"> новая конечная точка</font>
+    static POINTS ptsPrevEnd;      <font
+color="blue">//</font><font color="green"> предыдущая конечная точка</font>
+    static BOOL fPrevLine = FALSE; <font
+color="blue">//</font><font color="green"> флаг предыдущей линии</font>
+
+    switch (uMsg)
+    {
+       case WM_LBUTTONDOWN:
+
+            <font
+color="blue">//</font><font color="green"> Захватываем мышку.</font>
+
+            SetCapture(hwndMain);
+
+            <font
+color="blue">//</font><font color="green"> Получаем экранные координаты клиентской области,</font>
+            <font
+color="blue">//</font><font color="green"> и преобразуем их в клиентские координаты.</font>
+
+            GetClientRect(hwndMain, &amp;rcClient);
+            ptClientUL.x = rcClient.left;
+            ptClientUL.y = rcClient.top;
+
+            <font
+color="blue">//</font><font color="green"> Добавляем один пиксель справа и снизу, так как координаты,</font>
+            <font
+color="blue">//</font><font color="green"> полученные из GetClientRect не включают левого и</font>
+            <font
+color="blue">//</font><font color="green"> нижнего пикселей.</font>
+
+            ptClientLR.x = rcClient.right + 1;
+            ptClientLR.y = rcClient.bottom + 1;
+            ClientToScreen(hwndMain, &amp;ptClientUL);
+            ClientToScreen(hwndMain, &amp;ptClientLR);
+
+            <font
+color="blue">//</font><font color="green"> Копируем клиентские координаты клиентской области</font>
+            <font
+color="blue">//</font><font color="green"> в структуру rcClient. Ограничиваем курсор мышки клиентской</font>
+            <font
+color="blue">//</font><font color="green"> областью, передав структуру rcClient в</font>
+            <font
+color="blue">//</font><font color="green"> функцию ClipCursor.</font>
+
+            SetRect(&amp;rcClient, ptClientUL.x, ptClientUL.y,
+                ptClientLR.x, ptClientLR.y);
+            ClipCursor(&amp;rcClient);
+
+            <font
+color="blue">//</font><font color="green"> Преобразуем координаты курсора для структуры POINTS,</font>
+            <font
+color="blue">//</font><font color="green"> которая определяет начальную точку рисования линии</font>
+            <font
+color="blue">//</font><font color="green"> в течение сообщения WM_MOUSEMOVE.</font>
+
+            ptsBegin = MAKEPOINTS(lParam);
+            return 0;
+
+        case WM_MOUSEMOVE:
+
+            <font
+color="blue">//</font><font color="green"> Чтобы рисовалась линия, то при движении мышки</font>
+            <font
+color="blue">//</font><font color="green"> пользователь должен удерживать нажатой левую кнопку мышки.</font>
+
+            if (wParam &amp; MK_LBUTTON)
+            {
+
+                <font
+color="blue">//</font><font color="green"> Получаем контекст устройства (DC) для клиентской области</font>
+
+                hdc = GetDC(hwndMain);
+
+                <font
+color="blue">//</font><font color="green"> Следующая функция гарантирует, что пиксели</font>
+                <font
+color="blue">//</font><font color="green"> предыдущей линии установлены в белый цвет, а</font>
+                <font
+color="blue">//</font><font color="green"> вновь нарисованной линии - в чёрный.</font>
+
+                SetROP2(hdc, R2_NOTXORPEN);
+
+                <font
+color="blue">//</font><font color="green"> Если линия была нарисована в предыдущем WM_MOUSEMOVE,</font>
+                <font
+color="blue">//</font><font color="green"> то рисуем поверх неё. Тем самым, установив пиксели</font>
+                <font
+color="blue">//</font><font color="green"> линии в белый цвет, мы сотрём её.</font>
+
+                if (fPrevLine)
+                {
+                    MoveToEx(hdc, ptsBegin.x, ptsBegin.y, (LPPOINT) NULL);
+                    LineTo(hdc, ptsPrevEnd.x, ptsPrevEnd.y);
+                }
+
+                <font
+color="blue">//</font><font color="green"> Преобразуем текущие координаты курсора в структуру</font>
+                <font
+color="blue">//</font><font color="green"> POINTS, а затем рисуем новую линию.</font>
+
+                ptsEnd = MAKEPOINTS(lParam);
+                MoveToEx(hdc, ptsBegin.x, ptsBegin.y, (LPPOINT) NULL);
+                LineTo(hdc, ptsEnd.x, ptsEnd.y);
+
+                <font
+color="blue">//</font><font color="green"> Устанавливаем флаг предыдущей линии, сохраняем конечную</font>
+                <font
+color="blue">//</font><font color="green"> точку новой линии, а затем освобождаем DC.</font>
+
+                fPrevLine = TRUE;
+                ptsPrevEnd = ptsEnd;
+                ReleaseDC(hwndMain, hdc);
+            }
+            break;
+
+        case WM_LBUTTONUP:
+
+            <font
+color="blue">//</font><font color="green"> Пользователь закончил рисовать линию. Сбрасываем флаг</font>
+            <font
+color="blue">//</font><font color="green"> предыдущей линии, освобождаем курсор мышки и</font>
+            <font
+color="blue">//</font><font color="green"> освобождаем захват мышки.</font>
+
+            fPrevLine = FALSE;
+            ClipCursor(NULL);
+            ReleaseCapture();
+            return 0;
+
+        case WM_DESTROY:
+            PostQuitMessage(0);
+            break;
+
+        <font
+color="blue">//</font><font color="green"> Обрабатываем другие сообщения.</font>
+</pre>
+    <p><a name="processing_dblclick"></a><b>Обработка двойного щелчка</b></p>
+    <p>Чтобы получать сообщения о двойном щелчке
+    (double-click messages), класс окна должен содержать стиль <a
+    href="http://msdn.microsoft.com/library/en-us/winui/winui/windowsuserinterface/windowing/windowclasses/aboutwindow.asp#class_styles">CS_DBLCLKS</a>.
+    Этот стиль устанавливается при регистрации
+    оконного класса, как показано ниже.</p>
+    <p><b>Пример:</b></p>
+    <pre>BOOL InitApplication(HINSTANCE hInstance)
+{
+    WNDCLASS wc;
+
+    wc.style = CS_DBLCLKS | CS_HREDRAW | CS_VREDRAW;
+    wc.lpfnWndProc = (WNDPROC) MainWndProc;
+    wc.cbClsExtra = 0;
+    wc.cbWndExtra = 0;
+    wc.hInstance = hInstance;
+    wc.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+    wc.hCursor = LoadCursor(NULL, IDC_IBEAM);
+    wc.hbrBackground = GetStockObject(WHITE_BRUSH);
+    wc.lpszMenuName = &quot;MainMenu&quot;;
+    wc.lpszClassName = &quot;MainWClass&quot;;
+
+    return RegisterClass(&amp;wc);
+}</pre>
+    <p>Сообщение о двойном щелчке всегда
+    предшевствует сообщению о нажатии кнопки.</p>
+    <p><a name="selecting_text"></a><b>Выделение строки текста</b></p>
+    <p>В данном разделе приведён пример, который был
+    взят из обычного текстового редактора. Он
+    включает код, позволяющий пользователю обычным
+    щелчком устанавливать каретку в любом месте
+    текста, а также выделять (подсвечивать) строку
+    текста двойным щелчком.</p>
+    <p><b>Пример:</b></p>
+    <pre>LRESULT APIENTRY MainWndProc(HWND hwndMain, UINT uMsg,
+                                    WPARAM wParam, LPARAM lParam)
+{
+    HDC hdc;                     <font
+color="blue">//</font><font color="green"> дескриптор контекста устройства</font>
+    TEXTMETRIC tm;               <font
+color="blue">//</font><font color="green"> данные о размере шрифта</font>
+    int i, j;                    <font
+color="blue">//</font><font color="green"> счётчики цикла</font>
+    int cCR = 0;                 <font
+color="blue">//</font><font color="green"> счётчик возвратов каретки</font>
+    char ch;                     <font
+color="blue">//</font><font color="green"> символ из буфера ввода</font>
+    static int nBegLine;         <font
+color="blue">//</font><font color="green"> начало выделенной линии</font>
+    static int nCurrentLine = 0; <font
+color="blue">//</font><font color="green"> текущая выделенная строка</font>
+    static int nLastLine = 0;    <font
+color="blue">//</font><font color="green"> последняя строка текста</font>
+    static int nCaretPosX = 0;   <font
+color="blue">//</font><font color="green"> x-координата каретки</font>
+    static int cch = 0;          <font
+color="blue">//</font><font color="green"> количество введённых символов</font>
+    static int nCharWidth = 0;   <font
+color="blue">//</font><font color="green"> точная ширина символа</font>
+    static char szHilite[128];   <font
+color="blue">//</font><font color="green"> строка текста, которая будет выделена</font>
+    static DWORD dwCharX;        <font
+color="blue">//</font><font color="green"> средняя ширина символов</font>
+    static DWORD dwLineHeight;   <font
+color="blue">//</font><font color="green"> высота строки</font>
+    static POINTS ptsCursor;     <font
+color="blue">//</font><font color="green"> координаты курсора мышки</font>
+    static COLORREF crPrevText;  <font
+color="blue">//</font><font color="green"> предыдущий цвет текста</font>
+    static COLORREF crPrevBk;    <font
+color="blue">//</font><font color="green"> предыдущий цвет фона</font>
+    static PTCHAR pchInputBuf;   <font
+color="blue">//</font><font color="green"> указатель на буфер ввода</font>
+    static BOOL fTextSelected = FALSE; <font
+color="blue">//</font><font color="green"> флаг выделения текста</font>
+	size_t * pcch;
+	HRESULT hResult;
+
+    switch (uMsg)
+    {
+        case WM_CREATE:
+
+            <font
+color="blue">//</font><font color="green"> Получаем параметры текущего шрифта.</font>
+
+            hdc = GetDC(hwndMain);
+            GetTextMetrics(hdc, &amp;tm);
+            ReleaseDC(hwndMain, hdc);
+
+            <font
+color="blue">//</font><font color="green"> Сохраняем среднюю ширину и высоту символа.</font>
+
+            dwCharX = tm.tmAveCharWidth;
+            dwLineHeight = tm.tmHeight;
+
+            <font
+color="blue">//</font><font color="green"> Выделяем буфер для хранения ввода с клавиатуры.</font>
+
+            pchInputBuf = (LPSTR) GlobalAlloc(GPTR,
+                BUFSIZE * sizeof(TCHAR));
+
+            return 0;
+
+        case WM_CHAR:
+            switch (wParam)
+            {
+                case 0x08:  <font
+color="blue">//</font><font color="green"> backspace</font>
+                case 0x0A:  <font
+color="blue">//</font><font color="green"> перевод строки</font>
+                case 0x1B:  <font
+color="blue">//</font><font color="green"> escape</font>
+                    MessageBeep( (UINT) -1);
+                    return 0;
+
+                case 0x09:  <font
+color="blue">//</font><font color="green"> символ табуляции (tab)</font>
+
+                    <font
+color="blue">//</font><font color="green"> Преобразуем символы табуляции в четыре пробела.</font>
+
+                    for (i = 0; i &lt; 4; i++)
+                        SendMessage(hwndMain, WM_CHAR, 0x20, 0);
+                    return 0;
+
+                case 0x0D:  <font
+color="blue">//</font><font color="green"> возврат каретки</font>
+
+                  <font
+color="blue">//</font><font color="green"> Записываем символ возврата каретки и помещаем каретку</font>
+                  <font
+color="blue">//</font><font color="green"> в начало новой строки.</font>
+
+                    pchInputBuf[cch++] = 0x0D;
+                    nCaretPosX = 0;
+                    nCurrentLine += 1;
+                    break;
+
+                default:    // отображаемый символ
+ 
+                    ch = (char) wParam;
+                    HideCaret(hwndMain);
+
+                    <font
+color="blue">//</font><font color="green"> Получаем ширину символа и отображаем его.</font>
+
+                    hdc = GetDC(hwndMain);
+                    GetCharWidth32(hdc, (UINT) wParam, (UINT) wParam,
+                        &amp;nCharWidth);
+                    TextOut(hdc, nCaretPosX,
+                        nCurrentLine * dwLineHeight, &amp;ch, 1);
+                    ReleaseDC(hwndMain, hdc);
+
+                    <font
+color="blue">//</font><font color="green"> Сохраняем символ в буфере.</font>
+
+                    pchInputBuf[cch++] = ch;
+
+                    <font
+color="blue">//</font><font color="green"> Вычисляем новую горизонтальную координат каретки.</font>
+                    <font
+color="blue">//</font><font color="green"> Если координата достигла максимума, то вставляем</font>
+                    <font
+color="blue">//</font><font color="green"> перевод каретки и перемещаем каретку</font>
+                    <font
+color="blue">//</font><font color="green"> в начало следующей строки.</font>
+
+                    nCaretPosX += nCharWidth;
+                    if ((DWORD) nCaretPosX &gt; dwMaxCharX)
+                    {
+                        nCaretPosX = 0;
+                        pchInputBuf[cch++] = 0x0D;
+                        ++nCurrentLine;
+                    }
+
+                    ShowCaret(hwndMain);
+
+                    break;
+            }
+            SetCaretPos(nCaretPosX, nCurrentLine * dwLineHeight);
+            nLastLine = max(nLastLine, nCurrentLine);
+            break;
+
+        <font
+color="blue">//</font><font color="green"> Обрабатываем другие сообщения.</font>
+
+        case WM_LBUTTONDOWN:
+
+            <font
+color="blue">//</font><font color="green"> Если строка текста уже выделена, то перерисовываем</font>
+            <font
+color="blue">//</font><font color="green"> текст, чтобы убрать выделение.</font>
+
+            if (fTextSelected)
+            {
+              hdc = GetDC(hwndMain);
+              SetTextColor(hdc, crPrevText);
+              SetBkColor(hdc, crPrevBk);
+	      hResult = StringCchLength(szHilite, 128/sizeof(TCHAR), pcch);
+		if (FAILED(hResult))
+		{
+		<font
+color="blue">//</font><font color="green"> TODO: обработчик ошибки</font>
+		}
+              TextOut(hdc, 0, nCurrentLine * dwLineHeight, szHilite, *pcch);
+              ReleaseDC(hwndMain, hdc);
+              ShowCaret(hwndMain);
+              fTextSelected = FALSE;
+            }
+
+            <font
+color="blue">//</font><font color="green"> Сохраняем текущие координаты курсора мышки.</font>
+
+            ptsCursor = MAKEPOINTS(lParam);
+
+            <font
+color="blue">//</font><font color="green"> Определяем, на какой строке находится курсор, и сохраняем</font>
+            <font
+color="blue">//</font><font color="green"> номер строки. Следим, чтобы номера строк не были больше</font>
+            <font
+color="blue">//</font><font color="green"> номера последней строки текста. Результат используем</font>
+            <font
+color="blue">//</font><font color="green"> для установки y-координаты каретки.</font>
+
+            nCurrentLine = min((int)(ptsCursor.y / dwLineHeight),
+                nLastLine);
+
+            <font
+color="blue">//</font><font color="green"> Парсим текст буфера ввода, чтобы найти первый символ</font>
+            <font
+color="blue">//</font><font color="green"> в выделенной строке текста. Каждая строка оканчивается</font>
+            <font
+color="blue">//</font><font color="green"> символом возврата каретки, поэтому, чтобы найти</font>
+            <font
+color="blue">//</font><font color="green"> выделенную строку, достаточно сосчитать возвраты каретки.</font>
+
+            cCR = 0;
+            nBegLine = 0;
+            if (nCurrentLine != 0)
+            {
+                for (i = 0; (i &lt; cch) &amp;&amp;
+                        (cCR &lt; nCurrentLine); i++)
+                {
+                    if (pchInputBuf[i] == 0x0D)
+                        ++cCR;
+                }
+                nBegLine = i;
+            }
+
+            <font
+color="blue">//</font><font color="green"> Начиная с начала выделенной строки, измеряем ширину</font>
+            <font
+color="blue">//</font><font color="green"> каждого символа, суммируя с шириной уже измеренного</font>
+            <font
+color="blue">//</font><font color="green"> символа. Останавливаемся,</font>
+            <font
+color="blue">//</font><font color="green"> когда сумма больше, чем x-координата курсора.</font>
+            <font
+color="blue">//</font><font color="green"> Сумма используется для установки x-координаты каретки.</font>
+
+            hdc = GetDC(hwndMain);
+            nCaretPosX = 0;
+            for (i = nBegLine;
+                (pchInputBuf[i] != 0x0D) &amp;&amp; (i &lt; cch); i++)
+            {
+                ch = pchInputBuf[i];
+                GetCharWidth32(hdc, (int) ch, (int) ch, &amp;nCharWidth);
+                if ((nCaretPosX + nCharWidth) &gt; ptsCursor.x) break;
+                else nCaretPosX += nCharWidth;
+            }
+            ReleaseDC(hwndMain, hdc);
+
+            <font
+color="blue">//</font><font color="green"> Устанавливаем каретку в то место, куда кликнул пользователь.</font>
+
+            SetCaretPos(nCaretPosX, nCurrentLine * dwLineHeight);
+            break;
+
+        case WM_LBUTTONDBLCLK:
+
+            <font
+color="blue">//</font><font color="green"> Копируем выделенную строку в буфер.</font>
+
+            for (i = nBegLine, j = 0; (pchInputBuf[i] != 0x0D) &amp;&amp;
+                    (i &lt; cch); i++)
+            {
+                szHilite[j++] = pchInputBuf[i];
+            }
+            szHilite[j] = '\0';
+
+            <font
+color="blue">//</font><font color="green"> Скрываем каретку, инвертируем цвет фона и символов,</font>
+            <font
+color="blue">//</font><font color="green"> а затем перерисовываем выделенную строку.</font>
+
+            HideCaret(hwndMain);
+            hdc = GetDC(hwndMain);
+            crPrevText = SetTextColor(hdc, RGB(255, 255, 255));
+            crPrevBk = SetBkColor(hdc, RGB(0, 0, 0));
+	       hResult = StringCchLength(szHilite, 128/sizeof(TCHAR), pcch);
+		if (FAILED(hResult))
+		{
+		<font
+color="blue">//</font><font color="green"> TODO: обработчик ошибки</font>
+		}
+            TextOut(hdc, 0, nCurrentLine * dwLineHeight, szHilite, *pcch);
+            SetTextColor(hdc, crPrevText);
+            SetBkColor(hdc, crPrevBk);
+            ReleaseDC(hwndMain, hdc);
+
+            fTextSelected = TRUE;
+            break;
+
+            <font
+color="blue">//</font><font color="green"> Обрабатываем другие сообщения.</font>
+
+        default:
+            return DefWindowProc(hwndMain, uMsg, wParam, lParam);
+    }
+    return NULL;
+}</pre>
+    <p><a name="using_wheel"></a><b>Использование колеса мышки в
+    документах с встраиваемыми объектами</b></p>
+    <p>В этом разделе представлен пример,
+    демонстрирующий работу с документом Microsoft® Word, с
+    различными встраиваемыми объектами:<ul>
+      <li>Таблица Microsoft Excel</li>
+      <li>Элемент управления list box, который скроллируется
+        в ответ на вращение колёсика</li>
+      <li>Элемент управления text box, который не реагирует
+        на колёсико</li>
+    </ul>
+    <p>Сообщение <a
+    href="http://msdn.microsoft.com/library/en-us/winui/winui/windowsuserinterface/userinput/mouseinput/aboutmouseinput.asp#_win32_The_MSH_MOUSEWHEEL_Message">MSH_MOUSEWHEEL</a>
+    всегда посылается главному окну в Microsoft Word, даже
+    если активна встраиваемая таблица экселя.
+    Следующая таблица объясняет, как сообщение <b>MSH_MOUSEWHEEL</b>
+    обрабатывается в ответ на изменение фокуса.</p>
+    <table class="clsStd" border="1" cellspacing="0">
+<TBODY>
+      <tr>
+        <th bgcolor="#C0C0C0">Фокус на</th>
+        <th bgcolor="#C0C0C0">Обрабатывается следующим образом</th>
+      </tr>
+      <tr>
+        <td>документе Word</td>
+        <td>Word скроллирует окно документа.</td>
+      </tr>
+      <tr>
+        <td>внедрённой таблице Excel</td>
+        <td>Word постит сообщение в Excel. Вы должны решить,
+        должно ли внедрённое приложение реагировать на
+        сообщение или нет.</td>
+      </tr>
+      <tr>
+        <td>внедрённом элементе управления</td>
+        <td>Сперва приложение посылает сообщение
+        внедрённому контролу, который имеет фокус, и
+        проверяет код возврата, чтобы узнать, обработал
+        ли это сообщение внедрённый элемент управления.
+        Если элемент управления не обработал сообщение,
+        то приложение начнёт скроллировать окно всего
+        документа. Например, если пользователь кликает
+        по списку (list box), а затем начинает вращать
+        колёсико, то список будет скроллироваться в
+        соответствии с вращением колеса. Если
+        пользователь кликнет в текстовое окно, а затем
+        будет прокручивать колёсико, то будет
+        скроллироваться весь документ.</td>
+      </tr>
+</TBODY>
+    </table>
+    <p>Следующий пример демонстрирует, как приложение
+    может обработать два сообщения от колёсика.</p>
+    <p><b>Пример:</b></p>
+    <pre><font color="blue">/*</font><font color="green">***********************************************
+* эта часть кода работает с MSH_MOUSEWHEEL
+************************************************</font><font
+color="blue">*/</font>
+#include &quot;zmouse.h&quot;
+
+<font color="blue">//</font>
+<font
+color="blue">//</font><font color="green"> Самое главное, это определеить, поддерживается ли в системе</font>
+<font
+color="blue">//</font><font color="green"> сообщение WM_MOUSEWHEEL.</font>
+<font
+color="blue">//</font>
+#ifndef WM_MOUSEWHEEL
+#define WM_MOUSEWHEEL WM_MOUSELAST+1
+    <font
+color="blue">//</font><font color="green"> ID сообщения для колёсика IntelliMouse</font>
+#endif
+
+UINT uMSH_MOUSEWHEEL = 0;   <font
+color="blue">//</font><font color="green"> Значение, возвращённое функцией</font>
+                            <font
+color="blue">//</font><font color="green"> RegisterWindowMessage()</font>
+
+<font color="blue">/*</font><font
+color="green">*************************************************/</font>
+
+INT WINAPI WinMain(
+         HINSTANCE hInst,
+         HINSTANCE hPrevInst,
+         LPSTR lpCmdLine,
+         INT nCmdShow)
+{
+    MSG msg;
+    BOOL bRet;
+
+    if (!InitInstance(hInst, nCmdShow))
+        return FALSE;
+
+    <font
+color="blue">//</font>
+    <font color="blue">//</font><font color="green"> Новые IntelliMouse используют зарегистрированное сообщение</font>
+    <font
+color="blue">//</font><font color="green"> для передачи информации о вращении колеса. Зарегистрируем!</font>
+ 
+    uMSH_MOUSEWHEEL =
+     RegisterWindowMessage(MSH_MOUSEWHEEL); 
+    if ( !uMSH_MOUSEWHEEL )
+    {
+        MessageBox(NULL,&quot;
+                   RegisterWindowMessag Failed!&quot;,
+                   &quot;Error&quot;,MB_OK);
+        return msg.wParam;
+    }
+    
+    while (( bRet = GetMessage(&amp;msg, NULL, 0, 0)) != 0)
+    {
+        if (bRet == -1)
+        {
+            <font
+color="blue">//</font><font color="green"> обработка ошибки и возможный выход</font>
+        }
+        else
+        {
+            if (!TranslateAccelerator(ghwndApp,
+                                      ghaccelTable,
+                                      &amp;msg))
+            {
+                TranslateMessage(&amp;msg);
+                DispatchMessage(&amp;msg);
+            }
+        }
+    }
+
+    return msg.wParam;
+}
+
+<font
+color="blue">/*</font>***********************************************
+* Следующий код показывает как работать с WM_MOUSEWHEEL
+************************************************<font
+color="blue">*/</font>
+LONG APIENTRY MainWndProc(
+    HWND hwnd,
+    UINT msg,
+    WPARAM wParam,
+    LPARAM lParam)
+{
+    static int nZoom = 0;
+    
+
+    switch (msg)
+    {
+        case WM_MOUSEWHEEL:
+            ((short) HIWORD(wParam)&lt; 0) ? nZoom-- : nZoom++;
+
+            <font
+color="blue">//</font>
+            <font color="blue">//</font><font color="green"> Как-нибудь работаем с колёсиком...</font>
+            <font
+color="blue">//</font>
+
+            break;
+
+        default:
+            <font color="blue">//</font>
+            <font
+color="blue">//</font><font color="green"> uMSH_MOUSEWHEEL это сообщение, зарегистрированное</font>
+            <font
+color="blue">//</font><font color="green"> ддл-кой mswheel в версиях Windows, которые не</font>
+            <font
+color="blue">//</font><font color="green"> поддерживают новые сообщения в системе.</font>
+
+            if( msg == uMSH_MOUSEWHEEL )
+            {
+               ((int)wParam &lt; 0) ? nZoom-- : nZoom++;
+
+                <font
+color="blue">//</font>
+                <font color="blue">//</font><font color="green"> Как-нибудь работаем с колёсиком...</font>
+                <font
+color="blue">//</font>
+                break;
+            }
+
+            return DefWindowProc(hwnd,
+                                 msg,
+                                 wParam,
+                                 lParam);
+    }
+
+    return 0L;
+}</pre>
+    <p><a name="retrieving_wheel_scroll"></a><b>Получаем количество
+    строк, проскроллированных колесом мышки</b></p>
+    <p>Следующий пример, позволяет узнать количество
+    проскроллированных строк. Для тех операционных
+    систем, которые изначально поддерживают
+    колёсико мышки, такие как Microsoft Windows NT® 4.0 и выше,
+    рекомендуется использовать <a
+    href="http://msdn.microsoft.com/library/en-us/sysinfo/base/systemparametersinfo.asp"
+    target="_top">SystemParametersInfo</a>.</p>
+    <p><b>Пример:</b></p>
+    <pre><font color="blue">/*</font><font color="green"> SPI_GETWHEELSCROLLLINES
+   определена в winuser.h начиная с Windows NT 4.0. Для того, чтобы
+   иметь возможность узнать кол-во проскроллированных строк была 
+   обновлена функция SystemParametersInfo.
+</font><font
+color="blue">*/</font>
+
+#ifndef SPI_GETWHEELSCROLLLINES
+#define SPI_GETWHEELSCROLLLINES   104
+#endif
+
+#include &quot;zmouse.h&quot;
+
+<font
+color="blue">/*</font><font color="green">********************************************************
+* ФУНКЦИЯ: GetNumScrollLines
+* Описание: Системно-независимый способ получения количества
+*           строк, проскроллированных колесом мышки
+* Параметры: нет
+* Возвращает : UINT: Кол-во строк, где WHEEL_PAGESCROLL
+*           указывает на то, что в данный момент идёт скроллирование.
+********************************************************</font><font
+color="blue">*/</font>
+UINT GetNumScrollLines(void)
+{
+   HWND hdlMsWheel;
+   UINT ucNumLines=3;  <font
+color="blue">//</font><font color="green"> 3 по умолчанию</font>
+   OSVERSIONINFO osversion;
+   UINT uiMsh_MsgScrollLines;
+
+
+   memset(&amp;osversion, 0, sizeof(osversion));
+   osversion.dwOSVersionInfoSize =sizeof(osversion);
+   GetVersionEx(&amp;osversion);
+
+   <font
+color="blue">//</font><font color="green"> В Windows 9x &amp; Windows NT 3.51, для получения количества строк</font>
+   <font
+color="blue">//</font><font color="green"> используется MSWheel. В Windows NT 4.0 и выше, для этой цели</font>
+   <font
+color="blue">//</font><font color="green"> используется SystemParametersInfo.</font>
+
+   if ((osversion.dwPlatformId ==
+                        VER_PLATFORM_WIN32_WINDOWS) ||
+       ( (osversion.dwPlatformId ==
+                      VER_PLATFORM_WIN32_NT) &amp;&amp; 
+         (osversion.dwMajorVersion &lt; 4) )   )
+   {
+        hdlMsWheel = FindWindow(MSH_WHEELMODULE_CLASS, 
+                                MSH_WHEELMODULE_TITLE);
+        if (hdlMsWheel)
+        {
+           uiMsh_MsgScrollLines = RegisterWindowMessage
+                                     (MSH_SCROLL_LINES);
+           if (uiMsh_MsgScrollLines)
+                ucNumLines = (int)SendMessage(hdlMsWheel,
+                                    uiMsh_MsgScrollLines, 
+                                                       0, 
+                                                       0);
+        }
+   }
+   else if ( (osversion.dwPlatformId ==
+                         VER_PLATFORM_WIN32_NT) &amp;&amp;
+             (osversion.dwMajorVersion &gt;= 4) )
+   {
+      SystemParametersInfo(SPI_GETWHEELSCROLLLINES,
+                                          0,
+                                    &amp;ucNumLines, 0);
+   }
+   return(ucNumLines);
+}</pre>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

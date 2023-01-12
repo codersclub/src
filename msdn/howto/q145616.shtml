@@ -1,0 +1,152 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как разрешить меню для Edit Control</h3>
+    <p>В CDialog или другом окне, которое не имеет меню edit
+    для вырезания (cutting), копирования (copying), и вставки (pasting),
+    контролы CEdit обрабатывают эти функции через
+    обычные Windows акселераторы (CTRL+X,V,C, или SHIFT-DELETE,
+    SHIFT-INSERT, CTRL-INSERT, CTRL-DELETE, и т.д.).Однако в стандартном
+    приложении MDI или SDI эти опции запрещены.</p>
+    <p>Это происходит из-за того, что AppWizard присваивает
+    обработчики меню и клавиши акселераторов
+    стандартному меню. Поэтому окошко
+    редактирования никак не реагирует на клавиши
+    акселераторов. Данная статья показывает, как
+    добавить в элементы управления edit на форме,
+    наследованной от CFormView, функции буфера обмена (clipboard).</p>
+    <p>Если полностью удалить опции меню (не просто
+    разрешить или запретить) и различные объявления
+    акселераторов, то никаких конфликтов в Вашем CEdit
+    не будет и он будет как обычно работать с
+    функциями буфера обмена. Однако, если Вы захотите
+    включить функции буфера обмена в стандартном
+    меню Edit (и соответствующие им&nbsp; кнопки на
+    тулбаре), то Вам понадобится добавить некоторые
+    дополнительные обработчики в программу.<br>
+    <br>
+    <ul>
+      <li>Ваши UPDATE_COMMAND_UI должны будут определять,
+        действительно элемент управления, который имеет
+        фокус в данный момент, является CEdit и есть ли в нём
+        какой-нибудь текст, для которого можно применить
+        данную операцию.<br>
+        <br>
+      </li>
+      <li>Так как Вы имеете пункты меню для Cut, Copy, или Paste
+        которые привязаны к стандартным акселераторам,
+        то Вам понадобится написать обработчики для
+        действий.<br>
+        <br>
+      </li>
+    </ul>
+    <h3>Пример по шагам</h3>
+    <p><br>
+    Этот пример содержит код, который можно добавить,
+    чтобы позволить вырезать, копировать и вставлять
+    текст в элемент управления CEdit в CFormView.<br>
+    <br>
+    <ol>
+      <li>Сперва определяем, действительно элемент
+        имеющий фокус является CEdit:<pre class="CODESAMP">   // IsEdit: вспомогательная функция для определения, указывает ли
+   // данный указатель CWnd на элемент управления CEDit.
+   // Используйте функцию SDK ::GetClassName() так как MFC-шный IsKindOf
+   // выдаст ошибку, если это не CEdit
+
+   BOOL CMyFormView::IsEdit( CWnd* pWnd )
+   {
+      ASSERT( pWnd != NULL );
+      HWND hWnd = pWnd-&gt;GetSafeHwnd();
+      if (hWnd == NULL)
+         return FALSE;
+
+      TCHAR szClassName[6];
+      return ::GetClassName(hWnd, szClassName, 6) &amp;&amp;
+             _tcsicmp(szClassName, _T(&quot;Edit&quot;)) == 0;
+   } </pre>
+        <p><br>
+        <br>
+        </p>
+      </li>
+      <li>Добавляем обработчики UPDATE_COMMAND_UI для ID_EDIT_COPY &amp;
+        ID_EDIT_CUT:<pre class="CODESAMP">   // UPDATE_COMMAND_UI обработчик для Edit Copy и Edit Cut, которые оба
+   // требуют, чтобы текущий фокус находился в окошке редактирования,
+   // которое содержит выделенный текст.
+
+   void CMyFormView::OnUpdateNeedSel(CCmdUI* pCmdUI)
+   {
+     // получаем текущий фокус и определяем, находится ли он на CEdit
+      CWnd* pWnd = GetFocus();
+      if (NULL == pWnd || !IsEdit( pWnd ))
+      {
+         pCmdUI-&gt;Enable( FALSE );
+      }
+      else
+      {
+         CEdit* pEdit = (CEdit*)pWnd;
+         int nBeg, nEnd;
+
+         pEdit-&gt;GetSel( nBeg, nEnd );
+         pCmdUI-&gt;Enable( nBeg != nEnd );
+      }
+   } </pre>
+        <p><br>
+        <br>
+        </p>
+      </li>
+      <li>Добавляем обработчики UPDATE_COMMAND_UI для ID_EDIT_PASTE:<pre
+        class="CODESAMP">   // UPDATE_COMMAND_UI обработчики для Edit Paste, требующие, чтобы
+   // фокус был на окне редактирования и чтобы буфер обмена содержал
+   // текст, который будет вставлен в контрол.
+
+   void CMyFormView::OnUpdateNeedClip(CCmdUI* pCmdUI)
+   {
+      // получаем текущий фокус и определяем, находится ли он на CEdit
+      // а так же проверяем, чтобы элемент управления не был read-only.
+      CWnd* pWnd = GetFocus();
+      if (  NULL == pWnd ||
+            !IsEdit( pWnd ) ||
+            (pWnd-&gt;GetStyle() &amp; ES_READONLY) != 0 )
+      {
+         pCmdUI-&gt;Enable( FALSE );
+      }
+      else
+         pCmdUI-&gt;Enable(::IsClipboardFormatAvailable(CF_TEXT));
+   } </pre>
+        <p><br>
+        <br>
+        </p>
+      </li>
+      <li>Добавляем стандартные обработчики для ID_EDIT_COPY,
+        ID_EDIT_CUT, и ID_EDIT_PASTE:<pre class="CODESAMP">   void CMyFormView::OnEditCopy()
+   {
+      CEdit* pEdit = (CEdit*)GetFocus();
+      ASSERT( IsEdit( pEdit) );
+      pEdit-&gt;Copy();
+   }
+
+   void CMyFormView::OnEditCut()
+   {
+      CEdit* pEdit = (CEdit*)GetFocus();
+      ASSERT( IsEdit( pEdit) );
+      pEdit-&gt;Cut();
+   }
+
+   void CMyFormView::OnEditPaste()
+   {
+      CEdit* pEdit = (CEdit*)GetFocus();
+      ASSERT( IsEdit( pEdit) );
+      ASSERT(::IsClipboardFormatAvailable(CF_TEXT));
+      pEdit-&gt;Paste();
+   } </pre>
+      </li>
+    </ol>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

@@ -1,0 +1,142 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как изменить курсор мышки для окна в MFC</h3>
+    <p>В приложениях Windows, окно всегда создаётся на
+    основе оконного класса. Оконный класс содержит
+    несколько характеристик, на которых
+    основывается создаваемое окно, вклучая и курсор
+    мышки поумолчанию. В некоторых случаях,
+    приложению необходимо изменить курсор,
+    связанный с окном, которое оно создаёт. Данная
+    статья описывает три метода, при помощи которых
+    MFC приложение может отображать различные курсоры
+    в различное время.</p>
+    <p>Ниже приведены некоторые ситуации, в которых MFC
+    приложению необходимо менять курсор мышки:<br>
+    <ul>
+      <li>Например, когда Вы создаёте текстовый редактор,
+        то I-образный курсор больше подходит для ввода
+        текста, нежели стрелка. Это влечёт замену курсора
+        мышки на весь период работы приложения.<br>
+        <br>
+      </li>
+      <li>Например, когда производится длительная
+        операция, такая как считывание или запись на диск.
+        В данном случае пользователю желательно
+        показать песочные часы. Это влечёт замену
+        курсора мышки на ограниченный период времени.<br>
+        <br>
+      </li>
+    </ul>
+    <h3>Три метода</h3>
+    <p>Давайте кратко рассмотрим три метода замены
+    стандартного курсора мышки в окне:<br>
+    <ul>
+      <li>Переопределяем функцию CWnd::OnSetCursor(). Вызываем API
+        функцию SetCursor() для изменения курсора.<br>
+        <br>
+      </li>
+      <li>Регистрируем собственный класс окна с желаемым
+        курсором мышки, переопределяем функцию
+        CWnd::PreCreateWindow() и используем вновь-зарегистрированный
+        класс для создания окна.<br>
+        <br>
+      </li>
+      <li>Чтобы показать стандартные песочные часы,
+        приложение может вызвать CCmdTarget::BeginWaitCursor(), а
+        затем CmdTarget::EndWaitCursor() чтобы обратно вернуть
+        стандартный курсор. Эта схема работает только на
+        протяжении одного сообщения. Если мышка будет
+        сдвинута до вызова EndWaitCursor, то Windows пошлёт окну
+        сообщение WM_SETCURSOR. Дефолтовый обработчик этого
+        сообщения изменит курсор на тот, который
+        зарегистрирован в классе. Поэтому необходимо
+        переопределить CWnd::OnSetCursor() для этого окна, чтобы
+        при изменении курсора на дефолтовый опять
+        показывало песочные часы.<br>
+        <br>
+      </li>
+    </ul>
+    <h3>Пример кода, илюстрирующий все три метода</h3>
+    <p>Следующий код, показывает три способа, как
+    изменить курсор мышки оконного класса,
+    наследованного от CView. m_ChangeCursor это переменна член
+    класса CMyView, ей присвоен тип BOOL. Она показывает,
+    надо ли показать другой тип курсора.</p>
+    <h3>Первый метод</h3>
+    <p>Изменяем курсор мышки для объекта CMyView путём
+    переопределения функции CWnd::OnSetCursor(). Используем
+    ClassWizard, чтобы в карте сообщений для сообщения
+    WM_SETCURSOR добавить функцию CMyView::OnSetCursor(). В тело
+    функции добавляем следующий код:</p>
+    <pre class="CODESAMP">      BOOL CMyView::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
+      {
+            if ( m_ChangeCursor )
+              {
+                  ::SetCursor(AfxGetApp()-&gt;LoadStandardCursor(IDC_WAIT));
+                  return TRUE;
+              }
+
+            return CView::OnSetCursor(pWnd, nHitTest, message);
+      } </pre>
+    <h3>Второй метод</h3>
+    <p>При помощи функции AfxRegisterClass() или AfxRegisterWndClass()
+    регистрируем собственный оконный класс,
+    содержащий желаемый курсор мышки. Затем создаём
+    окно вида, основанное на зарегистрированном
+    оконном классе. Более подробнее о регистрации
+    оконного класса в MFC, см. MFC Tech Note 1, &quot;Window Class
+    Registration.&quot;</p>
+    <pre class="CODESAMP">      BOOL CMyView::PreCreateWindow(CREATESTRUCT&amp; cs)
+      {
+          cs.lpszClass = AfxRegisterWndClass(
+            CS_DBLCLKS | CS_HREDRAW | CS_VREDRAW, // используем желаемые
+                                                  // стили окна
+            AfxGetApp()-&gt;LoadStandardCursor(IDC_WAIT),
+            (HBRUSH) (COLOR_WINDOW + 1));         // кисть фона
+
+          return CView::PreCreateWindow(cs)
+      } </pre>
+    <h3>Третий метод</h3>
+    <p>Для изменения курсора мышки вызываем функции
+    BeginWaitCursor() и EndWaitCursor().<br>
+    <br>
+    <b>ЗАМЕЧАНИЕ</b>: CWinApp::DoWaitCursor(1) и CWinApp::DoWaitCursor(-1)
+    работают аналогично BeginWaitCursor() и EndWaitCursor(),
+    соответственно.</p>
+    <pre class="CODESAMP">      void CMyView::PerformLengthyOperation()
+      {
+            BeginWaitCursor();  // или AfxGetApp()-&gt;DoWaitCursor(1)
+
+            //...
+
+            EndWaitCursor();    // или AfxGetApp()-&gt;DoWaitCursor(-1)
+      } </pre>
+    <p><b>&nbsp;</p>
+    <p>ЗАМЕЧАНИЕ</b>: Если вызовы BeginWaitCursor() и EndWaitCursor()
+    делаются не в том же самом обработчике, то
+    необходимо переопределить OnSetCursor как показано
+    ниже:</p>
+    <pre class="CODESAMP">      BOOL CMyView::OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message)
+      {
+            if (m_ChangeCursor)
+              {
+                  RestoreWaitCursor();
+                  return TRUE;
+              }
+
+            return CView::OnSetCursor(pWnd, nHitTest, message);
+      } </pre>
+    <p>В этом примере, m_ChangeCursor устанавливается в TRUE
+    перед вызовом BeginWaitCursor(), и обратно в FALSE после
+    вызова EndWaitCursor().</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

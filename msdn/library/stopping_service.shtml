@@ -1,0 +1,252 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Остановка сервиса.</h3>
+    <p>Сервис можно остановить при помощи функции <a
+    href="http://msdn.microsoft.com/library/en-us/dllproc/base/controlservice.asp"><b>ControlService</b></a>
+    отправив запрос SERVICE_CONTROL_STOP. Если SCM получает
+    запрос SERVICE_CONTROL_STOP для сервиса, он начинает
+    процедуру остановки сервиса, перенаправив
+    запрос в функцию сервиса <a
+    href="http://msdn.microsoft.com/library/en-us/dllproc/base/servicemain.asp"><b>ServiceMain</b></a>.
+    Однако, если SCM определит, что другой запущенный
+    сервис зависит от указанного, то он не будет
+    перенаправлять запрос на остановку сервиса, а
+    вместо этого вернёт ERROR_DEPENDENT_SERVICES_RUNNING. Поэтому,
+    чтобы программно остановить сервис, надо сперва
+    узнать все зависимые сервисы и предварительно
+    остановить их.</p>
+    <p>&nbsp;</p>
+    <pre xml:space="preserve">#include &lt;windows.h&gt;
+#include &lt;tchar.h&gt;
+#include &lt;stdio.h&gt;
+
+// Основная задача функции - остановить сервис. Так же она попытается
+// остановить зависимые сервисы. Функция позволяет задавать величину
+// таймаута.
+//
+// Параметры:
+//   hSCM - Дескриптор менеджера управления сервисами (SCM).
+//   hService - Дескриптор останавливаемого сервиса.
+//   fStopDependencies - Останавливать или нет зависимые сервисы.
+//   dwTimeout - максимальное время (в миллисекундах) ожидания
+//
+// В случае успеха, функция возвращает ERROR_SUCCESS. Иначе,
+// возвращается код системной ошибки.
+
+DWORD StopService( SC_HANDLE hSCM, SC_HANDLE hService,
+      BOOL fStopDependencies, DWORD dwTimeout )
+{
+   SERVICE_STATUS ss;
+   DWORD dwStartTime = GetTickCount();
+
+   // Убеждаемся, что сервис уже не остановлен
+   if ( !QueryServiceStatus( hService, &amp;ss ) )
+      return GetLastError();
+
+   if ( ss.dwCurrentState == SERVICE_STOPPED ) 
+      return ERROR_SUCCESS;
+
+   // Если скрвис находится в процессе остановки, то подождём
+   while ( ss.dwCurrentState == SERVICE_STOP_PENDING ) 
+   {
+      Sleep( ss.dwWaitHint );
+      if ( !QueryServiceStatus( hService, &amp;ss ) )
+         return GetLastError();
+
+      if ( ss.dwCurrentState == SERVICE_STOPPED )
+         return ERROR_SUCCESS;
+
+      if ( GetTickCount() - dwStartTime &gt; dwTimeout )
+         return ERROR_TIMEOUT;
+   }
+
+  // Если сервис запущен, то сперва необходимо остановить зависимые сервисы
+   if ( fStopDependencies ) 
+   {
+      DWORD i;
+      DWORD dwBytesNeeded;
+      DWORD dwCount;
+
+      LPENUM_SERVICE_STATUS   lpDependencies = NULL;
+      ENUM_SERVICE_STATUS     ess;
+      SC_HANDLE               hDepService;
+
+      // Передаём буфер нулевого размера, чтобы узнать требуемый размер
+      if ( EnumDependentServices( hService, SERVICE_ACTIVE, 
+         lpDependencies, 0, &amp;dwBytesNeeded, &amp;dwCount ) ) 
+      {
+         // Нет зависимых сервисов
+      } 
+      else 
+      {
+         if ( GetLastError() != ERROR_MORE_DATA )
+            return GetLastError(); // Неустранимая ошибка
+
+         // Выделяем буфер для зависимых сервисов
+         lpDependencies = (LPENUM_SERVICE_STATUS) HeapAlloc(
+               GetProcessHeap(), HEAP_ZERO_MEMORY, dwBytesNeeded );
+
+         if ( !lpDependencies )
+            return GetLastError();
+
+         __try {
+            // Начинаем перечислять зависимые сервисы
+            if ( !EnumDependentServices( hService, SERVICE_ACTIVE,
+                  lpDependencies, dwBytesNeeded, &amp;dwBytesNeeded,
+                  &amp;dwCount ) )
+               return GetLastError();
+
+            for ( i = 0; i &lt; dwCount; i++ )
+            {
+               ess = *(lpDependencies + i);
+
+               // Открываем сервис
+               hDepService = OpenService( hSCM, ess.lpServiceName, 
+                     SERVICE_STOP | SERVICE_QUERY_STATUS );
+               if ( !hDepService )
+                  return GetLastError();
+
+               __try {
+                   // Посылаем код остановки
+                  if ( !ControlService( hDepService,
+                           SERVICE_CONTROL_STOP,
+                           &amp;ss ) )
+                     return GetLastError();
+
+                  // Ждём, пока сервис остановится
+                  while ( ss.dwCurrentState != SERVICE_STOPPED )
+                  {
+                      Sleep( ss.dwWaitHint );
+                     if ( !QueryServiceStatus( hDepService, &amp;ss ) )
+                        return GetLastError();
+
+                     if ( ss.dwCurrentState == SERVICE_STOPPED )
+                        break;
+
+                     if ( GetTickCount() - dwStartTime &gt; dwTimeout )
+                        return ERROR_TIMEOUT;
+                  }
+
+               }
+               __finally 
+               {
+                  // Всегда освобождаем дескриптор сервиса
+                  CloseServiceHandle( hDepService );
+
+               }
+            }
+
+         }
+         __finally
+         {
+            // Так же всегда освобождаем буфер
+            HeapFree( GetProcessHeap(), 0, lpDependencies );
+         }
+      }
+   }
+
+   // Посылаем код остановки главному сервису
+   if ( !ControlService( hService, SERVICE_CONTROL_STOP, &amp;ss ) )
+      return GetLastError();
+
+   // Ждём, пока сервис остановится
+   while ( ss.dwCurrentState != SERVICE_STOPPED )
+   {
+      Sleep( ss.dwWaitHint );
+      if ( !QueryServiceStatus( hService, &amp;ss ) )
+         return GetLastError();
+
+      if ( ss.dwCurrentState == SERVICE_STOPPED )
+         break;
+
+      if ( GetTickCount() - dwStartTime &gt; dwTimeout )
+         return ERROR_TIMEOUT;
+   }
+
+   // Возвращаем успешный результат
+   return ERROR_SUCCESS;
+}
+
+// Вспомогательная функция для отображения сообщений об ошибках
+
+void DisplayError( LPTSTR szAPI, DWORD dwError )
+{
+   LPTSTR lpBuffer = NULL;
+
+   FormatMessage( FORMAT_MESSAGE_ALLOCATE_BUFFER |
+         FORMAT_MESSAGE_FROM_SYSTEM, NULL, dwError,
+         MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+         (LPTSTR) &amp;lpBuffer, 0, NULL );
+
+   _tprintf( TEXT(&quot;%s failed:\n&quot;), szAPI );
+   _tprintf( TEXT(&quot;    error code = %u\n&quot;), dwError );
+   _tprintf( TEXT(&quot;    message    = %s\n&quot;), lpBuffer );
+
+   LocalFree( lpBuffer );
+}
+
+// Основная функция программы, которая использует функцию StopService,
+// приведённую выше.
+// 
+// Параметры:  
+//   argc - количество аргументов в командной строке
+//   argv[] - массив аргументов командной строки
+
+void _tmain( int argc, TCHAR *argv[] ) 
+{
+   SC_HANDLE hSCM;
+   SC_HANDLE hService;
+   DWORD     dwError;
+
+   if ( argc &lt; 2 ) 
+   {
+      _tprintf( TEXT(&quot;usage: \&quot;%s\&quot; &lt;ServiceName&gt;\n&quot;), argv[0] );
+      return;
+   }
+
+   __try 
+   {
+      // Открываем базу SCM
+      hSCM = OpenSCManager( NULL, NULL, SC_MANAGER_CONNECT );
+      if ( !hSCM )
+      {
+         DisplayError( TEXT(&quot;OpenSCManager()&quot;), GetLastError() );
+         __leave;
+      }
+
+      // Открываем указанный сервис
+      hService = OpenService( hSCM, argv[1], SERVICE_STOP
+            | SERVICE_QUERY_STATUS | SERVICE_ENUMERATE_DEPENDENTS );
+      if ( !hService ) 
+      {
+         DisplayError( TEXT(&quot;OpenService()&quot;), GetLastError() );
+         __leave;
+      }
+
+      // Пытаемся остановить сервис в течение 30 секунд
+      dwError = StopService( hSCM, hService, TRUE, 30000 ) ;
+      if ( dwError == ERROR_SUCCESS )
+         _tprintf( TEXT(&quot;Service stopped.\n&quot;) );
+      else
+         DisplayError( TEXT(&quot;StopService()&quot;), dwError );
+
+   }
+   __finally
+   {
+      if ( hService )
+         CloseServiceHandle( hService );
+
+      if ( hSCM )
+         CloseServiceHandle( hSCM );
+   }
+}</pre>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->
