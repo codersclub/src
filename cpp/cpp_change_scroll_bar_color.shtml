@@ -1,0 +1,174 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <font size="4" style="FONT-SIZE: 16pt"><b><p>Меняем цвет Scroll Bar в
+    приложении MFC</b></font></p>
+    <p><a name="winui7"></a>Автор: <b><a href="mailto:askpd@pobox.com">Paul DiLascia</a></b></p>
+    <p><img height="290" src="cfig04.gif" width="300"></p>
+    <p>Windows имеет два типа скролбаров. Это
+    &quot;встроенные&quot; скролбары, которые мы получаем
+    при использовании оконных стилей WS_HSCROLL и/или
+    WS_VSCROLL, и скролбар контролы, которые фактически
+    являются дочерними окнами и которые можно
+    создавать в пределах окна. Сообщение WM_CTLCOLOR могут
+    посылать только последние.<br>
+    <br>
+    &nbsp;&nbsp;&nbsp; Естевственно, возникает вопрос, а
+    почему существует два вида скролбаров ? Ответ
+    кроется в истории. Давным давно, когда Windows была
+    ещё очень маленькой, существовала необходимость
+    экономить каждый бит памяти, а окна занимали
+    значительное пространство. Так как почти в
+    каждом окне присутствовали скролбары, то
+    разработчики решили сделать их неотемлемой
+    частью окон. С другой стороны, программистам не
+    понравилось такое решение, так как им больше
+    хотелось работать со скролбарами, как с
+    отдельными окнами. С одной стороны, конечно же
+    встроенные скролбары удобнее в использовании и
+    требуют меньше кода, но с другой имеют меньше
+    настроек, позволяющих менять их внешний вид.<br>
+    &nbsp;&nbsp; А как насчёт MFC? Поумолчанию, MFC-шный CScrollView
+    использует встроенные скролбары, у которых
+    нельзя менять цвет. Однако, ничего страшного не
+    случится, если мы заставим CScrollView использовать
+    Ваш собственный контрол скролбара. Но перед тем,
+    как мы решим данную задачу, я хочу заметить, что
+    WM_CTLCOLOR позволяет устанавливать только цвет фона,
+    но не цвет стрелки и бегунок. Поэтому, если Вы
+    хотите менять все цвета, то скорее всего WM_CTLCOLOR
+    окажется бесполезным. Позже я постараюсь
+    подкинуть несколько идей по этому поводу, ну а
+    теперь давайте посмотрим, как заставить CScrollView
+    использовать Ваш скролбар вместо встроенного.<br>
+    &nbsp;&nbsp; Итак, для начала, объявим экземпляры CScroll
+    баров в основном фрейме:<br>
+    </p>
+    <pre class="clsCode">class CMainFrame : public CFrameWnd {
+protected:
+  CScrollbar m_wndHScroll;
+  CScrollBar m_wndVScroll;
+  •••
+};
+</pre>
+    <p>Затем, при создании фрейма, создаём их окна:<br>
+    </p>
+    <pre class="clsCode">int CMainFrame::OnCreate(...)
+{
+  •••
+  CRect rc(0,0,0,0);
+  VERIFY(m_wndSBHorz.Create(WS_VISIBLE|WS_CHILD|SBS_HORZ,
+    rc, this, AFX_IDW_HSCROLL_FIRST));
+  VERIFY(m_wndSBVert.Create(WS_VISIBLE|WS_CHILD|SBS_VERT,
+    rc, this, AFX_IDW_HSCROLL_FIRST+1));
+  VERIFY(m_wndSBBox.Create(WS_VISIBLE|WS_CHILD|SBS_SIZEBOX,
+    rc, this,-1));
+  return 0;
+}
+</pre>
+    <p>&nbsp;&nbsp; Обратите внимание, что Вам прийдётся
+    создать бокс скролбара, это небольшой квадратик,
+    где вертикальный и горизонтальный скролбары
+    соединяются, чтобы можно было ресайзить окно и
+    избежать пустого пятна.<br>
+    &nbsp;&nbsp; Как только скролбары созданы, остаётся
+    ещё несколько вещей, о которых необходимо
+    позаботится. Это установить размер скролбаров,
+    обработать уведомления, и получить для них вид
+    (view). Последнее самое простое. CScrollView содержит
+    виртуальную функцию GetScrollBarCtrl, которую можно
+    переопределить.<br>
+    </p>
+    <pre class="clsCode">CScrollBar* CPictureView::GetScrollBarCtrl(int nBar) const
+{
+  CWnd* pParent = GetParent();
+  UINT nID = AFX_IDW_HSCROLL_FIRST;
+  if (nBar==SB_VERT)
+    nID++;
+  return (CScrollBar*)pParent-&gt;GetDlgItem(nID);
+}
+</pre>
+    <p>Она получает управление от родителя используя
+    удобные идентификаторы (ID) AFX_IDW_HSCROLL_FIRST и
+    AFX_IDW_HSCROLL_FIRST+1.<br>
+    &nbsp;&nbsp; А как же уведомления? Когда пользователь
+    перемещает полосу прокрутки, скролбар посылает
+    WM_HSCROLL или WM_VSCROLL своему родителю, чтобы Вы могли
+    что-нибудь сделать. Это есть очень хорошо, так как
+    если Вы поместите свои скролбары во фрейм, то
+    CFrameWnd уже имеет обработчики OnHScroll и OnVScroll, которые
+    направляют WM_HSCROLL и WM_VSCROLL в вид (view):<br>
+    </p>
+    <pre class="clsCode">// Из winfrm.cpp 
+void CFrameWnd::OnHScroll(...) 
+{  
+  CWnd* pActiveView = GetActiveView();
+  if (pActiveView != NULL) {
+    pActiveView-&gt;SendMessage(WM_HSCROLL, ...);
+  }
+}
+</pre>
+    <p>&nbsp;&nbsp; Если Ваш вид наследован от CScrollView, то для
+    того, чтобы обработать сообщения прокрутки,
+    ничего делать не надо, так как MFC делает это
+    автоматически!<br>
+    &nbsp;&nbsp; Теперь о размерах. Это то место, где
+    прийдётся проделать определённую работу. Для
+    того, чтобы всё летало, необходимо управлять
+    позицией скролбаров каждый раз, когда размер
+    фрейма изменяется. Помните, что скролбары, это
+    потомки фрейма а не вида. Обычно, обработка
+    изменения размеров производится в OnSize, однако
+    для фреймовых окон это делается в CFrameWnd::RecalcLayout.
+    Применительно к программе (исходник которой
+    можно скачать ниже) эта функция выглядит так:</p>
+    <pre>
+//////////////////
+// изменение размеров фрейма: перемещение вида и скролбаров
+//
+void CMainFrame::RecalcLayout(BOOL bNotify)
+{
+    CFrameWnd::RecalcLayout();
+
+    CView* pView = GetActiveView();
+    if (pView) {
+        CRect rc;
+        pView-&gt;GetWindowRect(&amp;rc);
+        ScreenToClient(&amp;rc);
+
+        // shrink view by scrollbars
+        int cyHScroll = GetSystemMetrics(SM_CYHSCROLL);
+        int cxVScroll = GetSystemMetrics(SM_CXVSCROLL);
+        rc.right  -= cxVScroll;
+        rc.bottom -= cyHScroll;
+        pView-&gt;MoveWindow(rc);
+
+        // next, move the scroll bars: horz, vert and box
+        rc.left   = rc.right;
+        rc.right += cxVScroll;
+        m_wndSBVert.MoveWindow(rc);
+
+        rc.left   = 0;
+        rc.right -= cxVScroll;
+        rc.top    = rc.bottom;
+        rc.bottom+= cyHScroll;
+        m_wndSBHorz.MoveWindow(rc);
+
+        rc.left = rc.right;
+        rc.right+=cxVScroll;
+        m_wndSBBox.MoveWindow(rc);
+    }
+}  }
+}
+</pre>
+    <p><br>
+    <a href="CQA0111.exe">Скачать исходник</a> (201K)</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

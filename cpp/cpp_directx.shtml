@@ -1,0 +1,1481 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<h1>Изучаем Direct X вместе на примерах SDK 7.0</h1>
+
+<b>Создадим проект, который показывает первичный и вторичный буфера.</b>
+
+<br>
+<br>
+
+Перед началом работы возьмите DirectX SDK 7.0
+(<a href="http://www.microsoft.com/" target="_blank">http://www.microsoft.com/</a>,
+128 891 648 байт или прямиком
+<a href="http://www.msdn.microsoft.com/directx/downloads.asp" target="_blank">СЮДА</a>),
+скиньте из директории Lib файлы в Visual C++, тоже в директорию Lib,
+и перепишите Include в директорию Include.
+
+<br>
+<br>
+
+Откройте проект имеющий расширение *.mak, а не *.dsw.
+Или же, если у Вас нет терпения качать, а Шаг первый хотите сделать,
+возьмите отсюда:
+<a href="http://zhenya.hotmail.ru/directx/projects\include.rar">include.rar</a>
+и <a href="http://zhenya.hotmail.ru/directx/projects\lib.rar">lib.rar</a>.
+
+<br>
+<br>
+
+Затем загрузите этот проект:
+<a href="http://zhenya.hotmail.ru/directx/projects\projects.rar">project.rar</a>
+.
+
+<br>
+<br>
+
+Откройте проект при помощи меню <b>File-&gt;Open Workspace</b>,
+и выберите ddex1.dsw.
+
+<br>
+<br>
+
+Проект загружен. Можете скомпилировать и посмотреть для
+начала, что происходит. Лично я применял Visual C++ 6.0 взятый из
+Visual Studio 6.0 (но может и на 5.0 компилироваться, если сделать выше
+указанные действия).
+
+<br>
+<br>
+
+Итак, рассмотрим нижеследующий код:
+
+<pre>
+#include &lt;windows.h&gt;
+
+#include &lt;ddraw.h&gt;
+
+#include &lt;stdio.h&gt;
+
+#include &lt;stdarg.h&gt;
+
+#include &quot;resource.h&quot;
+
+int PASCAL
+
+WinMain(HINSTANCE hInstance,
+
+        HINSTANCE
+ hPrevInstance,
+
+ >
+        LPSTR
+ lpCmdLine,
+
+ >
+        int nCmdShow)
+
+ >{
+
+ >
+    MSG                        
+ msg;
+
+ > 
+
+ >
+    InitApp(hInstance, nCmdShow);
+
+ > 
+
+ >
+    while (GetMessage(&amp;msg, NULL, 0,
+ 0))
+
+ >
+    {
+
+ >
+        TranslateMessage(&amp;msg);
+
+ >
+        DispatchMessage(&amp;msg);
+
+ >
+    }
+
+ >
+    return msg.wParam;
+
+ >}
+       
+ 
+
+<b>
+style="COLOR: red; FONT-SIZE: 10pt; >РАЗЪЯСНЕНИЕ:</b>
+<b>
+>InitApp
+>(
+
+>hInstance
+>,
+
+>nCmdShow
+>)</b> –
+style="COLOR: blue"> создает класс окна, в котором
+инициализируется
+>DirectDraw
+>, ниже мы
+его создадим.
+
+>Цикл <b>
+
+>while
+</b> >–
+обработка сообщений с клавиатуры (постоянна, на
+протяжении всей программы, пока она не
+завершится).
+
+> 
+
+>Теперь
+рассмотрим
+>InitApp
+ >более
+подробно:
+<p style="TEXT-ALIGN: justify; TEXT-INDENT: 14.2pt">
+> 
+
+<pre>
+static
+ HRESULT
+
+InitApp(HINSTANCE
+ hInstance, int nCmdShow)
+
+{
+
+
+    HWND            
+            hWnd;
+
+
+    WNDCLASS
+                   
+ wc;
+
+
+    DDSURFACEDESC2
+             
+ ddsd;
+
+
+    DDSCAPS2
+                   
+ ddscaps;
+
+ 
+
+
+    //
+Устанавливаем
+
+ >параметры
+
+ >окна
+       
+
+
+
+    wc.style = CS_HREDRAW | CS_VREDRAW;
+
+
+    wc.lpfnWndProc = WindowProc;
+
+
+    wc.cbClsExtra = 0;
+
+
+    wc.cbWndExtra = 0;
+
+
+    wc.hInstance = hInstance;
+
+
+    wc.hIcon = LoadIcon(hInstance,
+ MAKEINTRESOURCE(IDI_MAIN_ICON)); style="COLOR: blue">
+
+
+    wc.hCursor = LoadCursor(NULL,
+ IDC_ARROW);
+
+
+    wc.hbrBackground = (HBRUSH
+ )GetStockObject(BLACK_BRUSH);
+
+
+    wc.lpszMenuName = NAME;
+
+
+    wc.lpszClassName = NAME;
+
+
+    RegisterClass(&amp;wc);
+
+ 
+
+
+    //
+Создаем
+
+ >окно
+       
+
+
+
+    hWnd = CreateWindowEx(WS_EX_TOPMOST,
+
+
+                         
+ NAME,
+
+
+                         
+ TITLE,
+
+
+                         
+ WS_POPUP,
+
+
+                         
+ 0,
+
+
+ 
+                         0,
+
+
+                         
+ GetSystemMetrics(SM_CXSCREEN),
+
+
+                         
+ GetSystemMetrics(SM_CYSCREEN),
+
+
+                         
+ NULL, style="COLOR: blue">
+
+
+                         
+ NULL,
+
+
+                         
+ hInstance,
+
+
+             
+             NULL);
+
+
+    ShowWindow(hWnd, nCmdShow);
+
+
+    UpdateWindow(hWnd);
+
+ 
+
+
+    ///////////////////////////////////////////////////////////////////////////
+
+
+    //
+Создаем
+
+ >главный
+       
+
+ DirectDraw
+объект
+       
+
+
+
+    ///////////////////////////////////////////////////////////////////////////
+
+
+    DirectDrawCreateEx(NULL,
+ (VOID**)&amp;g_pDD, IID_IDirectDraw7, NULL);
+
+ 
+
+
+    //
+Отображение
+
+ >окна
+       
+:
+ >полноэкранный
+       
+
+
+
+    g_pDD-&gt;SetCooperativeLevel(hWnd,
+ DDSCL_EXCLUSIVE | DDSCL_FULLSCREEN);
+
+ 
+
+
+   
+//
+ Устанавливаем графический режим 640
+x
+480
+       
+x
+8
+
+   
+
+g_pDD-&gt;SetDisplayMode(640,
+ 480, 8, 0, 0);
+
+ style="COLOR: blue; FONT-SIZE: 10pt; > 
+
+
+   
+// Создаем
+ первичный буфер, у которого есть вторичный
+
+
+   
+ZeroMemory(&amp;ddsd,
+ sizeof(ddsd));
+
+
+    ddsd.dwSize = sizeof(ddsd);
+
+
+    ddsd.dwFlags = DDSD_CAPS |
+ DDSD_BACKBUFFERCOUNT;
+
+
+    ddsd.ddsCaps.dwCaps =
+ DDSCAPS_PRIMARYSURFACE | DDSCAPS_FLIP |
+
+
+                         
+ DDSCAPS_COMPLEX;
+
+
+    ddsd.dwBackBufferCount = 1;
+
+
+    g_pDD-&gt;CreateSurface(&amp;ddsd,
+ &amp;g_pDDSPrimary, NULL);
+
+ 
+
+
+    //
+Делаем
+
+ >вторичный
+
+ >буфер
+       
+
+
+
+    ZeroMemory(&amp;ddscaps,
+ sizeof(ddscaps));
+
+
+    ddscaps.dwCaps = DDSCAPS_BACKBUFFER;
+
+
+    g_pDDSPrimary-&gt;GetAttachedSurface(&amp;ddscaps,
+ &amp;g_pDDSBack);
+
+ 
+
+
+    //
+Устанавливаем
+
+ >таймер
+       
+
+ style="mso-tab-count: 1">      
+
+
+    SetTimer(hWnd, TIMER_ID, TIMER_RATE,
+ NULL);
+
+ 
+
+
+    return DD_OK;
+
+}
+       
+</td>
+      </tr>
+    </table>
+   
+    style="COLOR: blue; FONT-SIZE: 10pt; > 
+   
+А также
+     после #
+include
+
+инициализируем
+    следующие параметры:
+    <p style="TEXT-ALIGN: justify; TEXT-INDENT: 14.2pt">
+ 
+    <table bgColor="#00ccff" border="1" cellPadding="0" cellSpacing="0"
+    style="BACKGROUND: #00ccff; BORDER-BOTTOM: medium none; BORDER-COLLAPSE: collapse; BORDER-LEFT: medium none; BORDER-RIGHT: medium none; BORDER-TOP: medium none; mso-padding-alt: 0cm 5.4pt 0cm 5.4pt; mso-border-alt: solid windowtext .5pt">
+      <tr>
+ <td
+ style="BORDER-BOTTOM: windowtext 0.5pt solid; BORDER-LEFT: windowtext 0.5pt solid; BORDER-RIGHT: windowtext 0.5pt solid; BORDER-TOP: windowtext 0.5pt solid; PADDING-BOTTOM: 0cm; PADDING-LEFT: 5.4pt; PADDING-RIGHT: 5.4pt; PADDING-TOP: 0cm; WIDTH: 478.55pt"
+ vAlign="top" width="638">
+       
+#define
+ NAME                        
+ &quot;DDExample1&quot;
+
+#define
+ TITLE                         
+ &quot;Direct Draw Example 1&quot;
+
+ 
+
+#define
+ TIMER_ID                   
+ 1
+
+#define
+ TIMER_RATE              
+ 500
+
+ 
+
+LPDIRECTDRAW7
+            
+       g_pDD = NULL;               
+ //
+Главный
+       
+
+ DirectDraw
+объект
+       
+
+
+LPDIRECTDRAWSURFACE7
+    g_pDDSPrimary = NULL;
+  //
+Первичная
+
+ >память
+       
+
+ DirectDraw
+
+LPDIRECTDRAWSURFACE7
+    g_pDDSBack = NULL;
+      //
+Вторичная
+
+ >память
+       
+
+ DirectDraw
+
+ 
+
+static
+ char                
+ szMsg[] = &quot;Page Flipping Test: Press F12 to exit&quot;;
+
+static
+ char                
+ szFrontMsg[] = &quot;Front buffer (F12 to quit)&quot;;
+
+static
+ char                
+ szBackMsg[] = &quot;Back buffer (F12 to quit)&quot;;</td>
+      </tr>
+    </table>
+   
+    style="COLOR: blue; FONT-SIZE: 10pt; > 
+    <b>
+    style="COLOR: red; FONT-SIZE: 10pt; >РАЗЪЯСНЕНИЕ:</b>
+    <b>
+    style="COLOR: red; FONT-SIZE: 10pt; > </b>
+    <b>
+    style="COLOR: red; FONT-SIZE: 10pt; >Создание
+    объекта
+    style="COLOR: red; FONT-SIZE: 10pt; >DirectDraw
+    style="COLOR: red; FONT-SIZE: 10pt; >,
+    определяем  режим
+    отображения и разрешаемую графическую
+    способность</b>
+    <b>
+    style="COLOR: red; FONT-SIZE: 10pt; > </b>
+    <b>
+DirectDrawCreateEx(NULL,
+    (VOID**)&amp;g_pDD, IID_IDirectDraw7, NULL);</b>
+   
+Перед тем
+    как пользоваться возможностями
+DirectDraw
+, нужно
+    его создать, что и делает эта функция. <b>
+   
+g
+_
+   
+pDD</b>
+ –
+    содержит сам объект на
+DirectDraw
+.
+   
+ 
+    <b>
+g_pDD-&gt;SetCooperativeLevel(hWnd,
+    DDSCL_EXCLUSIVE | DDSCL_FULLSCREEN);</b>
+   
+Устанавливаем
+    полноэкранный графический режим.
+    <b>
+DDSCL
+_
+   
+EXCLUSIVE</b>
+ –
+    разрешает прямой доступ к видеокарте. Т.е. все
+    операции, которые мы будем проводить позднее, они
+    будут обрабатываться значительно быстрее.
+    Доступен только при параметре
+DDSCL
+_
+   
+FULLSCREEN
+.
+    <b>
+DDSCL
+_
+   
+FULLSCREEN</b>
+ –
+    создаем полноэкранный графический режим.
+   
+ 
+    <b>
+g_pDD-&gt;SetDisplayMode(640,
+    480, 8, 0, 0);</b>
+   
+Устанавливаем
+    графический режим.
+   
+<b>640</b> –
+    точек по горизонтали.
+   
+<b>480</b> –
+    точек по вертикали.
+   
+Режимы
+    могут быть: 320
+x
+200, 640
+   
+x
+480, 800
+   
+x
+600, 1024
+   
+x
+768, 1280
+   
+x
+1024, 1600
+   
+x
+1280)
+   
+<b>8</b> –
+    бит цветов или 256. Также могут быть 16 бит, 24 бита и
+    32 бита.
+   
+ 
+    <h1> style="COLOR: red">Создаем первичный буфер</h1>
+   
+ 
+    <b>
+ZeroMemory
+(&amp;
+   
+ddsd
+,
+   
+sizeof
+(
+   
+ddsd
+));</b>
+   
+Выделяем
+    память в видеобуфере, если ее не хватит, то в
+    оперативную или на жестком диске.
+   
+<b>ddsd</b>
+указывает
+    на структуру
+DDSURFACEDESC
+2, которая
+    в свою очередь содержит характеристики
+     буфера . Ее свойства
+    описаны ниже:
+   
+ 
+    <b>
+ddsd.dwSize
+    = sizeof(ddsd);</b>
+   
+Присваиваем
+    размер
+ddsd
+.
+   
+ 
+    <b>
+ddsd.dwFlags
+    = DDSD_CAPS | DDSD_BACKBUFFERCOUNT;</b>
+   
+У этой
+    поверхности (выделенной памяти), будут
+    использоваться параметры
+DDSD
+_
+   
+CAPS
+ и
+   
+DDSD
+_
+   
+BACKBUFFERCOUNT
+. Т.е. для
+    чего она будет предназначена.
+   
+ 
+    <b>
+ddsd.ddsCaps.dwCaps
+    = DDSCAPS_PRIMARYSURFACE | DDSCAPS_FLIP | DDSCAPS_COMPLEX;</b>
+   
+Эта
+    поверхность используется в качестве первичного
+    видеобуфера (
+DDS
+CAPS_PRIMARYSURFACE),
+    применяется переключение видеостраниц (
+   
+DDSCAPS
+_
+   
+FLIP
+).
+    Параметр
+DDSCAOS
+_
+   
+COMPLEX
+ нужен,
+    если ставишь
+DDSCAPS
+_
+   
+FLIP
+, для
+    быстродействия.
+   
+ 
+    <b>
+ddsd
+.
+   
+dwBackBufferCount
+ = 1;</b>
+   
+Указываем,
+    что эта поверхность будет использовать второй
+    буфер. Если параметры второго буфера не задаем,
+    то они ставятся по умолчанию, в зависимости от
+    первичного буфера.
+   
+ 
+    <b>
+g_pDD-&gt;CreateSurface(&amp;ddsd,
+    &amp;g_pDDSPrimary, NULL);</b>
+   
+Выше мы
+    определили параметры памяти
+ddsd
+, теперь
+    их переносим в
+g
+_
+   
+pDDSPrimary
+, которая
+    и будет первичным видеобуфером (тот который
+    отображается на экране). А
+ddsd
+ можно
+    использовать для другого…
+   
+ 
+    <h2>Создаем вторичный буфер</h2>
+   
+ 
+    <b>
+ZeroMemory
+(&amp;
+   
+ddscaps
+,
+   
+sizeof
+(
+   
+ddscaps
+));</b>
+   
+Выделяем
+    память для вторичного видеобуфера. Он должен
+    иметь структуру не
+LPDIRECTDRAWSURFACE
+7, а
+   
+DDSCAPS
+2, хотя в
+    большинстве параметров они схожи
+    style="FONT-FAMILY: Wingdings; FONT-SIZE: 10pt; mso-ansi-language: EN-US; mso-ascii-mso-hansi-mso-bidi-mso-char-type: symbol; mso-symbol-font-family: Wingdings">
+    style="mso-char-type: symbol; mso-symbol-font-family: Wingdings">J
+
+   
+ 
+    <b>
+ddscaps.dwCaps
+    = DDSCAPS_BACKBUFFER;</b>
+   
+Указываем,
+    что данная память будет предназначена в качестве
+    вторичного видеобуфера (т.е. память, которая не
+    отображается на экране).
+   
+ 
+    <b>
+g_pDDSPrimary-&gt;GetAttachedSurface(&amp;ddscaps,
+    &amp;g_pDDSBack);</b>
+   
+g
+_
+   
+pDDSBack
+ теперь
+    содержится вторичный буфер, который, в данном
+    моменте, подключается к первичной памяти при
+    помощи функции
+GetAttachedSurface
+. И стоит
+    вызвать функцию
+flip
+, как они
+    поменяются на экране, т.е. невидимая, станет
+    видимой, а видимая невидимой, но это ниже…
+   
+ 
+    <b>
+SetTimer(hWnd,
+    TIMER_ID, TIMER_RATE, NULL);</b>
+   
+Устанавливаем
+    время. Через определенное миллисекунд,
+   
+Windows
+
+    отправляет сообщение
+WM
+_
+   
+TIMER
+, которая
+    нам в дальнейшем пригодится.
+    <b>
+TIMER
+_
+   
+ID</b>
+ –
+    идентификатор часов, в нашем случае он равняется
+    1. Можно поставить одновременно несколько
+    таймеров, задав функцию
+SetTimer
+ но уже с
+    индификатором 2, будет создан второй таймер, и при
+    помощи функции
+KillTimer
+(
+   
+hWnd
+, 2), его
+    удаляем, а первый остается.
+    <b>
+TIMER
+_
+   
+RATE</b>
+ – ставим
+    число в миллисекундах,  1с
+    = 1000 мс.
+   
+ 
+   
+Ниже
+    следующий код расположите перед функцией
+   
+InitApp
+:
+   
+ 
+    <b>
+    style="COLOR: red; FONT-SIZE: 10pt; >Обработка
+    style="COLOR: red; FONT-SIZE: 10pt; >
+   
+    style="COLOR: red; FONT-SIZE: 10pt; >сообщений
+   
+    style="COLOR: red; FONT-SIZE: 10pt; >
+    Windows</b>
+    <p style="TEXT-ALIGN: justify; TEXT-INDENT: 14.2pt">
+ 
+    <table bgColor="#00ccff" border="1" cellPadding="0" cellSpacing="0"
+    style="BACKGROUND: #00ccff; BORDER-BOTTOM: medium none; BORDER-COLLAPSE: collapse; BORDER-LEFT: medium none; BORDER-RIGHT: medium none; BORDER-TOP: medium none; mso-padding-alt: 0cm 5.4pt 0cm 5.4pt; mso-border-alt: solid windowtext .5pt">
+      <tr>
+ <td
+ style="BORDER-BOTTOM: windowtext 0.5pt solid; BORDER-LEFT: windowtext 0.5pt solid; BORDER-RIGHT: windowtext 0.5pt solid; BORDER-TOP: windowtext 0.5pt solid; PADDING-BOTTOM: 0cm; PADDING-LEFT: 5.4pt; PADDING-RIGHT: 5.4pt; PADDING-TOP: 0cm; WIDTH: 478.55pt"
+ vAlign="top" width="638">
+       
+long
+ FAR PASCAL
+
+WindowProc(HWND
+ hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+
+{
+
+
+   
+switch
+ (
+       
+message
+)
+
+
+    {
+
+
+         //
+ Завершение программы
+
+
+       
+       
+case
+ WM_DESTROY:
+
+
+           
+ PostQuitMessage(0);
+
+
+           
+ return 0L;
+
+ 
+
+
+        
+// Если
+ нажали клавишу, в данном случае
+Esc
+ >и
+       
+F
+12
+ завершает программу
+
+
+       
+       
+case
+ WM_KEYDOWN:
+
+
+           
+ switch (wParam)
+
+
+           
+ {
+
+
+               
+ case VK_ESCAPE:
+
+
+               
+ case VK_F12:
+
+
+                   
+ PostMessage(hWnd, WM_CLOSE, 0, 0);
+
+
+                   
+ return 0L;
+
+
+           
+ }
+
+
+           
+ break;
+
+ style="COLOR: blue; FONT-SIZE: 10pt; > 
+
+
+        
+//
+ Скрываем курсор с экрана
+
+
+       
+       
+case
+ WM_SETCURSOR:
+
+
+           
+ SetCursor(NULL);
+
+
+           
+ return TRUE;
+
+
+        
+
+
+       
+//
+ Перерисовываем экран по таймеру, таймер
+ автоматически посылает
+WM
+_
+       
+TIMER
+
+
+
+       
+       
+case
+ WM_TIMER:
+
+
+           
+
+//
+
+ >Перерисовываем
+ вторичный буфер
+
+
+           
+
+UpdateFrame
+(
+       
+hWnd
+);
+
+ 
+
+
+ style="mso-tab-count: 1">           
+ // Меняем местами, первичный со вторичным
+ буфером
+
+
+ style="mso-tab-count: 1">           
+
+g_pDDSPrimary-&gt;Flip(NULL,
+ 0);
+
+ 
+
+
+    }
+
+
+    return DefWindowProc(hWnd, message,
+ wParam, lParam);
+
+}</td>
+      </tr>
+    </table>
+   
+ 
+    <b>
+    style="COLOR: red; FONT-SIZE: 10pt; >РАЗЪЯСНЕНИЕ:</b>
+   
+Здесь
+    вроде и так все понятно, читай комментарии. 
+   
+ 
+   
+Смотрим
+    дальше, что у нас:
+    <p style="TEXT-ALIGN: justify; TEXT-INDENT: 14.2pt">
+ 
+    <table bgColor="#00ccff" border="1" cellPadding="0" cellSpacing="0"
+    style="BACKGROUND: #00ccff; BORDER-BOTTOM: medium none; BORDER-COLLAPSE: collapse; BORDER-LEFT: medium none; BORDER-RIGHT: medium none; BORDER-TOP: medium none; mso-padding-alt: 0cm 5.4pt 0cm 5.4pt; mso-border-alt: solid windowtext .5pt">
+      <tr>
+ <td
+ style="BORDER-BOTTOM: windowtext 0.5pt solid; BORDER-LEFT: windowtext 0.5pt solid; BORDER-RIGHT: windowtext 0.5pt solid; BORDER-TOP: windowtext 0.5pt solid; PADDING-BOTTOM: 0cm; PADDING-LEFT: 5.4pt; PADDING-RIGHT: 5.4pt; PADDING-TOP: 0cm; WIDTH: 478.55pt"
+ vAlign="top" width="638">
+       
+static
+ void
+
+UpdateFrame(HWND
+ hWnd)
+
+{
+
+
+    static BYTE
+                
+ phase = 0;
+
+
+    HDC                        
+ hdc;
+
+
+    DDBLTFX                    
+ ddbltfx;
+
+
+    RECT                       
+ rc;
+
+
+    SIZE                    
+    size;
+
+ 
+
+
+   
+//
+ Заполняем выделенную память черным цветом и
+ затем копируем ее во вторичный буфер
+
+
+   
+ZeroMemory(&amp;ddbltfx,
+ sizeof(ddbltfx));
+
+
+    ddbltfx.dwSize = sizeof(ddbltfx);
+
+
+    ddbltfx.dwFillColor = 0;
+
+
+    g_pDDSBack-&gt;Blt(NULL, NULL, NULL,
+ DDBLT_COLORFILL | DDBLT_WAIT, &amp;ddbltfx);
+
+ 
+
+
+    // Отрываем контекст
+ устройства (Кто забудет это сделать, тот не
+ сможет вывести символы)
+
+
+   
+g_pDDSBack-&gt;GetDC(&amp;hdc);
+
+
+    SetBkColor(hdc, RGB(0, 0, 255));
+
+
+    SetTextColor(hdc, RGB(255, 255, 0));
+
+
+        if
+ (
+       
+phase
+)
+ style="COLOR: blue">
+
+
+        {
+
+
+ style="mso-tab-count: 1">           
+ // Первый раз она пропускается, так как
+       
+phase
+ = 0.
+ Заносим текст во вторичный буфер
+
+
+           
+
+GetClientRect(hWnd,
+ &amp;rc);
+
+
+           
+ GetTextExtentPoint(hdc, szMsg, lstrlen(szMsg), &amp;size);
+
+
+           
+ TextOut(hdc, (rc.right - size.cx) / 2, (rc.bottom - size.cy) / 2,
+
+
+                   
+ szMsg, sizeof(szMsg) - 1);
+
+
+           
+ TextOut(hdc, 0, 0, szFrontMsg, lstrlen(szFrontMsg));
+
+
+           
+ phase
+ = 0;
+
+
+        }
+
+
+       
+       
+else
+
+
+
+        {
+
+
+           
+ // При первом обращении выполняется эта
+ функция, заносит текст во вторичный
+
+
+
+           
+ //
+ буфер
+ <p style="TEXT-ALIGN: justify; TEXT-INDENT: 35.4pt">
+TextOut(hdc,
+ 0, 0, szBackMsg, lstrlen(szBackMsg));
+
+
+           
+ phase
+ = 1;
+
+
+        }
+
+
+        //
+ Закрываем контекст устройства
+
+
+       
+       
+g_pDDSBack-&gt;ReleaseDC(hdc);
+
+}
+       
+</td>
+      </tr>
+    </table>
+
+   
+ 
+    <b>
+    style="COLOR: red; FONT-SIZE: 10pt; >РАЗЪЯСНЕНИЕ:</b>
+    <b>
+    style="COLOR: red; FONT-SIZE: 10pt; > </b>
+    <b>
+    style="COLOR: red; FONT-SIZE: 10pt; >Очищаем
+    вторичную память.</b>
+    <b>
+    style="COLOR: red; FONT-SIZE: 10pt; > </b>
+    <b>
+ZeroMemory(&amp;ddbltfx,
+    sizeof(ddbltfx));</b>
+   
+Выделяем
+    свободную память.
+    <b>
+ddbltfx.dwSize
+    = sizeof(ddbltfx);</b>
+   
+Ставим ее
+    размер.
+    <b>
+ddbltfx
+.
+   
+dwFillColor
+ = 0;</b>
+   
+Цвет
+    заполнения ставим 0, т.е. черный.
+    <b>
+ </b>
+    <b>
+g_pDDSBack-&gt;Blt(NULL,
+    NULL, NULL, DDBLT_COLORFILL | DDBLT_WAIT, &amp;ddbltfx);</b>
+   
+Заполняем
+    вторичную память черным цветом, т.е. очищаем.
+   
+ 
+    <b>
+    style="COLOR: red; FONT-SIZE: 10pt; >Рисуем
+    во вторичной памяти:</b>
+    <b>
+ </b>
+    <b>
+g_pDDSBack-&gt;GetDC(&amp;hdc);</b>
+    <p class="MsoBodyText">Открываем контекст устройства для
+    вторичной памяти, потому что именно в ней будут
+    происходить изменения.
+    <b>
+ </b>
+    <b>
+SetBkColor(hdc,
+    RGB(0, 0, 255));</b>
+   
+Устанавливаем
+    фон текста,
+RGB
+ –
+    красный, зеленый, синий.
+   
+ 
+    <b>
+SetTextColor(hdc,
+    RGB(255, 255, 0));</b>
+    <p class="MsoBodyText">Устанавливаем цвет самого текста.
+    <p class="MsoBodyText"> 
+   
+if
+    (phase)
+   
+
+      {
+   
+
+          GetClientRect(hWnd,
+    &amp;rc);
+   
+
+          GetTextExtentPoint
+(
+   
+hdc
+, “Тест
+    переключения страниц: нажмите
+F
+12, чтобы
+    выйти”, 
+    <p style="MARGIN-LEFT: 35.4pt; TEXT-ALIGN: justify; TEXT-INDENT: 35.4pt">
+   
+lstrlen
+(“Тест
+    переключения страниц: нажмите
+F
+12, чтобы
+    выйти”),
+    <p style="MARGIN-LEFT: 35.4pt; TEXT-ALIGN: justify; TEXT-INDENT: 35.4pt">
+&amp;
+   
+size
+);
+   
+
+         
+   
+TextOut
+(
+   
+hdc
+, (
+   
+rc
+.
+   
+right
+ -
+   
+size
+.
+   
+cx
+) / 2, (
+   
+rc
+.
+   
+bottom
+ -
+   
+size
+.
+   
+cy
+) / 2, “Тест
+    переключения страниц: 
+    <p style="MARGIN-LEFT: 35.4pt; TEXT-ALIGN: justify; TEXT-INDENT: 35.4pt">
+нажмите
+    F12, чтобы выйти”,
+sizeof
+(“Тест
+    переключения страниц: нажмите
+F
+12, 
+    <p style="MARGIN-LEFT: 35.4pt; TEXT-ALIGN: justify; TEXT-INDENT: 35.4pt">
+чтобы
+    выйти”) - 1);
+   
+
+         
+   
+TextOut
+(
+   
+hdc
+, 0, 0,
+    “Первичный буфер: (
+F
+12 выход)”.
+   
+szFrontMsg
+,
+   
+lstrlen
+(“Первичный
+    буфер: 
+    <p style="MARGIN-LEFT: 35.4pt; TEXT-ALIGN: justify; TEXT-INDENT: 35.4pt">
+(
+   
+F
+12
+    выход)”.));
+   
+
+         
+   
+phase
+ = 0;
+    <p class="MsoBodyText">   }
+    style="COLOR: blue">
+    <p class="MsoBodyText">Выполняется в том случае, если
+    style=">phase> равна
+    1 (при первом обращении она не выполняется).
+    <p class="MsoBodyText"> 
+    <p class="MsoBodyText"><b> style=">GetClientRect(hWnd,
+    &amp;rc);</b>
+    <p class="MsoBodyText">Заносит в структуру
+    style=">rc параметры окна, левого
+    верхнего угла, и правого нижнего.
+    <p class="MsoBodyText"> style="COLOR: blue"> 
+    <b>
+GetTextExtentPoint
+(
+   
+hdc
+, “Тест
+    переключения страниц: нажмите
+F
+12, чтобы
+    выйти”,</b>
+    <p style="TEXT-ALIGN: justify; TEXT-INDENT: 35.4pt"><b>
+   
+lstrlen
+(“Тест
+    переключения страниц: нажмите
+F
+12, чтобы
+    выйти”), &amp;
+size
+);</b>
+   
+Заносит в структуру size ширину и высоту данной строки.
+Которая используется для вывода текста по середине экрана.
+
+<b>TextOut( hdc, ( rc.right - size.cx ) / 2, ( rc.bottom - size.cy ) / 2, “Тест
+    переключения страниц:</b>
+
+<b>нажмите F12, чтобы выйти”,
+sizeof
+(“Тест
+    переключения страниц: нажмите
+F
+12, </b>
+    <p style="TEXT-ALIGN: justify; TEXT-INDENT: 35.4pt"><b>
+чтобы
+    выйти”) - 1);</b>
+   
+Выводим текст в координатах х и y, задав его текст и размер текста.
+Один вычитаем, чтобы не было иероглифа.
+
+<br>
+<br>
+
+<b>Переключение страниц:</b>
+<br>
+<br>
+Затем выводим вторую строку на вторичный буфер, выполняется команда
+<br>
+<b>g_pDDSPrimary-&gt;Flip( NULL, 0);</b>
+<br>
+и вторичный буфер мы с Вами увидим на экране, а первичный “прячется”.
+
+<br>
+<br>
+
+Через некоторое время Windows посылает команду WM_TIMER и на этот
+раз выполняется if, куда заносятся две строки.
+
+<!--#include virtual="/ssi/bottom.html"-->

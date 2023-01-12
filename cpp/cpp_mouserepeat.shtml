@@ -1,0 +1,76 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Имитация многоразового нажатия мышкой</h3>
+    <p>Автор: <a href="mailto:psackett@fuse.net"><b>Pete Sackett</b></a></p>
+    <p>Описывается простой алгоритм многоразового
+    вызова любой функции до тех пор пока нажата
+    кнопка мыши (проще говоря при посылке сообщения
+    WM_LBUTTONDOWN), либо пока курсор мышки не покинул
+    определённой области.</p>
+    <p>Вам необходимо переопределить <code>OnLButtonDown</code>, <code>OnMouseMove</code>,
+    <code>OnLButtonUp</code> и <code>OnTimer</code> функции в Вашем классе,
+    наследованном от <code>CWnd</code>. Скорость повторений
+    установлена такой же как на клавиатуре. </p>
+    <pre>void CTestCtrl::OnLButtonDown(UINT nFlags, CPoint point)
+{
+    if(PtInRect(&amp;myRect, point))
+    {
+        DoClickThing();
+        SetCapture();
+
+        // инициализируем интервал таймера = задержка повтора на клавиатуре
+        int setting = 0;
+        SystemParametersInfo(SPI_GETKEYBOARDDELAY, 0, &amp;setting, 0);
+        int interval = (setting + 1) * 250;
+        TimerID = SetTimer(99, interval, NULL);
+        TimerStep = 1;
+    }
+}
+
+void CTestCtrl::OnMouseMove(UINT nFlags, CPoint point)
+{
+    if(TimerStep &amp;&amp; !PtInRect(&amp;myRect, point))
+    {
+        KillTimer(TimerID);
+        ReleaseCapture();
+        TimerStep = 0;
+    }
+}
+
+void CTestCtrl::OnLButtonUp(UINT nFlags, CPoint point)
+{
+    if(TimerStep)
+    {
+        KillTimer(TimerID);
+        ReleaseCapture();
+        TimerStep = 0;
+    }
+}
+
+void CTestCtrl::OnTimer(UINT nIDEvent)
+{
+    if(TimerStep == 1)
+    {
+        KillTimer(TimerID);
+
+        // устанавливаем интервал таймера, взятый с клавиатуры
+        DWORD setting = 0;
+        SystemParametersInfo(SPI_GETKEYBOARDSPEED, 0, &amp;setting, 0);
+        int interval = 400 - (setting * 12);
+        TimerID = SetTimer(100, interval, NULL);
+        TimerStep = 2;
+    }
+
+    if(TimerStep)
+        DoClickThing(); //наша функция, вызываемая многократно
+}
+</pre>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

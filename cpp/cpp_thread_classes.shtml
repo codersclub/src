@@ -1,0 +1,211 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="720" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <font color="#a0a099"><h2 align="center">Создание классов с
+    потоками</font></h2>
+    <hr>
+    <p>Автор: <a href="mailto:bestx@mail.ru">Покрашенко Александр</a>.</p>
+    <p style="MARGIN: 0cm 0cm 0pt">Встречая в форумах вопросы о
+    том, как создавать классы с потоками, я решил
+    написать эту статью.</p>
+    <p style="MARGIN: 0cm 0cm 0pt">Вся проблема состоит в том, что
+    для создания потока, необходимо передать адрес
+    функции потока, а передать адрес функции, которая
+    является членом класса нельзя. Можно завести
+    статическую функцию, но тогда теряется смысл
+    создавать классы, так как не получится
+    использовать все возможности ООП при таком
+    подходе.</p>
+    <p>Конечно можно использовать класс MFC, но не все
+    приложения используют эту библиотеку. </p>
+    <p>Вся идея состоит в том, что мы все-таки опишем
+    глобальную функцию, которую и будем передавать в
+    качестве параметра функции CreateThread, а в свою
+    очередь эта функция запустит на выполнение
+    функцию потока в Вашем классе.</p>
+    <p>Итак, создадим базовый класс:</p>
+    <p>class CMyThread<br>
+    {<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; friend DWORD WINAPI
+    ThreadProc(LPVOID lpParameter); // пояснения см. ниже<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; HANDLE m_hThread;</p>
+    <p>public:<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; DWORD Terminate(BOOL
+    bCritical=FALSE);<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; BOOL Execute();<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; CMyThread();<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; virtual
+    ~CMyThread();&nbsp;</p>
+    <p>protected:</p>
+    <p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; DWORD m_dwID;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; virtual DWORD
+    ThreadFunc()=NULL; // эта функция будет переопределяться в
+    наследующих классах<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; BOOL m_bTerminated; //
+    этот флаг будет указывать потоку, что пора
+    закругляться и завершать свю работу корректно.<br>
+    };</p>
+    <p>Мы описали класс со всеми необходимыми
+    функциями: запуска потока, остановки.&nbsp;</p>
+    <p>Теперь напишем глобальную потоковую
+    функцию:&nbsp;</p>
+    <p>extern DWORD WINAPI ThreadProc(LPVOID lpParameter)<br>
+    {<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; CMyThread
+    *pMyThread=(CMyThread *)lpParameter;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; return
+    pMyThread-&gt;ThreadFunc();<br>
+    }</p>
+    <p>Ключевое слово extern предотвратит использование
+    этой функции вне этого файла программы. В
+    качестве параметра получим указатель на объект,
+    в котором и будет помещен код необходимый для
+    выполнения в отдельном потоке. Хотя мы и
+    преобразуем указатель к указателю на базовый
+    класс, но вызовется функция наследующего класса.</p>
+    <p>CMyThread::CMyThread()<br>
+    {<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; m_bTerminated=FALSE;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; m_hThread=NULL;<br>
+    }</p>
+    <p>CMyThread::~CMyThread()<br>
+    {<br>
+    &nbsp;&nbsp; Terminate(FALSE); // при уничтожении объекта,
+    убедимся, что поток завершен или завершим его<br>
+    }</p>
+    <p>Теперь перейдем к самому главному - запуску
+    нашего потока:</p>
+    <p>BOOL CMyThread::Execute()<br>
+    {<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if (m_hThread)<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    return FALSE;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; }<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    m_hThread=CreateThread(NULL,0,(LPTHREAD_START_ROUTINE) <b
+    style="mso-bidi-font-weight: normal">ThreadProc</b>,<b
+    style="mso-bidi-font-weight: normal">this</b>,0,&amp;m_dwID);</p>
+    <p>&nbsp;&nbsp;&nbsp; return (m_hThread==NULL)?FALSE:TRUE;</p>
+    <p>}</p>
+    <p>В качестве параметров мы передали адрес
+    глобальной функции и указатель на наш объект!</p>
+    <p>Эта функция завершает работу потока. Сперва она
+    предупреждает поток о завершении, но если он сам
+    не завершается, &quot;убьем&quot; его.</p>
+    <p>DWORD CMyThread::Terminate(BOOL bCritical)<br>
+    {<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if (m_hThread==NULL)<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    return (DWORD)-1;</p>
+    <p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; m_bTerminated=TRUE;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; DWORD dwExitCode;</p>
+    <p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if (!bCritical)<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    for(int i=10;i&gt;0;i--)<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    {<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    GetExitCodeThread(m_hThread,&amp;dwExitCode);<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    if (dwExitCode==STILL_ACTIVE)<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    Sleep(25);<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    else<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    break;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    }<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; }</p>
+    <p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    GetExitCodeThread(m_hThread,&amp;dwExitCode);<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if
+    (dwExitCode==STILL_ACTIVE)<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    TerminateThread(m_hThread,-1);<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    GetExitCodeThread(m_hThread,&amp;dwExitCode);<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; CloseHandle(m_hThread);<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; m_hThread=NULL;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; m_bTerminated=FALSE;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; return dwExitCode;<br>
+    }</p>
+    <p>Вот и все, базовый класс готов. Теперь создаем
+    наш класс, с необходимыми характеристиками,
+    функцией потока и наследуем базовый класс:</p>
+    <p>class CMathThread : public CMyThread<br>
+    {<br>
+    public:<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; double m_dValue;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; CMathThread();<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; virtual ~CMathThread();</p>
+    <p>protected:<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; DWORD ThreadFunc(); //
+    обязательно определяем эту функцию, и помещаем в
+    нее свой код<br>
+    };</p>
+    <p>CMathThread::CMathThread()<br>
+    {<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; m_dValue=0;<br>
+    }</p>
+    <p>&nbsp;</p>
+    <p>Вот эта функция и запустится на выполнение
+    после вызова CMathThread::Execute() :</p>
+    <p>DWORD CMathThread::ThreadFunc()<br>
+    {<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; for(;;)<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    if (m_bTerminated)&nbsp; // проверяем, не пора ли
+    закругляться (см. комментарий ниже)<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    break;</p>
+    <p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    m_dValue+=.00001; // собственно вчисления<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; }<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; return 0;<br>
+    }</p>
+    <p>&nbsp;</p>
+    <p>Создаем любые классы, переопределяем
+    виртуальную функцию ThreadFunc() и создаем хоть сотню
+    объектов такого типа, передавая им аргументы
+    через члены класса.</p>
+    <p>Отметим, что создать базовый класс нельзя, т.к.
+    он содержит чисто виртуальную функцию, которую
+    необходимо определять в наследующих классах.</p>
+    <p>Опытные программисты сразу обнаружат
+    несколько ошибок, которые никак нельзя допускать
+    при работе с потоками. Например, неправильно
+    использовать переменную для предупреждения
+    потока о завершении (m_bTerminate). Второе, необходимо
+    дописать механизмы общения с объектом с
+    временной остановкой потока. Но целью статьи
+    было объяснение создания подобных классов,
+    потому что синхронизация потоков слишком
+    большая тема для описания в данной статье.</p>
+    <p>В данном случае я допустил использование
+    переменной для предупреждения потока, т.к. она
+    подразумевает только 2 состояния 0 и не 0. Но
+    считывание переменной m_dValue при работающем
+    потоке чревато. Необходимо использовать Event, Mutex,
+    Semaphore&nbsp;либо другие механизмы для синхронизации
+    с потоком для считывания общих данных. А это, как
+    я уже сказал, совсем другая история…</p>
+    <p><b>Примеры:</b></p>
+    <p><a href="threads_exe.zip">Исполняемый - 5Кб</a><br>
+    <a href="threads_src.zip">Исходники - 13Кб</a></p>
+    <p align="right">Покрашенко Александр<br>
+    Владивосток<br>
+    31.08.2001<br>
+    email: <a href="mailto:bestx@mail.ru">bestx@mail.ru</a></p>
+    <p align="center"><br>
+    </td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

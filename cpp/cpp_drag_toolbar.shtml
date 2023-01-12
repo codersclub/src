@@ -1,0 +1,144 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3 align="center"><font color="#a0a099">Перетаскивание элементов
+    из Toolbar в view </font></h3>
+    <hr>
+    <p>Автор: <a href="mailto:phhnguyen@yahoo.com">Pham Hong Nguyen</a>.</p>
+    <p><img src="DragToolBar.jpg" width="407" height="206"> </p>
+    <p>Основноя проблема заключается в том, что toolbar не
+    реагирует на действие переноса элементов.
+    Следовательно нам нужно брать и посылать
+    соответствующие сообщения самостоятельно. Итак,
+    наследуем новый класс CDragToolBar от CToolBar, затем
+    добавляем в него обработчик события LButtonDown:</p>
+    <pre>void CDragToolBar::OnLButtonDown(UINT nFlags, CPoint point) 
+{
+   int nCount = GetToolBarCtrl().GetButtonCount();
+   for (int i=0; i&lt;nCount; i++) {
+   CRect rect;
+      GetItemRect(i, rect);
+      if (rect.PtInRect(point)) {
+         PostMessage(WM_COMMAND, GetItemID(i));
+         return;
+      }
+   }
+      
+   CToolBar::OnLButtonDown(nFlags, point);
+}</pre>
+    <p>Теперь во view перехватываем все события,
+    поступающие от toolbar и переводим программу в режим
+    перетаскивания:</p>
+    <pre>void CDTBView::OnDragToolBar(UINT nCmdID)
+{
+   m_dragBtn = nCmdID;
+   BeginDrag ();
+}</pre>
+    <p>В этом примере drag and drop работает через CImageList. </p>
+    <p>Данный метод прекрасно работает. Однако,
+    существует небольшая проблемма, заключающаяся в
+    том, что перетаскиваемая кнопка тулбара не
+    правильно перерисовывается ввиду нарушения
+    курсора перетаскивания (он фиксирует
+    изображение кнопки до апдейта, а затем только
+    перерисовывает его). Поэтому нам потребуется
+    небольшое улучшение кода.</p>
+    <p>Вместо того, чтобы входить в режим
+    перетаскивания после получения сообщения,
+    программа должна записать событие
+    перетаскиваемой кнопки и дать немного времени,
+    чтобы тулбар проапдейтил статус кнопки. Чтобы
+    гарантировать это, мы фиксируем событие
+    перемещения мышки, и проверяем как далеко была
+    перемещена мышка. Если всё ОК, то отправляем
+    другое сообщение, для того, чтобы программа вошла
+    в режим перетаскивания:</p>
+    <pre>void CDragToolBar::OnLButtonDown(UINT nFlags, CPoint point) 
+{
+   int nCount = GetToolBarCtrl().GetButtonCount();
+   for (int i=0; i&lt;nCount; i++) {
+      CRect rect;
+      GetItemRect(i, rect);
+      if (rect.PtInRect(point)) {
+         PostMessage(WM_COMMAND, GetItemID(i));
+         m_dragMode = TRUE;
+         m_point = point;
+         return;
+      }
+   }
+      
+   CToolBar::OnLButtonDown(nFlags, point);
+}
+
+void CDragToolBar::OnMouseMove(UINT nFlags, CPoint point) 
+{
+   if (m_dragMode &amp;&amp; 
+             abs(m_point.x-point.x)+abs(m_point.y-point.y)&gt;=3) {
+      PostMessage(WM_COMMAND, ID_START_DRAG);
+      m_dragMode = FALSE;
+   }
+   CToolBar::OnMouseMove(nFlags, point);
+}</pre>
+    <p>Во view делаем соответствующие изменения:</p>
+    <pre>void CDTBView::OnDragToolBar(UINT nCmdID)
+{
+   m_dragBtn = nCmdID;
+}
+
+void CDTBView::OnStartDrag() 
+{
+   BeginDrag();
+}</pre>
+    <p>А теперь добавим немного кода, чтобы придать
+    тулбару немного интеллектуальности.</p>
+    <pre>void CDragToolBar::OnLButtonDown(UINT nFlags, CPoint point) 
+{
+   int nCount = GetToolBarCtrl().GetButtonCount();
+   for (int i=0; i&lt;nCount; i++) {
+      CRect rect;
+      GetItemRect(i, rect);
+      if (rect.PtInRect(point)) {
+         PostMessage(WM_COMMAND, GetItemID(i));
+         m_dragMode = TRUE;
+         m_point = point;
+         return;
+      }
+   }
+      
+   CToolBar::OnLButtonDown(nFlags, point);
+}
+
+void CDragToolBar::OnMouseMove(UINT nFlags, CPoint point) 
+{
+   if (m_dragMode &amp;&amp; 
+             abs(m_point.x-point.x)+abs(m_point.y-point.y)&gt;=3) {
+      PostMessage(WM_COMMAND, ID_START_DRAG);
+      m_dragMode = FALSE;
+   }
+   CToolBar::OnMouseMove(nFlags, point);
+}</pre>
+    <p>Ну и во view тоже сделаем немного изменений:</p>
+    <pre>void CDTBView::OnDragToolBar(UINT nCmdID)
+{
+   m_dragBtn = nCmdID;
+}
+
+void CDTBView::OnStartDrag() 
+{
+   BeginDrag();
+}</pre>
+    <p>&nbsp;</p>
+    <h3>Downloads</h3>
+    <a href="DragToolBarDemo.zip"><p>Скачать демонстрационный
+    проект - 30 Kb</a><br>
+    <a href="DragToolBar.zip">Скачать исходник - 2 Kb</a> </p>
+    <p><br>
+    <br>
+    </td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

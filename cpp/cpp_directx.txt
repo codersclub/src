@@ -1,0 +1,647 @@
+<!--#include virtual="/ssi/top.html"-->
+
+Изучаем
+Direct X вместе на примерах  SDK 7.0
+
+Создадим проект, который показывает первичный и вторичный буфера.
+
+ 
+
+Перед началом работы возьмите DirectX SDK 7.0 (http://www.microsoft.com/, 128 891 648 байт или прямиком сюда), скиньте из директории Lib файлы в Visual C++, тоже в директорию Lib, и  перепишите Include в директорию Include. Откройте проект имеющий расширение *.mak, а не *.dsw. Или же, если у Вас нет терпения качать, а Шаг первый хотите сделать, возьмите отсюда: include.rar и lib.rar.
+
+ 
+
+Затем загрузите этот проект: project.rar.
+
+ 
+
+Откройте проект при помощи меню File->Open Workspace, и выберите ddex1.dsw. Проект загружен. Можете скомпилировать и посмотреть для начала, что происходит. Лично я применял Visual C++ 6.0 взятый из Visual Studio 6.0 (но может и на 5.0 компилироваться, если сделать выше указанные действия).
+
+ 
+
+Итак, рассмотрим нижеследующий код:
+
+ 
+
+#include <windows.h>
+
+#include <ddraw.h>
+
+#include <stdio.h>
+
+#include <stdarg.h>
+
+#include "resource.h"
+
+ 
+
+int PASCAL
+
+WinMain(HINSTANCE hInstance,
+
+        HINSTANCE hPrevInstance,
+
+        LPSTR lpCmdLine,
+
+        int nCmdShow)
+
+{
+
+    MSG                         msg;
+
+ 
+
+    InitApp(hInstance, nCmdShow);
+
+ 
+
+    while (GetMessage(&msg, NULL, 0, 0))
+
+    {
+
+        TranslateMessage(&msg);
+
+        DispatchMessage(&msg);
+
+    }
+
+    return msg.wParam;
+
+}
+
+ 
+
+РАЗЪЯСНЕНИЕ:
+
+InitApp(hInstance, nCmdShow) - создает класс окна, в котором инициализируется DirectDraw, ниже мы его создадим.
+
+Цикл while - обработка сообщений с клавиатуры (постоянна, на протяжении всей программы, пока она не завершится).
+
+ 
+
+Теперь рассмотрим InitApp более подробно:
+
+ 
+
+static HRESULT
+
+InitApp(HINSTANCE hInstance, int nCmdShow)
+
+{
+
+    HWND                        hWnd;
+
+    WNDCLASS                    wc;
+
+    DDSURFACEDESC2              ddsd;
+
+    DDSCAPS2                    ddscaps;
+
+ 
+
+    // Устанавливаем параметры окна
+
+    wc.style = CS_HREDRAW | CS_VREDRAW;
+
+    wc.lpfnWndProc = WindowProc;
+
+    wc.cbClsExtra = 0;
+
+    wc.cbWndExtra = 0;
+
+    wc.hInstance = hInstance;
+
+    wc.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_MAIN_ICON));
+
+    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+
+    wc.hbrBackground = (HBRUSH )GetStockObject(BLACK_BRUSH);
+
+    wc.lpszMenuName = NAME;
+
+    wc.lpszClassName = NAME;
+
+    RegisterClass(&wc);
+
+ 
+
+    // Создаем окно
+
+    hWnd = CreateWindowEx(WS_EX_TOPMOST,
+
+                          NAME,
+
+                          TITLE,
+
+                          WS_POPUP,
+
+                          0,
+
+                          0,
+
+                          GetSystemMetrics(SM_CXSCREEN),
+
+                          GetSystemMetrics(SM_CYSCREEN),
+
+                          NULL,
+
+                          NULL,
+
+                          hInstance,
+
+                          NULL);
+
+    ShowWindow(hWnd, nCmdShow);
+
+    UpdateWindow(hWnd);
+
+ 
+
+    ///////////////////////////////////////////////////////////////////////////
+
+    // Создаем главный DirectDraw объект
+
+    ///////////////////////////////////////////////////////////////////////////
+
+    DirectDrawCreateEx(NULL, (VOID**)&g_pDD, IID_IDirectDraw7, NULL);
+
+ 
+
+    // Отображение окна: полноэкранный
+
+    g_pDD->SetCooperativeLevel(hWnd, DDSCL_EXCLUSIVE | DDSCL_FULLSCREEN);
+
+ 
+
+    // Устанавливаем графический режим 640x480x8
+
+    g_pDD->SetDisplayMode(640, 480, 8, 0, 0);
+
+ 
+
+    // Создаем первичный буфер, у которого есть вторичный
+
+    ZeroMemory(&ddsd, sizeof(ddsd));
+
+    ddsd.dwSize = sizeof(ddsd);
+
+    ddsd.dwFlags = DDSD_CAPS | DDSD_BACKBUFFERCOUNT;
+
+    ddsd.ddsCaps.dwCaps = DDSCAPS_PRIMARYSURFACE | DDSCAPS_FLIP |
+
+                          DDSCAPS_COMPLEX;
+
+    ddsd.dwBackBufferCount = 1;
+
+    g_pDD->CreateSurface(&ddsd, &g_pDDSPrimary, NULL);
+
+ 
+
+    // Делаем вторичный буфер
+
+    ZeroMemory(&ddscaps, sizeof(ddscaps));
+
+    ddscaps.dwCaps = DDSCAPS_BACKBUFFER;
+
+    g_pDDSPrimary->GetAttachedSurface(&ddscaps, &g_pDDSBack);
+
+ 
+
+    // Устанавливаем таймер     
+
+    SetTimer(hWnd, TIMER_ID, TIMER_RATE, NULL);
+
+ 
+
+    return DD_OK;
+
+}
+
+ 
+
+А также  после #include инициализируем следующие параметры:
+
+ 
+
+#define NAME                         "DDExample1"
+
+#define TITLE                          "Direct Draw Example 1"
+
+ 
+
+#define TIMER_ID                    1
+
+#define TIMER_RATE               500
+
+ 
+
+LPDIRECTDRAW7                   g_pDD = NULL;                // Главный DirectDraw объект
+
+LPDIRECTDRAWSURFACE7    g_pDDSPrimary = NULL;  // Первичная память DirectDraw
+
+LPDIRECTDRAWSURFACE7    g_pDDSBack = NULL;      // Вторичная память DirectDraw
+
+ 
+
+static char                 szMsg[] = "Page Flipping Test: Press F12 to exit";
+
+static char                 szFrontMsg[] = "Front buffer (F12 to quit)";
+
+static char                 szBackMsg[] = "Back buffer (F12 to quit)";
+
+ 
+
+РАЗЪЯСНЕНИЕ:
+
+ 
+
+Создание объекта DirectDraw, определяем  режим отображения и разрешаемую графическую способность
+
+ 
+
+DirectDrawCreateEx(NULL, (VOID**)&g_pDD, IID_IDirectDraw7, NULL);
+
+Перед тем как пользоваться возможностями DirectDraw, нужно его создать, что и делает эта функция. g_pDD - содержит сам объект на DirectDraw.
+
+ 
+
+g_pDD->SetCooperativeLevel(hWnd, DDSCL_EXCLUSIVE | DDSCL_FULLSCREEN);
+
+Устанавливаем полноэкранный графический режим.
+
+DDSCL_EXCLUSIVE - разрешает прямой доступ к видеокарте. Т.е. все операции, которые мы будем проводить позднее, они будут обрабатываться значительно быстрее. Доступен только при параметре DDSCL_FULLSCREEN.
+
+DDSCL_FULLSCREEN - создаем полноэкранный графический режим.
+
+ 
+
+g_pDD->SetDisplayMode(640, 480, 8, 0, 0);
+
+Устанавливаем графический режим.
+
+640 - точек по горизонтали.
+
+480 - точек по вертикали.
+
+Режимы могут быть: 320x200, 640x480, 800x600, 1024x768, 1280x1024, 1600x1280)
+
+8 - бит цветов или 256. Также могут быть 16 бит, 24 бита и 32 бита.
+
+ 
+Создаем первичный буфер
+
+ 
+
+ZeroMemory(&ddsd, sizeof(ddsd));
+
+Выделяем память в видеобуфере, если ее не хватит, то в оперативную или на жестком диске.
+
+ddsd указывает на структуру DDSURFACEDESC2, которая в свою очередь содержит характеристики  буфера . Ее свойства описаны ниже:
+
+ 
+
+ddsd.dwSize = sizeof(ddsd);
+
+Присваиваем размер ddsd.
+
+ 
+
+ddsd.dwFlags = DDSD_CAPS | DDSD_BACKBUFFERCOUNT;
+
+У этой поверхности (выделенной памяти), будут использоваться параметры DDSD_CAPS и DDSD_BACKBUFFERCOUNT. Т.е. для чего она будет предназначена.
+
+ 
+
+ddsd.ddsCaps.dwCaps = DDSCAPS_PRIMARYSURFACE | DDSCAPS_FLIP | DDSCAPS_COMPLEX;
+
+Эта поверхность используется в качестве первичного видеобуфера (DDSCAPS_PRIMARYSURFACE), применяется переключение видеостраниц (DDSCAPS_FLIP). Параметр DDSCAOS_COMPLEX нужен, если ставишь DDSCAPS_FLIP, для быстродействия.
+
+ 
+
+ddsd.dwBackBufferCount = 1;
+
+Указываем, что эта поверхность будет использовать второй буфер. Если параметры второго буфера не задаем, то они ставятся по умолчанию, в зависимости от первичного буфера.
+
+ 
+
+g_pDD->CreateSurface(&ddsd, &g_pDDSPrimary, NULL);
+
+Выше мы определили параметры памяти ddsd, теперь их переносим в g_pDDSPrimary, которая и будет первичным видеобуфером (тот который отображается на экране). А ddsd можно использовать для другого:
+
+ 
+Создаем вторичный буфер
+
+ 
+
+ZeroMemory(&ddscaps, sizeof(ddscaps));
+
+Выделяем память для вторичного видеобуфера. Он должен иметь структуру не LPDIRECTDRAWSURFACE7, а DDSCAPS2, хотя в большинстве параметров они схожи J
+
+ 
+
+ddscaps.dwCaps = DDSCAPS_BACKBUFFER;
+
+Указываем, что данная память будет предназначена в качестве вторичного видеобуфера (т.е. память, которая не отображается на экране).
+
+ 
+
+g_pDDSPrimary->GetAttachedSurface(&ddscaps, &g_pDDSBack);
+
+g_pDDSBack теперь содержится вторичный буфер, который, в данном моменте, подключается к первичной памяти при помощи функцииGetAttachedSurface. И стоит вызвать функцию flip, как они поменяются на экране, т.е. невидимая, станет видимой, а видимая невидимой, но это ниже:
+
+ 
+
+SetTimer(hWnd, TIMER_ID, TIMER_RATE, NULL);
+
+Устанавливаем время. Через определенное миллисекунд, Windows отправляет сообщение WM_TIMER, которая нам в дальнейшем пригодится.
+
+TIMER_ID - идентификатор часов, в нашем случае он равняется 1. Можно поставить одновременно несколько таймеров, задав функцию SetTimer но уже с индификатором 2, будет создан второй таймер, и при помощи функции KillTimer(hWnd, 2), его удаляем, а первый остается.
+
+TIMER_RATE - ставим число в миллисекундах,  1с = 1000 мс.
+
+ 
+
+Ниже следующий код расположите перед функцией InitApp:
+
+ 
+
+Обработка сообщений Windows
+
+ 
+
+long FAR PASCAL
+
+WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+
+{
+
+    switch (message)
+
+    {
+
+         // Завершение программы
+
+        case WM_DESTROY:
+
+            PostQuitMessage(0);
+
+            return 0L;
+
+ 
+
+         // Если нажали клавишу, в данном случае Esc и F12 завершает программу
+
+        case WM_KEYDOWN:
+
+            switch (wParam)
+
+            {
+
+                case VK_ESCAPE:
+
+                case VK_F12:
+
+                    PostMessage(hWnd, WM_CLOSE, 0, 0);
+
+                    return 0L;
+
+            }
+
+            break;
+
+ 
+
+         // Скрываем курсор с экрана
+
+        case WM_SETCURSOR:
+
+            SetCursor(NULL);
+
+            return TRUE;
+
+       
+
+        // Перерисовываем экран по таймеру, таймер автоматически посылает WM_TIMER
+
+        case WM_TIMER:
+
+            // Перерисовываем вторичный буфер
+
+            UpdateFrame(hWnd);
+
+ 
+
+            // Меняем местами, первичный со вторичным буфером
+
+            g_pDDSPrimary->Flip(NULL, 0);
+
+ 
+
+    }
+
+    return DefWindowProc(hWnd, message, wParam, lParam);
+
+}
+
+ 
+
+РАЗЪЯСНЕНИЕ:
+
+Здесь вроде и так все понятно, читай комментарии.
+
+ 
+
+Смотрим дальше, что у нас:
+
+ 
+
+static void
+
+UpdateFrame(HWND hWnd)
+
+{
+
+    static BYTE                 phase = 0;
+
+    HDC                         hdc;
+
+    DDBLTFX                     ddbltfx;
+
+    RECT                        rc;
+
+    SIZE                        size;
+
+ 
+
+    // Заполняем выделенную память черным цветом и затем копируем ее во вторичный буфер
+
+    ZeroMemory(&ddbltfx, sizeof(ddbltfx));
+
+    ddbltfx.dwSize = sizeof(ddbltfx);
+
+    ddbltfx.dwFillColor = 0;
+
+    g_pDDSBack->Blt(NULL, NULL, NULL, DDBLT_COLORFILL | DDBLT_WAIT, &ddbltfx);
+
+ 
+
+    // Отрываем контекст устройства (Кто забудет это сделать, тот не сможет вывести символы)
+
+    g_pDDSBack->GetDC(&hdc);
+
+    SetBkColor(hdc, RGB(0, 0, 255));
+
+    SetTextColor(hdc, RGB(255, 255, 0));
+
+        if (phase)
+
+        {
+
+            // Первый раз она пропускается, так как phase = 0. Заносим текст во вторичный буфер
+
+            GetClientRect(hWnd, &rc);
+
+            GetTextExtentPoint(hdc, szMsg, lstrlen(szMsg), &size);
+
+            TextOut(hdc, (rc.right - size.cx) / 2, (rc.bottom - size.cy) / 2,
+
+                    szMsg, sizeof(szMsg) - 1);
+
+            TextOut(hdc, 0, 0, szFrontMsg, lstrlen(szFrontMsg));
+
+            phase = 0;
+
+        }
+
+        else
+
+        {
+
+            // При первом обращении выполняется эта функция, заносит текст во вторичный
+
+            // буфер
+
+TextOut(hdc, 0, 0, szBackMsg, lstrlen(szBackMsg));
+
+            phase = 1;
+
+        }
+
+        // Закрываем контекст устройства
+
+        g_pDDSBack->ReleaseDC(hdc);
+
+}
+
+ 
+
+РАЗЪЯСНЕНИЕ:
+
+ 
+
+Очищаем вторичную память.
+
+ 
+
+ZeroMemory(&ddbltfx, sizeof(ddbltfx));
+
+Выделяем свободную память.
+
+ddbltfx.dwSize = sizeof(ddbltfx);
+
+Ставим ее размер.
+
+ddbltfx.dwFillColor = 0;
+
+Цвет заполнения ставим 0, т.е. черный.
+
+ 
+
+g_pDDSBack->Blt(NULL, NULL, NULL, DDBLT_COLORFILL | DDBLT_WAIT, &ddbltfx);
+
+Заполняем вторичную память черным цветом, т.е. очищаем.
+
+ 
+
+Рисуем во вторичной памяти:
+
+ 
+
+g_pDDSBack->GetDC(&hdc);
+
+Открываем контекст устройства для вторичной памяти, потому что именно в ней будут происходить изменения.
+
+ 
+
+SetBkColor(hdc, RGB(0, 0, 255));
+
+Устанавливаем фон текста, RGB - красный, зеленый, синий.
+
+ 
+
+SetTextColor(hdc, RGB(255, 255, 0));
+
+Устанавливаем цвет самого текста.
+
+ 
+
+if (phase)
+
+   {
+
+       GetClientRect(hWnd, &rc);
+
+       GetTextExtentPoint(hdc, "Тест переключения страниц: нажмите F12, чтобы выйти",
+
+lstrlen("Тест переключения страниц: нажмите F12, чтобы выйти"),
+
+&size);
+
+       TextOut(hdc, (rc.right - size.cx) / 2, (rc.bottom - size.cy) / 2, "Тест переключения страниц:
+
+нажмите F12, чтобы выйти", sizeof("Тест переключения страниц: нажмите F12,
+
+чтобы выйти") - 1);
+
+       TextOut(hdc, 0, 0, "Первичный буфер: (F12 выход)".szFrontMsg, lstrlen("Первичный буфер:
+
+(F12 выход)".));
+
+       phase = 0;
+
+   }
+
+Выполняется в том случае, если phase равна 1 (при первом обращении она не выполняется).
+
+ 
+
+GetClientRect(hWnd, &rc);
+
+Заносит в структуру rc параметры окна, левого верхнего угла, и правого нижнего.
+
+ 
+
+GetTextExtentPoint(hdc, "Тест переключения страниц: нажмите F12, чтобы выйти",
+
+lstrlen("Тест переключения страниц: нажмите F12, чтобы выйти"), &size);
+
+Заносит в структуру size ширину и высоту данной строки. Которая используется для вывода текста по середине экрана.
+
+ 
+
+TextOut(hdc, (rc.right - size.cx) / 2, (rc.bottom - size.cy) / 2, "Тест переключения страниц:
+
+нажмите F12, чтобы выйти", sizeof("Тест переключения страниц: нажмите F12,
+
+чтобы выйти") - 1);
+
+Выводим текст в координатах х и y, задав его текст и размер текста. Один вычитаем, чтобы не было иероглифа.
+
+ 
+
+Переключение страниц:
+
+ 
+
+Затем выводим вторую строку на вторичный буфер, выполняется команда                 g_pDDSPrimary->Flip(NULL, 0); и вторичный буфер мы с Вами увидим на экране, а первичный "прячется". Через некоторое время Windows посылает команду WM_TIMER и на этот раз выполняется if, куда заносятся две строки.
+<!--#include virtual="/ssi/bottom.html"-->

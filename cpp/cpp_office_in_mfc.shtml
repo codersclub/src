@@ -1,0 +1,388 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3 align="center"><font color="#a0a099">Применение MS Office в MFC MDI приложении</font></h3>
+    <hr>
+    <p>Автор: <a href="mailto:it@hotmail.ru?Subject=XOffice">Igor Tkachev</a>. <!-- Sample image - gif or jpg --> </p>
+    <p><img src="XOffice.jpg" width="460" height="330"></p>
+<P>Зачем?<BR>
+Однажды я занимался проектом, главной особенностью которого было наличие
+не детского количества типовых форм ввода и вывода.
+Что-то типа делопроизводства. Документы должны были заполняться данными
+из БД или другими данными,  которые может предоставить программа.
+При этом было бы крайне желательно, чтобы шаблон документа мог разобратьс
+с этими данными самостоятельно.
+
+<P>
+Оказалось, что всем этим требованиям удовлетворяет MS Office.
+
+<P>
+В этой статье я попытаюсь это продемонстрировать.
+
+<P>
+Сразу замечу, что самой большой проблемой была нестабильная работа самого
+MS Office в режиме ActiveX Document. Поэтому, вы заметите некоторые явно
+не оптимальные решения, но это на первый взгляд. Например, пришлось
+отказаться от прямого вызова макросов VBA, т.к. после завершения программы
+MS Office оставался в памяти, и снять его можно было только диспетчером
+задач, ну и т.п.
+Если вам удастся решить эту проблему, прошу поделиться со мной.
+
+<P>Начнем.
+
+<P><B>1. </B>
+Сгенерируйте новое MDI приложение при помощи MFC
+AppWizard. Назовите проект XOffice и на третьем шаге обязательно установите
+флажки Container и Active document container.
+
+<P><B>2. </B>
+Приложение должно быть сервером автоматизации. Я воспользовался способом,
+предложенным Nick Hodapp в примере AutoATL, который можно найти на
+<A href="http://www.codeguru.com/atl/AutoATL.shtml">www.codeguru.com</A>.
+Ознакомьтесь с этим примером и выполните все шаги по преобразованию
+программы в сервер автоматизации.
+
+<P><B>3. </B>
+Теперь займемся подключением MS Office.
+Включите в проект файл Office.h следующего содержания:
+
+<PRE><TT><HR><FONT color=green>// Office.h</FONT>
+
+<FONT color=blue>#define</FONT> Uses_MSO2000
+
+<FONT color=blue>#ifdef</FONT> Uses_MSO2000
+<FONT color=green>// for MS Office 2000</FONT>
+<FONT color=blue>#import </FONT><FONT color=teal>"C:\Program Files\Microsoft Office\Office\MSO9.DLL"</FONT>
+<FONT color=blue>#import </FONT><FONT color=teal>"C:\Program Files\Common Files\Microsoft Shared\VBA\VBA6\VBE6EXT.OLB"</FONT>
+<FONT color=blue>#import </FONT><FONT color=teal>"C:\Program Files\Microsoft Office\Office\MSWORD9.OLB"</FONT> \
+        rename(<FONT color=teal>"ExitWindows"</FONT>,<FONT color=teal>"_ExitWindows"</FONT>)
+<FONT color=blue>#import </FONT><FONT color=teal>"C:\Program Files\Microsoft Office\Office\EXCEL9.OLB"</FONT> \
+        rename(<FONT color=teal>"DialogBox"</FONT>,<FONT color=teal>"_DialogBox"</FONT>) \
+        rename(<FONT color=teal>"RGB"</FONT>,<FONT color=teal>"_RGB"</FONT>) \
+        exclude(<FONT color=teal>"IFont"</FONT>,<FONT color=teal>"IPicture"</FONT>)
+<FONT color=blue>#import </FONT><FONT color=teal>"C:\Program Files\Common Files\Microsoft Shared\DAO\DAO360.DLL"</FONT> \
+        rename(<FONT color=teal>"EOF"</FONT>,<FONT color=teal>"EndOfFile"</FONT>) rename(<FONT color=teal>"BOF"</FONT>,<FONT color=teal>"BegOfFile"</FONT>)
+<FONT color=blue>#import </FONT><FONT color=teal>"C:\Program Files\Microsoft Office\Office\MSACC9.OLB"</FONT>
+<FONT color=blue>#else</FONT>
+<FONT color=green>// for MS Office 97</FONT>
+<FONT color=blue>#import </FONT><FONT color=teal>"C:\Program Files\Microsoft Office\Office\MSO97.DLL"</FONT>
+<FONT color=blue>#import </FONT><FONT color=teal>"C:\Program Files\Common Files\Microsoft Shared\VBA\VBEEXT1.OLB"</FONT>
+<FONT color=blue>#import </FONT><FONT color=teal>"C:\Program Files\Microsoft Office\Office\MSWORD8.OLB"</FONT> \
+        rename(<FONT color=teal>"ExitWindows"</FONT>,<FONT color=teal>"_ExitWindows"</FONT>)
+<FONT color=blue>#import </FONT><FONT color=teal>"C:\Program Files\Microsoft Office\Office\EXCEL8.OLB"</FONT> \
+        rename(<FONT color=teal>"DialogBox"</FONT>,<FONT color=teal>"_DialogBox"</FONT>) \
+        rename(<FONT color=teal>"RGB"</FONT>,<FONT color=teal>"_RGB"</FONT>) \
+        exclude(<FONT color=teal>"IFont"</FONT>,<FONT color=teal>"IPicture"</FONT>)
+<FONT color=blue>#import </FONT><FONT color=teal>"C:\Program Files\Common Files\Microsoft Shared\DAO\DAO350.DLL"</FONT> \
+        rename(<FONT color=teal>"EOF"</FONT>,<FONT color=teal>"EndOfFile"</FONT>)
+        rename(<FONT color=teal>"BOF"</FONT>,<FONT color=teal>"BegOfFile"</FONT>)
+<FONT color=blue>#import </FONT><FONT color=teal>"C:\Program Files\Microsoft Office\Office\MSACC8.OLB"</FONT>
+<FONT color=blue>#endif</FONT>
+<HR></TT></PRE>
+
+<P><B>4. </B>
+Создадим новую форму, которая нам понадобится в дальнейшем.
+Menu – Insert – New Form…
+<P>
+В поле <B>Name</B> введите <B>CFormDemo</B>.
+Нажмите кнопку <B>New </B>возле поля <B>Document </B>
+и в появившейся форме OK. И еще раз OK.
+<P>
+На новой форме разместим три Edit Box'а и два Button'а.
+В ClassWizard'е привяжем Edit Box'ы к переменным (соответственно
+CString m_str, double m_double, long m_long).
+
+<P><B>5. </B>
+Для Button'ов создадим обработчики следующего вида:
+
+<PRE><TT><HR><FONT color=green>// FormDemo.cpp</FONT>
+
+<FONT color=blue>void </FONT>NewXOfficeDoc(LPCTSTR,LPCTSTR,<FONT color=blue>double</FONT>,<FONT color=blue>long</FONT>);
+
+<FONT color=blue>void</FONT> CFormDemo::OnButton1()
+{
+    UpdateData();
+    NewXOfficeDoc(<FONT color=teal>"XOffice.doc"</FONT>,m_str,m_double,m_long);
+}
+
+<FONT color=blue>void</FONT> CFormDemo::OnButton2()
+{
+    UpdateData();
+    NewXOfficeDoc(<FONT color=teal>"XOffice.xls"</FONT>,m_str,m_double,m_long);
+}
+<HR></TT></PRE>
+
+<P>
+В начало файла XOfficeDoc.cpp добавим следующий код:
+
+<PRE><TT><HR><FONT color=green>// XOfficeDoc.cpp</FONT>
+
+<FONT color=blue>static </FONT>CString g_template;
+<FONT color=blue>static </FONT>CString g_str;
+<FONT color=blue>static double</FONT>  g_double;
+<FONT color=blue>static long</FONT>    g_long;
+
+<FONT color=blue>void</FONT> NewXOfficeDoc(LPCTSTR aTemplate,LPCTSTR aStr,
+                   <FONT color=blue>double </FONT>aDouble,<FONT color=blue>long </FONT>aLong)
+{
+    CString   str;
+    POSITION  pos = AfxGetApp()-&gt;GetFirstDocTemplatePosition();
+    <FONT color=blue>while </FONT>(pos != NULL) {
+	   CDocTemplate *temp = AfxGetApp()-&gt;GetNextDocTemplate(pos);
+        if (temp-&gt;GetDocString(str,CDocTemplate::docName) {
+            str == _T(<FONT color=teal>"XOffice"</FONT>)) {
+            g_template = aTemplate;
+            g_str      = aStr;
+            g_double   = aDouble;
+            g_long     = aLong;
+            temp-&gt;OpenDocumentFile(NULL);
+            <FONT color=blue>return</FONT>;
+        }
+    }
+}
+<HR></TT></PRE>
+
+<P>
+Теперь мы умеет создавать MDI документы по нажатию кнопок на форме.
+
+<P><B>6. </B>
+За поддержку включения ActiveX документов в MFC отвечает класс
+<B>COleDocObjectItem</B>. Он уже многое умеет, но нам нужно ещё научить
+его загружать документы, задаваемые нами.
+<P>
+Внесите следующие изменения в класс <B>CXOfficeCntrItem</B>:
+
+<PRE><TT><HR><FONT color=green>// CntrItem.h</FONT>
+
+<FONT color=blue>class</FONT> CXOfficeCntrItem : <FONT color=blue>public</FONT> ColeDocObjectItem
+{
+...
+<FONT color=blue>public</FONT>:
+<B>    CXOfficeCntrItem(CXOfficeDoc* pContainer,LPCTSTR);
+    <FONT color=blue>bool</FONT> m_isCreate;
+    <FONT color=blue>bool</FONT> CreateItem(LPCTSTR);</B>
+...
+};
+<HR>
+<FONT color=green>// CntrItem.cpp</FONT>
+
+CXOfficeCntrItem::CXOfficeCntrItem(CXOfficeDoc* pContainer,LPCTSTR templ)
+    : COleDocObjectItem(pContainer), m_isCreate(<FONT color=blue>false</FONT>)
+{
+    CreateItem(templ);
+}
+
+<FONT color=blue>bool </FONT> CXOfficeCntrItem::CreateItem(LPCTSTR templ)
+{
+    USES_CONVERSION;
+
+    <FONT color=green>// get storage for the object via virtual function call</FONT>
+    m_dwItemNumber = GetNewItemNumber();
+    GetItemStorage();
+
+    <FONT color=green>// add AfxOleInit(); in CXOfficeApp::InitInstance</FONT>
+    AfxOleGetMessageFilter()-&gt;EnableNotRespondingDialog(FALSE);
+
+    <FONT color=green>// attempt to create the object</FONT>
+    LPOLECLIENTSITE lpClientSite = GetClientSite();
+    SCODE sc = ::OleCreateFromFile(CLSID_NULL,
+                                   T2COLE(templ),
+                                   IID_IUnknown,
+                                   OLERENDER_DRAW,
+                                   NULL,
+                                   lpClientSite,
+                                   m_lpStorage,
+                                  (LPVOID*)&amp;m_lpObject);
+    <FONT color=blue>return</FONT> m_isCreate = FinishCreate(sc) == TRUE;
+}
+<HR></TT></PRE>
+
+<P><B>7. </B>
+И последнее, что нужно сделать – это внести изменения в классы
+<B>CXOfficeDoc </B>и <B>CXOfficeView</B> для отображения ActiveX документа
+
+<PRE><TT><HR><FONT color=green>// CntrItem.h</FONT>
+
+<FONT color=blue>class</FONT> CXOfficeCntrItem : <FONT color=blue>public</FONT> ColeDocObjectItem
+{
+...
+<FONT color=blue>public</FONT>:
+<B>    CXOfficeCntrItem(CXOfficeDoc* pContainer,LPCTSTR);
+    <FONT color=blue>bool</FONT> m_isCreate;
+    <FONT color=blue>bool</FONT> CreateItem(LPCTSTR);</B>
+...
+};
+<HR>
+<FONT color=green>// CntrItem.cpp</FONT>
+
+CXOfficeCntrItem::CXOfficeCntrItem(CXOfficeDoc* pContainer,LPCTSTR templ)
+    : COleDocObjectItem(pContainer), m_isCreate(<FONT color=blue>false</FONT>)
+{
+    CreateItem(templ);
+}
+
+<FONT color=blue>bool </FONT> CXOfficeCntrItem::CreateItem(LPCTSTR templ)
+{
+    USES_CONVERSION;
+
+    <FONT color=green>// get storage for the object via virtual function call</FONT>
+    m_dwItemNumber = GetNewItemNumber();
+    GetItemStorage();
+
+    <FONT color=green>// add AfxOleInit(); in CXOfficeApp::InitInstance</FONT>
+    AfxOleGetMessageFilter()-&gt;EnableNotRespondingDialog(FALSE);
+
+    <FONT color=green>// attempt to create the object</FONT>
+    LPOLECLIENTSITE lpClientSite = GetClientSite();
+    SCODE sc = ::OleCreateFromFile(CLSID_NULL,
+                                   T2COLE(templ),
+                                   IID_IUnknown,
+                                   OLERENDER_DRAW,
+                                   NULL,
+                                   lpClientSite,
+                                   m_lpStorage,
+                                  (LPVOID*)&amp;m_lpObject);
+    <FONT color=blue>return</FONT> m_isCreate = FinishCreate(sc) == TRUE;
+}
+<HR></TT></PRE>
+
+<P>
+Итак, теперь мы умеем программно загружать ActiveX
+документы. Это уже не плохо само по себе. <FONT face=Wingdings>J</FONT>
+<P>
+Обратите внимание, что процедуры сохранения и загрузки <B>наших</B>
+документов тоже нормально работают, сохраняя при этом содержимое исходного
+документа шаблона, правда это совсем не входит в наши планы. Единственное,
+что не работает – это Print Preview. Я так и не смог с этим разобраться,
+посему, если у кого-то это получится, буду рад узнать об этом первым.
+
+<P><B>8. </B>
+Теперь научим класс <B>CXOfficeDoc</B> сохранять и загружать <B>только</B>
+наши данные и не задавать вопросы при изменении данных самого ActiveX
+документа. Для этого с помощью ClassWizard'а добавьте методы
+<B>OnOpenDocument</B> и <B>SaveModified </B>и внесите следующие изменения:
+
+<PRE><TT><HR><FONT color=green>// XOfficeDoc.cpp</FONT>
+
+<FONT color=blue>void </FONT> CXOfficeDoc::Serialize(CArchive&amp; ar)
+{
+    <FONT color=blue>if </FONT>(ar.IsStoring()) {
+<B>        ar &lt;&lt; m_template &lt;&lt; m_str &lt;&lt; m_double &lt;&lt; m_long;</B>
+    } <FONT color=blue>else </FONT> {
+<B>        ar &gt;&gt; m_template &gt;&gt; m_str &gt;&gt; m_double &gt;&gt; m_long;</B>
+    }
+<FONT color=green><B>//    COleDocument::Serialize(ar);</B></FONT>
+}
+
+BOOL CXOfficeDoc::OnOpenDocument(LPCTSTR lpszPathName)
+{
+    <FONT color=blue>if </FONT>(!COleDocument::OnOpenDocument(lpszPathName))
+        <FONT color=blue>return </FONT>FALSE;
+<B>    <FONT color=blue>return </FONT>LoadTemplate();</B>
+}
+
+BOOL CXOfficeDoc::SaveModified()
+{
+    <FONT color=blue>return </FONT>CDocument::SaveModified();</B>
+}
+<HR>
+<FONT color=green>// CntrItem.cpp</FONT>
+
+<FONT color=blue>void </FONT> CXOfficeCntrItem::OnChange(OLE_NOTIFICATION nCode, DWORD dwParam)
+{
+<B>    BOOL modified = m_pDocument-&gt;IsModified();</B>
+    COleDocObjectItem::OnChange(nCode, dwParam);
+<B>    m_pDocument-&gt;SetModifiedFlag(modified);</B>
+
+    GetDocument()-&gt;UpdateAllViews(NULL);
+}
+<HR></TT></PRE>
+
+<P><B>9. </B>
+Следующим шагом будет получение интерфейса <B>IDispatch</B> ActiveX документа.
+Внесем следующие изменени в класс <B>CXOfficeCntrItem</B>:
+
+<PRE><TT><HR><FONT color=green>// CntrItem.h</FONT>
+...
+<B><FONT color=blue>#include </FONT>&lt;comdef.h&gt; <comdef.h></B>
+...
+<FONT color=blue>class </FONT>CXOfficeCntrItem : <FONT color=blue>public </FONT>COleDocObjectItem
+{
+<FONT color=blue>public</FONT>:
+...<B>
+    <FONT color=blue>int          </FONT>m_who;      // 0 - ?, 1 - Word, 2 - Excel
+    IDispatchPtr m_disp;
+
+    LPDISPATCH   GetIDispatch();
+    <FONT color=blue>void         </FONT>AttachDisp  ();
+    <FONT color=blue>void         </FONT>ActivateDisp();
+    <FONT color=blue>void         </FONT>CloseDisp   ();</B>
+...
+};
+<HR></TT></PRE>
+
+<P>
+Я не стал приводить текст соответствующих методов, так как это заняло бы
+слишком много места. Их можно посмотреть в исходных текстах программы.
+Необходимо будет также внести соответствующие изменения в классы
+<B>CXOfficeDoc</B> и <B>CXOfficeView</B>.
+
+<PRE><TT><HR><FONT color=green>// CXOfficeView.cpp</FONT>
+
+<FONT color=blue>void </FONT>CXOfficeView::OnInitialUpdate()
+{
+...
+    m_pSelection = GetDocument()-&gt;m_ctrl;
+<B>    m_pSelection-&gt;AttachDisp();</B>
+
+<FONT color=green>    //Active documents should always be activated</FONT>
+...
+<B>    m_pSelection-&gt;ActivateDisp();</B>
+}
+<HR>
+<FONT color=green>// CXOfficeDoc.cpp</FONT>
+
+<FONT color=blue>void </FONT>CXOfficeDoc::OnCloseDocument()
+{
+<B>    <FONT color=blue>if </FONT>(m_ctrl)</B>
+<B>        m_ctrl-&gt;CloseDisp();</B>
+    COleDocument::OnCloseDocument();
+}
+<HR></TT></PRE>
+
+<P><B>10. </B>
+Теперь пришло время наделить разумом наш сервер автоматизации.
+Для этого определим свойства <B>ActiveDocument</B> и <B>IsActiveDocument</B>
+для интерфейса <B>IApplication</B>, а также свойства <B>PStr</B>,
+<B>PDouble</B> и <B>PLong</B> для интерфейса <B>IDocument</B>.
+
+<PRE><TT><FONT face="Times New Roman" size=3>Это просто сделать с помощью ATL Wizard'а.
+Workspace – Class View – IApplication – Правый мышь – Add Property
+Workspace – Class View – IDocument – Правый мышь – Add Property
+</FONT></TT></PRE>
+<P>Реализацию методов можно посмотреть в исходных текстах.
+
+<P><B>11. </B>
+Файлы XOffice.doc и XOffice.xls являются примеры документов Word и Excel.
+В Word документе инициализация полей происходит в событии Document_New,
+которое явно вызывается из программы. Значение полей
+присваивается именованным закладкам. В Excel документе инициализаци ячеек
+производится в событии Workbook_Activate. Это не совсем удобно,
+но я перепробовал множество вариантов и остановился на этом, как на наиболее
+устойчиво работающем. Как я уже говорил, непосредственный вызов макроса из
+VBA оставляет Excel в памяти после завершения работы программы.
+
+<P align=right><A href="http://it.nm.ru">Игорь Л. Ткачёв</A>
+<BR><A href="mailto:it@hotmail.ru?Subject=XOffice">it@hotmail.ru</A>
+    <h3>Downloads</h3>
+    <a href="XOffice_demo.zip"><p>Скачать demo project - 36 Kb</a><br>
+    <a href="XOffice_src.zip">Скачать исходник - 71 Kb</a> <br>
+    <br>
+    </td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

@@ -1,0 +1,369 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3 align="center"><font color="#a0a099">PasswordSpy - Получение забытых
+    паролей при помощи ловушек Windows</font></h3>
+    <hr>
+    <p>Автор: <a href="mailto:bsfriesen@hotmail.com">Brian Friesen</a>.</p>
+    <p><a href="pwdspy.gif" target="newFrame"><br>
+    <img src="pwdspy.gif" width="450"> <br>
+    <font size="3"><em>Клкните сюда, чтобы увеличить картинку</em></font></a></p>
+    <p><u>Компилятор:</u> VC5, VC6 </p>
+    <h3>Описание</h3>
+    <p>Более ранние версии подобных программ, для
+    получения паролей, используют дырку в
+    безопасности Windows. Однако с появлением Windows 2000 эта
+    лазейка была исправлена и подобные программы
+    несмогли функционировать. После нескольких
+    неудачных попыток был найден способ скопировать
+    пароль из запущенного приложения на любой
+    32-битной Windows.</p>
+    <h3>Как использовать</h3>
+    <p>PasswordSpy довольно проста в использовании. Вам
+    достаточно запустить программу, содержащую
+    забытый пароль, а так же PasswordSpy. Затем перетащить
+    лупу из PasswordSpy на поле &quot;****&quot; и PasswordSpy покажет
+    то, что скрывается за звёздочками. PasswordSpy был
+    протестирован на Win95/98/ME и WinNT/2K/XP. </p>
+    <h3>Возможности</h3>
+    <p>Плюс ко всему, PasswordSpy демонстрирует некоторые
+    полезные возможности:<ul>
+      <li><u>Единственный экземпляр приложения.</u> Если
+        пользователь запускает вторую копию PasswordSpy, то
+        первая копия перемещается на передний план
+        вместо создания второй.</li>
+      <li><u>&quot;Всегда наверху&quot;</u> Одной строчкой коды Вы
+        можете установить или удалить из Вашего
+        приложения состояние &quot;всегда наверху&quot; (&quot;always
+        on top&quot;).</li>
+      <li><u>Межпроцессова связь.</u> PasswordSpy использует
+        различные формы IPC включая сообщение WM_COPYDATA, а так
+        же отображаемые в память файлы.</li>
+      <li><u>Установка ловушек.</u> Чтобы извречь пароль в
+        Windows2000 и WindowsXP, необходимо установить ловушку на
+        необходимый процесс. </li>
+    </ul>
+    <p>&nbsp;</p>
+    <h3>Подробности кода</h3>
+    <p>Самая интересная часть PasswordSpy - это методика
+    установки ловушки Windows при помощи API функции
+    SetWindowsHookEx. При помощи этой функции можно
+    инсталировать ловушку (hook) на всю систему либо на
+    отдельный процесс. Существует дюжина различных
+    типов ловушек, и каждый тип отслеживает
+    определённые события. Когда одно из этих событий
+    случается, то код Вашей ловушки получает
+    управление. PasswordSpy использует ловушку WH_GETMESSAGE,
+    которая отслеживает вызовы функций GetMessage и
+    PeekMessage. Если Вы хотите узнать больше о функции
+    SetWindowsHookEx то советую почитать о ней в MSDN.</p>
+    <p>Самая трудная часть в использовании ловушек
+    Windows - это правильно сохраненить дескриптор в
+    ловушке. Перед тем, как установить ловушку, Вам
+    потребуются две вещи. 1) DLL, содержащая функцию
+    ловушки и 2) ID потока, который Вы хотите
+    перехватывать. Теперь предложим <i>Процессу A</i>
+    установить ловушку на <i>Процесс B</i>. После
+    перехвата <i>Процесса B</i>, дескриптор ловушки
+    возвращается в <i>Процесс A</i> и DLL отображается в
+    адресное пространство <i>Процесса B</i>. Когда
+    происходит одно из перехваченных событий в <i>Процессе
+    B</i>, то из <i>Процесса B</i> вызывается код ловушки (Заметьте,
+    что код Вашей ловушки вызывается из другого
+    процесса! Поэтому, если в ловушке вызвать функцию
+    GetCurrentProcessId, то Вы получите PID перехваченного
+    процесса, а не той программы, которая установила
+    ловушку). В ловушке Вы можете делать всё что
+    захотите, однако не забудьте, перед тем как код
+    ловушки завершится, вызвать CallNextHookEx. Если не
+    сделать вызова этой функции, то остальные
+    ловушки, которые, возможно, были установлены на
+    это же событие не смогут получить сообщение.
+    Проблема в том, что CallNextHookEx требует дескриптор
+    ловушки, но этот дескриптор был возвращён в <i>Процесс
+    A</i>, а мы в данный момент находимся в <i>Процессе B</i>.
+    Поэтому необходимо организовать некую
+    межпроцессовую связь для передачи дескриптора
+    ловушки.</p>
+    <p>Большинство примеров ловушек решают эту
+    проблему путём создания &quot;shared&quot; секций в DLL.</p>
+    <pre>#pragma data_seg(&quot;Shared&quot;)
+HHOOK g_hHook = NULL;
+#pragma data_seg()
+#pragma comment(linker, &quot;/section:Shared,rws&quot;)</pre>
+    <p>Этот код создаёт единственную переменную,
+    которая будет доступна всем загруженным
+    экземплярам этой DLL. Если пять процессов загрузят
+    эту DLL, то все пять получат доступ к этой
+    переменной. Однако данный метод порождает
+    несколько проблем. Во первых, некоторые
+    компиляторы могут не поддерживать данную опцию.
+    Во вторых, что если Microsoft решит изменить принцип
+    работы секций &quot;shared&quot; в будующих версиях Windows;
+    это значит, что данная технология больше не будет
+    работать. Так же, данный метод не имеет
+    синхронизации потоков, а так как Вы работаете с
+    несколькими потоками, то синхронизация потоков
+    очень важна.</p>
+    <p>Для решения этих проблем я воспользовался для
+    IPC отображаемыми в памяти файлами, и мутексами (mutex)
+    для синхронизации потоков. Я заключил весь этот
+    код в класс и назвал его CIPC. Используя
+    отображаемые в памяти файлы, я решил проблему
+    специальной опции компилятора, так как в ней
+    отпала необходимость а все действия
+    производятся обычными Win32 API функциями. Плюс MMF-ы
+    это распространённый способ доступа к данным из
+    нескольких процессов, поэтому Microsoft врят ли что-то
+    изменит в этой области в будующем. А так же
+    мутексы гарантируют, что доступ потока
+    синхронизирован.</p>
+    <pre><span class="codeComment">//***********************************************
+// IPC.h
+//***********************************************</span>
+#ifndef _IPC_H_
+#define _IPC_H_
+
+#define IPC_SHARED_MMF  _T(&quot;{34F673E0-878F-11D5-B98A-00B0D07B8C7C}&quot;)
+#define IPC_MUTEX       _T(&quot;{34F673E1-878F-11D5-B98A-00B0D07B8C7C}&quot;)
+
+<span
+class="codeComment">// Класс для межпроцессовой связи используя
+// отображаемые в память файлы</span>
+class CIPC
+{
+public:
+  CIPC();
+  virtual ~CIPC();
+
+  bool CreateIPCMMF(void);
+  bool OpenIPCMMF(void);
+  void CloseIPCMMF(void);
+
+  bool IsOpen(void) const {return (m_hFileMap != NULL);}
+
+  bool ReadIPCMMF(LPBYTE pBuf, DWORD &amp;dwBufSize);
+  bool WriteIPCMMF(const LPBYTE pBuf, 
+                   const DWORD dwBufSize);
+
+  bool Lock(void);
+  void Unlock(void);
+
+protected:
+  HANDLE m_hFileMap;
+  HANDLE m_hMutex;
+};
+
+#endif
+
+
+<span
+class="codeComment">//***********************************************
+// IPC.cpp
+//***********************************************</span>
+#include &quot;IPC.h&quot;
+
+<span
+class="codeComment">//***********************************************</span>
+CIPC::CIPC() : m_hFileMap(NULL), m_hMutex(NULL)
+{
+}
+
+<span
+class="codeComment">//***********************************************</span>
+CIPC::~CIPC()
+{
+    CloseIPCMMF();
+    Unlock();
+}
+
+<span
+class="codeComment">//***********************************************</span>
+bool CIPC::CreateIPCMMF(void)
+{
+  bool bCreated = false;
+
+  try
+  {
+     if(m_hFileMap != NULL)
+        return false;    <span
+class="codeComment">// Уже создан</span>
+
+     <span class="codeComment">// Создаём в памяти 4 килобайтный отображаемый в память
+     // файл для шаринга данных</span>
+     m_hFileMap = CreateFileMapping((HANDLE)0xFFFFFFFF,
+         NULL,
+         PAGE_READWRITE,
+         0,
+         4096,
+         IPC_SHARED_MMF);
+     if(m_hFileMap != NULL)
+        bCreated = true;
+  }
+  catch(...) {}
+
+  return bCreated;
+}
+
+<span
+class="codeComment">//***********************************************</span>
+bool CIPC::OpenIPCMMF(void)
+{
+    bool bOpened = false;
+
+    try
+    {
+        if(m_hFileMap != NULL)
+            return true;    <span
+class="codeComment">// Уже открыт</span>
+
+        m_hFileMap = 
+          OpenFileMapping(FILE_MAP_READ | FILE_MAP_WRITE,
+            FALSE,
+            IPC_SHARED_MMF);
+        if(m_hFileMap != NULL)
+            bOpened = true;
+    }
+    catch(...) {}
+
+    return bOpened;
+}
+
+<span
+class="codeComment">//***********************************************</span>
+void CIPC::CloseIPCMMF(void)
+{
+    try
+    {
+        if(m_hFileMap != NULL)
+            CloseHandle(m_hFileMap), m_hFileMap = NULL;
+    }
+    catch(...) {}
+}
+
+<span
+class="codeComment">//***********************************************</span>
+bool CIPC::ReadIPCMMF(LPBYTE pBuf, DWORD &amp;dwBufSize)
+{
+  _ASSERTE(pBuf);
+
+  bool bSuccess = true;
+
+  try
+  {
+     if(m_hFileMap == NULL)
+         return false;
+
+     DWORD dwBaseMMF = (DWORD)MapViewOfFile(m_hFileMap,
+                FILE_MAP_READ | FILE_MAP_WRITE,
+         0, 0, 0);
+     _ASSERTE(dwBaseMMF);
+
+     <span
+class="codeComment">// Первый DWORD в MMF содержит размер данных</span>
+     DWORD dwSizeofInBuf = dwBufSize;
+     CopyMemory(&amp;dwBufSize, (LPVOID)dwBaseMMF, sizeof(DWORD));
+
+     if(dwSizeofInBuf != 0)
+     {
+         if(dwBufSize &gt; dwSizeofInBuf)
+             bSuccess = false;
+         else
+              CopyMemory(pBuf, 
+                  (LPVOID)(dwBaseMMF + sizeof(DWORD)),
+                  dwBufSize);
+     }
+
+     UnmapViewOfFile((LPVOID)dwBaseMMF);
+  }
+  catch(...) {}
+
+  return bSuccess;
+}
+
+<span
+class="codeComment">//***********************************************</span>
+bool CIPC::WriteIPCMMF(const LPBYTE pBuf, const DWORD dwBufSize)
+{
+    _ASSERTE(pBuf);
+
+    bool bSuccess = true;
+
+    try
+    {
+        if(m_hFileMap == NULL)
+            return false;
+
+        DWORD dwBaseMMF = (DWORD)MapViewOfFile(m_hFileMap,
+            FILE_MAP_READ | FILE_MAP_WRITE,
+            0, 0, 0);
+        _ASSERTE(dwBaseMMF);
+
+        <span
+class="codeComment">// Первый DWORD в MMF содержит размер данных</span>
+        CopyMemory((LPVOID)dwBaseMMF, &amp;dwBufSize, sizeof(DWORD));
+        CopyMemory((LPVOID)(dwBaseMMF + sizeof(DWORD)), 
+                            pBuf, 
+                            dwBufSize);
+
+        UnmapViewOfFile((LPVOID)dwBaseMMF);
+    }
+    catch(...) {}
+
+    return bSuccess;
+}
+
+<span
+class="codeComment">//***********************************************</span>
+bool CIPC::Lock(void)
+{
+    bool bLocked = false;
+
+    try
+    {
+        <span
+class="codeComment">// First get the handle to the mutex</span>
+        m_hMutex = CreateMutex(NULL, FALSE, IPC_MUTEX);
+        if(m_hMutex != NULL)
+        {
+            <span
+class="codeComment">// Wait to get the lock on the mutex</span>
+            if(WaitForSingleObject(m_hMutex, INFINITE) == 
+                                            WAIT_OBJECT_0)
+                bLocked = true;
+        }
+    }
+    catch(...) {}
+
+    return bLocked;
+}
+
+<span
+class="codeComment">//***********************************************</span>
+void CIPC::Unlock(void)
+{
+    try
+    {
+        if(m_hMutex != NULL)
+        {
+            ReleaseMutex(m_hMutex);
+            CloseHandle(m_hMutex);
+            m_hMutex = NULL;
+        }
+    }
+    catch(...) {}
+}</pre>
+    <p>&nbsp;</p>
+    <h3>Downloads</h3>
+    <a href="pwdspy.zip"><p>Скачать демонстрационный проект - 25
+    Kb</a><br>
+    <a href="pwdspysrc.zip">Скачать исходник - 27 Kb</a> </p>
+    <p><a name="#how_works"></a></p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

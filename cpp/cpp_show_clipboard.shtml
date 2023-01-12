@@ -1,0 +1,86 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Посмотрим, что у нас в clipboard.</h3>
+    <p>Автор: <a href="mailto:mdunn@inreach.com">Michael Dunn</a><ul>
+      <li><a href="clipspy_src.zip">Скачать исходник - 45 Kb</a> <p><img
+        align="bottom" alt=" [Screen shot 1 - Word clipboard data - 45K] " border="0"
+        src="clipspy1.gif" width="651" height="567"><br>
+        <i>Рис. 1: ClipSpy показывает, что Word 97 положил в clipboard
+        после простой операции копирования.</i></p>
+        <p><img align="bottom" alt=" [Screen shot 2 - Word drag-n-drop data - 22K] " border="0"
+        src="clipspy2.gif" width="626" height="258"><br>
+        <i>Рис. 2: ClipSpy показывает содержимое clipboard , если в
+        Word что-нибудь перетащить.</i></p>
+      </li>
+    </ul>
+    <p>&nbsp;</p>
+    <p>Программка ClipSpy работает через MFC класс <code>COleDataObject</code>
+    , который включает интерфейс <code>IDataObject</code>, и
+    обеспечивает доступ к содержимому clipboard. Функция <code>CLeftView::ReadDataAndFillList()</code>
+    отслеживает форматы данных в clipboard и заполняет
+    ими список:</p>
+    <pre>BOOL CLeftView::ReadDataAndFillList ( COleDataObject* pDO )
+{
+FORMATETC etc;
+UINT      uNumFormats = 0;
+
+    // определяем, сколько форматов данных доступно в clipboard.
+
+    pDO-&gt;BeginEnumFormats();
+
+    while ( pDO-&gt;GetNextFormat ( &amp;etc ))
+    {
+        if ( pDO-&gt;IsDataAvailable ( etc.cfFormat ))
+        {
+            uNumFormats++;
+        }
+    }
+</pre>
+    <p>ClipSpy проверяет, является ли каждый формат
+    данных встроенным. Если нет, то вызывается
+    функция <code>GetClipboardFormatName()</code>для получения
+    названия формата:</p>
+    <pre>    TCHAR szFormat [256];
+    GetClipboardFormatName ( etc.cfFormat, szFormat, 256 );
+</pre>
+    <p>Затем ClipSpy считывает данные из формата:</p>
+    <pre>HGLOBAL hgData;
+UINT    uDataSize;
+CClipSpyDoc* pDoc = GetDocument();
+
+    // Получаем HGLOBAL данных.
+    hgData = pDO-&gt;GetGlobalData ( etc.cfFormat );
+
+    if ( NULL != hgData )
+    {
+        uDataSize = GlobalSize ( hgData );
+        pDoc-&gt;AddDataBlock ( hgData, uDataSize );
+    }
+    else
+    {
+        pDoc-&gt;AddEmptyBlock();
+    }
+</pre>
+    <p>Функции <code>AddDataBlock()</code> и <code>AddEmptyBlock()</code> это
+    члены класса Документ, которые сохраняют копии
+    данных.</p>
+    <p>Следующий интересный момент, это <code>CLeftView::OnItemchanged()</code>
+    и <code>CClipSpyView::OnUpdate()</code>. Первая функция определяет
+    изменения и соответственно вызывает функцию <code>UpdateAllViews()</code>,
+    которая в свою очередь вызывает <code>OnUpdate()</code>. <code>OnUpdate()</code>
+    заполняет правый rich edit данными.</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div></TBODY>
+
+
+<p align="center"><br>
+<br>
+</p>
+<!--#include virtual="/ssi/bottom.html"-->

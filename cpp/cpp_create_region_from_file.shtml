@@ -1,0 +1,283 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3 align="center"><font color="#a0a099">Создаём регион из файла</font></h3>
+    <hr>
+    <p>Автор: <a href="mailto:zaz@internet-zahav.net">Yuriy Zaporozhets</a><ul
+    class="download">
+      <li><a href="FileRgn_demo.zip">Скачать демонстрашку - 64 Kb</a> </li>
+      <li><a href="FileRgn_src.zip">Скачать исходник - 21 Kb</a> </li>
+    </ul>
+    <p><img height="140" src="rgn.gif" width="399"> </p>
+    <h2>Описание</h2>
+    <p>Это очень простая функция, создающая регион из
+    bitmap (.bmp) файла. Так же в примере представлен
+    усовершенствованный вариант этой функции,
+    позволяющий задавать маску изображения.</p>
+    <p>Компилятор: Visual C++ 4-6</p>
+    <p>Функция называется CreateRgn и имеет два параметра: <br>
+    <i>szFileName</i> - имя файла, содержащего картинку. <br>
+    <i>pPoint</i> - указатель на структуру POINT , которая
+    содержит координаты цвета, который используется
+    для конструирования региона, если параметр NULL, то
+    будет использоваться цвет в координате (0, 0). </p>
+    <pre>HRGN CreateRgn(LPTSTR szFileName, LPPOINT pPoint)
+{
+	HBITMAP hBmp = (HBITMAP)LoadImage( NULL, szFileName, 
+                               IMAGE_BITMAP, <span
+class="cpp-literal">0</span>, <span class="cpp-literal">0</span>, LR_LOADFROMFILE );
+	<span
+class="cpp-keyword">if</span> ( !hBmp ) <span class="cpp-keyword">return</span> NULL;
+
+	BITMAP bi;
+	BYTE bpp;
+	DWORD e;
+	DWORD f, t;
+	INT i, j;
+	<span
+class="cpp-keyword">bool</span> b = <span class="cpp-keyword">false</span>;
+	HRGN Rgn, ResRgn = CreateRectRgn( <span
+class="cpp-literal">0</span>, <span class="cpp-literal">0</span>, <span class="cpp-literal">0</span>, <span
+class="cpp-literal">0</span> );
+
+	GetObject( hBmp, <span class="cpp-keyword">sizeof</span>( BITMAP ), &amp;bi );
+
+	bpp = bi.bmBitsPixel &gt;&gt; <span
+class="cpp-literal">3</span>;
+
+	BYTE *pBits = <span class="cpp-keyword">new</span> BYTE[ bi.bmWidth * bi.bmHeight * bpp ];
+
+	<span
+class="cpp-keyword">int</span>  p = GetBitmapBits( hBmp, bi.bmWidth * bi.bmHeight * bpp,
+                                                                pBits );
+
+	<span
+class="cpp-keyword">if</span> ( pPoint == NULL || pPoint-&gt;x &gt;= bi.bmWidth ||
+                                             pPoint-&gt;y &gt;= bi.bmHeight )
+		e = *(DWORD*)pBits;
+	<span
+class="cpp-keyword">else</span> 
+		e = *(DWORD*)(pBits + (pPoint-&gt;y * bi.bmWidth + pPoint-&gt;x) * bpp );
+
+	e &lt;&lt;= <span
+class="cpp-literal">32</span> - bi.bmBitsPixel;
+
+	<span class="cpp-keyword">for</span> ( i = <span
+class="cpp-literal">0</span>; i &lt; bi.bmHeight; i++ )
+	<span class="cpp-keyword">for</span> ( j = <span
+class="cpp-literal">0</span>; j &lt; bi.bmWidth; j++ )
+	{
+		t = *(DWORD*)(pBits + (i * bi.bmWidth +
+                                        j) * bpp) &lt;&lt; (<span
+class="cpp-literal">32</span> - bi.bmBitsPixel);
+
+		<span class="cpp-keyword">if</span> ( t == e )
+		{
+			<span
+class="cpp-keyword">if</span> ( !b )
+			{
+				f = j;
+				b = <span class="cpp-keyword">true</span>;
+			} <span
+class="cpp-keyword">else</span> <span class="cpp-keyword">if</span> ( j == (bi.bmWidth - <span
+class="cpp-literal">1</span>) )
+			{
+				Rgn = CreateRectRgn( f, i, j, i + <span
+class="cpp-literal">1</span> );
+				CombineRgn( ResRgn, ResRgn, Rgn, RGN_OR );
+				b = <span
+class="cpp-keyword">false</span>;
+			}
+		} <span class="cpp-keyword">else</span> <span
+class="cpp-keyword">if</span> ( b )
+		{
+			Rgn = CreateRectRgn( f, i, j, i + <span
+class="cpp-literal">1</span> );
+			CombineRgn( ResRgn, ResRgn, Rgn, RGN_OR );
+			b = <span
+class="cpp-keyword">false</span>;
+		}
+	}
+
+	<span class="cpp-keyword">delete</span> pBits;
+
+	<span
+class="cpp-keyword">return</span> ResRgn;
+}</pre>
+    <p><b>Update:</b> Ниже представлена улучшенная версия
+    функции, которая требует маску битмапа для TrueColor.
+    В Win9x ширина маски битмапа&nbsp; <b>должна</b> быть <code>DWORD</code>.
+    </p>
+    <pre>HRGN CreateRgnFromFile(HBITMAP hBmp, COLORREF color)
+{
+	<span class="cpp-comment">// получаем размер маски</span>
+	BITMAP bm = { <span
+class="cpp-literal">0</span> };
+	GetObject( hBmp, <span class="cpp-keyword">sizeof</span>(BITMAP), &amp;bm );
+
+	m_dwWidth	= bm.bmWidth;		<span
+class="cpp-comment">// ширина bitmap</span>
+	m_dwHeight	= bm.bmHeight;		<span
+class="cpp-comment">// высота bitmap</span>
+
+	<span class="cpp-comment">// Распределяем буфер для маски</span>
+	LPBYTE pBits = <span
+class="cpp-keyword">new</span> BYTE[ bm.bmWidthBytes * bm.bmHeight ];
+	<span
+class="cpp-comment">// заполняем буфер свойствами</span>
+	BITMAPINFO bi = { <span
+class="cpp-literal">0</span> };
+	bi.bmiHeader.biSize	= <span class="cpp-keyword">sizeof</span>( BITMAPINFOHEADER );
+	bi.bmiHeader.biBitCount	= bm.bmBitsPixel;
+	bi.bmiHeader.biHeight	= bm.bmHeight;
+	bi.bmiHeader.biWidth	= bm.bmWidth;
+	bi.bmiHeader.biPlanes	= bm.bmPlanes;
+	<span
+class="cpp-comment">// заполняем биты буфера</span>
+	HDC hdc = ::GetDC( NULL );
+	GetDIBits( hdc, hBmp, <span
+class="cpp-literal">0</span>, bm.bmHeight, pBits, &amp;bi, DIB_RGB_COLORS );
+	::ReleaseDC( NULL, hdc );
+
+	<span
+class="cpp-keyword">if</span> ( bi.bmiHeader.biBitCount &lt; <span class="cpp-literal">16</span> ) <span
+class="cpp-keyword">return</span> NULL;
+
+	<span class="cpp-comment">// сдвигаем биты и байт на пиксель (для сравнения цветов)</span>
+	BYTE sb = <span
+class="cpp-literal">32</span> - bi.bmiHeader.biBitCount;	
+	BYTE bpp = bi.bmiHeader.biBitCount &gt;&gt; <span
+class="cpp-literal">3</span>;
+
+	LPBYTE pClr = (LPBYTE)&amp;color;
+	<span class="cpp-comment">// переставляем красный и синий компоненты</span>
+	BYTE tmp = pClr[<span
+class="cpp-literal">0</span>]; pClr[<span class="cpp-literal">0</span>] = pClr[<span
+class="cpp-literal">2</span>]; pClr[<span class="cpp-literal">2</span>] = tmp;
+	<span
+class="cpp-comment">// convert color if curent DC is 16-bit (5:5:5)</span>
+	<span
+class="cpp-keyword">if</span> ( bpp == <span class="cpp-literal">2</span> )	color = ((DWORD)(pClr[<span
+class="cpp-literal">0</span>] &amp; <span class="cpp-literal">0xf8</span>) &gt;&gt; <span
+class="cpp-literal">3</span>) |
+				((DWORD)(pClr[<span class="cpp-literal">1</span>] &amp; <span
+class="cpp-literal">0xf8</span>) &lt;&lt; <span class="cpp-literal">2</span>) |
+				((DWORD)(pClr[<span
+class="cpp-literal">2</span>] &amp; <span class="cpp-literal">0xf8</span>) &lt;&lt; <span
+class="cpp-literal">7</span>);
+	<span class="cpp-comment">// выравниваем цвет для сравнения</span>
+	color &lt;&lt;= sb;
+
+	<span
+class="cpp-keyword">const</span> DWORD RDHDR = <span class="cpp-keyword">sizeof</span>(RGNDATAHEADER);
+	<span
+class="cpp-keyword">const</span> DWORD MAXBUF = <span class="cpp-literal">40</span>;	<span
+class="cpp-comment">// размер одного блока в RECT-ах</span>
+					<span
+class="cpp-comment">// (т.e. MAXBUF*sizeof(RECT)
+                                        // в байтах)</span>
+	LPBYTE	pColor = pBits;
+	LPRECT	pRects;								
+	DWORD	cBlocks = <span
+class="cpp-literal">0</span>;		<span class="cpp-comment">// кол-во распределённых блоков</span>
+
+	INT	i, j;			<span
+class="cpp-comment">// текущая позиция в маске картинки</span>
+	INT	first = <span
+class="cpp-literal">0</span>;		<span class="cpp-comment">// левая координата текущей линии</span>,
+                                        // в которой была найдена маска
+	<span
+class="cpp-keyword">bool</span>	wasfirst = <span class="cpp-keyword">false</span>;	<span
+class="cpp-comment">// устанавливается, если маска была
+                                        // найдена в текущей линии</span>
+	<span
+class="cpp-keyword">bool</span>	ismask;			<span class="cpp-comment">// устанавливается, если текущий
+                                        // цвет является маской</span>
+
+	<span
+class="cpp-comment">// распределяем память для данных региона</span>
+	RGNDATAHEADER* pRgnData = (RGNDATAHEADER*)<span
+class="cpp-keyword">new</span> BYTE[ RDHDR +
+                                 ++cBlocks * MAXBUF * <span
+class="cpp-keyword">sizeof</span>(RECT) ];
+	memset( pRgnData, <span class="cpp-literal">0</span>, RDHDR + cBlocks * MAXBUF * <span
+class="cpp-keyword">sizeof</span>(RECT) );
+	<span class="cpp-comment">// заполняем его по умолчанию</span>
+	pRgnData-&gt;dwSize	= RDHDR;
+	pRgnData-&gt;iType		= RDH_RECTANGLES;
+	pRgnData-&gt;nCount	= <span
+class="cpp-literal">0</span>;
+
+	<span class="cpp-keyword">for</span> ( i = <span
+class="cpp-literal">0</span>; i &lt; bm.bmHeight; i++ )
+	for ( j = 0; j &lt; bm.bmWidth; j++ )
+	{
+		// получаем цвет
+		ismask = *(DWORD*)pColor &lt;&lt; sb != color;
+		// сдвиг указателя на следующий цвет
+		pColor += bpp;
+		// помещаем часть сканируемой линии как регион RECT,
+                // если прозрачный цвет найден после цвета маски либо
+		// цвет маски найден в конце маски изображения
+		if ( wasfirst &amp;&amp; (ismask ^ (j &lt; bm.bmWidth - 1)) )
+		{
+			// получаем смещение в массиве RECT
+			pRects = (LPRECT)((LPBYTE)pRgnData + RDHDR);
+			// сохраняем текущий RECT
+			pRects[ pRgnData-&gt;nCount++ ] = CRect( first, 
+                                 bm.bmHeight - i - <span
+class="cpp-literal">1</span>, j, bm.bmHeight - i );
+			<span class="cpp-comment">// если буфер полон, то перераспределяем его
+</span>			<span
+class="cpp-keyword">if</span> ( pRgnData-&gt;nCount &gt;= cBlocks * MAXBUF )
+			{
+				LPBYTE pRgnDataNew = <span
+class="cpp-keyword">new</span> BYTE[ RDHDR +
+                                       ++cBlocks * MAXBUF * <span
+class="cpp-keyword">sizeof</span>(RECT) ];
+				memcpy( pRgnDataNew, pRgnData, RDHDR +
+                                    (cBlocks - <span
+class="cpp-literal">1</span>) * MAXBUF * <span class="cpp-keyword">sizeof</span>(RECT));
+
+				<span
+class="cpp-keyword">delete</span> pRgnData;
+				pRgnData = (RGNDATAHEADER*)pRgnDataNew;
+			}
+			wasfirst = <span
+class="cpp-keyword">false</span>;
+		}
+		<span class="cpp-keyword">else</span> <span
+class="cpp-keyword">if</span> ( !wasfirst &amp;&amp; ismask )	    <span class="cpp-comment">// устанавливаем
+                                                    // wasfirst когда
+                                                    // маска найдена</span>
+		{
+			first = j;
+			wasfirst = <span
+class="cpp-keyword">true</span>;
+		}
+	}
+
+	<span class="cpp-keyword">delete</span> pBits;
+
+	<span
+class="cpp-comment">// создаём регион</span>
+	HRGN hRgn = ExtCreateRegion( NULL, RDHDR +
+                    pRgnData-&gt;nCount * <span
+class="cpp-keyword">sizeof</span>(RECT), (LPRGNDATA)pRgnData );
+
+	<span class="cpp-keyword">delete</span> pRgnData;
+
+	<span
+class="cpp-keyword">return</span> hRgn;
+}
+</pre>
+    <p><br>
+    <br>
+    </td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

@@ -1,0 +1,298 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><div align="left"><table border="0" cellpadding="0" cellspacing="0" width="750">
+      <tr>
+        <td width="100%"><h3 align="center"><font color="#a0a099">Манипуляции с
+        индикаторами на клавиатуре в Windows NT </font></h3>
+        </td>
+      </tr>
+    </table>
+    </div><hr>
+    <p>Автор: <a href="mailto:mmcginty@acctechdev.com">Mark J. McGinty</a>. </p>
+    <p><u>Требования: VC5, NT4 SP3-SP5 </u></p>
+    <p>Этот пример демонстрирует управление
+    индикаторами Num Lock, Caps Lock и Scroll Lock.<br>
+    Несколько необходимых значений были
+    позаимствованы из заголовков DDK, поэтому<br>
+    для компиляции исходника нет необходимости
+    иметь установленный DDK. </p>
+    <p>Всё, что делает эта программка - это открывает
+    обработчик драйвера клавиатуры, а затем<br>
+    вызывает DeviceIoControl, чтобы послать в него
+    управляющие коды функций IOCTL. </p>
+    <p>Конкретно в этом примере запускается отдельный
+    поток, который заставляет мигать<br>
+    индикатор Scroll Lock. </p>
+    <pre><tt><font color="#990000">
+/***********************************************************
+** NTKbdLites.c                                           **
+**                                                        **
+**  Copyright 1999 Mark J. McGinty, All Rights Reserved   **
+**   Free Usage granted to the public domain.             **
+**                                                        **
+***********************************************************/
+
+#include &lt;windows.h&gt;
+#include &lt;winioctl.h&gt;
+#include &quot;NTKbdLites.h&quot;
+
+// Code can be built as either a DLL or a static link library
+//
+#ifdef STATIC_LIBRARY
+#define DECLSPEC 
+#else
+#define DECLSPEC __declspec(dllexport)
+#endif
+
+// FlashKeyboardLight
+//
+// Flashes the keyboard indicator, specified by LightFlag, one time, 
+// at the rate indicated by Duration. All lights are left in their
+// previous states when this call returns.
+//
+// Possible LightFlags:
+//      KEYBOARD_CAPS_LOCK_ON   
+//      KEYBOARD_NUM_LOCK_ON    
+//      KEYBOARD_SCROLL_LOCK_ON
+
+int DECLSPEC FlashKeyboardLight(HANDLE hKbdDev, UINT LedFlag, int Duration)
+{
+    KEYBOARD_INDICATOR_PARAMETERS InputBuffer;    // Input buffer for DeviceIoControl
+    KEYBOARD_INDICATOR_PARAMETERS OutputBuffer;   // Output buffer for DeviceIoControl
+    UINT                LedFlagsMask;
+    BOOL                Toggle;
+    ULONG               DataLength = sizeof(KEYBOARD_INDICATOR_PARAMETERS);
+    ULONG               ReturnedLength; // Number of bytes returned in output buffer
+    int             i;
+
+    InputBuffer.UnitId = 0;
+    OutputBuffer.UnitId = 0;
+
+    // Сохраняем текущее состояние индикаторов
+    //
+    if (!DeviceIoControl(hKbdDev, IOCTL_KEYBOARD_QUERY_INDICATORS,
+                &amp;InputBuffer, DataLength,
+                &amp;OutputBuffer, DataLength,
+                &amp;ReturnedLength, NULL))
+        return GetLastError();
+
+    // Маскируем бит света, которым будем управлять
+    //
+    LedFlagsMask = (OutputBuffer.LedFlags &amp; (~LedFlag));
+
+    // Устанавливаем переменную переключателя, чтобы отразить текущее состояние.
+    //
+    Toggle = (OutputBuffer.LedFlags &amp; LedFlag);
+
+    for (i = 0; i &lt; 2; i++)
+    {
+        Toggle ^= 1;
+        InputBuffer.LedFlags = (LedFlagsMask | (LedFlag * Toggle));
+
+        if (!DeviceIoControl(hKbdDev, IOCTL_KEYBOARD_SET_INDICATORS,
+                    &amp;InputBuffer, DataLength,
+                    NULL,   0,  &amp;ReturnedLength, NULL))
+            return GetLastError();
+
+        Sleep(Duration);
+    }
+    return 0;
+}
+
+HANDLE DECLSPEC OpenKeyboardDevice(int *ErrorNumber)
+{
+    HANDLE  hndKbdDev;
+    int     *LocalErrorNumber;
+    int     Dummy;
+
+    if (ErrorNumber == NULL)
+        LocalErrorNumber = &amp;Dummy;
+    else
+        LocalErrorNumber = ErrorNumber;
+
+    *LocalErrorNumber = 0;
+    
+    if (!DefineDosDevice (DDD_RAW_TARGET_PATH, &quot;Kbd&quot;,
+                &quot;\\Device\\KeyboardClass0&quot;))
+    {
+        *LocalErrorNumber = GetLastError();
+        return INVALID_HANDLE_VALUE;
+    }
+
+    hndKbdDev = CreateFile(&quot;\\\\.\\Kbd&quot;, GENERIC_WRITE, 0,
+                NULL,   OPEN_EXISTING,  0,  NULL);
+    
+    if (hndKbdDev == INVALID_HANDLE_VALUE)
+        *LocalErrorNumber = GetLastError();
+
+    return hndKbdDev;
+}
+
+int DECLSPEC CloseKeyboardDevice(HANDLE hndKbdDev)
+{
+    int e = 0;
+
+    if (!DefineDosDevice (DDD_REMOVE_DEFINITION, &quot;Kbd&quot;, NULL))
+        e = GetLastError();
+
+    if (!CloseHandle(hndKbdDev))                    
+        e = GetLastError();
+
+    return e;
+}
+
+// Процедура, которая будет запущена как поток, которая будет заставлять мигать индикатор.
+//
+DWORD WINAPI FlashKeyboardLightThd(LPVOID lpv)
+{
+    LPFLASH_KBD_THD_INIT pInit = (LPFLASH_KBD_THD_INIT)lpv;
+    FLASH_KBD_THD_INIT Init = *pInit;
+    HANDLE  hndKbdDev;
+    HANDLE  heventCancel = OpenEvent(EVENT_ALL_ACCESS, FALSE, Init.EventName);
+
+    if (heventCancel == NULL)
+        ExitThread(-1);
+
+    hndKbdDev = OpenKeyboardDevice(NULL);
+    if (hndKbdDev == INVALID_HANDLE_VALUE)
+    {
+        CloseHandle(heventCancel);
+        ExitThread(-1);
+    }
+
+    for (;;)
+    {
+        FlashKeyboardLight(hndKbdDev, Init.LightFlag, Init.Duration);
+        
+        if (WaitForSingleObject(heventCancel, Init.Duration) != WAIT_TIMEOUT)
+            break;
+    }
+
+    Sleep(Init.Duration);
+
+    CloseHandle(heventCancel);
+    CloseKeyboardDevice(hndKbdDev);
+    
+    ExitThread(0);
+    return 0;
+}
+
+// Создаём структуру и запускаем поток для мигания индикатора
+//
+HANDLE DECLSPEC FlashKeyboardLightInThread(UINT LightFlag, int Duration, LPSTR EventName)
+{
+    DWORD ThreadId;
+    static FLASH_KBD_THD_INIT FlashInit;
+
+    FlashInit.LightFlag = LightFlag;
+    FlashInit.Duration = Duration;
+    lstrcpyn(FlashInit.EventName, EventName, 128);
+
+    return CreateThread(NULL, 0, FlashKeyboardLightThd, (LPVOID)&amp;FlashInit, 0, &amp;ThreadId);
+ 
+}
+
+/***********************************************************
+** NTKbdLites.h                                           **
+**                                                        **
+**  Copyright 1999 Mark J. McGinty, All Rights Reserved   **
+**   Free Usage granted to the public domain.             **
+**                                                        **
+***********************************************************/
+
+#include &lt;windows.h&gt;
+
+//
+// Определяем индикаторы клавиатуры.
+//
+
+#define IOCTL_KEYBOARD_SET_INDICATORS        CTL_CODE(FILE_DEVICE_KEYBOARD, 0x0002, METHOD_BUFFERED, FILE_ANY_ACCESS)
+#define IOCTL_KEYBOARD_QUERY_TYPEMATIC       CTL_CODE(FILE_DEVICE_KEYBOARD, 0x0008, METHOD_BUFFERED, FILE_ANY_ACCESS)
+#define IOCTL_KEYBOARD_QUERY_INDICATORS      CTL_CODE(FILE_DEVICE_KEYBOARD, 0x0010, METHOD_BUFFERED, FILE_ANY_ACCESS)
+
+
+typedef struct _KEYBOARD_INDICATOR_PARAMETERS {
+    USHORT UnitId;          // Unit identifier.
+    USHORT    LedFlags;     // LED indicator state.
+
+} KEYBOARD_INDICATOR_PARAMETERS, *PKEYBOARD_INDICATOR_PARAMETERS;
+
+#define KEYBOARD_CAPS_LOCK_ON     4
+#define KEYBOARD_NUM_LOCK_ON      2
+#define KEYBOARD_SCROLL_LOCK_ON   1
+
+#ifdef STATIC_LIBRARY
+#define DECLSPEC 
+#else
+#define DECLSPEC __declspec(dllexport)
+#endif
+
+int DECLSPEC FlashKeyboardLight(HANDLE hKbdDev, UINT LightFlag, int Duration);
+HANDLE DECLSPEC OpenKeyboardDevice(int *ErrorNumber);
+int DECLSPEC CloseKeyboardDevice(HANDLE hndKbdDev);
+HANDLE DECLSPEC FlashKeyboardLightInThread(UINT, int, LPSTR);
+
+typedef struct {
+    UINT        LightFlag;
+    int     Duration;
+    char        EventName[128];
+} FLASH_KBD_THD_INIT, *LPFLASH_KBD_THD_INIT;
+</font></tt></pre>
+    <pre><tt><font color="#990000">
+</pre>
+    <p align="left">/***********************************************************<br>
+    ** NTFlashScrollLight.c<br>
+    **<br>
+    **<br>
+    **<br>
+    ** Copyright 1999 Mark J. McGinty, All Rights Reserved<br>
+    **<br>
+    ** Free Usage granted to the public domain.<br>
+    **<br>
+    **<br>
+    **<br>
+    **<br>
+    **<br>
+    ** A short test program, to excersize NTKbdLites.c<br>
+    **<br>
+    **<br>
+    **<br>
+    ***********************************************************/<br>
+    <br>
+    #include &lt;windows.h&gt;<br>
+    #include &lt;stddef.h&gt;<br>
+    #include &lt;stdio.h&gt;<br>
+    #include &lt;stdlib.h&gt;<br>
+    #include &lt;conio.h&gt;<br>
+    #include &quot;NTKbdLites.h&quot;<br>
+    #define CANCEL_EVENT_NAME &quot;TestThreadedFlasherEvent&quot;<br>
+    <br>
+    void __cdecl main(int argc, char **argv)<br>
+    {<br>
+    HANDLE heventCancel = CreateEvent(NULL, FALSE, FALSE, CANCEL_EVENT_NAME);<br>
+    HANDLE hThread = FlashKeyboardLightInThread(KEYBOARD_SCROLL_LOCK_ON, 250,
+    CANCEL_EVENT_NAME);<br>
+    <br>
+    printf(&quot;\r\n\r\nSample usage of IOCTL_KEYBOARD_SET_INDICATORS&quot;);<br>
+    printf(&quot;\r\n\r\n (the Scroll Lock light should be flashing)&quot;);<br>
+    printf(&quot;\r\n\r\n\r\npress any key to exit...&quot;);<br>
+    <br>
+    getch();<br>
+    printf(&quot;\r\n&quot;);<br>
+    <br>
+    SetEvent(heventCancel);<br>
+    WaitForSingleObject(hThread, 30000);<br>
+    CloseHandle(heventCancel);<br>
+    exit(0);<br>
+    } </font></tt></p>
+    <h3>Downloads</h3>
+    <a href="NTKbdLites_demo.zip"><p>Скачать демо проект - 24 Kb</a><br>
+    <a href="NTKbdLites_src.zip">Скачать исходник - 6 Kb</a> </p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

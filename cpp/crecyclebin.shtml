@@ -1,0 +1,354 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td>&nbsp;<p><strong><font face="Arial"><span CLASS="clsCap">RecycFile.h</span></font></strong><br>
+    </p>
+    <pre>
+////////////////////////////////////////////////////////////////
+// MSDN — April 2001
+// If this code works, it was written by Paul DiLascia.
+// If not, I don't know who wrote it.
+// Compiles with Visual C++ 6.0. Runs on Windows 98 and probably Windows 
+// 2000 too.
+//
+#include &lt;shellapi.h&gt;
+
+//////////////////
+// CRecycleFile — sends a file to the Recycle Bin.
+// Note derived from SHFILEOPSTRUCT.
+//
+class CRecycleFile : public SHFILEOPSTRUCT {
+protected:
+public:
+   CRecycleFile();
+   ~CRecycleFile() { }
+   int Recycle(LPCTSTR pszPath, BOOL bDelete=FALSE);
+};
+</pre>
+    <p>&nbsp;</p>
+    <p><strong><font face="Arial"><span CLASS="clsCap">RecycFile.cpp</span></font></strong><br>
+    </p>
+    <pre>
+////////////////////////////////////////////////////////////////
+// MSDN — April 2001
+// If this code works, it was written by Paul DiLascia.
+// If not, I don't know who wrote it.
+// Compiles with Visual C++ 6.0. Runs on Windows 98 and probably Windows 
+// 2000 too.
+//
+#include &lt;windows.h&gt;
+#include &lt;tchar.h&gt;
+#include &quot;RecycFile.h&quot;
+
+//////////////////
+// Constructor initializes SHFILEOPSTRUCT with reasonable
+// defaults. You can override if you like. Go ahead, make my day.
+//
+CRecycleFile::CRecycleFile()
+{
+   memset((SHFILEOPSTRUCT*)this,0,sizeof(SHFILEOPSTRUCT));
+   fFlags |= FOF_SILENT;                // don't report progress
+   fFlags |= FOF_NOERRORUI;             // don't report errors
+   fFlags |= FOF_NOCONFIRMATION;        // don't confirm delete
+}
+
+//////////////////
+// Send a file to the recycle bin. Args:
+//  - full pathname of file.
+//  - bDelete: if TRUE, really delete file (no recycle bin)
+//
+int CRecycleFile::Recycle(LPCTSTR pszPath, BOOL bDelete)
+{
+   // Copy pathname to double-NULL-terminated string.
+   //
+   TCHAR buf[_MAX_PATH + 1]; // allow one more character
+   _tcscpy(buf, pszPath);    // copy caller's path name
+   buf[_tcslen(buf)+1]=0;    // need two NULLs at end
+
+   // Set SHFILEOPSTRUCT params for delete operation
+   //
+   wFunc = FO_DELETE;                   // REQUIRED: delete operation
+   pFrom = buf;                         // REQUIRED: which file(s)
+   pTo = NULL;                          // MUST be NULL
+   if (bDelete) {                       // if delete requested..
+      fFlags &amp;= ~FOF_ALLOWUNDO;         // ..don't use Recycle Bin
+   } else {                             // otherwise..
+      fFlags |= FOF_ALLOWUNDO;          // ..send to Recycle Bin
+   }
+   return SHFileOperation(this);        // do it!
+}
+</pre>
+    <hr COLOR="#000080" ALIGN="left" WIDTH="500">
+    <p><strong><font face="Arial"><span CLASS="clsCap">recycle.cpp</span></font></strong><br>
+    </p>
+    <pre>
+////////////////////////////////////////////////////////////////
+// MSDN — April 2001
+// If this code works, it was written by Paul DiLascia.
+// If not, I don't know who wrote it.
+// Compiles with Visual C++ 6.0. Runs on Windows 98 and probably Windows 
+// 2000 too.
+//
+#pragma once
+#pragma warning(disable:4786)           // disable annoying C4786
+#define VC_EXTRALEAN                    // Exclude rarely used stuff from
+                                        // headers
+#include &lt;windows.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;direct.h&gt;                     // getcwd
+#include &lt;conio.h&gt;                      // getche
+#include &lt;tchar.h&gt;
+#include &lt;assert.h&gt;
+#include &lt;string&gt;                       // STL string class
+#include &lt;list&gt;                         // STL list class
+#include &lt;sys/stat.h&gt;                   // stat function
+#include &quot;RecycFile.h&quot;
+
+using namespace std;                    // use STL
+typedef list&lt;string&gt; CStringList;       // like MFC
+
+// I'm really roughing it here—need my own TRACE and ASSERT!
+#define ASSERT assert
+#ifdef _DEBUG
+#define TRACE _tprintf
+#else
+#define TRACE 1 ? (void)0 : ::_tprintf
+#endif
+
+// pre-declare functions
+void    usage();
+void    help();
+string  GetCurrentDir();
+string  MakeAbsolute(const string&amp; relname);
+BOOL    confirm(LPCTSTR pFileName);
+LPCTSTR GetErrorMsg(int err);
+
+// global command-line switches
+BOOL bPrompt=FALSE;        // prompt each file
+BOOL bQuiet=FALSE;         // don't display messages
+BOOL bDisplayOnly=FALSE;   // display results only; don't actually recycle
+BOOL bZap=FALSE;           // really delete (don't recycle)
+
+// test if file exists
+inline fileexists(LPCTSTR pFilename)
+{
+   struct stat st;
+   return stat(pFilename, &amp;st)==0;
+}
+
+// check for switch: / or -
+inline BOOL isswitch(TCHAR c)
+{
+   return c==L'/' || c==L'-';
+}
+
+//////////////////
+// Main function expects argv already expanded for wildcards. You must 
+// link with setargv.obj!!
+//
+int main(int argc, TCHAR* argv[], TCHAR* envp[])
+{
+   // Parse command line, building list of file names.
+   // Switches can come in any order.
+   //
+   CStringList files;
+   for (int i=1; i&lt;argc; i++) {
+      if (isswitch(argv[i][0])) {
+         switch(tolower(argv[i][1])) {
+         case 'q':
+            bQuiet=TRUE;
+            break;
+         case 'n':
+            bDisplayOnly=TRUE;
+            break;
+         case 'p':
+            bPrompt=TRUE;
+            break;
+         case 'z':
+            bZap=TRUE;
+            break;
+         case '?':
+            help();
+            return 0;
+         default:
+            usage();
+            return 0;
+         }
+      } else {
+         // Got a file name. Make it absolute and add to list.
+         files.push_back(MakeAbsolute(argv[i]));
+      }
+   }
+
+   if (files.empty()) {
+      // No files specified: tell bozo user how to use this command.
+      usage();
+      return 0;
+   }
+
+   // Delete (recycle) all the files in the list
+   int nDel=0;
+   CStringList::iterator it;
+
+   // loop over list of files and recycle each one 
+   for (it=files.begin(); it!=files.end(); it++) {
+      const string&amp; filename = *it;
+      LPCTSTR pFileName = filename.c_str();
+
+      // Only recycle if file exists. If the user types a wildcard—eg:
+      // recycle foo.* and there are no files that match &quot;foo.*&quot;, then 
+      // setargv passes the wildcard expression unexpanded—but obviously 
+      // there is no such file.
+      //
+      if (fileexists(pFileName)) {
+
+         if (!bQuiet &amp;&amp; !bPrompt) {
+            // tell user I'm recycling this file
+            _ftprintf(stderr,_T(&quot;%s %s\n&quot;),
+               bZap ? _T(&quot;Deleting&quot;) : _T(&quot;Recycling&quot;), pFileName);
+         }
+
+         if (!bDisplayOnly) {
+            if (!bPrompt || confirm(pFileName)) {
+               // Finally! Recycle the file. Use CRecycleFile.
+               CRecycleFile rf;
+               int err = rf.Recycle(pFileName,bZap);
+               if (err==0) {
+                  nDel++;
+               } else {
+                  // Can't recycle: display error message
+                  _ftprintf(stderr,_T(&quot;Error %d: %s&quot;), err, 
+	                            GetErrorMsg(err));
+               }
+            }
+         }
+      } else {
+         _ftprintf(stderr,_T(&quot;File not found \&quot;%s\&quot;\n&quot;), pFileName);
+      }
+   }
+   if (!bQuiet) {
+      _ftprintf(stderr,_T(&quot;%d files recycled\n&quot;),nDel);
+   }
+   return 0;
+}
+
+////////////////
+// Duh.
+//
+void usage()
+{
+   _tprintf(_T(&quot;Usage: RECYCLE [/QNPZ?] file...\n&quot;));
+}
+
+////////////////
+// Ditto duh.
+//
+void help()
+{
+   _tprintf(_T(&quot;Purpose:  Send one or more files to the recycle bin.\n&quot;));
+   _tprintf(_T(&quot;Format:   RECYCLE [/Q /N /P /Z] file....\n&quot;));
+   _tprintf(_T(&quot;          /Q(uiet)     no messages\n&quot;));
+   _tprintf(_T(&quot;          /N(othing)   don't delete, just show files\n&quot;));
+   _tprintf(_T(&quot;          /P(rompt)    confirm each file\n&quot;));
+   _tprintf(_T(&quot;          /Z(ap)       really delete—same as del\n&quot;));
+}
+
+//////////////////
+// Make a file name absolute with respect to current directory.
+//
+string MakeAbsolute(const string&amp; relname)
+{
+   // Get current directory. Since cwd is static this happens only once.
+   static const string cwd = GetCurrentDir();
+
+   string absname;
+   if (relname[0] &amp;&amp; relname[1] &amp;&amp; relname[1]==':') {
+      // relname is already absolute
+      absname = relname;
+
+   } else if (relname[0]=='\\') {
+      // relname begins with \ — add drive letter and colon
+      absname = string(cwd,0,2);
+      absname += relname;
+
+   } else {                             // file name begins with letter:
+      // relname begins with a letter — prepend cwd
+      absname = cwd;
+      absname += relname;
+   }
+   return absname;
+}
+
+//////////////////
+// Get current directory. For some reason unknown to mankind, getcwd 
+// returns &quot;C:\FOO&quot; (no \ at end) if dir is NOT root; yet it returns &quot;C:\&quot; 
+// (with \) if cwd is root. Go figure. To make the result consistent for 
+// appending a file name, GetCurrentDir adds the missing \ if needed. 
+// Result always has final \.
+//
+string GetCurrentDir()
+{
+   TCHAR dir[MAX_PATH];
+   _tgetcwd(dir, sizeof(dir)/sizeof(TCHAR));
+
+   // Append '\' if needed
+   int lastchar = _tcslen(dir)-1;
+   if (lastchar&gt;0 &amp;&amp; dir[lastchar] != '\\') // if last char isn't \ ..
+      _tcscat(dir,_T(&quot;\\&quot;));                // ..add one
+
+   return dir;                         // compiler will convert to string!
+}
+
+//////////////////
+// Get user confirmation to recycle/delete a file
+//
+BOOL confirm(LPCTSTR pFileName)
+{
+   while (TRUE) {
+      _tprintf(_T(&quot;Recycle %s (Y/N/All)? &quot;), pFileName);
+      char c = _getche();
+      if (c=='') {
+         _tprintf(_T(&quot;^C\n&quot;));
+         exit(0);
+      }
+      _tprintf(_T(&quot;\n&quot;));
+      switch (tolower(c)) {
+      case 'a':
+         bPrompt=FALSE;
+         // fall through
+      case 'y':
+         return TRUE;
+      case 'n':
+         return FALSE;
+      }
+   }
+}
+
+//////////////////
+// Get Windows system error message
+//
+LPCTSTR GetErrorMsg(int err)
+{
+   const BUFSIZE = 512;
+   static TCHAR buf[BUFSIZE];
+   buf[0]=0;
+
+   // Only Windows could have a function this confusing to get a simple 
+   // error message.
+   FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+      NULL,    // source
+      err,     // error code
+      0,       // language ID
+      buf,     // buffer to receive message
+      BUFSIZE, // size of buf
+      NULL);   // arguments
+   return buf;
+}
+</pre>
+    </td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

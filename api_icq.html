@@ -1,0 +1,1500 @@
+<html>
+
+<head>
+<title>Пример работы с DNS</title>
+<meta name="GENERATOR" content="Microsoft FrontPage 3.0">
+</head>
+
+<body topmargin="0" leftmargin="0" marginwidth="0" marginheigth="0">
+
+<table border="0" cellpadding="0" cellspacing="0" width="750">
+  <tr>
+    <td rowspan="2" valign="top"><img src="main1.gif" width="278" height="61"
+    alt="main1.gif (6856 bytes)"></td>
+    <td align="center"><font style="font-size: 15pt" face="Times New Roman" size="4"
+    color="#4904B1">Информационный сервер</font></td>
+  </tr>
+  <tr>
+    <td><a href="http://www.lbe.ru/cgi-bin/href/castle?1002" target="_top"><img
+    src="http://www.lbe.ru/cgi-bin/banner/castle?1002" width="468" height="60" border="0"
+    alt="List Banner Exchange" ismap></a></td>
+  </tr>
+</table>
+
+<p>&nbsp;</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+  <tr>
+    <td width="750" bgcolor="#A5E4A7"><font face="Tahoma" style="font-size: 10pt" size="-1"><b>&nbsp;
+    Листинг 1 (Исходный код самого клиента)</b></font></td>
+  </tr>
+</table>
+
+<pre>
+#include &lt;windows.h&gt;
+#include &lt;windowsx.h&gt;
+#include &lt;commctrl.h&gt;
+#include &lt;winsock.h&gt;
+#include &quot;dstring.h&quot;
+#include &quot;resrc1.h&quot;
+
+LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+BOOL CALLBACK DialogRecv(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+BOOL CALLBACK DialogSend(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+BOOL CALLBACK MainDialog(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+BOOL CALLBACK DialogHistory(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+BOOL WndProc_OnCreate(HWND hWnd, LPCREATESTRUCT lpCreateStruct);
+void WndProc_OnWSANetEvent(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+void MainDlg_OnSize(HWND hWnd, UINT state, int cx, int cy);
+void HisDlg_OnSize(HWND hWnd, UINT state, int cx, int cy);
+void ConnectSMTPServerSocket(void);
+void TimerMessage(HWND hWnd, DWORD dwMessage);
+void AddStatusIcon(HWND hWnd, DWORD dwMessage);
+void CALLBACK MainTimerMessage(HWND hWnd, UINT Msg, UINT idEvent, DWORD dwTime);
+BOOL CreateListenSocket(void);
+BOOL CreateOutgoingSocket(void);
+void HandlePopupMenu (HWND hwnd, POINT point);
+int SendClientMessage(int nPort, const char *szAddr, const char *svMessage);
+int SendId(int nPort, const char *szAddr, const char *svUser);
+int UDP_Recv(BYTE **pInData, int *pnInDataLen);
+int UDP_Send(BYTE *pData, int nDataLen, int nPort, const char *szAddr);
+void UDP_Free(BYTE *pBuffer);
+void DrawLBItem(LPDRAWITEMSTRUCT lpdis);
+HBITMAP ShrinkBitmap ( HWND hWnd, HBITMAP hbm);
+
+#define SMTP_PORT 25
+#define SMTP_ADDR &quot;128.1.1.1&quot;
+#define WSA_NETEVENT (WM_USER + 1)
+#define WM_NOTIFYICONMSG (WM_USER + 2)
+#define DIA_MESSAGE			21
+#define DIA_MESSAGE_PART	22
+#define DIA_USER			31
+#define DIA_USERBASE		32
+#define DIA_USERDENIED		33
+#define DIA_USERBASE_PART	34
+#define DIA_TERMINATE		41
+#define DIA_MOUSE			42
+#define DIA_KEYBOARD		43
+#define MYLBSTYLE   WS_CHILD|WS_BORDER |LBS_SORT| \
+                    WS_VSCROLL | LBS_NOINTEGRALHEIGHT
+#define CRLF			 &quot;\x0d\x0a&quot;
+
+HINSTANCE hInst;
+HWND hWndDialog;
+HWND hWndMainDialog;
+HWND hLboxWnd;
+HWND hLBwnd;
+HWND hHisEdWnd;
+HWND hHisOkWnd;
+HANDLE IconMail;
+HBRUSH hbrushMenu;
+SOCKET s;
+SOCKET SendSocket;
+
+UINT g_uState;
+int  iNumIcon;
+BOOL m_bUserAccess;			// ii?ii ee iieuciaaoae? iieuciaaouny anueie
+BOOL m_bEpsent;				// ionoonoaoao ee ?aeiaae
+BOOL m_bMainClose;			// i?eioaeoaeuii ee cae?uoi aeaaiia ieii
+BOOL m_bMainState;			// aeaia ee eeiiea iannaia?a?a
+BOOL m_bMainVisible;		// aeaeii eee iao aeaaiia ieii iannaia?a?a
+BOOL m_bState;				// anou eee iao i?eoaaoea niiauaiey
+BOOL m_bReply;				// a eaeii aeaa ioia?a?aou aeaeia i?e?ia(ioi?aaea eee i?e?i)
+BOOL m_bStateReply;			// ii?ii ee ?eoaou neaao?uaa niiauaiea
+BOOL m_bAlarm;				// ?a?ei iianiinoe
+UINT m_uTimer;				// oaeia? ia ieaa?uo? eeiieo
+UINT m_uMainTimer;			// oaeia? ia iaiiaeaiea aacu ?ca?ia a iieaeia
+DString UserBase;			// nienie Iieuciaaoaeae a iieaeia n Aeieoieeaie 
+DString MessBase;			// i?eoaaoea niiauaiey n ia?aoiuie aa?anaie
+DString MessHistory;		// A?oea i?eoaaoeo e ioi?aaeaiiuo niiauaiee
+DString AddrReplyToServer;	// Aeieoiee na?aa?a
+DString AddrReplyToClient;	// Aeieoiee i?eoaaoaai niiauaiey io a?oaiai iieuciaaoaey
+DString AddrClientToSend;	// Aa?an ioi?aaeyaiiai niiauaiey
+DString NameClientToSend;	// Eiy iieuciaaoaey, eioi?iio ioi?aaeyaony niiauaiea
+DString szUserToReply;		// Eiy iieuciaaoaey, i?eneaaoaai niiauaiea
+DString szBufMess;			// oaeno i?eoaaoaai niiauaiey
+DString AddrDiaServ;		// Aeieoiee anueiaiai na?aa?a
+char svUserName[256];		// Eiy iieuciaaoaey, caionoeaoaai anueo
+DWORD dwBufSize=256;
+char LBUserBase[256];
+
+typedef struct {
+	DWORD dwFlags;
+} UDPHDR;
+
+typedef struct {
+	BYTE bAction;
+	union {
+		struct {
+			BYTE bUserNameLen;		// Aeeiia eiaie iieuciaaoaey a oaea niiauaiey
+			DWORD dwDataLen;		// ?acia? aaiiuo a oaea niiauaiey
+			BYTE wNumPacket;		// iiia? oaeouaai iaeaoa
+			BYTE wNumberOfPackets;	// Anaai iaeaoia aey aaiiiai niiauaiey
+			BYTE bFont;				// O?eoo oaenoa niiauaiey
+		} message;
+	};
+} DIA_HEADER;
+
+int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
+{
+	MSG msg;
+	HWND hWnd;
+	WNDCLASSEX wndclass;
+
+	hInst = hInstance;
+
+	wndclass.style = 0;
+	wndclass.lpfnWndProc = (WNDPROC)WndProc;
+	wndclass.cbClsExtra = 0;
+	wndclass.cbWndExtra = 0;
+	wndclass.hInstance = hInst;
+	wndclass.hIcon = NULL;
+	wndclass.hCursor = NULL;
+	wndclass.hbrBackground = NULL;
+	wndclass.lpszMenuName = NULL;
+	wndclass.lpszClassName = &quot;WSCLAS&quot;;
+	
+	if(!RegisterClassEx(&amp;wndclass))
+		if(!RegisterClass((LPWNDCLASS)&amp;wndclass.style))  return FALSE;
+
+	hWnd=CreateWindow(&quot;WSCLAS&quot;, &quot;&quot;, 0, 0, 0, 1, 1, HWND_DESKTOP, NULL, hInst, NULL);
+
+	hWndDialog=hWnd;
+
+	m_bMainState = FALSE;
+	m_bMainVisible = FALSE;
+	m_bState = FALSE;
+	m_bStateReply = TRUE;
+	m_bEpsent = FALSE;
+	m_bUserAccess = FALSE;
+	m_bAlarm = FALSE;
+
+	IconMail = LoadImage(hInst,MAKEINTRESOURCE(IDI_ICON6),IMAGE_ICON,
+			20,16,LR_DEFAULTCOLOR);
+	hbrushMenu = CreateSolidBrush(GetSysColor(COLOR_MENU));
+	iNumIcon = 5;
+	GetUserName(svUserName,&amp;dwBufSize);
+	AddrDiaServ = &quot;128.1.1.11&quot;;
+
+	SendId(5002, AddrDiaServ.GetDString(), svUserName);
+
+	m_uMainTimer = SetTimer(hWnd, 2, 11000, TIMERPROC(MainTimerMessage));
+
+	int vk = 0x45;	// eeaaeoa &quot;A&quot; eaoeineay
+	RegisterHotKey(hWnd,1000+(MOD_ALT*0x100)+vk,MOD_ALT,vk);	// ?aaeno?e?oai ALT-E eae ai?y?o? eeaaeoo
+
+	while(GetMessage(&amp;msg, NULL, 0, 0))  {
+		TranslateMessage(&amp;msg);
+		DispatchMessage(&amp;msg);
+	}
+	DeleteObject(hbrushMenu);
+	UnregisterHotKey(hWnd,1000+(MOD_ALT*0x100)+vk);
+	return msg.wParam;
+}
+
+LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+	LPCTSTR pszIDMess;
+	POINT pt;
+
+	switch(msg)  {
+		case WSA_NETEVENT:
+			WndProc_OnWSANetEvent(hWnd, msg, wParam, lParam);
+			break;
+
+		case WM_TIMER:
+			if(m_bEpsent == FALSE)  {
+				g_uState = !g_uState;
+				TimerMessage(hWnd, NIM_MODIFY);
+			}
+			break;
+
+		case WM_HOTKEY:
+			if(m_bUserAccess == TRUE)  {
+				if(m_bEpsent == FALSE&amp;&amp;m_bMainState==TRUE)  {
+					m_bEpsent=TRUE;
+					m_bMainState=FALSE;
+					TimerMessage(hWnd, NIM_DELETE);
+				} else  {
+					m_bEpsent = FALSE;
+					if(m_bMainState==FALSE&amp;&amp;m_bMainClose==FALSE&amp;&amp;m_bEpsent==FALSE)  {
+						m_bMainState = TRUE;
+						AddStatusIcon(hWnd, NIM_ADD);
+					}
+				}
+			}
+			break;
+
+        case WM_COMMAND:
+            switch (LOWORD(wParam))  {
+				case ID_EXIT_DIASOFT:
+					m_bMainClose = TRUE;				// aeaaiue aeaeia cae?uo i?eioaeoaeuii
+					m_bMainState = FALSE;				// aeaaiay eeiiea ia aeaia
+					m_bMainVisible = FALSE;				// aeaaiue aeaeia ia aeaai
+					m_bAlarm = FALSE;
+					KillTimer(hWnd,	m_uTimer);
+					TimerMessage(hWnd, NIM_DELETE);		// oae?aai aeaaio? eeiieo
+					EndDialog(hWndMainDialog, 0);		// oae?aai aeaaiue aeaeia
+					szBufMess = &quot;&quot;;
+					break;
+
+				case ID_OPEN_DIASOFT:
+					if(m_bMainVisible==FALSE)  {
+						m_bMainClose=FALSE;
+						m_bMainState=TRUE;
+						m_bMainVisible=TRUE;
+						pszIDMess = MAKEINTRESOURCE(IDD_MAINDIALOG);
+						DialogBoxParam(hInst, pszIDMess, hWnd, DLGPROC(MainDialog), 0);
+					}
+					break;
+
+				case ID_CHEIF_DIASOFT:
+					m_bEpsent=TRUE;
+					m_bMainState=FALSE;
+					m_bAlarm=TRUE;
+					iNumIcon=8;
+					TimerMessage(hWnd, NIM_DELETE);
+					break;
+
+				case ID_NODIST_DIASOFT:
+					m_bAlarm=FALSE;
+					break;
+
+				case ID_ABSENT_DIASOFT:
+					m_bEpsent=TRUE;
+					m_bMainState=FALSE;
+					m_bAlarm=FALSE;
+					iNumIcon=7;
+					TimerMessage(hWnd, NIM_DELETE);
+					break;
+
+				case ID_NORMAL_DIASOFT:
+					m_bAlarm=FALSE;
+					iNumIcon=5;
+					AddStatusIcon(hWnd, NIM_MODIFY);
+					break;
+			}
+			break;
+
+		case WM_NOTIFYICONMSG:
+			switch(lParam)  {
+				case WM_LBUTTONDBLCLK:
+					if(m_bMainState==FALSE&amp;&amp;m_bState==TRUE&amp;&amp;m_bStateReply==TRUE)  {
+						TimerMessage(hWnd, NIM_DELETE);
+						pszIDMess = MAKEINTRESOURCE(IDD_INCOMMESSAGE);
+						DialogBoxParam(hInst, pszIDMess, hWnd, DLGPROC(DialogRecv), 0);
+						if(MessBase.GetDString()==&quot;&quot;)  m_bState = FALSE;
+					}
+					else if(m_bMainState==TRUE&amp;&amp;m_bState==TRUE&amp;&amp;m_bStateReply==TRUE)  {
+						AddStatusIcon(hWnd, NIM_MODIFY);
+						pszIDMess = MAKEINTRESOURCE(IDD_INCOMMESSAGE);
+						DialogBoxParam(hInst, pszIDMess, hWnd, DLGPROC(DialogRecv), 0);
+					}
+					else if(m_bState==FALSE&amp;&amp;m_bMainVisible==FALSE)  {
+						pszIDMess = MAKEINTRESOURCE(IDD_MAINDIALOG);
+						DialogBoxParam(hInst, pszIDMess, hWnd, DLGPROC(MainDialog), 0);
+					}
+					break;
+
+				case WM_RBUTTONDOWN:
+					GetCursorPos(&amp;pt);
+					HandlePopupMenu (hWnd, pt);
+					break;
+
+				default:
+					break;
+			}
+			break;
+
+		HANDLE_MSG(hWnd, WM_CREATE, WndProc_OnCreate);
+
+		default:
+			return(DefWindowProc(hWnd, msg, wParam, lParam));
+	}
+	return 0;
+}
+
+BOOL CALLBACK DialogRecv(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+	DString NameRecv, IpRecv, MessRecv, Temp, TempMessHis, TitleSend;
+	int ndx1, ndx2;
+
+	switch(msg)  {
+		case WM_INITDIALOG:
+			m_bReply = FALSE;
+			m_bStateReply = FALSE;
+			if((ndx1 = MessBase.Find(&quot;,:2&quot;))!=-1)  {
+				NameRecv = &quot;Niiauaiea io \&quot;&quot;;
+				Temp = MessBase.Mid(2);
+				Temp = Temp.Left(ndx1-2);
+				NameRecv += Temp;
+				NameRecv += &quot;\&quot;&quot;;
+				MessBase = MessBase.Mid(2);
+				NameClientToSend = Temp;
+			}
+			SendMessage(hDlg, WM_SETTEXT, 0, (LPARAM) NameRecv.GetDString());
+			if((ndx1 = MessBase.Find(&quot;,:3&quot;))!=-1)  {
+				MessRecv = MessBase.Mid(ndx1+3);
+				if((ndx2 = MessRecv.Find(&quot;_:&quot;))!=-1)  MessRecv = MessRecv.Left(ndx2);
+			}
+			SendMessage(GetDlgItem(hDlg, IDC_EDIT_MSG), WM_SETTEXT, 0, (LPARAM)MessRecv.GetDString());
+			SendMessage(GetDlgItem(hDlg, IDC_BUTTON_REPLY), WM_SETFOCUS, 0, 0);
+			EnableWindow(GetDlgItem(hDlg, IDC_BUTTON_OK), FALSE);
+			if(MessBase.Find(&quot;_:&quot;)==-1)  {
+				m_bState = FALSE;
+				KillTimer(hWndDialog, m_uTimer);
+			}
+			return(TRUE);
+			break;
+
+		case WM_COMMAND:
+			switch(LOWORD(wParam))  {
+				case IDC_BUTTON_OK:
+					if(m_bReply == TRUE)  {
+						DString SendBuf;
+						char SendBuf1[256];
+
+						if((ndx1 = MessBase.Find(&quot;,:2&quot;))!=-1)  {
+							IpRecv = MessBase.Mid(ndx1+3);
+							if((ndx2 = IpRecv.Find(&quot;,:3&quot;))!=-1)  IpRecv = IpRecv.Left(ndx2);
+						}
+						if((ndx1 = MessBase.Find(&quot;_:&quot;))!=-1)  {
+							MessBase = MessBase.Mid(ndx1);
+							m_bState = TRUE;
+						}
+						else  {
+							MessBase = &quot;&quot;;
+							m_bState = FALSE;
+						}
+						m_bStateReply = TRUE;
+						SendBuf = svUserName;
+						TempMessHis = &quot;_:&quot;;
+						TempMessHis += svUserName;
+						TempMessHis += &quot;,:2&quot;;
+						TempMessHis += NameClientToSend;
+						TempMessHis += &quot;,:3&quot;;
+						GetDlgItemText(hDlg, IDC_EDIT_MSG, SendBuf1, sizeof(SendBuf1));
+						SendBuf += SendBuf1;
+						TempMessHis += SendBuf1;
+						TempMessHis += MessHistory;
+						MessHistory = TempMessHis;
+						SendClientMessage(5001, IpRecv.GetDString(), SendBuf.GetDString());
+					}
+					EndDialog(hDlg, 0);
+					m_bReply = FALSE;
+					break;
+
+				case IDC_BUTTON_REPLY:
+					m_bReply = TRUE;
+					TitleSend = &quot;Niiauaiea aey \&quot;&quot;;
+					TitleSend += NameClientToSend;
+					TitleSend += &quot;\&quot;&quot;;
+					SendMessage(hDlg, WM_SETTEXT, 0, (LPARAM)TitleSend.GetDString());
+					SendMessage(GetDlgItem(hDlg, IDC_BUTTON_OK), WM_SETTEXT, 0, (LPARAM) &quot;Ioi?aaeou&quot;);
+					SendMessage(GetDlgItem(hDlg, IDC_BUTTON_REPLY), WM_KILLFOCUS, 0, 0);
+					SendMessage(GetDlgItem(hDlg, IDC_EDIT_MSG), EM_SETREADONLY, FALSE, 0);
+					SendMessage(GetDlgItem(hDlg, IDC_EDIT_MSG), WM_SETTEXT, 0, (LPARAM) &quot;&quot;);
+					EnableWindow(GetDlgItem(hDlg, IDC_BUTTON_REPLY), FALSE);
+					EnableWindow(GetDlgItem(hDlg, IDC_BUTTON_OK), TRUE);
+					break;
+
+				case IDC_BUTTON_CANCEL:
+					if((ndx1 = MessBase.Find(&quot;_:&quot;))!=-1)  {
+						MessBase = MessBase.Mid(ndx1);
+						m_bState = TRUE;
+					}
+					else  {
+						MessBase = &quot;&quot;;
+						m_bState = FALSE;
+					}
+					m_bStateReply = TRUE;
+					EndDialog(hDlg, 0);
+					break;
+
+				case IDC_BUTTON_HISTORY:
+					DialogBoxParam(hInst, MAKEINTRESOURCE(IDD_HISTORY), hWndDialog, DLGPROC(DialogHistory), 0);
+					break;
+
+				default:
+					break;
+			}
+			break;
+
+		case WM_KILLFOCUS:
+			SendMessage(GetDlgItem(hDlg, IDC_EDIT_MSG), WM_SETFOCUS, 0, 0);
+			break;
+
+		case WM_CLOSE:
+			if((ndx1 = MessBase.Find(&quot;_:&quot;))!=-1)  {
+				MessBase = MessBase.Mid(ndx1);
+				m_bState = TRUE;
+			}
+			else  {
+				MessBase = &quot;&quot;;
+				m_bState = FALSE;
+			}
+			m_bStateReply = TRUE;
+			EndDialog(hDlg, 0);
+			break;
+	}
+	return(FALSE);
+}
+
+BOOL CALLBACK DialogSend(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+	char SendBuf1[256];
+	DString SendBuf, TempMessHis, TitleSend;
+
+	switch(msg)  {
+		case WM_INITDIALOG:
+			m_bReply = TRUE;
+			TitleSend = &quot;Niiauaiea aey \&quot;&quot;;
+			TitleSend += NameClientToSend;
+			TitleSend += &quot;\&quot;&quot;;
+			SendMessage(hDlg, WM_SETTEXT, 0, (LPARAM)TitleSend.GetDString());
+			SendMessage(GetDlgItem(hDlg, IDC_BUTTON_OK), WM_SETTEXT, 0, (LPARAM) &quot;Ioi?aaeou&quot;);
+			SendMessage(GetDlgItem(hDlg, IDC_BUTTON_REPLY), WM_KILLFOCUS, 0, 0);
+			SendMessage(GetDlgItem(hDlg, IDC_EDIT_MSG), EM_SETREADONLY, FALSE, 0);
+			SendMessage(GetDlgItem(hDlg, IDC_EDIT_MSG), WM_SETTEXT, 0, (LPARAM) &quot;&quot;);
+			EnableWindow(GetDlgItem(hDlg, IDC_BUTTON_REPLY), FALSE);
+			return(TRUE);
+			break;
+
+		case WM_COMMAND:
+			switch(LOWORD(wParam))  {
+				case IDC_BUTTON_OK:
+					m_bStateReply = TRUE;
+					SendBuf = svUserName;
+					TempMessHis = &quot;_:&quot;;
+					TempMessHis += svUserName;
+					TempMessHis += &quot;,:2&quot;;
+					TempMessHis += NameClientToSend;
+					TempMessHis += &quot;,:3&quot;;
+					GetDlgItemText(hDlg, IDC_EDIT_MSG, SendBuf1, sizeof(SendBuf1));
+					SendBuf += SendBuf1;
+					TempMessHis += SendBuf1;
+					TempMessHis += MessHistory;
+					MessHistory = TempMessHis;
+					SendClientMessage(5001, AddrClientToSend.GetDString(), SendBuf.GetDString());
+					EndDialog(hDlg, 0);
+					m_bReply = FALSE;
+					break;
+
+				case IDC_BUTTON_CANCEL:
+					m_bStateReply = TRUE;
+					EndDialog(hDlg, 0);
+					break;
+
+				case IDC_BUTTON_HISTORY:
+					DialogBoxParam(hInst, MAKEINTRESOURCE(IDD_HISTORY), hWndDialog, DLGPROC(DialogHistory), 0);
+					break;
+			}
+			break;
+
+		case WM_CLOSE:
+			m_bStateReply = TRUE;
+			EndDialog(hDlg, 0);
+			break;
+
+		default:
+			break;
+	}
+	return(FALSE);
+}
+
+BOOL CALLBACK MainDialog(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+	DString TempUserBase1, TempUserBase2, TempUser;
+	LPTSTR psz;
+	int  ndx1, ndx2, cx, i;
+	RECT rc;
+
+	TempUserBase1 = UserBase;
+
+	switch(msg)  {
+		case WM_INITDIALOG:
+			hWndMainDialog = hDlg;
+			hLboxWnd = GetDlgItem(hDlg,IDC_LIST1);
+			cx = GetSystemMetrics(SM_CXSCREEN);
+			cx = cx - 125;
+			MoveWindow( hDlg, cx, 4, 115, 230, TRUE);
+			GetClientRect(hDlg, &amp;rc);
+			MoveWindow(GetDlgItem(hDlg,IDC_MAIN_BUTTON),1,rc.bottom-22,30,22,TRUE);
+			i = 0;
+			cx = 0;
+			memset(LBUserBase,'\0',256);
+			do  {
+				if((ndx1 = TempUserBase1.Find(&quot;_:&quot;))!=-1)  {
+					TempUserBase1 = TempUserBase1.Mid(ndx1+2);
+					ndx2 = TempUserBase1.Find(&quot;,:3&quot;);
+					TempUser = TempUserBase1.Left(ndx2);
+
+					if(i==0)  strcpy(LBUserBase+1, TempUser.GetDString());
+					else  strcat(LBUserBase+cx+1, TempUser.GetDString());
+					SendMessage(hLboxWnd,LB_ADDSTRING,0,(LPARAM)(LPCSTR)LBUserBase+cx+1);
+					cx = cx+1+strlen(TempUser.GetDString());
+					i++;
+					TempUserBase1 = TempUserBase1.Mid(ndx2+3);
+				}
+			} while(ndx1!=-1);
+			m_bMainVisible = TRUE;
+			return(TRUE);
+			break;
+
+		case WM_COMMAND:
+			switch(LOWORD(wParam))  {
+				case IDC_LIST1:
+					if(HIWORD(wParam)==LBN_DBLCLK&amp;&amp;m_bStateReply==TRUE)  {
+						psz = (LPTSTR)SendMessage(GetDlgItem(hDlg,IDC_LIST1), LB_GETITEMDATA, SendMessage(GetDlgItem(hDlg,IDC_LIST1), LB_GETCURSEL,0,0), (LPARAM)0);
+						NameClientToSend = psz;
+						if((ndx1 = TempUserBase1.Find(NameClientToSend.GetDString()))!=-1)  {
+							TempUserBase2 = TempUserBase1.Mid(ndx1);
+							if((ndx2 = TempUserBase2.Find(&quot;,:3&quot;))!=-1)  {
+								TempUserBase1 = TempUserBase2.Mid(ndx2+3);
+								if((ndx1 = TempUserBase1.Find(&quot;_:&quot;))!=-1)  AddrClientToSend = TempUserBase1.Left(ndx1);
+								else  AddrClientToSend = TempUserBase1;
+							}
+						}
+						m_bStateReply = FALSE;
+						DialogBoxParam(hInst, MAKEINTRESOURCE(IDD_INCOMMESSAGE), hWndDialog, DLGPROC(DialogSend), 0);
+					}
+			}
+			break;
+
+		case WM_PAINT:
+			i = SendMessage(hLboxWnd, LB_GETCOUNT, 0, 0);
+			if(i==0)  {
+				GetClientRect(hLboxWnd, &amp;rc);
+				FillRect(GetDC(hLboxWnd), &amp;rc, hbrushMenu);
+			}
+			break;
+
+		case WM_DRAWITEM:
+	        GetClientRect(hLboxWnd, &amp;rc);
+			((LPDRAWITEMSTRUCT)lParam)-&gt;rcItem.right = rc.right;
+		    DrawLBItem((LPDRAWITEMSTRUCT)lParam);
+
+			i = SendMessage(hLboxWnd, LB_GETCOUNT, 0, 0);
+			i = i * 16;
+			GetClientRect(hLboxWnd, &amp;rc);
+			if(rc.top&lt;i) { rc.top=&quot;rc.top&quot; + i; FillRect(GetDC(hLboxWnd), &amp;rc, hbrushMenu); } return(DefWindowProc(hDlg, msg, wParam, lParam)); break; HANDLE_MSG(hDlg, WM_SIZE, MainDlg_OnSize); case WM_CLOSE: m_bMainClose=&quot;TRUE;&quot; m_bMainState=&quot;FALSE;&quot; m_bMainVisible=&quot;FALSE;&quot; if(m_bState=&quot;=&quot; FALSE) TimerMessage(hWndDialog, NIM_DELETE); EndDialog(hDlg, 0); break; } return(FALSE); } BOOL CALLBACK DialogHistory(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam) { DString TempHis1, TempHis2, TempHis3, TempMainHis; int ndx1,ndx2; RECT rc; switch(msg) { case WM_INITDIALOG: hHisEdWnd=&quot;GetDlgItem(hDlg,IDC_HISTORY_EDIT);&quot; hHisOkWnd=&quot;GetDlgItem(hDlg,IDC_HISTORY_OK);&quot; GetClientRect(hDlg, &amp;rc); MoveWindow(hHisEdWnd,5,5,rc.right-10,rc.bottom-32,TRUE); MoveWindow(hHisOkWnd,rc.right/2-30,rc.bottom-23,60,20,TRUE); TempHis1=&quot;svUserName;&quot; TempHis1 +=&quot;,:2&quot; ; TempHis1 +=&quot;NameClientToSend;&quot; TempHis2=&quot;NameClientToSend;&quot; TempHis2 +=&quot;,:2&quot; ; TempHis2 +=&quot;svUserName;&quot; TempMainHis=&quot;MessHistory;&quot; do { ndx1=&quot;TempMainHis.Find(TempHis1.GetDString());&quot; ndx2=&quot;TempMainHis.Find(TempHis2.GetDString());&quot; if(ndx1!=&quot;-1&amp;&amp;ndx2!=-1)&quot; { if(ndx1<ndx2) TempMainHis="TempMainHis.Mid(ndx1);" else TempMainHis="TempMainHis.Mid(ndx2);" } if(ndx1!="-1&amp;&amp;ndx2==-1)" TempMainHis="TempMainHis.Mid(ndx1);" if(ndx1="=-1&amp;&amp;ndx2!=-1)" TempMainHis="TempMainHis.Mid(ndx2);" if(ndx1!="-1&amp;&amp;ndx2!=-1||ndx1!=-1&amp;&amp;ndx2==-1||ndx1==-1&amp;&amp;ndx2!=-1)" { ndx1="TempMainHis.Find(&quot;,:2&quot;);" TempHis3 +="TempMainHis.Left(ndx1);" TempHis3 +=":" ; TempHis3 +="CRLF;" ndx1="TempMainHis.Find(&quot;,:3&quot;);" TempMainHis="TempMainHis.Mid(ndx1+3);" if((ndx2="TempMainHis.Find(&quot;_:&quot;))!=-1)" { TempHis3 +="TempMainHis.Left(ndx2);" TempHis3 +="CRLF;" TempHis3 +="CRLF;" TempMainHis="TempMainHis.Mid(ndx2);" } else { TempHis3 +="TempMainHis;" TempHis3 +="CRLF;" TempHis3 +="CRLF;" TempMainHis ; } } } while(ndx1!="-1&amp;&amp;ndx2!=-1);" SendMessage(hHisEdWnd, WM_SETTEXT, 0, (LPARAM)TempHis3.GetDString()); return(TRUE); break; case WM_COMMAND: switch(LOWORD(wParam)) { case IDC_HISTORY_OK: EndDialog(hDlg, 0); break; } break; HANDLE_MSG(hDlg, WM_SIZE, HisDlg_OnSize); case WM_CLOSE: EndDialog(hDlg, 0); break; } return(FALSE); } BOOL WndProc_OnCreate(HWND hWnd, LPCREATESTRUCT lpCreateStruct) { int rc; WSADATA WSAData; rc="WSAStartup(MAKEWORD(1," 1), &WSAData); if(rc !="0)" return FALSE; CreateListenSocket(); CreateOutgoingSocket(); // ConnectSMTPServerSocket(); rc="WSAAsyncSelect(s," hWnd, WSA_NETEVENT, FD_READ); if(rc> 0)  {
+		closesocket(s);
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+BOOL CreateListenSocket(void)
+{
+	struct sockaddr_in srv_address;
+	int namelen;
+	int nPort;
+
+	nPort=atoi(&quot;5001&quot;);
+
+	s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	if(s != INVALID_SOCKET)  {
+		memset(&amp;srv_address,0,sizeof(SOCKADDR_IN));
+		srv_address.sin_addr.S_un.S_addr=INADDR_ANY;
+		srv_address.sin_family = AF_INET;
+		srv_address.sin_port = htons((WORD)nPort);
+	}
+	if(bind(s, (SOCKADDR *) &amp;srv_address, sizeof(SOCKADDR_IN)) == SOCKET_ERROR)  {
+		closesocket(s);
+		return FALSE;
+	} else  {
+		namelen=sizeof(SOCKADDR_IN);
+		getsockname(s,(SOCKADDR *)&amp;srv_address,&amp;namelen);
+		return TRUE;
+	}
+}
+
+BOOL CreateOutgoingSocket(void)
+{
+	struct sockaddr_in srv_address;
+	int namelen;
+
+	SendSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	if(SendSocket != INVALID_SOCKET)  {
+		memset(&amp;srv_address,0,sizeof(SOCKADDR_IN));
+		srv_address.sin_addr.S_un.S_addr=INADDR_ANY;
+		srv_address.sin_family = AF_INET;
+		srv_address.sin_port = 0;
+	}
+	if(bind(SendSocket, (SOCKADDR *) &amp;srv_address, sizeof(SOCKADDR_IN)) == SOCKET_ERROR)  {
+		closesocket(s);
+		return FALSE;
+	} else  {
+		namelen=sizeof(SOCKADDR_IN);
+		getsockname(s,(SOCKADDR *)&amp;srv_address,&amp;namelen);
+		return TRUE;
+	}
+}
+
+void WndProc_OnWSANetEvent(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+	DIA_HEADER *pHeader;
+	DString RecBuf, TempMessHis;
+	int nRet,nSize;
+
+	if(WSAGETSELECTEVENT(lParam) == FD_READ)  {
+		if((nRet=UDP_Recv((BYTE **)&amp;pHeader,&amp;nSize))&gt;0)  {
+			if(nSize&lt;sizeof(DIA_HEADER)) { UDP_Free((BYTE*)pHeader); return; } if(pHeader-&gt;bAction==DIA_USERBASE) {
+				BYTE *pData=(BYTE *)malloc(pHeader-&gt;message.dwDataLen);
+				if(pData==NULL) {
+					UDP_Free((BYTE*)pHeader);
+					return;
+				}
+				memcpy(pData,(BYTE *)pHeader+sizeof(DIA_HEADER),nSize);
+				UserBase = (LPCSTR)pData;
+				m_bUserAccess = TRUE;
+				if(m_bMainState==FALSE&amp;&amp;m_bMainClose==FALSE&amp;&amp;m_bEpsent==FALSE)  {
+					m_bMainState = TRUE;
+					AddStatusIcon(hWnd, NIM_ADD);
+				}
+				free(pData);
+			}
+			if(pHeader-&gt;bAction==DIA_USERDENIED) {
+				BYTE *pData=(BYTE *)malloc(pHeader-&gt;message.dwDataLen);
+				if(pData==NULL) {
+					UDP_Free((BYTE*)pHeader);
+					return;
+				}
+				memcpy(pData,(BYTE *)pHeader+sizeof(DIA_HEADER),nSize);
+				UserBase = (LPCSTR)pData;
+				m_bUserAccess = FALSE;
+				if(m_bMainState==TRUE)  {
+					TimerMessage(hWnd, NIM_DELETE);
+					m_bMainState = FALSE;
+				}
+				free(pData);
+			}
+			if(pHeader-&gt;bAction==DIA_MESSAGE_PART)  {
+				m_bState = TRUE;
+				AddrReplyToClient = AddrReplyToServer;
+				BYTE *pData=(BYTE *)malloc(pHeader-&gt;message.dwDataLen);
+				if(pData==NULL) {
+					UDP_Free((BYTE*)pHeader);
+					return;
+				}
+				memcpy(pData,(BYTE *)pHeader+sizeof(DIA_HEADER),nSize);
+				szBufMess = (LPCSTR)pData;
+				MessageBox(NULL, &quot;I?eoea ?anou aeeiiiai iaeaoa !!!&quot;, &quot;Error&quot;, MB_OK|MB_SETFOREGROUND);
+				free(pData);
+			}
+			if(pHeader-&gt;bAction==DIA_MESSAGE) {
+				m_bState = TRUE;
+				AddrReplyToClient = AddrReplyToServer;
+				BYTE *pData=(BYTE *)malloc(pHeader-&gt;message.dwDataLen);
+				if(pData==NULL) {
+					UDP_Free((BYTE*)pHeader);
+					return;
+				}
+				memcpy(pData,(BYTE *)pHeader+sizeof(DIA_HEADER),nSize);
+				szBufMess = (LPCSTR)pData;
+				MessBase += &quot;_:&quot;;
+				MessBase += szBufMess.Left(pHeader-&gt;message.bUserNameLen);
+				MessBase += &quot;,:2&quot;;
+				MessBase += AddrReplyToClient;
+				MessBase += &quot;,:3&quot;;
+				MessBase += szBufMess.Mid(pHeader-&gt;message.bUserNameLen);
+				TempMessHis = &quot;_:&quot;;
+				TempMessHis += szBufMess.Left(pHeader-&gt;message.bUserNameLen);
+				TempMessHis += &quot;,:2&quot;;
+				TempMessHis += svUserName;
+				TempMessHis += &quot;,:3&quot;;
+				TempMessHis += szBufMess.Mid(pHeader-&gt;message.bUserNameLen);
+				TempMessHis += MessHistory;
+				MessHistory = TempMessHis;
+				if(m_bMainState==FALSE&amp;&amp;m_bEpsent==FALSE)  TimerMessage(hWnd, NIM_ADD);
+				m_uTimer = SetTimer(hWnd, 1, 500, NULL);
+				free(pData);
+				if(m_bAlarm==TRUE)  {
+					DString SendAlarm;
+
+					SendAlarm = svUserName;
+					SendAlarm += &quot;Aeaa-oi iaaeecinoe oiaeo ia?aeunoai, iioe?ay iioiua ?o?ee....&quot;;
+					SendClientMessage(5001, AddrReplyToClient.GetDString(), SendAlarm.GetDString());
+				}
+			}
+			UDP_Free((BYTE *)pHeader);
+		}
+	}
+}
+
+void ConnectSMTPServerSocket(void)
+{
+	SOCKET nSMTPServerSocket;
+	struct sockaddr_in smtp_address;
+	int nConnect;
+	int iLength;
+	int iMsg = 0;
+	int iEnd = 0;
+	BYTE sBuf[4096];
+
+	char *MailMessage[] =
+	{
+		&quot;HELO axel.ru\r\n&quot;,
+		&quot;MAIL FROM:&lt;&quot;, &quot;RCPT TO:&lt;Vasia@Pupkin.ru&gt;\r\n&quot;,
+		&quot;DATA\r\n&quot;,
+		&quot;&quot;,
+		&quot;QUIT\r\n&quot;,
+		NULL
+	};
+
+	lstrcat(MailMessage[1], svUserName);
+	lstrcat(MailMessage[1], &quot;@axel.ru&gt;\r\n&quot;);
+	MailMessage[4] = svUserName;
+	lstrcat(MailMessage[4],&quot; is enter to Domain\r\n\r\n.\r\n&quot;);
+
+	nSMTPServerSocket = socket(PF_INET, SOCK_STREAM, 0);
+
+	if(nSMTPServerSocket != INVALID_SOCKET)  {
+		smtp_address.sin_family = AF_INET;
+		smtp_address.sin_addr.s_addr = inet_addr(SMTP_ADDR);
+		smtp_address.sin_port = htons(SMTP_PORT);
+
+		nConnect = connect(nSMTPServerSocket, (PSOCKADDR)&amp;smtp_address, sizeof(smtp_address));
+
+		if(nConnect)  {
+		}
+		else  {
+			do  {
+				iLength = recv(nSMTPServerSocket, (LPSTR)sBuf+iEnd, sizeof(sBuf)-iEnd, 0);
+				iEnd += iLength;
+				sBuf[iEnd] = '\0';
+				send(nSMTPServerSocket, (LPSTR)MailMessage[iMsg], strlen(MailMessage[iMsg]), 0);
+				iMsg++;
+			} while(MailMessage[iMsg]);
+		}
+
+		closesocket(nSMTPServerSocket);
+	}
+}
+
+void TimerMessage(HWND hWnd, DWORD dwMessage)
+{
+	HICON hStatusIcon;
+	LPCSTR pszIDStatusIcon;
+	NOTIFYICONDATA tnd;
+
+	pszIDStatusIcon = MAKEINTRESOURCE(g_uState?IDI_ICON3:IDI_ICON4);
+	hStatusIcon = LoadIcon( hInst,pszIDStatusIcon );
+	tnd.cbSize = sizeof(NOTIFYICONDATA);
+	tnd.hWnd = hWnd;
+	tnd.uID = 1;
+	tnd.uFlags = NIF_MESSAGE|NIF_ICON|NIF_TIP;
+	tnd.uCallbackMessage = WM_NOTIFYICONMSG;
+	tnd.hIcon = hStatusIcon;
+	lstrcpyn(tnd.szTip, &quot;Aai niiauaiea&quot;, sizeof(tnd.szTip));
+	Shell_NotifyIcon( dwMessage, &amp;tnd );
+}
+
+void AddStatusIcon(HWND hWnd, DWORD dwMessage)
+{
+	HICON hStatusIcon;			// Iniiaiay eeiiea a noaoona
+	LPCSTR pszIDStatusIcon;		// Oeacaoaeu ia aeaaio? eeiieo a noaoona
+	NOTIFYICONDATA tnd;
+
+	switch(iNumIcon)  {
+		case 5:
+			pszIDStatusIcon = MAKEINTRESOURCE(IDI_ICON5);
+			break;
+		case 7:
+			pszIDStatusIcon = MAKEINTRESOURCE(IDI_ICON7);
+			break;
+		case 8:
+			pszIDStatusIcon = MAKEINTRESOURCE(IDI_ICON8);
+			break;
+	}
+	hStatusIcon = LoadIcon( hInst,pszIDStatusIcon );
+	tnd.cbSize = sizeof(NOTIFYICONDATA);
+	tnd.hWnd = hWnd;
+	tnd.uID = 1;
+	tnd.uFlags = NIF_MESSAGE|NIF_ICON|NIF_TIP;
+	tnd.uCallbackMessage = WM_NOTIFYICONMSG;
+	tnd.hIcon = hStatusIcon;
+	lstrcpyn(tnd.szTip, &quot;Anuea :)&quot;, sizeof(tnd.szTip));
+	Shell_NotifyIcon( dwMessage, &amp;tnd );
+}
+
+void HandlePopupMenu (HWND hWnd, POINT point)
+{
+	HMENU hMenu;
+	HMENU hMenuTrackPopup;
+	HBITMAP  hbmMenuNormal;
+	LPCSTR pszIDMenu;
+
+	pszIDMenu = MAKEINTRESOURCE(IDM_POPUPMENU1);
+	hMenu = LoadMenu (hInst, pszIDMenu);
+	if (!hMenu)  return;
+	hMenuTrackPopup = GetSubMenu (hMenu, 0);
+	hbmMenuNormal  = ShrinkBitmap (hWnd, LoadBitmap (hInst, MAKEINTRESOURCE(IDB_BITMAP2)));
+	SetMenuItemBitmaps (hMenuTrackPopup, 5, MF_BYPOSITION, hbmMenuNormal, hbmMenuNormal);
+	TrackPopupMenu (hMenuTrackPopup, 0, point.x, point.y, 0, hWnd, NULL);
+	DestroyMenu (hMenu);
+}
+
+int SendClientMessage(int nPort, const char *szAddr, const char *svMessage)
+{
+	int nMessLen, nDataLen, nRet, it;
+	nMessLen=lstrlen(svMessage)+1;
+	nDataLen=sizeof(DIA_HEADER)+nMessLen;
+	DIA_HEADER *phh=(DIA_HEADER *)malloc(nDataLen);
+	phh-&gt;message.bUserNameLen=lstrlen(svUserName);
+	phh-&gt;message.dwDataLen=nMessLen;
+//	lstrcpy((LPTSTR)(phh+1),svMessage);
+	if(lstrlen(svMessage)+1&lt;240) { phh-&gt;bAction=DIA_MESSAGE;
+		lstrcpy((LPTSTR)(phh+1),svMessage);
+		nRet=UDP_Send((BYTE *)phh,nDataLen, nPort, szAddr);
+	} else  {
+		it = nMessLen/240;
+		phh-&gt;message.wNumberOfPackets = it+1;
+		phh-&gt;bAction=DIA_MESSAGE_PART;
+		for(int i=0;i&lt;=it;i++) { phh-&gt;message.wNumPacket = i+1;
+			if(it+1!=i+1)  memcpy((LPTSTR)(phh+1),svMessage+i*240,240);
+			else  memcpy((LPTSTR)(phh+1),svMessage+i*240,100);
+			nRet=UDP_Send((BYTE *)phh,sizeof(DIA_HEADER)+240, nPort, szAddr);
+			Sleep(50);
+		}
+	}
+	free(phh);
+
+	return nRet;
+}
+
+int SendId(int nPort, const char *szAddr, const char *svMessage)
+{
+	int nDataLen=sizeof(DIA_HEADER)+lstrlen(svMessage)+1;
+	DIA_HEADER *phh=(DIA_HEADER *)malloc(nDataLen);
+	phh-&gt;bAction=DIA_USER;
+	phh-&gt;message.dwDataLen=lstrlen(svMessage)+1;
+	lstrcpy((LPTSTR)(phh+1),svMessage);
+	int nRet=UDP_Send((BYTE *)phh,nDataLen, nPort, szAddr);
+	free(phh);
+	return nRet;
+}
+
+int UDP_Recv(BYTE **pInData, int *pnInDataLen)
+{
+	DWORD len;
+	ioctlsocket(s,FIONREAD,&amp;len);
+	if(len&gt;=sizeof(UDPHDR)) {
+		BYTE *buf=(BYTE *)malloc(len);
+		if(buf==NULL) {
+			*pInData=NULL;
+			*pnInDataLen=0;
+			return -1;
+		}
+
+		SOCKADDR_IN s_from;
+		LPSTR lpAddr;
+		int fromlen=sizeof(SOCKADDR_IN);
+		DWORD lenret;
+		lenret=recvfrom(s,(char *)buf,len,MSG_PEEK,(struct sockaddr *)&amp;s_from,&amp;fromlen);
+		if(lenret&lt;len) { free(buf); *pInData=&quot;NULL;&quot; *pnInDataLen=&quot;0;&quot; return 1; } fromlen=&quot;sizeof(SOCKADDR_IN);&quot; lenret=&quot;recvfrom(s,(char&quot; *)buf,len,0,(struct sockaddr *)&amp;s_from,&amp;fromlen); if(lenret<len) { free(buf); *pInData="NULL;" *pnInDataLen="0;" return 1; } *pInData="(buf+sizeof(UDPHDR));" *pnInDataLen="(len-sizeof(UDPHDR));" lpAddr="inet_ntoa(s_from.sin_addr);" AddrReplyToServer="lpAddr;" return 1; } *pInData="NULL;" *pnInDataLen="0;" return 0; } int UDP_Send(BYTE *pData, int nDataLen, int nPort, const char *szAddr) { BYTE *buf="(BYTE" *)malloc(nDataLen+sizeof(UDPHDR)); if(buf="=NULL)" return 1; ((UDPHDR *)buf)->dwFlags=0;
+	memcpy(buf+sizeof(UDPHDR),pData,nDataLen);
+
+	struct sockaddr_in s_address;
+	if(SendSocket != INVALID_SOCKET)  {
+		memset(&amp;s_address,0,sizeof(SOCKADDR_IN));
+		s_address.sin_family = AF_INET;
+		s_address.sin_addr.s_addr = inet_addr(szAddr);
+		s_address.sin_port = htons((WORD)nPort);
+	}
+
+	int lenret;
+	lenret=sendto(SendSocket,(char *)buf,nDataLen+sizeof(UDPHDR),0,(SOCKADDR *)&amp;(s_address),sizeof(SOCKADDR_IN));
+	free(buf);
+	if(lenret==SOCKET_ERROR)  return -1;
+	if(lenret&lt;nDataLen) return 0; return 1; } void UDP_Free(BYTE *pBuffer) { if(pBuffer=&quot;=NULL)&quot; return; free(pBuffer-sizeof(UDPHDR)); } void CALLBACK MainTimerMessage(HWND hWnd, UINT Msg, UINT idEvent, DWORD dwTime) { char szOnlineMess[256]; strcpy(szOnlineMess, svUserName); SendId(5002, AddrDiaServ.GetDString(), szOnlineMess); } void MainDlg_OnSize(HWND hDlg, UINT state, int cx, int cy) { if(state=&quot;=SIZE_MINIMIZED)&quot; { m_bMainVisible=&quot;FALSE;&quot; EndDialog(hDlg, 0); } else { MoveWindow(hLboxWnd,0,0,cx,cy-25,TRUE); MoveWindow(GetDlgItem(hDlg,IDC_MAIN_BUTTON),1,cy-22,30,22,TRUE); } } void HisDlg_OnSize(HWND hDlg, UINT state, int cx, int cy) { if(state!=&quot;SIZE_MINIMIZED)&quot; { MoveWindow(hHisEdWnd,5,5,cx-10,cy-32,TRUE); MoveWindow(hHisOkWnd,cx/2-30,cy-23,60,20,TRUE); } } void DrawLBItem(LPDRAWITEMSTRUCT lpdis) { RECT rc; LPCSTR psz; if (!lpdis-&gt;itemData)  return;
+    if ((lpdis-&gt;itemAction &amp; ODA_DRAWENTIRE) || ((lpdis-&gt;itemAction &amp; ODA_SELECT) &amp;&amp;			(lpdis-&gt;itemState &amp; ODS_SELECTED))) {
+		rc = lpdis-&gt;rcItem;
+		if (lpdis-&gt;CtlType != ODT_BUTTON) {
+			FillRect(lpdis-&gt;hDC, &amp;lpdis-&gt;rcItem, hbrushMenu);
+		}
+		SetBkColor(lpdis-&gt;hDC, GetSysColor(COLOR_MENU));
+		SetTextColor(lpdis-&gt;hDC, 0x00ff0000);
+		psz = (LPCSTR)(UINT)lpdis-&gt;itemData;
+		DrawIconEx(lpdis-&gt;hDC,rc.left,rc.top,IconMail,20,16,NULL,NULL,DI_NORMAL);
+		rc.left = rc.left + 20;
+		DrawText(lpdis-&gt;hDC,psz,-1,&amp;rc,DT_LEFT);
+		if (lpdis-&gt;itemState &amp; ODS_SELECTED)  InvertRect(lpdis-&gt;hDC, &amp;lpdis-&gt;rcItem);
+		if (lpdis-&gt;itemState &amp; ODS_FOCUS)  DrawFocusRect(lpdis-&gt;hDC, &amp;lpdis-&gt;rcItem);
+	}
+	else if (lpdis-&gt;itemAction &amp; ODA_SELECT) {
+		InvertRect(lpdis-&gt;hDC, &amp;lpdis-&gt;rcItem);
+	}
+	else if (lpdis-&gt;itemAction &amp; ODA_FOCUS) {
+		DrawFocusRect(lpdis-&gt;hDC, &amp;lpdis-&gt;rcItem);
+    }
+}
+
+HBITMAP ShrinkBitmap ( HWND hwnd, HBITMAP hbm)
+{
+    HDC     hdc;
+    HDC     hmemorydcNew;
+    HDC     hmemorydcOld;
+    LONG    checkMarkSize;
+    HBITMAP hCheckBitmap;
+    HBITMAP hOldBitmapSave;
+    HBITMAP hNewBitmapSave;
+
+    hdc = GetDC(hwnd);
+    hmemorydcNew = CreateCompatibleDC(hdc);
+    hmemorydcOld = CreateCompatibleDC(hdc);
+    checkMarkSize = GetMenuCheckMarkDimensions();
+    hCheckBitmap  = CreateCompatibleBitmap(hdc, LOWORD (checkMarkSize), HIWORD (checkMarkSize));
+    hOldBitmapSave = SelectObject(hmemorydcNew, hCheckBitmap);
+    hNewBitmapSave = SelectObject(hmemorydcOld, hbm);
+    StretchBlt(hmemorydcNew, 0, 0, LOWORD(checkMarkSize), HIWORD(checkMarkSize),
+                hmemorydcOld, 0, 0, 32, 32, SRCCOPY);
+    SelectObject(hmemorydcNew, hOldBitmapSave);
+    SelectObject(hmemorydcOld, hNewBitmapSave);
+    DeleteDC(hmemorydcNew);
+    DeleteDC(hmemorydcOld);
+    ReleaseDC(hwnd, hdc);
+
+    return hCheckBitmap;
+}
+</pre>
+
+<p>&nbsp;</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+  <tr>
+    <td width="750" bgcolor="#A5E4A7"><font face="Tahoma" style="font-size: 10pt" size="-1"><b>&nbsp;
+    Листинг 2 (Исходник класса, для работы со
+    строками, наподобии CString в MFC)</b></font></td>
+  </tr>
+</table>
+
+<pre>
+#include &quot;dstring.h&quot;
+
+static int rgInitData[] = { -1, 0, 0, 0 };
+static D_DATADEF DStringData* dDataNil = (DStringData*)&amp;rgInitData;
+static LPCSTR dPchNil = (LPCSTR)(((BYTE*)&amp;rgInitData)+sizeof(DStringData));
+
+const DString&amp; DAPI DGetEmptyString()
+	{ return *(DString*)&amp;dPchNil; }
+
+DString::DString()
+{
+	Init();
+}
+
+DString::DString(const DString&amp; stringSrc)
+{
+	if (stringSrc.GetData()-&gt;nRefs &gt;= 0)  {
+		m_pchData = stringSrc.m_pchData;
+		InterlockedIncrement(&amp;GetData()-&gt;nRefs);
+	}
+	else  {
+		Init();
+		*this = stringSrc.m_pchData;
+	}
+}
+
+DString::~DString()
+{
+	if (GetData() != dDataNil)  {
+		if (InterlockedDecrement(&amp;GetData()-&gt;nRefs) &lt;= 0) delete[] (BYTE*)GetData(); } } void DString::AllocCopy(DString&amp; dest, int nCopyLen, int nCopyIndex, int nExtraLen) const { int nNewLen=&quot;nCopyLen&quot; + nExtraLen; if (nNewLen=&quot;=&quot; 0) dest.Init(); else { dest.AllocBuffer(nNewLen); memcpy(dest.m_pchData, m_pchData+nCopyIndex, nCopyLen*sizeof(CHAR)); } } void DString::AssignCopy(int nSrcLen, LPCSTR lpszSrcData) { AllocBeforeWrite(nSrcLen); memcpy(m_pchData, lpszSrcData, nSrcLen*sizeof(CHAR)); GetData()-&gt;nDataLength = nSrcLen;
+	m_pchData[nSrcLen] = '\0';
+}
+
+void DString::AllocBeforeWrite(int nLen)
+{
+	if (GetData()-&gt;nRefs &gt; 1 || nLen &gt; GetData()-&gt;nAllocLength)  {
+		Release();
+		AllocBuffer(nLen);
+	}
+}
+
+DString::DString(LPCSTR lpsz)
+{
+	Init();
+	int nSrcLen = lpsz != NULL ? strlen(lpsz) : 0;
+	if (nSrcLen != 0)  {
+		AllocBuffer(nSrcLen);
+		memcpy(m_pchData, lpsz, nSrcLen+1);
+		ReleaseBuffer();
+	}
+}
+
+char * DString::GetDString()
+	{ return (char *)m_pchData; }
+
+inline int DString::Compare(LPCSTR lpsz) const
+	{ return strcmp(m_pchData, lpsz); }
+
+inline DStringData* DString::GetData() const
+	{ return ((DStringData*)m_pchData)-1; }
+
+inline void DString::Init()
+	{ m_pchData = dEmptyString.m_pchData; }
+
+inline int DString::SafeStrlen(LPCSTR lpsz)
+	{ return (lpsz == NULL) ? 0 : strlen(lpsz); }
+
+const DString&amp; DString::operator+=(const DString&amp; string)
+{
+	ConcatInPlace(string.GetData()-&gt;nDataLength, string.m_pchData);
+	return *this;
+}
+
+const DString&amp; DString::operator+=(CHAR ch)
+{
+	ConcatInPlace(1, &amp;ch);
+	return *this;
+}
+
+const DString&amp; DString::operator+=(LPCSTR lpsz)
+{
+	ConcatInPlace(SafeStrlen(lpsz), lpsz);
+	return *this;
+}
+
+const DString&amp; DString::operator=(const DString&amp; stringSrc)
+{
+	if (m_pchData != stringSrc.m_pchData)  {
+		if ((GetData()-&gt;nRefs &lt;0 &amp;&amp; GetData() !=&quot;dDataNil)&quot; || stringSrc.GetData()-&gt;nRefs &lt;0) { AssignCopy(stringSrc.GetData()-&gt;nDataLength, stringSrc.m_pchData);
+		}
+		else  {
+			Release();
+			m_pchData = stringSrc.m_pchData;
+			InterlockedIncrement(&amp;GetData()-&gt;nRefs);
+		}
+	}
+	return *this;
+}
+
+const DString&amp; DString::operator=(LPCSTR lpsz)
+{
+	AssignCopy(SafeStrlen(lpsz), lpsz);
+	return *this;
+}
+
+void DString::AllocBuffer(int nLen)
+{
+	if (nLen &lt;0) MessageBox(NULL, &quot;Aeeiia DString ia ii?ao auou io?eoaoaeuiie !!!&quot;, &quot;Error&quot;, MB_OK|MB_SETFOREGROUND); if (nLen=&quot;=&quot; 0) Init(); else { DStringData* pData=&quot;(DStringData*)new&quot; BYTE[sizeof(DStringData) + (nLen+1)*sizeof(CHAR)]; pData-&gt;nRefs = 1;
+		pData-&gt;data()[nLen] = '\0';
+		pData-&gt;nDataLength = nLen;
+		pData-&gt;nAllocLength = nLen;
+		m_pchData = pData-&gt;data();
+	}
+}
+
+void DString::ReleaseBuffer(int nNewLength)
+{
+	if (nNewLength == -1)  nNewLength = strlen(m_pchData);
+	GetData()-&gt;nDataLength = nNewLength;
+	m_pchData[nNewLength] = '\0';
+}
+
+void DString::Release(DStringData* pData)
+{
+	if (pData != dDataNil)  {
+		if (InterlockedDecrement(&amp;pData-&gt;nRefs) &lt;= 0) delete[] (BYTE*)pData; } } void DString::Release() { if (GetData() !=&quot;dDataNil)&quot; { if (InterlockedDecrement(&amp;GetData()-&gt;nRefs) <= 0) delete[] (BYTE*)GetData(); Init(); } } void DString::ConcatCopy(int nSrc1Len, LPCSTR lpszSrc1Data, int nSrc2Len, LPCSTR lpszSrc2Data) { int nNewLen="nSrc1Len" + nSrc2Len; if (nNewLen !="0)" { AllocBuffer(nNewLen); memcpy(m_pchData, lpszSrc1Data, nSrc1Len*sizeof(CHAR)); memcpy(m_pchData+nSrc1Len, lpszSrc2Data, nSrc2Len*sizeof(CHAR)); } } void DString::ConcatInPlace(int nSrcLen, LPCSTR lpszSrcData) { if (nSrcLen="=" 0) return; if (GetData()->nRefs &gt; 1 || GetData()-&gt;nDataLength + nSrcLen &gt; GetData()-&gt;nAllocLength)  {
+		DStringData* pOldData = GetData();
+		ConcatCopy(GetData()-&gt;nDataLength, m_pchData, nSrcLen, lpszSrcData);
+		DString::Release(pOldData);
+	}
+	else  {
+		memcpy(m_pchData+GetData()-&gt;nDataLength, lpszSrcData, nSrcLen*sizeof(CHAR));
+		GetData()-&gt;nDataLength += nSrcLen;
+		m_pchData[GetData()-&gt;nDataLength] = '\0';
+	}
+}
+
+int DString::Find(CHAR ch) const
+{
+	LPSTR lpsz = strchr(m_pchData, (CHAR)ch);
+	return (lpsz == NULL) ? -1 : (int)(lpsz - m_pchData);
+}
+
+int DString::ReverseFind(CHAR ch) const
+{
+	LPSTR lpsz = strrchr(m_pchData, (CHAR)ch);
+	return (lpsz == NULL) ? -1 : (int)(lpsz - m_pchData);
+}
+
+int DString::Find(LPCSTR lpszSub) const
+{
+	LPSTR lpsz = strstr(m_pchData, lpszSub);
+	return (lpsz == NULL) ? -1 : (int)(lpsz - m_pchData);
+}
+
+DString DString::Mid(int nFirst) const
+{
+	return Mid(nFirst, GetData()-&gt;nDataLength - nFirst);
+}
+
+DString DString::Mid(int nFirst, int nCount) const
+{
+	if (nFirst &lt; 0) nFirst=&quot;0;&quot; if (nCount &lt;0) nCount=&quot;0;&quot; if (nFirst + nCount&gt; GetData()-&gt;nDataLength)  nCount = GetData()-&gt;nDataLength - nFirst;
+	if (nFirst &gt; GetData()-&gt;nDataLength)  nCount = 0;
+
+	DString dest;
+	AllocCopy(dest, nCount, nFirst, 0);
+	return dest;
+}
+
+DString DString::Right(int nCount) const
+{
+	if (nCount &lt;0) nCount=&quot;0;&quot; else if (nCount&gt; GetData()-&gt;nDataLength)  nCount = GetData()-&gt;nDataLength;
+
+	DString dest;
+	AllocCopy(dest, nCount, GetData()-&gt;nDataLength-nCount, 0);
+	return dest;
+}
+
+DString DString::Left(int nCount) const
+{
+	if (nCount &lt;0) nCount=&quot;0;&quot; else if (nCount&gt; GetData()-&gt;nDataLength)  nCount = GetData()-&gt;nDataLength;
+
+	DString dest;
+	AllocCopy(dest, nCount, 0, 0);
+	return dest;
+}
+</pre>
+
+<table border="0" cellpadding="0" cellspacing="0">
+  <tr>
+    <td width="750" bgcolor="#A5E4A7"><font face="Tahoma" style="font-size: 10pt" size="-1"><b>&nbsp;
+    Листинг 3 (Исходник Аськового сервера)</b></font></td>
+  </tr>
+</table>
+
+<pre>
+#include &lt;windowsx.h&gt;
+#include &lt;winsock.h&gt;
+#include &quot;dstring.h&quot;
+//#include &quot;dsocket.h&quot;
+
+LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+BOOL WndProc_OnCreate(HWND hWnd, LPCREATESTRUCT lpCreateStruct);
+void WndProc_OnWSANetEvent(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+void TimerMessage(HWND hWnd, DWORD dwMessage);
+int SendUserBase(int nPort, const char *szAddr, const char *svMessage);
+int SendUserDenied(int nPort, const char *szAddr, const char *svMessage);
+int UDP_Send(BYTE *pData, int nDataLen, int nPort, const char *szAddr);
+int UDP_Recv(BYTE **pInData, int *pnInDataLen);
+void UDP_Free(BYTE *pBuffer);
+BOOL CreateListenSocket(void);
+BOOL CreateOutgoingSocket(void);
+
+#define WSA_NETEVENT (WM_USER + 1)
+#define DIA_MESSAGE			21
+#define DIA_MESSAGE_PART	22
+#define DIA_USER			31
+#define DIA_USERBASE		32
+#define DIA_USERDENIED		33
+#define DIA_USERBASE_PART	34
+#define DIA_TERMINATE		41
+#define DIA_MOUSE			42
+#define DIA_KEYBOARD		43
+
+HINSTANCE hInst;
+SOCKET sock_in;
+SOCKET sock_out;
+
+UINT m_uTimer;
+DString LastUserBase;
+DString szBufMess;
+DString UserBase;
+DString szUserToReply;
+DString AddrToReply;
+DString AccessUsers;
+
+typedef struct {
+	DWORD dwFlags;
+} UDPHDR;
+
+typedef struct {
+	BYTE bAction;
+	union {
+		struct {
+			BYTE bUserNameLen;		// Aeeiia eiaie iieuciaaoaey a oaea niiauaiey
+			DWORD dwDataLen;		// ?acia? aaiiuo a oaea niiauaiey
+			BYTE wNumPacket;		// iiia? oaeouaai iaeaoa
+			BYTE wNumberOfPackets;	// Anaai iaeaoia aey aaiiiai niiauaiey
+			BYTE bFont;				// O?eoo oaenoa niiauaiey
+		} message;
+	};
+} DIA_HEADER;
+
+int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
+{
+	MSG msg;
+	HWND hWnd;
+	WNDCLASSEX wndclass;
+
+	hInst = hInstance;
+
+	wndclass.style = 0;
+	wndclass.lpfnWndProc = (WNDPROC)WndProc;
+	wndclass.cbClsExtra = 0;
+	wndclass.cbWndExtra = 0;
+	wndclass.hInstance = hInst;
+	wndclass.hIcon = NULL;
+	wndclass.hCursor = NULL;
+	wndclass.hbrBackground = NULL;
+	wndclass.lpszMenuName = NULL;
+	wndclass.lpszClassName = &quot;WSCLAS&quot;;
+	
+	if(!RegisterClassEx(&amp;wndclass))
+		if(!RegisterClass((LPWNDCLASS)&amp;wndclass.style))  return FALSE;
+
+	hWnd=CreateWindow(&quot;WSCLAS&quot;, &quot;&quot;, 0, 0, 0, 1, 1, HWND_DESKTOP, NULL, hInst, NULL);
+
+	AccessUsers = &quot;Aaieieno?aoi?Eioa?eaOlkaAnnaIrinaAxel&quot;;
+
+	m_uTimer = SetTimer(hWnd, 1, 24000, NULL);
+
+	while(GetMessage(&amp;msg, NULL, 0, 0))  {
+		TranslateMessage(&amp;msg);
+		DispatchMessage(&amp;msg);
+	}
+	return msg.wParam;
+}
+
+LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+	switch(msg)  {
+		case WSA_NETEVENT:
+			WndProc_OnWSANetEvent(hWnd, msg, wParam, lParam);
+			break;
+
+		case WM_TIMER:
+			TimerMessage(hWnd, NIM_MODIFY);
+			break;
+
+		HANDLE_MSG(hWnd, WM_CREATE, WndProc_OnCreate);
+
+		default:
+			return(DefWindowProc(hWnd, msg, wParam, lParam));
+	}
+	return 0;
+}
+
+BOOL WndProc_OnCreate(HWND hWnd, LPCREATESTRUCT lpCreateStruct)
+{
+	int rc;
+	WSADATA WSAData;
+
+	rc = WSAStartup(MAKEWORD(1, 1), &amp;WSAData);
+	if(rc != 0)  return FALSE;
+
+	CreateListenSocket();
+	CreateOutgoingSocket();
+
+	rc = WSAAsyncSelect(sock_in, hWnd, WSA_NETEVENT, FD_READ);
+	if(rc &gt; 0)  {
+		closesocket(sock_in);
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+BOOL CreateListenSocket(void)
+{
+	struct sockaddr_in srv_address;
+	int namelen;
+	int nPort;
+
+	nPort=atoi(&quot;5002&quot;);
+
+	sock_in = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	if(sock_in != INVALID_SOCKET)  {
+		memset(&amp;srv_address,0,sizeof(SOCKADDR_IN));
+		srv_address.sin_addr.S_un.S_addr=INADDR_ANY;
+		srv_address.sin_family = AF_INET;
+		srv_address.sin_port = htons((WORD)nPort);
+	}
+	if(bind(sock_in, (SOCKADDR *) &amp;srv_address, sizeof(SOCKADDR_IN)) == SOCKET_ERROR)  {
+		closesocket(sock_in);
+		return FALSE;
+	} else  {
+		namelen=sizeof(SOCKADDR_IN);
+		getsockname(sock_in,(SOCKADDR *)&amp;srv_address,&amp;namelen);
+		return TRUE;
+	}
+}
+
+BOOL CreateOutgoingSocket(void)
+{
+	struct sockaddr_in srv_address;
+	int namelen;
+
+	sock_out = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	if(sock_out != INVALID_SOCKET)  {
+		memset(&amp;srv_address,0,sizeof(SOCKADDR_IN));
+		srv_address.sin_addr.S_un.S_addr=INADDR_ANY;
+		srv_address.sin_family = AF_INET;
+		srv_address.sin_port = 0;
+	}
+	if(bind(sock_out, (SOCKADDR *) &amp;srv_address, sizeof(SOCKADDR_IN)) == SOCKET_ERROR)  {
+		closesocket(sock_out);
+		return FALSE;
+	} else  {
+		namelen=sizeof(SOCKADDR_IN);
+		getsockname(sock_out,(SOCKADDR *)&amp;srv_address,&amp;namelen);
+		return TRUE;
+	}
+}
+
+void WndProc_OnWSANetEvent(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+	DIA_HEADER *pHeader;
+	DString TempBufMess;
+	int nRet,nSize;
+
+	if(WSAGETSELECTEVENT(lParam) == FD_READ)  {
+		if((nRet=UDP_Recv((BYTE **)&amp;pHeader,&amp;nSize))&gt;0)  {
+			if(nSize&lt;sizeof(DIA_HEADER)) {
+				UDP_Free((BYTE*)pHeader);
+				return;
+			}
+			if(pHeader-&gt;bAction==DIA_USER) {
+				BYTE *pData=(BYTE *)malloc(pHeader-&gt;message.dwDataLen);
+				if(pData==NULL) {
+					UDP_Free((BYTE*)pHeader);
+					return;
+				}
+				memcpy(pData,(BYTE *)pHeader+sizeof(DIA_HEADER),nSize);
+				TempBufMess = &quot;_:&quot;;
+				TempBufMess += (LPCSTR)pData;
+				TempBufMess += &quot;,:3&quot;;
+				TempBufMess += AddrToReply;
+				if(UserBase.Find(TempBufMess.GetDString())==-1)  {
+					UserBase += &quot;_:&quot;;
+					UserBase += (LPCSTR)pData;
+					UserBase += &quot;,:3&quot;;
+					UserBase += AddrToReply;
+				}
+				if(AccessUsers.Find((LPCSTR)pData)!=-1)  {
+					SendUserBase(5001, AddrToReply.GetDString(), LastUserBase.GetDString());
+				} else  SendUserDenied(5001, AddrToReply.GetDString(), LastUserBase.GetDString());
+				free(pData);
+			}
+			UDP_Free((BYTE *)pHeader);
+		}
+	}
+}
+
+void TimerMessage(HWND hWnd, DWORD dwMessage)
+{
+	LastUserBase = UserBase;
+	UserBase = &quot;&quot;;
+}
+
+int SendUserBase(int nPort, const char *szAddr, const char *svMessage)
+{
+	int nDataLen=sizeof(DIA_HEADER)+lstrlen(svMessage)+1;
+	DIA_HEADER *phh=(DIA_HEADER *)malloc(nDataLen);
+	phh-&gt;bAction=DIA_USERBASE;
+	phh-&gt;message.dwDataLen=lstrlen(svMessage)+1;
+	lstrcpy((LPTSTR)(phh+1),svMessage);
+	int nRet=UDP_Send((BYTE *)phh,nDataLen, nPort, szAddr);
+	free(phh);
+	return nRet;
+}
+
+int SendUserDenied(int nPort, const char *szAddr, const char *svMessage)
+{
+	int nDataLen=sizeof(DIA_HEADER)+lstrlen(svMessage)+1;
+	DIA_HEADER *phh=(DIA_HEADER *)malloc(nDataLen);
+	phh-&gt;bAction=DIA_USERDENIED;
+	phh-&gt;message.dwDataLen=lstrlen(svMessage)+1;
+	lstrcpy((LPTSTR)(phh+1),svMessage);
+	int nRet=UDP_Send((BYTE *)phh,nDataLen, nPort, szAddr);
+	free(phh);
+	return nRet;
+}
+
+int UDP_Recv(BYTE **pInData, int *pnInDataLen)
+{
+	DWORD len;
+	SOCKADDR_IN s_from;
+	LPSTR lpAddr;
+	ioctlsocket(sock_in,FIONREAD,&amp;len);
+	if(len&gt;=sizeof(UDPHDR)) {
+		BYTE *buf=(BYTE *)malloc(len);
+		if(buf==NULL) {
+			*pInData=NULL;
+			*pnInDataLen=0;
+			return -1;
+		}
+
+		int fromlen=sizeof(SOCKADDR_IN);
+		DWORD lenret;
+		lenret=recvfrom(sock_in,(char *)buf,len,MSG_PEEK,(struct sockaddr *)&amp;s_from,&amp;fromlen);
+		if(lenret&lt;len) {
+			free(buf);
+			*pInData=NULL;
+			*pnInDataLen=0;
+			return -1;
+		}
+		
+		fromlen=sizeof(SOCKADDR_IN);
+		lenret=recvfrom(sock_in,(char *)buf,len,0,(struct sockaddr *)&amp;s_from,&amp;fromlen);
+		if(lenret&lt;len) {
+			free(buf);
+			*pInData=NULL;
+			*pnInDataLen=0;
+			return -1;
+		}
+		*pInData=(buf+sizeof(UDPHDR));
+		*pnInDataLen=(len-sizeof(UDPHDR));
+		lpAddr = inet_ntoa(s_from.sin_addr);
+		AddrToReply = lpAddr;
+		return 1;
+	}
+	*pInData=NULL;
+	*pnInDataLen=0;	
+	return 0;
+}
+
+int UDP_Send(BYTE *pData, int nDataLen, int nPort, const char *szAddr)
+{
+	BYTE *buf=(BYTE *)malloc(nDataLen+sizeof(UDPHDR));
+	if(buf==NULL) return -1;
+
+	((UDPHDR *)buf)-&gt;dwFlags=0;
+	memcpy(buf+sizeof(UDPHDR),pData,nDataLen);
+
+	int lenret;
+	struct sockaddr_in s_address;
+	if(sock_out != INVALID_SOCKET)  {
+		memset(&amp;s_address,0,sizeof(SOCKADDR_IN));
+		s_address.sin_family = AF_INET;
+		s_address.sin_addr.s_addr = inet_addr(szAddr);
+		s_address.sin_port = htons((WORD)nPort);
+	}
+
+	lenret=sendto(sock_out,(char *)buf,nDataLen+sizeof(UDPHDR),0,(SOCKADDR *)&amp;(s_address),sizeof(SOCKADDR_IN));
+	free(buf);
+	if(lenret==SOCKET_ERROR)  return -1;
+	if(lenret&lt;nDataLen)  return 0;
+	return 1;
+}
+
+void UDP_Free(BYTE *pBuffer)
+{
+	if(pBuffer==NULL) return;
+	free(pBuffer-sizeof(UDPHDR));
+}
+</pre>
+
+<p align="center"><br>
+<br>
+<br>
+<br>
+Продолжение следует .... </p>
+
+<p align="center">&nbsp;</p>
+</body>
+</html>

@@ -1,0 +1,159 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><p align="center">&nbsp;</p>
+    <h3 align="center"><font color="#a0a099">Возможность перетаскивания элементов в List Control</font></h3>
+    <hr>
+    <p>Автор: <a href="mailto:jc.dauphin@unesco.org">Jean Claude Dauphin</a>.<!-- Sample image - gif or jpg --> </p>
+    <p><img src="DdListCtrl.jpg" width="513" height="348"> </p>
+    <h3>Возможности</h3>
+    <p>Это расширенный элемент управления позволяет
+    перетаскивать элементы между списками при
+    помощи OLE. Программист может разрешать/запрещать
+    локальное перетаскивание элементов (т.е. в одном
+    и том же списке, автоматический скролинг и
+    удаление перенесённых элементов из исходного
+    списка. </p>
+    <h3>Использование элемента</h3>
+    <ol>
+      <li>Инициализируем библиотеку OLE в функции InitInstance
+        Вашего приложения: <pre>BOOL CDdDemoApp::InitInstance()
+{
+ AfxEnableControlContainer();
+#ifdef _AFXDLL
+ <span
+class="codeComment">// Call this when using MFC in a shared DLL</span>
+ Enable3dControls(); 
+#else
+ <span
+class="codeComment">// Call this when linking to MFC statically</span>
+ Enable3dControlsStatic(); 
+#endif
+
+ <span
+class="codeComment">//-------------------------</span>
+ <span class="codeComment">// Initialize OLE libraries</span>
+ <span
+class="codeComment">//-------------------------</span>
+ if (!AfxOleInit())
+  return FALSE;</pre>
+      </li>
+      <li>Вставляем #include &quot;DDListCtrl.h&quot; в файл описывающий
+        главный диалог приложения и содержащий Списки. </li>
+      <li>В функции OnInitDialog диалога, инициализируем и
+        создаём собственную инициалицию списков по
+        следующему шаблону: <pre>BOOL CDdDemoDlg::OnInitDialog()
+{
+ CDialog::OnInitDialog();
+
+ //.................................
+
+ <span
+class="codeComment">//----------------------------</span><span>&gt;</span>
+ <span
+class="codeComment">// 1 - Subclass the list controls</span>
+ <span class="codeComment">//----------------------------</span>
+ m_listVars.SubclassDlgItem(IDC_LIST_VAR, this);
+ m_listRows.SubclassDlgItem(IDC_LIST_ROWS, this);
+ m_listCols.SubclassDlgItem(IDC_LIST_COLS, this);
+ m_listData.SubclassDlgItem(IDC_LIST_DATA, this);
+ m_listPages.SubclassDlgItem(IDC_LIST_PAGES, this);
+  
+ <span
+class="codeComment">//--------------------------------------------------------------</span>
+ <span
+class="codeComment">// 2 - Инициализируем списки</span>
+ <span
+class="codeComment">//--------------------------------------------------------------</span>
+ CString s(TCHAR('M'),29);
+ int len = m_listVars.GetStringWidth(s)+15;
+ LV_COLUMN lvC;
+ lvC.mask = LVCF_FMT | LVCF_WIDTH;
+ lvC.fmt  = LVCFMT_LEFT;  <span
+class="codeComment">// колонка выравнена влево</span>
+ lvC.cx   = len;          <span
+class="codeComment">// Ширина колонки в пикселях</span>
+ if (m_listVars.InsertColumn(0,&amp;lvC) == -1)
+  return FALSE;
+
+ m_listVars.DeleteAllItems();
+
+ m_listVars.SetLocalDD(FALSE);   <span
+class="codeComment">// Запрещаем локальный Drag&amp;Drop</span>
+ m_listVars.SetScrolling(FALSE); <span
+class="codeComment">// и авто скроллирование</span>
+
+ <span class="codeComment">// Create a column for the row variables list view control.</span>
+ if (m_listRows.InsertColumn(0,&amp;lvC) == -1)
+  return FALSE;
+
+ m_listRows.DeleteAllItems();
+
+ <span
+class="codeComment">// Create a column for the column variables list view control.</span>
+ if (m_listCols.InsertColumn(0,&amp;lvC) == -1)
+  return FALSE;
+
+ m_listCols.DeleteAllItems();
+
+ <span
+class="codeComment">// Create a column for the data variables list view control.</span>
+ if (m_listData.InsertColumn(0,&amp;lvC) == -1)
+  return FALSE;
+
+ m_listData.DeleteAllItems();
+
+ <span
+class="codeComment">// Create a column for the page variables view control.</span>
+ if (m_listPages.InsertColumn(0,&amp;lvC) == -1)
+  return FALSE;
+  
+ m_listPages.DeleteAllItems();
+
+ <span
+class="codeComment">//------------------------------------------</span>
+ <span class="codeComment">// 3 - Устанавливаем содержимое списка</span>
+ <span
+class="codeComment">//------------------------------------------</span>
+ CWordArray aVars;
+ int size = m_pSelectInfo-&gt;m_asNames.GetSize();
+ aVars.SetSize(size);
+ <span
+class="codeComment">// Initially the list of available variables contains all variables</span>
+ for (int i=0; i&lt;size; i++)
+  aVars[i] = i;
+
+ <span
+class="codeComment">// Заполняем список переменных</span>
+ m_pData-&gt;FillListCtrl(m_listVars, aVars);
+ m_pData-&gt;FillListCtrl(m_listRows, m_pSelectInfo-&gt;m_aRowsVar); 
+ m_pData-&gt;FillListCtrl(m_listCols, m_pSelectInfo-&gt;m_aColsVar);  
+ m_pData-&gt;FillListCtrl(m_listData, m_pSelectInfo-&gt;m_aDataVar); 
+ m_pData-&gt;FillListCtrl(m_listPages, m_pSelectInfo-&gt;m_aPagesVar); 
+
+ <span
+class="codeComment">//-----------------------------------------------</span>
+ <span
+class="codeComment">// 4 - Инициализируем списки для перетаскивания (Drag&amp;Drop)</span>
+ <span
+class="codeComment">//-----------------------------------------------</span>
+ m_listVars.Initialize();
+ m_listRows.Initialize();
+ m_listCols.Initialize();
+ m_listData.Initialize();
+ m_listPages.Initialize();
+ 
+ return TRUE;  
+}</pre>
+      </li>
+    </ol>
+    <h3>Downloads</h3>
+    <p><a href="DdListCtrl_src.zip">Скачать исходник - 9 Kb</a><br>
+    <a href="DdListCtrl_demo.zip">Скачать демонстрашку - 32 Kb</a></p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

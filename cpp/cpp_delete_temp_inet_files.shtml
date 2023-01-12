@@ -1,0 +1,112 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3 align="center"><font color="#a0a099">Удаляем Temporary Internet Files </font></h3>
+    <hr>
+    <p>Автор: <a href="mailto:get_job_done@yahoo.com">Peter Sun</a>.</p>
+    <p>От Автора: В IE5, Вы можете удалить Temporary Internet Files в
+    &quot;Internet Options&quot; на закладке &quot;Свойства&quot;. А Вам
+    никогда не хотелось, чтобы удалением Temporary Internet
+    Files занималось Ваше приложение? Данный пример
+    показывает - как это можно сделать с помощью WinInet
+    API-функций: FindFirstUrlCacheEntry, FindNextUrlCacheEntry, DeleteUrlCacheEntry, и
+    FindCloseUrlCache. </p>
+    <p>Они не документированы, но я попробовал, и они
+    работают в VC++ 6.0 на Win98/NT. </p>
+    <pre><font color="#990000"><tt>
+#include &lt;wininet.h&gt;
+//
+// Удаление всех файлов в папке Temporary Internet Files
+// 
+// Внимание, данный пример не удаляет Кукисы
+// [смотри if (!(lpCacheEntry-&gt;CacheEntryType &amp; COOKIE_CACHE_ENTRY))]
+// 
+BOOL DelTempFiles() 
+{
+    BOOL bResult = FALSE;
+    BOOL bDone = FALSE;
+    LPINTERNET_CACHE_ENTRY_INFO lpCacheEntry = NULL;  
+ 
+    DWORD  dwTrySize, dwEntrySize = 4096; // размер буфера    
+    HANDLE hCacheDir = NULL;    
+    DWORD  dwError = ERROR_INSUFFICIENT_BUFFER;
+    
+    do 
+    {                               
+        switch (dwError)
+        {
+            // need a bigger buffer
+            case ERROR_INSUFFICIENT_BUFFER: 
+                delete [] lpCacheEntry;            
+                lpCacheEntry = (LPINTERNET_CACHE_ENTRY_INFO) new char[dwEntrySize];
+                lpCacheEntry-&gt;dwStructSize = dwEntrySize;
+                dwTrySize = dwEntrySize;
+                BOOL bSuccess;
+                if (hCacheDir == NULL)                
+                  
+                    bSuccess = (hCacheDir 
+                      = FindFirstUrlCacheEntry(NULL, lpCacheEntry,
+                      &amp;dwTrySize)) != NULL;
+                else
+                    bSuccess = FindNextUrlCacheEntry(hCacheDir, lpCacheEntry, &amp;dwTrySize);
+
+                if (bSuccess)
+                    dwError = ERROR_SUCCESS;    
+                else
+                {
+                    dwError = GetLastError();
+                    dwEntrySize = dwTrySize; // возвращаем новый размер буфера
+                }
+                break;
+
+             // уже всё удалено
+            case ERROR_NO_MORE_ITEMS:
+                bDone = TRUE;
+                bResult = TRUE;                
+                break;
+
+             // если нет ошибок
+            case ERROR_SUCCESS:                       
+        
+                // кукисы не удалять
+                if (!(lpCacheEntry-&gt;CacheEntryType &amp; COOKIE_CACHE_ENTRY))                
+                   
+                 DeleteUrlCacheEntry(lpCacheEntry-&gt;lpszSourceUrlName);
+                    
+                // Удаляем следующий элемент
+                dwTrySize = dwEntrySize;
+                if (FindNextUrlCacheEntry(hCacheDir, lpCacheEntry, &amp;dwTrySize))
+                    dwError = ERROR_SUCCESS;          
+     
+                else
+                {
+                    dwError = GetLastError();
+                    dwEntrySize = dwTrySize; // возвращаем новый размер буфера
+                }                    
+                break;
+
+            // по умолчанию
+            default:
+                bDone = TRUE;                
+                break;
+        }
+
+        if (bDone)
+        {   
+            delete [] lpCacheEntry; 
+            if (hCacheDir)
+                FindCloseUrlCache(hCacheDir);         
+                                  
+        }
+    } while (!bDone);
+    return bResult;
+}
+</tt></font></pre>
+    </td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

@@ -1,0 +1,1942 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <font FACE="Arial" SIZE="4"><b><p>Даниель А. Нортон. Драйверы
+    устройств в системе WINDOWS</b></font><font FACE="Times New Roman"
+    SIZE="2"></p>
+    <p>Драйверы устройств, как правило, - наиболее
+    критическая часть</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">программного обеспечения
+    компьютеров. По иронии судьбы это также и</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">наиболее скрытая
+    часть разработки программного обеспечения.
+    Драйверы</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">устройств
+    системы Windows фирмы Microsoft не являются исключением.</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">Если вы когда-либо
+    писали обычное приложение в системе Windows, то</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">вам известно, что
+    требуется определенное количество скрытых
+    способов,</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">чтобы
+    приложение работало надежно. Как подмножество
+    приложений</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">Windows,
+    драйверы устройств системы Windows следуют этому же
+    правилу.</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">В
+    данной статье автор рассматривает работающий
+    драйвер устройства,</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">который обеспечивает доступ к
+    портам ввода-вывода и обрабатывает</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">прерывания, и виртуальный
+    драйвер устройства (VxD), который имитирует</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">технические
+    средства. Предполагается, что читатель знает
+    основы</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">программирования
+    в системе Windows, включая библиотеки динамической</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">связи (dynamic link libraries
+    - DLLs).</font><font FACE="Arial"><i><b></p>
+    <p>Устройство</b></i></font><font FACE="Times New Roman" SIZE="2"></p>
+    <p ALIGN="JUSTIFY">Рассматриваемое устройство - это не
+    часть технических средств,</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">которая была разработана, чтобы
+    продемонстрировать, как писать</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">драйвер устройства в системе
+    Windows. Скорее, это виртуальное</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">устройство, полностью
+    реализованное в программном обеспечении.</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">Программа-пример
+    выполняется только с виртуальным устройством,</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">которое автор
+    определил работая с системой Windows в расширенном</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">режиме (Enhanced mode)
+    процессора 386, и при условии, что установлен</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">виртуальный
+    драйвер устройства (VxD). Далее в статье более
+    детально</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">будет
+    описан исходный код для этого устройства. На
+    данный момент</font><font SIZE="2"> </font><font FACE="Times New Roman"
+    SIZE="2">следует знать, что устройство имеет два
+    порта: порт состояния и порт</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">управления, оба на одном и том
+    же адресе. На рис. 1 показаны биты,</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">используемые в порте состояния.
+    Бит 2 указывает, что имела место</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">ошибка устройства, бит 1
+    показывает, что запрос на прерывание</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">является отложенным, а бит 0
+    указывает, что устройство занято. Бит 7</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">говорит о том, что
+    устройство есть в наличии. В этом случае данный</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">бит равен нулю.
+    Если же устройство не установлено или к нему нет</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">доступа, то бит
+    принимает значение, равное 1.</font><font FACE="Courier New"
+    SIZE="2"></p>
+    <p>+--------------------------------------------------------+</p>
+    <p>| 7 6...3 2 1 0 |</p>
+    <p>+---------+-------------------+---------+-------+--------+</p>
+    <p>| PRESENT | | ERROR | IRQ | BUSY |</p>
+    <p>+---------+-------------------+---------+-------+--------+</p>
+    <p>PRESENT - устройство есть в наличии;</p>
+    <p>ERROR - произошла ошибка устройства;</p>
+    <p>IRQ - прерывание отложено;</p>
+    <p>BUSY - устройство занято.</font><font FACE="Times New Roman" SIZE="2"></p>
+    <p>(Остальные биты игнорируются для дальнейшей
+    совместимости.)</font><font FACE="Courier New" SIZE="2"></p>
+    <p><i>Рис. 1. Биты порта состояния устройства</i></font><font
+    FACE="Times New Roman" SIZE="2"></p>
+    <p ALIGN="JUSTIFY">На рис. 2 показаны биты, используемые в
+    порте управления. Бит 1</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">указывает устройству, что ЦПУ
+    закончило обработку прерывания. Бит 0</font><font SIZE="2">
+    </font><font FACE="Times New Roman" SIZE="2">показывает, что
+    устройство может начать обработку ввода-вывода.
+    (В</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">данный
+    момент не следует заострять внимание на том, что
+    фактически</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">устройство
+    делает. Вместо этого, необходимо уделить
+    внимание тому,</font><font SIZE="2"> </font><font FACE="Times New Roman"
+    SIZE="2">как написать драйвер для такого устройства,
+    которое обеспечивает</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">аппаратные прерывания.)</font><font
+    FACE="Courier New" SIZE="2"></p>
+    <p>+--------------------------------------------------------+</p>
+    <p>| 7...2 1 0 |</p>
+    <p>+---------------------------------------+-------+--------+</p>
+    <p>| 1 1 1 1 1 1 | EOI | START |</p>
+    <p>+---------------------------------------+-------+--------+</p>
+    <p>EOI - сигнал для устройства, подтверждающий прием
+    прерывания;</p>
+    <p>START - сигнал для устройства начинать пересылку
+    ввода-вывода.</font><font FACE="Times New Roman" SIZE="2"></p>
+    <p>(Остальные биты должны быть установлены в 1 для
+    дальнейшей</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">совместимости.)</font><font
+    FACE="Courier New" SIZE="2"></p>
+    <p><i>Рис. 2. Биты порта управления устройства</font><font
+    FACE="Arial"><b></p>
+    <p>Драйвер устройства в системе MS-DOS</b></font></i><font
+    FACE="Times New Roman" SIZE="2"></p>
+    <p ALIGN="JUSTIFY">На листинге 1 показана программа
+    dostest.asm, представляющая</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">собой обычный драйвер
+    устройства для системы MS-DOS, который общается</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">с устройством.
+    Несмотря на простоту и малый размер данная
+    программа</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">содержит
+    основные компоненты драйвера устройства,
+    который</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">обрабатывает
+    прерывания.</font></p>
+    <p>_____________________________________________________________________</p>
+    <pre>page ,132
+    ; masm tisr ; &gt;err
+    .286p
+    .xlist
+    include ..\..\include\bogus.inc
+    .list
+    Words struc
+    LoWord dw ?
+    HiWord dw ?
+    Words ends
+    EOI equ 020h ; команда EOI для контроллера PIC
+    INTA00 equ 020h ; управление главным контроллером PIC
+    INTA01 equ 021h ; регистр маски главного контроллера PIC
+    INT_MASTER_0 equ 08h ;номер INT главн. контроллера PIC
+    INTB00 equ 0A0h ; управление подчиненным контроллером PIC
+    INTB01 equ 0A1h ;регистр маски подчиненного контроллера PIC
+    INT_SLAVE_0 EQU 70h ; номер INT подчиненного контроллера PIC
+    ;
+    ; Установить переменные для нашего номера прерывания
+    ;
+    ife (FAKE_IRQ GE 8)
+    INT_DEV equ (INT_MASTER_0+(FAKE_IRQ AND 7))
+    PIC00 equ INTA00
+    PIC01 equ INTA01
+    else
+    INT_DEV equ (INT_SLAVE_0+(FAKE_IRQ AND 7))
+    INT_MASK equ 1 SHL (FAKE_IRQ AND 7)
+    PIC00 equ INTB00
+    PIC01 equ INTB01
+    endif
+    CONST SEGMENT DWORD PUBLIC 'DATA'
+    sdNoBogus db 'I do not see the bogus device.',Odh,Oah,'$'
+    sdPrompt db Odh,Oah,'S)tart, or Q)uit: ','$'
+    sdCRLF db Odh,Oah,'$'
+    sdDot db '.','$'
+    CONST ENDS
+    DATA SEGMENT DWORD PUBLIC 'DATA'
+    dwCount1 dw 0
+    dwCount2 dw 0
+    lpPrevISR dd 0 ; адрес предыдущей программы ISR
+    fStopping db 0 ; значение TRUE при завершении
+    DATA ENDS
+    STACK SEGMENT DWORD STACK 'STACK'
+    db 512 dup (?)
+    STACK ENDS
+    DGroup GROUP CONST,DATA,STACK
+    ;IP IntSvcRtn - The Interrupt Service Routine (Программа
+    обслуживания
+    ; прерывания)
+    ; WARNINGS (предупреждения)
+    ;
+    ; NOTES (примечания)
+    ; Данная программа ISR увеличивает счетчик прерываний (dwCount1)
+    ; и заново маскирует устройство.
+    ;
+    ; Если установлен флаг &quot;fStopping&quot;, устройство не маскируется заново.
+    ;
+    FIXED_TEXT SEGMENT PARA PUBLIC 'CODE'
+    segData1 dw DGroup
+    assume CS:FIXED_TEXT,DS:NOTHING
+    IntSvcRtn proc far
+    push ax
+    push dx
+    push ds
+    mov ds,segDatal
+    assume ds:DGroup
+    inc dwCount1
+    mov al,NOT FAKE_CTL_EOI
+    mov dx,FAKE_PORT
+    out dx,al ; послать EOI устройству
+    mov al,EOI
+    out PIC00,al ; послать EOI контроллеру PIC
+    ife (PIC00 EQ INTA00)
+    out INTA00,al ; послать EOI главн. контроллеру PIC также
+    endif
+    cmp fStopping,0 ; существует?
+    jnz isr9 ; если да, то не нужен перезапуск
+    mov al,NOT FAKE_CTL_START
+    mov dx,FAKE_PORT
+    out dx,al ; перезапуск ввода-вывода
+    isr9:
+    pop ds
+    assume ds:NOTHING
+    pop dx
+    pop ax
+    iret
+    IntSvcRtn endp
+    FIXED_TEXT ENDS
+    ;IP_main - точка входа в программу
+    ; NOTES (примечания)
+    ; Драйвер устройства выдает для пользователя приглашение:
+    ;S)tart(начать) или Q)uit(выйти). Если пользователь нажимает S,
+    ;программа разрешает прерывания и вооружает устройство, печатая точку
+    ;каждый раз, как устройство прерывается.
+    ;
+    
+    _TEXT SEGMENT PARA PUBLIC 'CODE'
+    segData2 dw DGroup
+    segfixed dw FIXED_TEXT
+    assume cs:_TEXT,ds:NOTHING
+    _main label far
+    mov ds,segData2 ;инициализируется сегмент данных по умолчанию
+    assume ds:DGroup
+    mov dx,FAKE_PORT
+    in al,dx ; присутствует ли фиктивное устройство?
+    or al,al
+    jns m10 ;пропустить, если да
+    mov dx,OFFSET DGroup:sdNoBogus
+    mov ah,9
+    int 21h ; в противном случае печатать сообщение об ошибке
+    mov ax,4C01h
+    int 21h ; и выйти из системы
+    m10:
+    mov ax,3500h+INT_DEV
+    cli
+    int 21h ; запросить текущую программу ISR
+    mov lpPrevISR.LoWord,bx
+    mov lpPrevISR.HiWord,es ; сохранить ее
+    mov dx,OFFSET FIXED_TEXT:IntSvcRtn
+    push ds
+    mov ds,segFixed
+    assume ds:NOTHING
+    mov ax,2500h+INT_DEV
+    int 21h ; установить нашу программу ISR
+    pop ds
+    assume ds:DGroup
+    sti
+    mov dx,OFFSET DGroup:sdPrompt
+    mov ax,9
+    int 21h ; S)tart или Q)uit
+    ml1:
+    mov dl,0PFh
+    mov ah,6
+    int 21h ; читать с консоли, не ожидая
+    jz ml3
+    or al,40h
+    cmp al,'q'
+    je ml8 ; пропустить, если нажато &quot;Q&quot;
+    cmp al,'s'
+    jne ml3 ; пропустить, если не нажато &quot;S&quot;
+    cli
+    in al,PIC01 ; размаскировать прерывание
+    and al,NOT INT_MASK
+    out PIC01,al
+    sti
+    mov al,NOT FAKE_CTL_START
+    mov dx,FAKE_PORT
+    out dx,al ; начать ввод-вывод с устройства
+    ml3:
+    mov ax,dwCount1
+    cmp ax,dwCount2
+    je ml4 ; пропустить, если счетчик прерываний не изменился
+    mov dwCount2,ax
+    mov dx,OFFSET DGroup:sdDot
+    mov ah,9
+    int 21,h ;в противном случае выдать точку
+    ml4:
+    jmp ml1 ; цикл
+    ml8:
+    mov fStopping,1 ; указание для программы ISR завершить
+    работу
+    mov dx,FAKE_PORT
+    ml9:
+    in al,dx
+    rcr al,1
+    jnc ml9 ; цикл, если занято
+    cli
+    in al,PIC01
+    or al,INT_MASK
+    out PIC01,al ; маскировать уровень прерывания
+    sti
+    push ds
+    lds dx,lpPrevISR&gt;
+    assume ds:NOTHING
+    mov ax,2500h+INT_DEV
+    int 21h ; восстановить предыдущую программу ISR
+    pop ds
+    assume ds:DGroup
+    mov ax,4C00h
+    int 21h ; выход
+    _TEXT ENDS
+    end_main
+	</pre>
+    <p>_____________________________________________________________________ </p>
+    <p><i>Листинг 1. Программа dostest.asm</i><font SIZE="2"></p>
+    <p ALIGN="JUSTIFY"></font><font FACE="Times New Roman" SIZE="2">Драйвер
+    устройства начинает работу с проверки старшего
+    бита</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">порта
+    состояния, чтобы убедиться в наличии устройства.
+    Затем он</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">устанавливает
+    связь с вектором прерывания MS-DOS для прерывания 11.</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">Драйвер сохраняет
+    предыдущее значение, хранимое в этом векторе, так</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">чтобы можно было
+    заменить значение, если программа существует.</p>
+    <p ALIGN="JUSTIFY">Далее драйвер устройства выдает
+    приглашение для пользователя :</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">Start(начать) или Quit(выйти). Если
+    пользователь нажимает S,</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">программа начинает пересылку
+    ввода-вывода. Если пользователь нажимает</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">Q, то программа
+    отключает устройство, восстанавливает вектор</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">прерывания и
+    завершается.</font><font SIZE="2"> </p>
+    <p ALIGN="JUSTIFY"></font><font FACE="Times New Roman" SIZE="2">Чтобы начать
+    операцию ввода-вывода, драйвер MS-DOS сначада</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">размаскирует
+    программируемый контроллер прерываний (programmable</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">interrupt controller - PIC) для
+    уровня прерывания устройства (в</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">примере прерывание 11). Затем
+    драйвер начинает операцию ввода-вывода</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">для устройства
+    путем записи 1 в бит 0 порта управления. Так как</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">прерывания
+    включены, то при возникновении прерываний на
+    устройстве</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">получит
+    управление программа обслуживания прерываний
+    (interrupt</font><font SIZE="2"> service routine - ISR).</font><font
+    FACE="Times New Roman" SIZE="2"></p>
+    <p ALIGN="JUSTIFY">Если происходит прерывание на
+    устройстве, то программа ISR</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">подтверждает прием прерывания,
+    посылая значение EOI устройству (т.е.</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">записывая 1 в бит 1 порта
+    управления устройства) и контроллеру PIC.</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">Если программа,
+    выполняющая ввод-вывод, существует, то программа
+    ISR</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">выполняется.
+    В противном случае программа ISR осуществляет</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">инициализацию
+    пересылки ввода-вывода вновь, записывая 1 в бит 0
+    порта</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">управления
+    устройства. Итак, программа ISR возобновляет
+    ввод-вывод</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">всякий
+    раз, когда происходит прерывание, таким образом
+    устройство</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">непрерывно
+    выполняет операцию ввода-вывода. Кроме
+    обеспечения</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">непрерывного
+    ввода-вывода программа ISR увеличивает счетчик
+    (dwCount1)</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">всякий
+    раз, когда обрабатывает прерывание.</p>
+    <p ALIGN="JUSTIFY">В процессе выполнения ввода-вывода
+    программа следит за счетчиком</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">прерываний, отображает точку
+    (&quot;.&quot;) для каждой законченной пересылки</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">ввода-вывода и
+    продолжает сканировать клавиатуру, чтобы
+    определить,</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">хочет
+    ли пользователь остановить пересылку.</p>
+    <p ALIGN="JUSTIFY">Чтобы завершить программу,
+    пользователь нажимает клавишу Q.</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">Программа устанавливает флаг,
+    который информирует программу ISR о</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">том, что следует остановить
+    обработку. После того, как операция</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">ввода-вывода остановлена,
+    программа маскирует уровень прерывания в</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">контроллере PIC и
+    восстанавливает вектор прерывания.</font><font FACE="Arial"><i><b></p>
+    <p>Драйвер устройства в системе Windows</b></i></font><font
+    FACE="Times New Roman" SIZE="2"></p>
+    <p ALIGN="JUSTIFY">Чрезвычайно тривиальный драйвер
+    устройства MS-DOS, описанный</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">в предыдущем разделе, по
+    существу довольно сложно реализовать в</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">системе Windows. При
+    написании драйвера устройства в системе Windows,</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">обрабатывающего
+    прерывания, необходимо использовать
+    архитектуру,</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">отличную
+    от той, которая была использована для драйвера
+    MS-DOS. В</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">частности,
+    необходимо отделить компоненту обработки
+    прерывания от</font><font SIZE="2"> </font><font FACE="Times New Roman"
+    SIZE="2">компоненты приложения. Вместо единственной
+    программы, управляющей как</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">программой ISR, так и интерфейсом
+    пользователя, как сделано в системе</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">MS-DOS, в системе Windows необходимо
+    выделить эти функции в отдельные</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">программные модули, называемые
+    библиотекой динамической связи (DLL) и</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">интерфейсом прикладных
+    программ (Application Program</font><font SIZE="2"> Interface - API).</font><font
+    FACE="Arial"></p>
+    <p>Библиотека DLL для драйвера</font><font FACE="Times New Roman"
+    SIZE="2"></p>
+    <p ALIGN="JUSTIFY">При написании приложений в системе
+    Windows обычно в программном</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">модуле имеют дело только с
+    двумя типами сегментов: перемещаемым</font><font SIZE="2">
+    </font><font FACE="Times New Roman" SIZE="2">(moveable) и выгружаемым
+    (discardable). Сегменты данных программы</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">являются перемещаемыми, т.е. их
+    линейные адреса в памяти могут</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">изменяться, когда программе
+    управления памятью системы Windows</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">требуется организовать память.
+    Селектор (selector) и смещение,</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">используемые для доступа к
+    определенной ячейке памяти, остаются</font><font SIZE="2">
+    </font><font FACE="Times New Roman" SIZE="2">фиксированными, но под
+    схемой селектор-смещение система Windows</font><font SIZE="2">
+    </font><font FACE="Times New Roman" SIZE="2">может перемещать
+    фактические данные в линейной памяти.</p>
+    <p ALIGN="JUSTIFY">Сегменты программ-кодов также
+    перемещаемые, но имеют</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">дополнительный атрибут -
+    выгружаемые. Их содержимое может быть</font><font SIZE="2">
+    </font><font FACE="Times New Roman" SIZE="2">выгружено полностью, а
+    при необходимости загружено с диска, так как</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">нельзя писать и
+    (или) модифицировать информацию в сегменте</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">программы-кода.
+    Если при обращении к сегменту из программы Win</font><font
+    SIZE="2">dows, </font><font FACE="Times New Roman" SIZE="2">он оказался
+    выгруженным, программа управления памятью
+    системы Windows</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">автоматически
+    обратится к диску и прочитает ранее выгруженный
+    сегмент.</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2"></p>
+    <p ALIGN="JUSTIFY">Итак, каким образом это обстоятельство
+    влияет на код для</font><font SIZE="2"> </font><font FACE="Times New Roman"
+    SIZE="2">программы ISR? Так как прерывание может
+    произойти в любое время, а</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">код ISR может оказаться
+    выгруженным, то возникнет проблема загрузить</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">код в память, если
+    фиксируется прерывание. Вместо этого, можно</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">описать сегмент
+    как FIXED (фиксированный), а не как MOVEABLE</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">(перемещаемый) или DISCARDABLE
+    (выгружаемый). Сегмент с атрибутом</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">FIXED будет оставаться в
+    единственном месте линейной памяти и не</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">будет выгружаться,
+    даже если он содержит код. В этом случае, если</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">произойдет
+    прерывание, код будет доступен и готов к
+    выполнению.</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">Однако
+    следует отметить один малоизвестный факт, а
+    именно: в системе</font><font SIZE="2"> </font><font FACE="Times New Roman"
+    SIZE="2">Windows только те сегменты будут считаться FIXED,
+    которые были</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">описаны
+    в библиотеке DLL. Сегмент FIXED в обычном программном
+    модуле</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">будет
+    рассматриваться как MOVEABLE. Таким образом в
+    системе Windows</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">нельзя
+    будет поместить программу ISR в обычный
+    программный модуль.</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">Вместо этого ее необходимо
+    поместить в библиотеку DLL.</p>
+    <p ALIGN="JUSTIFY">Листинг 2 представляет исходный код
+    bogusa.asm на ассемблере для</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">библиотеки DLL, который содержит
+    программу ISR и может выполняться в</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">окружении Windows. Программа IntSvcRtn
+    очень похожа на свой дубликат,</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">работающий в системе MS-DOS.
+    Однако кроме увеличения переменной-счетчика
+    данная программа ISR также записывает в очередь
+    сообщение</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">Windows.
+    Чтобы избежать переполнения очереди, запись
+    сообщения</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">производится
+    только в случае, когда переменная-счетчик wCount</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">изменяет значение
+    от 0 к 1. Функция обнуления счетчика wCount после</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">того, как закончена
+    обработка сообщения, передана высокоуровневой</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">программе системы
+    Windows.</p>
+    <p ALIGN="JUSTIFY">С первого взгляда все эти рассуждения
+    кажутся простыми, однако</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">обработка прерываний в системе
+    Windows совсем не так проста, как в</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">системе MS-DOS.</font></p>
+    <pre>page ,132
+    ; masm tisr ; &gt;err
+    .286p
+    .xlist
+    include bogus.inc
+    include pic.h
+    .list
+    WM_COMMAND=0111h
+    EXTRN POSTMESSAGE:FAR
+    Words struc
+    LoWord dw ?
+    HiWord dw ?
+    Words ends
+    ;
+    ; Установить переменные для нашего номера прерывания
+    ;
+    ife (FAKE_IRQ GE 8)
+    INT_DEV equ (INT_MASTER_0+(FAKE_IRQ AND 7))
+    PIC00 equ INTA00
+    PIC01 equ INTA01
+    else
+    INT_DEV equ (INT_SLAVE_0+(FAKE_IRQ AND 7))
+    INT_MASK equ 1 SHL (FAKE_IRQ AND 7))
+    PIC00 equ INTB00
+    PIC01 equ INTB01
+    endif
+    FIXED_DATA SEGMENT DWORD PUBLIC 'DATA'
+    PUBLIC _hWndEvent,_wParamEvent,_wCount
+    _hWndEvent label word
+    hWndEvent dw 0 ; Окно для постирования событий
+    _wParamEvent label word
+    wParamEvent dw 0 ; Значение wParam для постирования
+    _wCount label word
+    wCount dw 0 ; Счетчик необработанных прерываний
+    FIXED_DATA ENDS
+    ; IP IntSvcRtn - программа обслуживания прерываний
+    ;
+    ; WARNINGS (Предупреждения)
+    ;
+    ; NOTES (Примечания)
+    ; Данная программа ISR увеличивает счетчик прерываний и заново
+    ; маскирует устройство.
+    ; Если предыдущее значение счетчика было равно 0, то записывается
+    ; сообщение
+    ; Если установлен флаг &quot;fStopping&quot;, устройство не маскируется заново.
+    ;
+
+    FIXED_TEXT SEGMENT PARA PUBLIC 'CODE'
+    selData1 dw FIXED_DATA
+    assume CS:FIXED_TEXT,DS:NOTHING
+    PUBLIC _IntSvcRtn
+    _IntSvcRtn label far
+    IntSvcRtn proc far
+    push ax
+    push dx
+    push ds
+    mov ds,selDatal
+    assume ds:FIXED_DATA
+    inc wCount
+    mov al,NOT FAKE_CTL_EOI&gt;
+    mov dx,FAKE_PORT
+    out dx,al ; посылаем устройству EOI
+    mov al,EOI
+    out PIC00,al ; посылаем EOI контроллеру PIC
+    ife (PIC00 EQ INTA00)
+    out INTA00,al ; посылаем EOI также главному контроллеру PIC
+    endif
+    cmp hWndEvent,0 ; завершать?
+    jz isr9 ; если да, то не делаем перезапуска и
+    ; постирования
+    cmp wCount,1 ; требуется постирование?
+    jne isr8 ; пропускаем, если нет
+    push bx ; сохраняем оставшиеся регистры
+    push cx
+    push es
+    push hWndEvent
+    push WM_COMMAND
+    push wParamEvent
+    push 0 ; lParam равно 0
+    push 0
+    call POSTMESSAGE ; регистрируем событие
+    pop es
+    pop cx
+    pop bx
+    isr8:
+    mov al,NOT FAKE_CTL_START
+    mov dx,FAKE_PORT
+    out dx,al ; возобновляем ввод-вывод
+    isr9:
+    pop ds
+    assume ds:NOTHING
+    pop dx
+    pop ax
+    iret
+    IntSvcRtn endp
+    ; требуется программе AllocIntReflector
+    PUBLIC _BogusCallback
+    _BogusCallback label far
+    BogusCallback proc far
+    pushf
+    call IntSvcRtn
+    ret
+    BogusCallback endp
+    FIXED_TEXT ENDS
+    end
+    ; конец файла
+    </pre>
+    <p>_____________________________________________________________________<i></p>
+    <p>Листинг 2. Программа bogusa.asm</i><font FACE="Arial"></p>
+    <p>Драйверный интерфейс API</font><font FACE="Times New Roman" SIZE="2"></p>
+    <p ALIGN="JUSTIFY">Кроме отдельного программного модуля
+    для программы ISR (в форме</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">библиотеки DLL системы Windows), для
+    работы драйвера необходим также</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">программный модуль
+    пользовательского интерфейса, называемый
+    интерфейс</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">API.
+    На листинге 3 приведена программа bogus.h,
+    представляющая собой</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">пример интерфейса API. Эта
+    программа содержит 4 точки входа в</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">библиотеку DLL.</font></p>
+    <p>_____________________________________________________________________</p>
+    <pre>
+    #ifndef EXPORT
+    #define EXPORT
+    #endif
+    extern int EXPORT FAR PASCAL BogusCheck(void) ;
+    extern void EXPORT FAR PASCAL BogusStart(HWND hWnd,WPARAM wParam) ;
+    extern int EXPORT FAR PASCAL BogusGetEvent(void) ;
+    extern void EXPORT FAR PASCAL BogusStop(void) ;
+    </pre>
+    <p>______________________________________________________________________<i></p>
+    <p>Листинг 3. Программа bogus.h.</i><font FACE="Times New Roman" SIZE="2"></p>
+    <p ALIGN="JUSTIFY">В точке входа BogusCheck просто проверяется
+    наличие устройства.</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">Программа возвращает значение
+    TRUE, если устройство обнаружено (бит 7</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">порта состояния), и значение FALSE
+    в противном случае.</p>
+    <p ALIGN="JUSTIFY">Точки входа BogusStart и BogusStop начинают и
+    завершают работу</font><font SIZE="2"> </font><font FACE="Times New Roman"
+    SIZE="2">устройства. Кроме того, точка входа BogusStart
+    разрешает прерывания и</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">обеспечивает связь с
+    аппаратным прерыванием, а точка входа BogusStop</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">выключает
+    прерывания устройства и восстанавливает
+    аппаратное</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">прерывание.</p>
+    <p ALIGN="JUSTIFY">Точка входа BogusGetEvent возвращает
+    количество прерываний,</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">обработанных со времени
+    первого старта устройства, либо со времени</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">последнего вызова
+    точки входа BogusGetEvent. (Точка входа</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">BogusGetEvent обнуляет счетчик
+    прерываний при каждом ее вызове.)</font><font FACE="Arial"></p>
+    <p>Прерывания при стандартном режиме работы
+    системы Windows</font><font FACE="Times New Roman" SIZE="2"></p>
+    <p ALIGN="JUSTIFY">При написании драйвера, который будет
+    выполняться в стандартном</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">режиме работы системы Windows,
+    необходимо учитывать возможность</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">появления прерывания, когда
+    процессор работает в реальном режиме.</font><font SIZE="2">
+    </font><font FACE="Times New Roman" SIZE="2">Даже если работают
+    только приложения системы Windows, а не приложения</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">системы MS-DOS,
+    процессор часто переключается из реального в</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">защищенный режим.
+    Так как система Windows 3.1 не является</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">операционной системой, а скорее
+    представляет собой окружение</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">пользовательского интерфейса,
+    она возлагает выполнение определенного</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">количества
+    основных функций, включая функцию ввода-вывода
+    файлов, на</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">операционную
+    систему (а именно MS-DOS).</p>
+    <p ALIGN="JUSTIFY">Поэтому когда приложение системы Windows
+    выполняет функцию</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">MS-DOS ввода-вывода файла и
+    процессор при этом работает в реальном</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">режиме, устройство
+    может прерывать ЦПУ. По умолчанию, если
+    библиотека</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">DLL
+    обеспечила связь с прерыванием, то система Windows
+    переключит ЦПУ</font><font SIZE="2"> </font><font FACE="Times New Roman"
+    SIZE="2">в защищенный режим для обработки прерывания
+    и, как только программа</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">ISR завершит работу, переключит
+    ЦПУ обратно в реальный режим для</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">продолжения выполнения функций
+    системы MS-DOS.</p>
+    <p ALIGN="JUSTIFY">Хотя это в меньшей мере относится к ЦПУ
+    80386, переключение</font><font SIZE="2"> </font><font FACE="Times New Roman"
+    SIZE="2">процессора из защищенного режима в реальный
+    режим, например на</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">процессоре 80286, создает
+    огромные накладные расходы, требующие</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">контролируемого
+    сброса ЦПУ, который выполняется в течении</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">миллисекунд. Если
+    необходимо ускорить среднее время ответа, нужно</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">предотвратить
+    переключение процессора в защищенный режим, если
+    он</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">получает
+    прерывание, работая в реальном режиме.</p>
+    <p ALIGN="JUSTIFY">Обеспечение связи с вектором
+    прерывания в защищенном режиме из</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">библиотеки DLL системы Windows -
+    тривиально, что и показано в</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">программе SetPMVector,
+    представленной в листинге 4 (программа</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">bogus.c). Установление
+    связи с вектором производится таким же</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">способом, как и в
+    системе MS-DOS, - с помощью функции setvector</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">системы MS-DOS. Однако в отличие от
+    вызова в системе MS-DOS, в</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">системе Windows при обращении к
+    функции передаются селектор и</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">смещение, а не сегмент и
+    смещение. Ядро системы Windows следит за</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">всем. Функции следует передать
+    нормальный селектор и смещение</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">(натуральный указатель far для
+    системы Windows), а не сегмент и</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">смещение (натуральный
+    указатель far для системы MS-DOS).</p>
+    <p ALIGN="JUSTIFY">Однако, как уже упоминалось,
+    установления связи с вектором</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">прерывания в защищенном режиме
+    недостаточно. Необходимо также</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">обеспечить связь с вектором
+    прерывания в реальном режиме, а это не</font><font SIZE="2">
+    </font><font FACE="Times New Roman" SIZE="2">тривиальная задача.</font></p>
+    <p>______________________________________________________________________</p>
+    <pre>/*EM BOGUS.C - Драйвер фиктивного устройства библиотеки DLL
+    *
+    * SUMMARY (Резюме)
+    * Базовые функции LibMain, WEP
+    *
+    * COMMENTS (Комментарии)
+    *
+    * WARNINGS (Предупреждения)
+    *
+    */
+    #include
+    #include &quot;bogusa.h&quot;
+    #include &quot;pic.h&quot;
+    #include &quot;dpmi.h&quot;
+    #define EXPORT _export _loadds
+    #include &quot;bogus.h&quot;
+    #define FAKE_PORT 0x141 /* Уровень фиктивности (bogosity) - 9.4 */
+    #define FAKE_IRQ 11 /* Уровень фиктивности (bogosity) - 9.8 */
+    #define FAKE_CTL_START 0x01
+    /* команда &quot;начать&quot; фиктивного порта (устанавливается в нуль) */
+    #define FAKE_CTL_EOI 0x02
+    /* EOI фиктивного порта */
+    #define FAKE_STAT_BUSY 0x01
+    /* индикация занятости фиктивного порта (zero=&gt;busy) */
+    #define FAKE_STAT_IRQ 0x02
+    /* IRQ фиктивного порта (zero=&gt;IRQ) */
+    #define FAKE_STAT_ERROR 0x04
+    /* ошибка ввода-вывода (zero=&gt;error) (сбрасывается при чтении) */
+    /* Установить переменные для нашего номера прерывания */
+    #if (FAKE_IRQ&lt;8)
+    #define INT_DEV (INT_MASTER_0+(FAKE_IRQ &amp; 7))
+    #define PIC00 INTA00
+    #define PIC01 INTA01
+    #else
+    #define INT_DEV (INT_SLAVE_0+(FAKE_IRQ &amp; 7))
+    #define PIC00 INTB00
+    #define PIC01 INTB01
+    #endif
+    #define INT_MASK (1 &lt;&lt; (FAKE_IRQ &amp; 7))
+    BOOL FAR PASCAL LibMain(HANDLE hInstance
+    /* обработчик библиотечного экземпляра*/
+    ,WORD wDataSeg
+    /* сегмент данных по умолчанию */
+    ,WORD cbHeap
+    /* размер динамической области по умолчанию */
+    ,LPSTR lpszCmdLine) ;
+    /* командная строка */
+    int FAR PASCAL WEP(int fSystemExit) ;
+    #pragma alloc_text(INIT_TEXT,LibMain)
+    /* держать вместе с LIBENTRY.ASM */
+    #pragma alloc_text(FIXED_TEXT,WEP)
+    HANDLE hLibInstance;
+    FARPROC lpfnPrevISR; /* Сохраненная предыдущая программа ISR*/
+    DWORD lpfnPrevRMISR;
+    /* Сохраненная предыдущая программа ISR реального режима*/
+    HANDLE hReflector;
+
+    DWORD DPMI_AllocateRMCallback(FARPROC lpfnCallback, _RMCS FAR *lpRMCS)
+    {
+     DWORD dwRet ;
+     _asm {
+       push ds
+       lds si,lpfnCallback
+       les di,lpRMCS
+       mov ax,DPMI_ALLOCRMC
+       int IVEC_DPMI
+       pop ds
+       jc lbl1
+       mov word ptr dwRet,dx ; возврат адреса обратного вызова
+       mov word ptr dwRet+2,cx
+       jmp short lbl2
+      lbl1:
+       mov word ptr dwRet,ax ; код ошибки в регистре ax
+       mov word ptr dwRet+2,0 ; возвратить seg=0,если произошла ошибка
+      lbl2:
+     }
+     return dwRet;
+    }
+
+    DWORD DPMI_FreeRMCallback(FARPROC lpfnCallback)
+    {
+     DWORD wRet ;
+     _asm {
+       mov dx,word ptr lpfnCallback
+       mov cx,word ptr lpfnCallback+2
+       mov ax,DPMI_FREERMC
+       int IVEC_DPMI
+       jc lbl1
+       xor ax,ax
+      lbl1:
+       mov wRet,ax
+     }
+     return wRet;
+    }
+
+    DWORD DPMI_GetRMVector(int iVector)
+    {
+     DWORD dwRet;
+     _asm {
+       mov ax,DPMI_GETRMVEC
+       mov bl,byte ptr iVector
+       int 31h
+       mov word ptr dwRet,dx
+       mov word ptr dwRet+2,cx
+     }
+     return dwRet;
+    }
+
+    void DPMI_SetRMVector(int iVector, DWORD lpfnRMISR)
+    {
+     _asm {
+       mov ax,DPMI_SETRMVEC
+       mov bl,byte ptr iVector
+       mov dx,word ptr lpfnRMISR
+       mov cx,word ptr lpfnRMISR+2
+       int 31h
+     }
+    }
+
+    FARPROC GetPMVector(int iVector)
+    {
+     FARPROC dwRet;
+     _asm {
+       mov bl,byte ptr iVector
+       mov ah,35h
+       int 21h
+       mov word ptr dwRet,bx
+       mov word ptr dwRet+2,es ; Сохранить
+     }
+     return dwRet;
+    }
+
+    void SetPMVector(int iVector, FARPROC lpfnISR)
+    {
+     _asm {
+       push ds
+       lds dx,lpfnISR
+       mov al,byte ptr iVector
+       mov ah,25h
+       int 21h ; Установить нашу программу ISR
+       pop ds
+     }
+    }
+
+    HANDLE AllocIntReflector(int iVector, FARPROC lpfnCallback)
+    {
+      DWORD dwDosMem;
+      LPSTR lpLowRMISR;
+      DWORD lpfnRMCallback;
+      _RMCS FAR *lpSaveRegs;
+      /* Распределить память DOS для программы обслуживания прерывания ISR,
+      *работающей в реальном режиме */
+      dwDosMem = GlobalDosAlloc(16 + sizeof (int) + sizeof (_RMCS);
+      if (dwDosMem == 0)  return 0;
+      lpLowRMISR = (LPSTR) MAKELONG(0,LOWORD(dwDosMem));
+      lpSaveRegs = (_RMCS FAR *) (&amp;lpLowRMISR[16]);
+      /* Распределить обратный вызов (callback), работающий в реальном
+      * режиме */
+      lpfnRMCallback = DPMI_AllocateRMCallback((FARPROC)lpfnCallback, lpSaveRegs);
+      if (HIWORD((DWORD)lpfnRMCallback == 0)  {
+        GlobalDosFree(LOWORD(dwDosMem));
+        return 0;
+      }
+      /* Сгенерировать код в нижних адресах памяти (только 6 байтов)*/
+      lpLowRMISR[0] = 0x9A; /* Вызов указателя на FAR */
+      *((DWORD FAR *)&amp;(lpLowRMISR[1])) = lpfnRMCallback;
+      lpLowRMISR[5] = 0xCF; /*IRET */
+      *((int FAR *)&amp;(lpLowRMISR[6])) = iVector;
+      /* Установить связь с вектором прерываний реального режима */
+      DPMI_SetRMVector(iVector,MAKELONG(0,HIWORD(dwDosMem)));
+      return (HANDLE) LOWORD(dwDosMem);
+      /* возврат обработчика-отражателя */
+    }
+
+    void FreeIntReflector(HANDLE hReflector)
+    {
+      LPSTR lpLowRMISR;
+      DWORD lpfnRMCallback;
+      /* Получить адрес нижнего ISR в защищенном режиме */
+      lpLowRMISR = (LPSTR)MAKELONG(0,(WORD)hReflector);
+      /* Следует убедиться, что это отражатель */
+      if ((lpLowRMISR[0] != 0x9A) || (lpLowRMISR[5] != 0xCF)) return;
+      /* выход, если не отражатель */
+      /* Выбрать адрес обратного вызова и освободить обратный вызов */
+      lpfnRMCallback = *((DWORD FAR *)&amp;((lpLowRMISR[1]));
+      DPMI_FreeRMCallback(lpfnRMCallback);
+      /* Освободить программу обслуживания прерываний реального режима*/
+      GlobalDosFree((WORD)hReflector);
+    }
+
+    /*XP&lt; LibMain - основная библиотечная точка входа */
+    *
+    * ENTRY (вход)
+    *
+    * EXIT (выход)
+    *
+    * RETURNS (возврат)
+    * Если инициализация завершается успешно принимает значение, равное
+    * TRUE, в противном случае - FALSE
+    *
+    * WARNINGS (предупреждения)
+    *
+    * CALLS (вызовы)
+    *
+    * NOTES (примечание)
+    * Настоящая библиотечная точка входа находится в ассемблерном модуле
+    * LIBENTRY.ASM, а в данную точку просто передается управление
+    *
+    */
+
+    BOOL FAR PASCAL LibMain(HANDLE hInstance
+    /* обработчик библиотечного экземпляра*/
+    ,WORD wDataSeg
+    /* сегмент данных по умолчанию */
+    ,WORD cbHeap
+    /* размер динамической области по умолчанию */
+    ,LPSTR lpszCmdLine);
+    /* командная строка */
+    /*&gt;*/
+    {
+      lpszCmdLine = lpszCmdLine;
+      /* Избегать предупреждения -W4 */
+      wDataSeg = wDataSeg;
+      cbHeap = cbHeap;
+      hInstance = hInstance;
+      /* Это может понадобиться позже для доступа к ресурсам из нашего
+      *исполнительного модуля */
+      return TRUE;
+    }
+
+    /*XP&lt; WEP - процедура выхода в системе Windows */
+    *
+    * ENTRY (вход)
+    * fSystemExit указывает на завершение сессии в системе Windows. В
+    * противном случае происходит только разгрузка данной библиотеки DLL.
+    * RETURNS (возврат)
+    * Всегда возвращается значение 1
+    *
+    * WARNINGS (предупреждения)
+    * Из-за ошибок в системе Windows 3.0 и более ранних версиях (а
+    * возможно и в более поздних версиях) данная функция должна быть
+    *помещена в фиксированный сегмент. Эти же ошибки приводят к тому, что
+    * значение DS сомнительно, а поэтому нельзя его использовать (также
+    * как и любые статические данные).
+    *
+    * В любом случае, несомненно не надо ничего делать в этой точке.
+    *
+    * CALLS (вызовы)
+    * Нет
+    * NOTES (примечания)
+    * Это стандартная процедура выхода DLL.
+    *
+    */
+
+    int FAR PASCAL WEP(int fSystemExit)
+    /*&gt;*/
+    {
+      fSystemExit = fSystemExit
+      /* Избегать предупреждения -W4 */
+      return 1 ; /* всегда указывает на успешное завершение */
+    }
+
+    int EXPORT FAR PASCAL BogusCheck(void)
+    {
+      BYTE bPortVal;
+      _asm {
+        mov dx,FAKE_PORT
+        in al,dx ; Присутсвует фиктивное устройство ?
+        mov bPortVal,al
+      }
+      return ((bPortVal &amp; 0x80) == 0);
+      /* Возвращает значение TRUE, если устройство присутствует */
+    }
+
+    void EXPORT FAR PASCAL BogusStart(HWND hWnd, WPARAM wParam)
+    {
+      wParamEvent = wParam;
+      hWndEvent = hWnd;
+      if (!lpfnPrevISR)  {
+        /* Сохранить предыдущую программу ISR и загрузить новую */
+        _asm cli
+        lpfnPrevISR = GetPMVector(INT_DEV);
+        SetPMVector(INT_DEV,(FARPROC)IntSvcRtn);
+        _asm sti
+        /* Сохранить предыдущую программу ISR реального режима и
+        *отразить на новую */
+        lpfnPrevRMISR = DPMI_GetRMVector(INT_DEV);
+        hReflector = AllocIntReflector(INT_DEV,(FARPROC)BogusCallback);
+        /* Разрешить прерывание и начать операцию ввода-вывода на
+        *устройстве */
+        _asm {
+          cli
+          in al,PIC01 ; разрешить прерывание
+          and al,NOT INT_MASK
+          out PIC01,al
+          sti
+          mov al,NOT FAKE_CTL_START
+          mov dx,FAKE_PORT
+          out dx,al ;начать операцию ввода-вывода на устройстве
+        }
+      }
+    }
+
+    int EXPORT FAR PASCAL BogusGetEvent(void)
+    {
+      WORD wCountRet;
+      _asm {
+        mov ax,SEG wCount
+        mov es,ax
+        xor ax,ax
+        xchg ax,es:wCount ;получить счетчик, установить в нуль
+        mov wCountRet,ax
+      }
+      return wCountRet;
+    }
+
+    void EXPORT FAR PASCAL BogusStop(void)
+    {
+      hWndEvent - 0x0000 ; /*команда для ISR &quot;завершить работу&quot;*/
+      if (!lpfnPrevISR) return; /* возвратиться, если программа не стартовала */
+      _asm {
+        mov dx,FAKE_PORT
+       l1:
+        in al,dx
+        rcr al,1
+        jnc l1 ; цикл, если занято
+        cli
+        in al,PIC01
+        or al,INT_MASK
+        out PIC01,al ; маскировать уровень прерывания
+        sti
+      }
+      DPMI_SetRMVector(INT_DEV, lpfnPrevRMISR);
+      /* Восстановить вектор реального режима */
+      FreeIntReflector(hReflector);
+      /* Освободить отражатель */
+      SetPMVector(INT_DEV, lpfnPrevISR);
+      /* Восстановить вектор защищенного режима */
+      lpfnPrevISR = NULL;
+    }
+
+
+    /* конец файла*/
+    </pre>
+    <p>_____________________________________________________________________<i></p>
+    <p>Листинг 4. Программа bogus.c</i><font FACE="Arial"></p>
+    <p>Интерфейс системы MS-DOS для защищенного режима</font><font
+    FACE="Times New Roman" SIZE="2"></p>
+    <p ALIGN="JUSTIFY">Чтобы установить связь с вектором
+    реального режима из кода</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">системы Windows защищенного
+    режима, необходимо работать с интерфейсом</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">системы MS-DOS для
+    защищенного режима (MS-DOS Protected Mode</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">Interface - DPMI). (Текущая версия DPMI
+    представляет собой уровень</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">1.0, но система Windows наиболее
+    полно реализует только уровень 0.9.</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">Некоторые функции уровня 1.0
+    реализованы в системе Windows 3.1.)</p>
+    <p ALIGN="JUSTIFY">Функция DPMI_SetRMVector вызывает интерфейс
+    DPMI, чтобы</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">установить
+    вектор реального режима. Можно видеть, что
+    интерфейс DPMI</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">взаимодействует
+    через регистры (регистр AX содержит
+    функциональный</font><font SIZE="2"> </font><font FACE="Times New Roman"
+    SIZE="2">код) и INT31h. Автор включил высокоуровневый
+    интерфейс в данную</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">и другие функции DPMI (доступен
+    только на диске кодов или в</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">интерактивном режиме), чтобы
+    можно было иметь доступ к интерфейсу</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">DPMI из языка Си и выделил код,
+    написанный на языке ассемблер, на</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">случай, если возникнет
+    необходимость использовать что-то отличное от</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">компилятора Си
+    фирмы Microsoft.</p>
+    <p ALIGN="JUSTIFY">Функция DPMI_AllocateRMCallback вызывает
+    интерфейс DPMI, чтобы</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">распределить обратный вызов
+    (callback), представляющий собой адрес,</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">вызываемый из реального режима,
+    который передает управление коду</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">защищенного режима. Например,
+    программа TSR системы MS-DOS может</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">вызвать код в библиотеке DLL
+    системы Windows через обратный вызов.</p>
+    <p ALIGN="JUSTIFY">Функция DPMI_AllocateRMCallback принимает два
+    параметра: адрес</font><font SIZE="2"> </font><font FACE="Times New Roman"
+    SIZE="2">кода защищенного режима, который будет
+    вызываться обратно, и</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">регистровую структуру, которая
+    обновляется при выполнении реального</font><font SIZE="2">
+    </font><font FACE="Times New Roman" SIZE="2">обратного вызова, таким
+    образом код защищенного режима может</font><font SIZE="2">
+    </font><font FACE="Times New Roman" SIZE="2">исследовать содержимое
+    регистров реального режима во время обратного</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">вызова.</p>
+    <p ALIGN="JUSTIFY">Функция DPMI_FreeRMCallback освобождает все
+    структуры, которые</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">были распределены в результате
+    обращения к функции</font><font SIZE="2"> DPMI_AllocateRMCallback.</font><font
+    FACE="Times New Roman" SIZE="2"> Функция DPMI_FreeRMCallback должна
+    вызываться</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">только
+    тогда, когда больше нет необходимости в обратном
+    вызове.</font><font FACE="Arial"></p>
+    <p>Программа ISR в реальном режиме</font><font
+    FACE="Times New Roman" SIZE="2"></p>
+    <p ALIGN="JUSTIFY">Несмотря на то, что автор рекомендовал
+    обеспечивать раздельную</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">программу ISR в реальном режиме,
+    в данном примере эта рекомендация не</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">была выполнена. Вместо этого,
+    автор предоставил программы,</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">необходимые при реализации
+    программы ISR на языке Си. Фактически,</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">данный пример устанавливает
+    связь с прерываниями реального режима</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">только для того,
+    чтобы переключить ЦПУ в защищенный режим для</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">обработки
+    прерывания. Таково по умолчанию поведение
+    системы Windows,</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">когда
+    с прерываниями реального режима не
+    устанавливается связь</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">вообще, таким образом автор
+    рассматривает несколько циклов, которые</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">не имеют никакого
+    другого назначения, кроме как показать, каким</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">образом все
+    работает.</p>
+    <p ALIGN="JUSTIFY">Рассмотрим код для точки входа BogusStart.
+    По существу он</font><font SIZE="2"> </font><font FACE="Times New Roman"
+    SIZE="2">работает так же, как работал бы в системе
+    MS-DOS. Код сохраняет</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">старое значение прерывания,
+    обеспечивает связь с текущим значением и</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">подает устройству
+    знак начать работу. Однако вместо обеспечения
+    связи</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">только
+    с вектором защищенного режима, он устанавливает
+    связь как с</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">вектором
+    реального режима, так и с вектором защищенного
+    режима.</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">Устанавливая
+    связь с вектором реального режима, код вызывает</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">AllocIntReflector, чтобы
+    обеспечить ссылку вектора прерываний</font><font SIZE="2">
+    </font><font FACE="Times New Roman" SIZE="2">реального режима на
+    обратный вызов, который просто обращается к</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">программе ISR
+    защищенного режима. Точка входа BogusStart подает
+    знак</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">устройству
+    начинать работу одинаковым образом при обоих
+    режимах</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">работы:
+    защищенном и реальном. Она размаскирует бит IRQ
+    для</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">контроллера
+    PIC и подает знак устройству начинать работу,
+    записывая 1</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">в
+    бит START порта управления устройством. Как только
+    приложение</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">обращается
+    к данной программе, начинается обработка
+    прерываний и</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">регистрация
+    сообщений в соответствии с программой ISR.</p>
+    <p ALIGN="JUSTIFY">Программа BogusStop тривиальна и просто
+    отключает устройство и</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">разрывает связи, установленные
+    программой BogusStart. Итак, осталось</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">привести пример прикладной
+    программы, чтобы показать работу операций</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">ввода-вывода.</font><font
+    FACE="Arial"></p>
+    <p>Приложение WINTEST</font><font FACE="Times New Roman" SIZE="2"></p>
+    <p ALIGN="JUSTIFY">Приложение wintest.c, показывающее работу
+    ввода-вывода (см.</font><font SIZE="2"> </font><font FACE="Times New Roman"
+    SIZE="2">листинг 5), состоит главным образом из
+    немодульного диалогового</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">блока, в котором непрерывно
+    высвечивается количество прерываний,</font><font SIZE="2">
+    </font><font FACE="Times New Roman" SIZE="2">обработанных с начала
+    работы программы.</p>
+    <p ALIGN="JUSTIFY">Программа MainDlgProc вызывает программу
+    BogusStart во время</font><font SIZE="2"> </font><font FACE="Times New Roman"
+    SIZE="2">выполнения WM_INITDIALOG, передавая в качестве
+    параметра обработчик</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">окна диалогового блока.
+    Программа ISR регистрирует сообщения к</font><font SIZE="2">
+    </font><font FACE="Times New Roman" SIZE="2">данному обработчику в
+    тех случаях, когда счетчик прерываний</font><font SIZE="2">
+    </font><font FACE="Times New Roman" SIZE="2">изменяется от нуля к
+    единице</font><font SIZE="2">.</font><font FACE="Times New Roman" SIZE="2"></p>
+    <p ALIGN="JUSTIFY">Программа MainDlgProc сохраняет текущее
+    суммарное значение</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">счетчика в переменной wCountTotal.
+    Всякий раз, когда диалог получает</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">сообщение WM_COMMAND с параметром
+    wParam, равным IDM_BOGUSEVENT,</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">программа обновляет суммарный
+    счетчик, отображаемый в диалоговом</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">блоке. Следует отметить, что
+    хотя программа ISR регистрирует</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">сообщение только тогда, когда
+    счетчик изменяется от нуля к единице,</font><font SIZE="2">
+    </font><font FACE="Times New Roman" SIZE="2">возможна (и весьма
+    вероятно) обработка количества прерываний до
+    того,</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">как
+    сообщение WM_COMMAND фактически будет передано
+    диалоговой</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">процедуре.
+    Методика, показанная в данной программе, при
+    которой</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">программа
+    ISR регистрирует сообщение только при первом
+    переходе, а</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">программа
+    BogusCheck чистит счетчик, обеспечивает точный
+    подсчет</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">количества
+    прерываний, даже если на уровне приложения
+    нельзя учесть</font><font SIZE="2"> </font><font FACE="Times New Roman"
+    SIZE="2">каждое прерывание в момент его
+    возникновения.</p>
+    <p ALIGN="JUSTIFY">При выполнении данной программы можно
+    наблюдать, что счетчик</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">прерывания в диалоговом блоке
+    непрерывно увеличивается, указывая</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">количество выполненных
+    операций ввод-вывода.</font><font FACE="Courier New" SIZE="2"></p>
+    <p>_____________________________________________________________________</p>
+    <p>#include</p>
+    <p>#include &quot;bogus.h&quot;</p>
+    <p>#include &quot;wintest.h&quot;</p>
+    <p>HANDLE hPgmInstance ;</p>
+    <p>#define IDM_BOGUSEVENT 0x3000</p>
+    <p>void CenterWindow(HWND hWnd)</p>
+    <p>{</p>
+    <p>int xSize, ySixe, xPos, yPos ;</p>
+    <p>RECT rc ;</p>
+    <p>xSize = GetSystemMetrics(SM_CXSCREEN) ;</p>
+    <p>ySize = GetSystemMetrics(SM_CYSCREEN) ;</p>
+    <p>GetWindowRect(hWnd, &amp;rc) ;</p>
+    <p>xPos = (xSize - (rc.right - rc.left)) / 2 ;</p>
+    <p>yPos = (ySize - (rc.bottom - rc.top)) / 2 ;</p>
+    <p>SetWindowRect(hWnd, NULL, xPos, yPos, 0, 0,</p>
+    <p>SWP_DRAWFRAME | SWP_NOSIZE | SWP_NOZORDER) ;</p>
+    <p>}</p>
+    <p>LRESULT _loadds FAR PASCAL MainDlgProc(HWND hwndDlg,</p>
+    <p>UINT msg, WPARAM wParam, LPARAM lParam)</p>
+    <p>{</p>
+    <p>static WORD wCountTotal = 0;</p>
+    <p>WORD wCount ;</p>
+    <p>lParam = lParam ;</p>
+    <p>switch (msg)</p>
+    <p>{</p>
+    <p>case WM_INITDIALOG:</p>
+    <p>RemoveMenu(GetSystemMenu(hwndDlg,0),</p>
+    <p>SC_CLOSE,MF_BYCOMMAND) ;</p>
+    <p>BogusStart(hwndDlg, IDM_BOGUSEVENT) ;</p>
+    <p>break ;</p>
+    <p>case WM_SHOWWINDOW:</p>
+    <p>if (wParam)</p>
+    <p>CenterWindow(hwndDlg) ;</p>
+    <p>break ;</p>
+    <p>case WM_COMMAND:</p>
+    <p>switch (wParam)</p>
+    <p>{</p>
+    <p>case IDM_BOGUSEVENT:</p>
+    <p>wCount = BogusGetEvent() ;</p>
+    <p>while 9wCount)</p>
+    <p>{</p>
+    <p>wCountTotal += wCount ;</p>
+    <p>wCount = BogusGetEvent() ;</p>
+    <p>}</p>
+    <p>SetDlgItemInt(hwndDlg, IDM_COUNT, wCountTotal, FALSE);</p>
+    <p>break ;</p>
+    <p>case IDCANCEL:</p>
+    <p>EndDialog(hwndDlg, 0) ;</p>
+    <p>break ;</p>
+    <p>}</p>
+    <p>break ;</p>
+    <p>default:</p>
+    <p>return FALSE ;</p>
+    <p>}</p>
+    <p>return TRUE ;</p>
+    <p>}</p>
+    <p>int PASCAL WinMain(HANDLE hInstance, HANDLE hPrevInstance,</p>
+    <p>LPSTR lpCmdLine, intnCmdShow)</p>
+    <p>{</p>
+    <p>hPgmInstance = hInstance ;</p>
+    <p>hPrevInstance = hPrevInstance ;</p>
+    <p>lpCmdLine = lpCmdLine ;</p>
+    <p>nCmdShow = nCmdShow ;</p>
+    <p>if (!hPrevInstance)</p>
+    <p>{</p>
+    <p>if (BogusCheck())</p>
+    <p>{</p>
+    <p>if (MessageBox(0, &quot;Press OK to begin bogus I/O&quot;,</p>
+    <p>&quot;WinTest&quot;, MB_OKCANCEL|MB_APPLMODAL) == IDOK)</p>
+    <p>{</p>
+    <p>DialogBox(hPgmInstance, &quot;MainDlg&quot;, 0,</p>
+    <p>(FARPROC) MainDlgProc) ;</p>
+    <p>BogusStop() ;</p>
+    <p>}</p>
+    <p>}</p>
+    <p>else</p>
+    <p>MessageBox(0, &quot;Bogus device not found&quot;, &quot;WinTest&quot;,</p>
+    <p>MB_ICOMMAND|MB_OK|MB_APPLMODAL) ;</p>
+    <p>}</p>
+    <p>else</p>
+    <p>MessageBox(0, &quot;Another instance already running&quot;,</p>
+    <p>&quot;WinTest&quot;, MB_ICONEXCLAMATION|MB_OK|MB_APPLMODAL) ;</p>
+    <p>return 0 ;</p>
+    <p>}</p>
+    <p>______________________________________________________________________</p>
+    <p><i>&nbsp;</p>
+    <p>Листинг 5. Программа wintest.c.</i></p>
+    <p></font><font FACE="Arial">&nbsp;</p>
+    <p>Драйвер виртуального устройства</font><font
+    FACE="Times New Roman" SIZE="2"></p>
+    <p ALIGN="JUSTIFY">Файл vxd2.asm (листинги 6 и 7) представляет
+    собой исходный код</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">драйвера фиктивного
+    устройства. Следует отметить, что для того, чтобы</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">построить этот
+    драйвер, необходимо иметь комплект драйверов
+    устройств</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">(Device
+    Driver Kit - DDK) системы Windows фирмы Microsoft, т.к. код</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">написан для
+    32-битового ассемблера, предусмотренного в
+    комплекте DDK</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">(MASM5).
+    Результирующий модуль может быть скомпонован
+    только</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">DDK-компоновщиком
+    LINK386 и утилитой послекомпоновочной обработки</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">ADDHDR. Кроме того,
+    данный исходный код ссылается на определенное</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">количество
+    включаемых файлов (include files), которые входят в
+    состав</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">только
+    комплекта DDK.</p>
+    <p ALIGN="JUSTIFY">Как было указано, типичный драйвер VxD
+    содержит обязательные</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">включаемые файлы, а кроме того
+    он начинается с вызова макроса Declare</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">_Virtual_Device, который создает блок
+    данных, описывающий виртуальный</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">драйвер для ядра системы Windows.
+    Этот блок данных, фактически, -единственное
+    обозначение, экспортируемое из драйвера VxD. Все</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">остальные точки
+    входа являются производными от данных,
+    содержащихся</font><font SIZE="2"> </font><font FACE="Times New Roman"
+    SIZE="2">внутри. Кроме всего прочего, данный макрос
+    описывает имя устройства,</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">порядок его инициализации и его
+    точки входа. Виртуальный драйвер VxD</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">может обслуживать запросы
+    приложений как в реальном, так и в защищенном
+    режимах. Точки входа для такого обслуживания
+    также описываются</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">данным макросом.</font><font
+    FACE="Courier New" SIZE="2"></p>
+    <p>_____________________________________________________________________</p>
+    <p>PAGE ,132</p>
+    <p>title VxD2B.ASM - Пример драйвера устройства #2b</p>
+    <p>;EM VxD2B - Пример драйвера устройства #2b</p>
+    <p>;</p>
+    <p>; Copyright 1992, Cherry Hill Software</p>
+    <p>; All rights reserved</p>
+    <p>;</p>
+    <p>; SUMMARY (Резюме)</p>
+    <p>; Данный драйвер имитирует прерываемое
+    устройство. Порт</p>
+    <p>; управления (выход) имеет следующее назначение
+    битов:</p>
+    <p>;</p>
+    <p>; Бит 0 - Начать (Start) ввод-вывод. Запись нуля в
+    данный бит</p>
+    <p>; начинает пересылку ввода-вывода. Пересылка
+    длится</p>
+    <p>; около 1/10 секунды. Запись единицы в этот бит не</p>
+    <p>; дает результата.</p>
+    <p>;</p>
+    <p>; Бит 1 - Устройству посылается EOI. Запись нуля в
+    данный бит</p>
+    <p>; приводит к посылке признака &quot;Конец
+    прерывания&quot; (End-</p>
+    <p>; of-interrupt - EOI) устройству и удаляет любой запрос</p>
+    <p>; на отложенное прерывание. Запись единицы в
+    этот бит не</p>
+    <p>; дает результата.</p>
+    <p>; Все остальные биты: Всегда записываются
+    единицы для дальнейшей</p>
+    <p>; совместимости.</p>
+    <p>;</p>
+    <p>; При чтении порта следующие значения
+    возвращаются:</p>
+    <p>;</p>
+    <p>; Бит 0 - Первоначально присваивается значение 1,
+    бит</p>
+    <p>; сбрасывается, когда бит 1 выходного порта
+    сбрасывается,</p>
+    <p>; и устанавливается, когда добавляется запрос
+    на</p>
+    <p>; прерывание. Данный бит равен нулю, когда
+    устройство</p>
+    <p>; передает данные и устанавливается в 1, чтобы
+    указать,</p>
+    <p>; когда передача завершена.</p>
+    <p>;</p>
+    <p>; Бит 1 - Первоначально присваивается значение 1,
+    бит</p>
+    <p>; сбрасывается, когда добавляется запрос на
+    прерывание и</p>
+    <p>; устанавливается, когда устройство удаляет
+    запрос на</p>
+    <p>; прерывание. Значение данного бита, равное
+    нулю,</p>
+    <p>; указывает на отложенное прерывание, бит
+    устанавливается</p>
+    <p>; в 1, если нет отложенного прерывания.</p>
+    <p>;</p>
+    <p>; Все остальные биты: возвращаемое значение
+    игнорируется для</p>
+    <p>; дальнейшей совместимости.</p>
+    <p>;</p>
+    <p>; WARNINGS (Предупреждения)</p>
+    <p>;</p>
+    <p>;</p>
+    <p>.386p</p>
+    <p>.xlist</p>
+    <p>include vmm.inc</p>
+    <p>include debug.inc</p>
+    <p>include v86mmgr.inc</p>
+    <p>include vpicd.inc</p>
+    <p>include ..\include\bogus.inc</p>
+    <p>.list</p>
+    <p>VM_Not_Executable equ VM_Not_Executeable ; acckk;</p>
+    <p>subttl VxD Declaration/Definition</p>
+    <p>VxD2B_Init_Order equ VNETBIOS_Init_Order+100 ; Данная операция</p>
+    <p>выполняется после запуска виртуальной сети</p>
+    <p>VxD2B_Device_ID equ Bogus_Device_ID</p>
+    <p>Declare_Virtual_Device VXD2, 1, 0, Vxd2B_Control, VxD2B_Device_ID, \</p>
+    <p>VxD2B_Init_Order</p>
+    <p>VxD_DATA_SEG</p>
+    <p>;</p>
+    <p>; Структура дескриптора виртуального
+    прерывания</p>
+    <p>;</p>
+    <p>; Данная структура передается VPIDC_Virtualize_IRQ. В
+    данной</p>
+    <p>; структуре описывается уровень прерывания,
+    процедура прерывания</p>
+    <p>; аппаратных средств, и процедура, которую
+    вызывает VPICD, когда</p>
+    <p>; прерывание диспетчируется в виртуальной
+    машине VM и когда VM</p>
+    <p>; возвращается из прерывания.</p>
+    <p>;</p>
+    <p>IRQD VPICD_IRQ_Descriptor</p>
+    <p>hIRQ dd -1 ; обработчик IRQ</p>
+    <p>hOwner dd -1 ; обработчик, владеющий VM</p>
+    <p>hTimeout dd 0 ; обработчик к обратному вызову по
+    тайм-ауту</p>
+    <p>bFakeData dd 01111111b ; имитировать данные порта
+    ввода-вывода</p>
+    <p>VxD_DATA_ENDS</p>
+    <p>subttl Dispatch VxD Control</p>
+    <p>VxD_LOCKED_CODE_SEG</p>
+    <p>BeginProc CheckOwner, NO_LOG</p>
+    <p>cmp ebx,hOwner</p>
+    <p>jne short col</p>
+    <p>ret ; выйти, если вызывается владелец</p>
+    <p>col:</p>
+    <p>cmp hOwner,-1</p>
+    <p>jne short co2 ; пропустить, если вызов не владельца</p>
+    <p>mov hOwner,ebx ;установить владельца</p>
+    <p>ret</p>
+    <p>co2:</p>
+    <p>mov al,-1</p>
+    <p>ret</p>
+    <p>EndProc CheckOwner</p>
+    <p>BeginProc TimeoutProc</p>
+    <p>mov hTimeout,0 ;почистить обработчик</p>
+    <p>cmp edx,hOwner ; все еще тот же владелец?</p>
+    <p>jne short tol ; пропустить, если нет</p>
+    <p>test bFakeData,FAKE_STAT_BUSY ;отложенный ввод-вывод?</p>
+    <p>jnz short tol ; пропустить, если нет</p>
+    <p>cmp hOwner,-1 ; имеется ли владелец?</p>
+    <p>je short tol ; пропустить, если нет</p>
+    <p>mov eax,hIRQ</p>
+    <p>mov ebx,hOwner</p>
+    <p>VxDcall VPICD_Set_Int_Request ;добавить прерывание</p>
+    <p>mov al,bFakeData</p>
+    <p>and al,NOT (FAKE_STAT_IRQ) ; указывает также в порте
+    состояния</p>
+    <p>or al,FAKE_STAT_BUSY ; указывает, что больше не занято</p>
+    <p>mov bFakeData,al</p>
+    <p>tol:</p>
+    <p>ret</p>
+    <p>End Proc TimeoutProc</p>
+    <p>;IP Port_IO_Callback - выполняет доступ к FAKE_PORT</p>
+    <p>;</p>
+    <p>; ENTRY (вход)</p>
+    <p>; EAX - выходное значение (для выходных
+    операторов)</p>
+    <p>; EBX - обработчик к текущему VM</p>
+    <p>; ECX - тип операции ввода-вывода</p>
+    <p>; DS,ES - FLAT</p>
+    <p>;</p>
+    <p>; EXIT (выход)</p>
+    <p>; EAX - входное значение (для входных операторов)</p>
+    <p>;</p>
+    <p>; WARNINGS (предупреждения)</p>
+    <p>;</p>
+    <p>; NOTES (примечания)</p>
+    <p>; Следует отметить, что мы даже не смотрим
+    регистровый фрейм</p>
+    <p>; клиента.</p>
+    <p>;</p>
+    <p>; Мы просто читаем и увеличиваем.</p>
+    <p>;</p>
+    <p>; CALLS (вызовы)</p>
+    <p>BeginProc Port_IO_Callback, NO_LOG</p>
+    <p>Dispatch_Byte_IO Fall_through,Port_Output_Callback</p>
+    <p>Port_Input_Callback:</p>
+    <p>call CheckOwner</p>
+    <p>jc short ioexit</p>
+    <p>mov al,bFakeData</p>
+    <p>or bFakeData,FAKE_STAT_ERROR ; почистить отложенную ошибку</p>
+    <p>ioexit:</p>
+    <p>ret</p>
+    <p>Port_Output_Callback:</p>
+    <p>call CheckOwner</p>
+    <p>jc short ioexit ;игнорировать ввод-вывод, если не
+    владелец</p>
+    <p>test al,FAKE_CTL_START</p>
+    <p>jnz short,poc1 ;пропустить, если не начинается
+    ввод-вывод</p>
+    <p>test bFakeData,FAKE_START_BUSY</p>
+    <p>jz short,poc1 ;пропустить, если уже занято</p>
+    <p>test bFakeData,FAKE_START_IRQ</p>
+    <p>jz short,poc1 ;пропустить, если отложенное IRQ</p>
+    <p>push eax</p>
+    <p>push edx</p>
+    <p>and bFakeData,NOT (FAKE_STAT_ERROR) ; предположить ошибку</p>
+    <p>mov eax,100 ; обратный вызов в 1/10 секунды</p>
+    <p>mov edx,hOwner ; передать владельца обратному вызову</p>
+    <p>mov esi,OFFSET32 TimeoutProc</p>
+    <p>VMMcall Set_VM_Time_Out</p>
+    <p>pop edx</p>
+    <p>pop eax</p>
+    <p>or esi,esi</p>
+    <p>jz short,poc1 ;пропустить, если ошибка</p>
+    <p>and bFakeData,NOT (FAKE_STAT_BUSY) ; указать на занятость</p>
+    <p>or bFakeData,FAKE_STAT_ERROR ; в противном случае почистить</p>
+    <p>индикацию ошибки</p>
+    <p>mov hTimeout,esi ;сохранить обработчик тайм-аута</p>
+    <p>poc1:</p>
+    <p>test al,FAKE_CTL_EOI</p>
+    <p>jnz short poc2 ; пропустить, если не посылается EOI</p>
+    <p>test bFakeData,FAKE_STAT_IRQ ;прерывание отложено?</p>
+    <p>jnz short poc2 ; пропустить, если нет</p>
+    <p>or bFakeData,FAKE_STAT_IRQ ;показать, что прерывание уже не-</p>
+    <p>отложеное</p>
+    <p>push eax</p>
+    <p>mov eax,hIRQ</p>
+    <p>VxDcall VPICD_Clear_Int_Request</p>
+    <p>pop eax</p>
+    <p>poc2:</p>
+    <p>ret</p>
+    <p>EndProc Port_IO_Callback</p>
+    <p>; ECX == 0 if unmasking (enabling), ECX != 0 if masking (disabling).</p>
+    <p>BeginProc VxD2_Mask_Change_Proc</p>
+    <p>call CheckOwner</p>
+    <p>jc short mcp9 ; игнорировать, если нет владельца</p>
+    <p>jcxz mcp9 ; пропустить, если не маскировано
+    (включено)</p>
+    <p>;</p>
+    <p>; Владелец освобождает управление. Разрешается
+    другой VM войти в</p>
+    <p>; систему.</p>
+    <p>;</p>
+    <p>mov hOwner,-1 ; почистить владельца</p>
+    <p>mcp9:</p>
+    <p>ret</p>
+    <p>EndProc VxD2_Mask_Change_Proc</p>
+    <p>; Вызывается, когда выполняется программа ISR</p>
+    <p>BeginProc VxD2_VInt_Proc</p>
+    <p>mov eax,High_Pri_Device_Boost</p>
+    <p>VMMCall Adjust_Exec_Priority ;повышенный приоритет для
+    начальной</p>
+    <p>обработки</p>
+    <p>ret</p>
+    <p>EndProc VxD2_VInt_Proc</p>
+    <p>; вызывается при возврате из программы ISR (IRETs)</p>
+    <p>BeginProc VxD2_IRET_Proc</p>
+    <p>mov eax,-(High_Pri_Device_Boost)</p>
+    <p>VMMCall Adjust_Exec_Priority ;восстановить приоритет</p>
+    <p>ret</p>
+    <p>EndProc VxD2_IRET_Proc</p>
+    <p>ifdef DEBUG</p>
+    <p>BeginProc VxD2B_Debug_Query</p>
+    <p>Trace_Out &quot;VxD2 has no debug command support.&quot;</p>
+    <p>clc</p>
+    <p>ret</p>
+    <p>End Proc VxD2B_Debug_Query</p>
+    <p>endif</p>
+    <p>;</p>
+    <p>; VxD2B_Control</p>
+    <p>;</p>
+    <p>CtlDisp macro x</p>
+    <p>Control_Dispatch x, VxD2B_&amp;x</p>
+    <p>endm</p>
+    <p>Begin_Control_Dispatch VxD2B</p>
+    <p>CtlDisp Device_Init</p>
+    <p>ifdef DEBUG</p>
+    <p>CtlDisp Debug_Query</p>
+    <p>endif</p>
+    <p>End_Control_Dispatch VxD2B</p>
+    <p>VxD_LOCKED_CODE_ENDS</p>
+    <p>VxD_CODE_SEG</p>
+    <p>VxD_CODE_ENDS</p>
+    <p>subttl VxD Initialization</p>
+    <p>VxD_ICODE_SEG</p>
+    <p>; EP VxD2B_Device_Init - Некритическая инициализация
+    устройства</p>
+    <p>;</p>
+    <p>; ENTRY (вход)</p>
+    <p>; EBP - фрейм клиента</p>
+    <p>; EBX - системный обработчик VM</p>
+    <p>; DS,ES - FLAT</p>
+    <p>;</p>
+    <p>; EXIT (выход)</p>
+    <p>; SUCCESS (успешный)</p>
+    <p>; Carry clear (&quot;нет переноса&quot;)</p>
+    <p>; FAILURE (аварийный)</p>
+    <p>; Carry set (&quot;есть перенос&quot;)</p>
+    <p>;</p>
+    <p>;</p>
+    <p>; WARNINGS (предупреждения)</p>
+    <p>;</p>
+    <p>; NOTES (примечания)</p>
+    <p>;</p>
+    <p>; CALLS (вызовы)</p>
+    <p>;</p>
+    <p>BeginProc VxD2B_Device_Init</p>
+    <p>Debug_Out &quot;VxD2B_Device_Init&quot;</p>
+    <p>mov edi,OFFSET32 IRQD</p>
+    <p>VxDcall VPICD_Virtualize_IRQ ; виртуализировать прерывание</p>
+    <p>jc short vdi1 ; выход, если ошибка</p>
+    <p>mov hIRQ,eax ; сохранить обработчик</p>
+    <p>mov edx,FAKE_PORT</p>
+    <p>mov esi,OFFSET32 Port_IO_Callback</p>
+    <p>VMMCall Install_IO_Handler</p>
+    <p>VMMCall Enable_Global_Trapping ;</p>
+    <p>clc ; нет ошибки</p>
+    <p>vdi1:</p>
+    <p>ret</p>
+    <p>EndProc VxD2B_Device_Init</p>
+    <p>VxD_ICODE_ENDS</p>
+    <p>VxD_REAL_INIT_SEG</p>
+    <p>VxD2B_Real_Init LABEL FAR ;вызывается перед тем, как
+    система Windows</p>
+    <p>входит в защищенный режим</p>
+    <p>mov ax,Device_Load_OK ;позволяет VxD загрузиться</p>
+    <p>xor bx,bx ; нет исключенных (Exclude) страниц EMM</p>
+    <p>xor si,si ; нет элементов экземпляров данных</p>
+    <p>; передать edx немодифицированным</p>
+    <p>ret</p>
+    <p>VxD_REAL_INIT_ENDS</p>
+    <p>END VxD2B_Real_Init</p>
+    <p>_____________________________________________________________________<i></p>
+    <p>Листинг 6. Программа vxd2.asm</i></p>
+    <p>_____________________________________________________________________</p>
+    <p>LIBRARY VXD2</p>
+    <p>DESCRIPTION 'Enhanced Windows VXD2(B) Device (Version 1.0)'</p>
+    <p>EXETYPE DEV386</p>
+    <p>SEGMENTS</p>
+    <p>_LTEXT PRELOAD NONDISCARDABLE</p>
+    <p>_LDATA PRELOAD NONDISCARDABLE</p>
+    <p>_ITEXT CLASS 'ICODE' DISCARDABLE</p>
+    <p>_IDATA CLASS 'ICODE' DISCARDABLE</p>
+    <p>_TEXT CLASS 'PCODE' NONDISCARDABLE</p>
+    <p>_DATA CLASS 'PCODE' NONDISCARDABLE</p>
+    <p>EXPORTS</p>
+    <p>VXD2_DDB @1</p>
+    <p>_____________________________________________________________________</p>
+    <p><i>&nbsp;</p>
+    <p>Листинг 7. Программа vxd2.def</i></font><font FACE="Arial"></p>
+    <p>События, управляющие устройством</font><font
+    FACE="Times New Roman" SIZE="2"></p>
+    <p ALIGN="JUSTIFY">По мере того, как система Windows в своей
+    работе проходит</font><font SIZE="2"> </font><font FACE="Times New Roman"
+    SIZE="2">различные стадии, начиная со стадии
+    инициализации самой системы,</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">через инициализацию
+    виртуальной машины VM и так далее, каждый</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">установленный
+    драйвер VxD вызывается неоднократно, а именно один
+    раз</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">на
+    каждую стадию. В таблице, приведенной ниже,
+    перечисляются фазы</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">системы Windows и главные события,
+    для которых вызывается каждый</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">драйвер VxD.</font><font FACE="Courier New"
+    SIZE="2"></p>
+    <p>Таблица</p>
+    <p>Управляющие сообщения драйвера VxD</p>
+    <p>-------------------+--------------------------------------------------</p>
+    <p>Sys_Critical_Init | Первое управляющее событие;
+    прерывания</p>
+    <p>| отключаются. Драйвер VxD определяет готовность</p>
+    <p>| устройства.</p>
+    <p>-------------------+--------------------------------------------------</p>
+    <p>Device_Init | Прерывания разрешаются; драйвер VxD
+    инициализиру-</p>
+    <p>| ет устройство; могут быть вызваны программы и</p>
+    <p>| драйверы системы DOS.</p>
+    <p>-------------------+--------------------------------------------------</p>
+    <p>Init_Complete | Указывает, что все драйверы VxD прошли
+    стадию</p>
+    <p>| Device_Init.</p>
+    <p>-------------------+--------------------------------------------------</p>
+    <p>System_Exit | Указывает, что система Windows готовится к</p>
+    <p>| закрытию и возврату в систему DOS. Память для</p>
+    <p>| системы DOS восстановлена в состояние, которое</p>
+    <p>| было до работы системы Windows.</p>
+    <p>-------------------+--------------------------------------------------</p>
+    <p>Sys_Critical_Exit | Последнее управляющее событие;
+    прерывания</p>
+    <p>| отключаются.</p>
+    <p>-------------------+--------------------------------------------------</p>
+    <p>Create_VM | Вызывается перед моментом создания
+    виртуальной</p>
+    <p>| машины VM; драйвер VxD указывает, доступны ли</p>
+    <p>| ресурсы для создания виртуальной машины VM.</p>
+    <p>-------------------+--------------------------------------------------</p>
+    <p>VM_Critical_Init | Вторая фаза создания виртуальной
+    машины VM.</p>
+    <p>-------------------+--------------------------------------------------</p>
+    <p>VM_Init | Третья фаза создания виртуальной машины
+    VM.</p>
+    <p>Sys_VM_Init | Драйвер VxD может аварийно завершить
+    работу</p>
+    <p>| виртуальной машины VM.</p>
+    <p>-------------------+--------------------------------------------------</p>
+    <p>Query_Destroy | Позволяет драйверу VxD предупредить
+    пользователя</p>
+    <p>| о затруднениях при разрушении виртуальной
+    машины</p>
+    <p>| VM.</p>
+    <p>-------------------+--------------------------------------------------</p>
+    <p>VM_Terminate | Первая стадия успешного завершения
+    виртуальной</p>
+    <p>Sys_VM_Terminate | машины VM. Если это системная
+    виртуальная</p>
+    <p>| машина VM, то сообщение указывает, что</p>
+    <p>| производится нормальное, вызванное
+    пользователем,</p>
+    <p>| завершение системы Windows.</p>
+    <p>-------------------+--------------------------------------------------</p>
+    <p>VM_Not_Executeable | Виртуальная машина VM закрывается.
+    Первая стадия</p>
+    <p>| аварийного завершения виртуальной машины VM.</p>
+    <p>-------------------+--------------------------------------------------</font><font
+    FACE="Times New Roman" SIZE="2"></p>
+    <p ALIGN="JUSTIFY">Драйвер VxD примера выполняет
+    управление только фазой</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">Device_Init. На этой стадии
+    устанавливается связь с портом ввода-вывода и
+    уровнем прерывания 11, а также производится их</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">виртуализация.
+    Обычно драйвер VxD виртуализирует порты
+    ввода-вывода и</font><font SIZE="2"> </font><font FACE="Times New Roman"
+    SIZE="2">прерывание в соответствии с физическим
+    аппаратным оборудованием. Но в</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">данном случае драйвер VxD может
+    виртуализировать и делает это с</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">портом и прерыванием, которые
+    не имеют соответствующего подключенного</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">аппаратного
+    оборудования.</p>
+    <p ALIGN="JUSTIFY">Код Install_IO_Handler вызывается, чтобы
+    виртуализировать</font><font SIZE="2"> </font><font FACE="Times New Roman"
+    SIZE="2">единственный порт ввода-вывода. Затем
+    всякий раз, когда</font><font SIZE="2"> </font><font FACE="Times New Roman"
+    SIZE="2">осуществляется доступ к описанному порту
+    ввода-вывода из виртуальной</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">машины VM, программа управления
+    виртуальной машиной системы Windows</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">(Virtual Machine Manager - VMM) вызывает
+    обратно драйвер VxD для</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">того, чтобы разрешить ему
+    имитировать операции ввода-вывода.</p>
+    <p ALIGN="JUSTIFY">Код VPICD_Virtualize_IRQ вызывается, чтобы
+    виртуализировать</font><font SIZE="2"> </font><font FACE="Times New Roman"
+    SIZE="2">уровень прерывания. Выполняя его, можно
+    имитировать прерывание</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">аппаратного оборудования (в
+    частности IRQ 11) в виртуальной машине.</font><font
+    FACE="Arial"></p>
+    <p>&quot;Фиктивное&quot; устройство</font><font FACE="Times New Roman"
+    SIZE="2"></p>
+    <p ALIGN="JUSTIFY">Когда к порту ввода-вывода (141)
+    устройства осуществляется</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">доступ виртуальной машиной VM
+    (либо в реальном, либо в защищенном</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">режиме), то машина вызывает
+    программу драйвера VxD Port_IO_Callback</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">(см. Листинг 6). В этой программе
+    подпрограмма Dispatch_Byte_IO</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">сводит большое количество
+    возможных типов доступа ввода-вывода (а</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">именно: byte, word, dword,
+    string и т.д.) к двум: байтовому вводу и</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">байтовому выводу.</p>
+    <p ALIGN="JUSTIFY">Для устройства из примера байтовый
+    ввод представляет собой чтение</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">из регистра состояния
+    устройства. Он возвращает просто переменную,</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">которая
+    сохраняется в памяти.</p>
+    <p ALIGN="JUSTIFY">Байтовый вывод - немного более сложная
+    операция, так как</font><font SIZE="2"> </font><font FACE="Times New Roman"
+    SIZE="2">представляет фактическую работу
+    устройства. При запуске устройства</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">также запускается таймер,
+    который выполняет обратный вызов (к коду</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">TimeoutProc) в течении 1/10
+    секунды и устанавливает состояние BUSY.</font><font SIZE="2">
+    </font><font FACE="Times New Roman" SIZE="2">Если вывод подтверждает
+    прием прерывания, то производится очистка</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">виртуального
+    запроса на прерывание путем вызова кода
+    VPICD_Clear_Int_Request и очистка состояния в регистре
+    состояния.</p>
+    <p ALIGN="JUSTIFY">Обратный вызов кода TimeoutProc
+    представляет завершение операции</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">ввода-вывода на устройстве и
+    именно в данный момент он моделирует</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">прерывание аппаратного
+    оборудования к виртуальной машине VM путем</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">вызова кода
+    VPICD_Clear_Int_Request и очистки состояния занятости</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">устройства.
+    Драйвер устройства в приложениях dostest и wintest
+    будет</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">обычно
+    обрабатывать прерывание путем подтвержения
+    приема его (посылая</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">EOI) и повторного запуска
+    процесса на всем протяжении снова.</p>
+    <p ALIGN="JUSTIFY">Следует отметить процедуры VxD2_VInt_Proc и
+    VxD2_IRET _Proc. На</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">данные
+    две процедуры существует ссылка в структуре,
+    которая</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">передается
+    коду VPICD_Virtualize_IRQ. Они вызываются в начале и конце</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">процесса
+    виртуализации прерывания в виртуальную машину VM.
+    Все их</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">функции
+    сводятся к увеличению и сохранению приоритета
+    виртуальной</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">машины
+    VM, которая временно обрабатывает данное
+    прерывание. Таким</font><font SIZE="2"> </font><font FACE="Times New Roman"
+    SIZE="2">способом драйвер VxD может управлять
+    приоритетом виртуальной машины</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">VM, которая считается
+    соответствующей. (Всегда желательно, чтобы</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">программа
+    обслуживания прерывания в любой виртуальной
+    машине VM имела</font><font SIZE="2"> </font><font FACE="Times New Roman"
+    SIZE="2">приоритет выше, чем приоритет обычной
+    обработки в других виртуальных</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">машинах VM.)</font><font FACE="Arial"></p>
+    <p>Установка драйвера VxD</font><font FACE="Times New Roman" SIZE="2"></p>
+    <p ALIGN="JUSTIFY">После построения драйвера VxD, до
+    первого обращения к нему</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">программы Windows необходимо
+    добавить его как строку device= в</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">секцию [386Enh] кода system.ini. Система
+    Windows должна быть запущена</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">заново, чтобы включить драйвер
+    VxD и виртуальное устройство. После</font><font SIZE="2"> </font><font
+    FACE="Times New Roman" SIZE="2">этого, можно выполнять и
+    тестировать приложения dostest и wintest.</font><font FACE="Arial"></p>
+    <p>Заключение</font><font FACE="Times New Roman" SIZE="2"></p>
+    <p>Хотя драйверы устройств системы Windows кажутся в
+    настоящее</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">время
+    очень сложными, обычные и виртуальные драйверы
+    устройств</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">предоставляют
+    огромное количество возможностей. Однако
+    следует</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">учитывать,
+    насколько более сложными они должны быть на
+    машине MIPS,</font><font SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">эксплуатирующей
+    систему Windows NT и код эмулятора 80x86, чтобы</font><font
+    SIZE="2"> </font><font FACE="Times New Roman" SIZE="2">обеспечить работу
+    виртуальной машины системы MS-DOS.</font></p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

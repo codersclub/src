@@ -1,0 +1,181 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h2>Программирование под модем.</h2>
+    <p>Чтобы постоянно опрашивать модем на предмет
+    поступления новых символов надо открыть
+    дополнительный поток с бесконечным циклом. </p>
+    <pre>
+//Прототип функции дополнительного потока.
+UINT TerminalThread(LPVOID arg);
+
+DWORD dwCount;
+DCB dcb;
+HANDLE hCommPort;
+DWORD Errors;
+COMSTAT pComStat;
+COMMTIMEOUTS CommTimeouts;
+
+UINT TerminalThread(LPVOID arg)
+{
+	//Открытие порта
+	hCommPort = CreateFile(options.Port, GENERIC_READ
+	| GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 
+	FILE_FLAG_OVERLAPPED, 0);
+
+	 //Получаем настройки порта
+	GetCommState(hCommPort, &amp;dcb);
+	
+	//Меняем часть настроек на свои
+	dcb.BaudRate = 9600;	//Скорости в бодах
+	dcb.ByteSize = 8; 	//Байты информации
+	dcb.Parity = NOPARITY;	//Четность
+	dcb.StopBits = ONESTOPBIT; //Кол-во стоп. битов
+
+	//Устанавливаем новые настройки
+	SetCommState(hCommPort, &amp;dcb);  
+
+	/* Установка таймаутов. 
+	Служит, чтобы программа не висла
+	в ожидании ответа от модема */
+	GetCommTimeouts(hCommPort,&amp;CommTimeouts);
+
+	CommTimeouts.ReadIntervalTimeout = 50;
+	CommTimeouts.ReadTotalTimeoutMultiplier = 1;
+	CommTimeouts.ReadTotalTimeoutConstant = 50;
+	CommTimeouts.WriteTotalTimeoutMultiplier = 1;
+	CommTimeouts.WriteTotalTimeoutConstant = 50;
+
+	SetCommTimeouts(hCommPort,&amp;CommTimeouts);
+
+	//Очистка буфера (На всякий случай)
+	FlushFileBuffers(hCommPort); 
+	
+	//Цикл опроса модема
+	for (;;) {
+		//Опрос модема
+ 		ReadFile(hCommPort, &amp;ch, 1, &amp;dwCount, NULL);
+      		if(ch) //Проверка на наличие символа
+   		{
+			//Вывод поступившего символа
+   			Функция_форматированного_вывода_символа(&amp;ch,1);
+		};
+   		ch = 0; 
+	}
+	return 0;
+}
+</pre>
+    <h2>Класс ввода/вывода HCSVIEW</h2>
+    <p>Ниже приведенный класс предназначен для
+    форматированного ввода/вывода. По интерфейсу
+    класс максимально близок к средствам
+    ввода/вывода под Dos. Т.е. вам придется только
+    задать окно и текст, который надо вывести в этом
+    окне, все остальное класс берет на себя. Текст,
+    который не помещается в окне будет автоматически
+    перенесен на следующую строку. Также класс
+    понимает символы возврата каретки и перехода на
+    следующую строку. Чтобы осуществить прокрутку в
+    окне, надо всего лишь перенаправить данные
+    получаемые по сообщению ON_WM_SCROLL соответствующей
+    функции класса. </p>
+    <h3>Класс HCSView:</h3>
+    <code><pre>class HCSView : public CWnd
+{
+char ch;
+TEXTMETRIC Font;
+RECT WinPos;
+char Buf[10000];
+int MaxX,MaxY,x,y,ScrollRange,ScrollPos;
+int Bufi;
+CClientDC *dcCompPtr;
+CBrush membrush;
+CBitmap VirtWin;
+CWnd *WinPtr;
+CDC memdc;
+int FullLineSize;
+public:
+	
+//Функция прокрутки.
+void HSScroll(UINT SBCode, UINT Pos, CScrollBar *SB);
+
+//Установить шрифт. NewFont - новый шрифт.
+void HSSetFont(LOGFONT NewFont);
+
+//Установить цвет текста.
+void HSSetTextColor(COLORREF TextColor);
+
+/*
+Функция вывода текста.
+Заносит данные в буфер
+И вызывает функцию HFillVirtWin.
+*str - указатель на строку.
+l - длинна строки.
+*/
+void HSTextOut(char *str, int l);
+
+/*
+Функция перерисовки виртуального окна.
+Выводит данные и буфера в виртуальное окно.
+Имеет смысл вызывать при изменении размеров окна.
+При получении сообщения ON_WM_SIZE
+Функцию нужно вызывать без аргументов:
+HFillVirtWin();
+*/
+void HFillVirtWin(int csr = 1,int nw = 1,int bp = 0);
+
+/*
+Функция копирования виртуального окна в
+реальное. Нужно вызывать при каждом сообщении
+	WM_ON_PAINT
+	*/
+void HSCopyVtR();
+
+//Конструктор класса.
+HCSView(CWnd *SWinPtr);
+};
+</code></pre>
+    <h3>Пример работы с классом</h3>
+    <code><pre>/*
+Пример части программы выводящий символы,
+поступающие с клавиатуры, на экран.
+MainWin - объект класса (CMainWin) окна 
+в которое будет выводится текст.
+*/
+
+HCSView View(&amp;MainWin); 
+
+//Вывод символа на экран
+afx_msg void CMainWin::OnChar(UINT ch, UINT count, UINT flag)
+{
+View.HSTextOut(&amp;c,1);
+}
+
+//Прокрутка
+afx_msg void CMainWin::OnVScroll(UINT SBCode, 
+UINT Pos, CScrollBar *SB)
+{
+ View.HSScroll(SBCode,Pos,SB);
+}
+
+//Перерисовка окна
+afx_msg void CMainWin::OnPaint()
+{
+	View.HSCopyVtR();
+}
+
+//Форматирования текста,
+//при изменении размеров окна.
+afx_msg void CMainWin::OnSize(UINT nType, int cx, int cy)
+{
+	View.HFillVirtWin();
+}
+</code></pre>
+    </td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

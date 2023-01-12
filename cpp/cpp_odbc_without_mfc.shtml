@@ -1,0 +1,157 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Простые ODBC классы без использования MFC</h3>
+    <p>Автор: <a href="mailto:justink@rochester.rr.com">Justin Kirby</a></p>
+    <a href="simple_odbc_src.zip"><p>Скачать исходники - 7 Kb</a> </p>
+    <font color="#000000" face="Verdana" size="2"><font color="#ff9900" face="Verdana"
+    size="3"><b><p>Описание</b></font> </p>
+    <p>Мне пришлось написать довольно много
+    приложений связанных с базами данных.
+    Большинство из них было небольшими и
+    использовали MFC класс </font><font face="Verdana" size="2"
+    color="#FF0000">CRecordset</font><font color="#000000" face="Verdana" size="2">.
+    Зависимость от MFC меня не всегда устраивала и
+    тогда я засел за создание собственного класса.
+    Таким образом появился набор, состоящий из
+    нескольких классов, обеспечивающий необходимые
+    возможности для работы с ODBC драйвером. </p>
+    <p>На самом деле эти классы не претендуют на что-то
+    &quot;совершенное&quot; и &quot;мощное&quot;, однако они
+    могут очень даже пригодиться для тех кто захочет
+    работать с драйвером ODBC напрямую через API
+    функции. </p>
+    <p>В файлах ODBC.h и ODBC.cpp содержится три класса <font
+    face="Verdana" size="2" color="#FF0000">CODBCCnx</font>, <font face="Verdana" size="2"
+    color="#FF0000">CODBCQuery</font> и <font face="Verdana" size="2" color="#FF0000">CODBCFatQuery</font>.
+    Основным из них является <font face="Verdana" size="2"
+    color="#FF0000">CODBCCnx</font>, который коннектится к DBMS, а так
+    же осуществляет все необходимые действия по
+    обработке запросов. <font face="Verdana" size="2" color="#FF0000">CODBCQuery</font>
+    и <font face="Verdana" size="2" color="#FF0000">CODBCFatQuery</font> являются
+    зарезервированными, и я планирую с их помощью
+    расширить возможности основного класса. </p>
+    <font color="#ff9900" face="Verdana" size="3"><b><p>Класс CODBCCnx</b></font> </p>
+    <p></font><font face="Verdana" size="2" color="#FF0000">CODBCCnx</font><font
+    color="#000000" face="Verdana" size="2"> содержит три функции </font><font
+    face="Verdana" size="2" color="#FF0000">Connect()</font><font color="#000000"
+    face="Verdana" size="2">, </font><font face="Verdana" size="2" color="#FF0000">Disconnect()</font><font
+    color="#000000" face="Verdana" size="2"> и </font><font face="Verdana" size="2"
+    color="#FF0000">IsOk()</font><font color="#000000" face="Verdana" size="2">.
+    Функция </font><font face="Verdana" size="2" color="#FF0000">Connect()</font><font
+    color="#000000" face="Verdana" size="2"> позволяет связаться с
+    драйвером DSN или используя сетевое имя
+    компьютера. </p></font>
+    <pre>//связываемся с DBMS через DSN, &quot;foodsn&quot;
+
+CODBCCnx dsn();
+dsn.Connect(&quot;foodsn&quot;,&quot;username&quot;,&quot;password&quot;);
+
+//Замечание: CODBCCnx dsn(&quot;foodsn&quot;,username&quot;,&quot;password&quot;); идентично предыдущей строке
+
+//проверяем успешность соединения
+if(!dsn.IsOk()){
+	//успешное соединение с базой
+}
+else{
+	//ошибка при соединении
+}
+
+//другой способ осуществления связи с базой данны, используя сетевое имя компьютера
+CODBCCnx name(&quot;SQL Server&quot;,&quot;CompName&quot;,&quot;username&quot;,&quot;password&quot;);
+//опять проверяем успешность соединения
+if(!name.IsOk()){
+	//успешное соединение с базой
+}
+else{
+	//ошибка при соединении
+}</pre><font color="#000000" face="Verdana" size="2">
+    <p>Итак, мы соединились с базой данных, теперь
+    давайте попробуем завершить сеанс связи. Для
+    этого нам пригодится функция </font><font face="Verdana" size="2"
+    color="#FF0000">Disconnect()</font><font color="#000000" face="Verdana" size="2">. В
+    параметрах этой функции можно задавать
+    различные параметры. Например, если транзакции
+    находятся в активном состоянии, то с помощь этих
+    параметров можно вернуть их в исходное
+    состояние, либо подождать их завершения. Если
+    вызвать функцию <font face="Verdana" size="2" color="#FF0000">Disconnect</font>,
+    без параметров, то все транзакции вернутся в
+    исходное состояние. </p></font>
+    <pre>//завершаем сеанс связи (dsn)
+dsn.Disconnect();	//возвращаем незавершённые транзакции в предыдущее состояние
+//Замечание: dsn.Disconnect(SQL_ROLLBACK) тоже самое, что и предыдущая строка
+
+
+//завершаем сеанс связи с базой &quot;name&quot;
+name.Disconnect(SQL_COMMIT); //завершаем все незавершённые транзакции</pre>
+    <font color="#ff9900" face="Verdana" size="3"><b><p>Класс CODBCQuery</b></font> </p><font color="#000000" face="Verdana" size="2">
+    <p>Итак, мы рассмотрели основные действия для
+    общения с базой данных. Но есть ещё один момент.
+    Не полохо было бы работать с объектом, созданным
+    ранее, через указатели, то есть сделать его
+    доступным из других классов. Для этого был создан
+    класс </font><font face="Verdana" size="2" color="#FF0000">CODBCQuery</font><font
+    color="#000000" face="Verdana" size="2">. </font><font face="Verdana" size="2"
+    color="#FF0000">CODBCQuery</font><font color="#000000" face="Verdana" size="2"> не
+    может использоваться как самостоятельный
+    объект, он постоянно привязан к основному классу:
+    </p></font>
+    <pre>//Устанавливаем соединение, используя dsn
+CODBCCnx *pDsn = new CODBCCnx(&quot;foodsn&quot;, &quot;username&quot;, &quot;password&quot;);
+CODBCQuery qry1, qry2;
+
+if(!pDsn-&gt;IsOk())
+{
+	//успешный коннект!! теперь дадим в доступ данный сеанс связи :)
+	pDsn-&gt;Connect(qry1.h_qstmt);
+	pDsn-&gt;Connect(qry2.h_qstmt);
+}
+else{
+	//ошибка
+}
+
+//так же эту процедуру можно совешнить за один шаг.
+CODBCQuery qry(new CODBCCnx(&quot;foodsn&quot;, &quot;username&quot;, &quot;password&quot;), true);
+
+//либо мы можем брать pDsn и передавать его в связку новых объектов
+CODBCQuery qry2(pDsn), qry3(pDsn,false);
+
+//либо можно заставить класс CODBCQuery самостоятельно коннектиться
+CODBCQuery qry4(&quot;SQL Server&quot;, &quot;CompName&quot;, &quot;username&quot;, &quot;password&quot;);
+//используя DSN
+CODBCQuery qry5(NULL, &quot;foodsn&quot;, &quot;username&quot;, &quot;password&quot;);</pre><font color="#000000" face="Verdana" size="2">
+    <p>Заключительная заметка: существует глобальная
+    функция </font><font face="Verdana" size="2" color="#FF0000">SQLSuccess()</font><font
+    color="#000000" face="Verdana" size="2">. Если передать в неё
+    переменную </font><font face="Verdana" size="2" color="#FF0000">SQLRETURN</font><font
+    color="#000000" face="Verdana" size="2">, то функция вернёт не
+    нулевое значение, если в этой переменной указать
+    значение </font><font face="Verdana" size="2" color="#FF0000">SQL_SUCCESS</font><font
+    color="#000000" face="Verdana" size="2"> или </font><font face="Verdana" size="2"
+    color="#FF0000">SQL_SUCCESS_WITH_INFO</font><font color="#000000" face="Verdana" size="2">.
+    Иногда возвращаемая информация бывает очень
+    даже полезной.</p>
+    <font color="#ff9900" face="Verdana" size="3"><b><p>В дополнение</b></font> </p>
+    <p>В архиве содержатся два файла strutil.h и strutil.cpp. Это
+    очень простые функции имеющие тип </font><font face="Verdana"
+    size="2" color="#FF0000">char*</font><font color="#000000" face="Verdana" size="2">.
+    Меня раздражает постоянная необходимость по
+    выделению памяти для </font><font face="Verdana" size="2"
+    color="#FF0000">strcpy</font><font color="#000000" face="Verdana" size="2">, и т.д...
+    Поэтому мне больше подходят эти две функции
+    взамен стандартных. Их названия начинаются с
+    jkl_str. Надеюсь, они Вам понравятся :).</p>
+    <p><br>
+    </font></td>
+  </tr>
+</table>
+</center></div></TBODY>
+
+
+<p align="center"><br>
+<br></p>
+<!--#include virtual="/ssi/bottom.html"-->

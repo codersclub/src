@@ -1,0 +1,204 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3 align="center"><font color="#a0a099">Вставляем HBITMAP (Bitmap) в
+    элемент управления RichEdit</font></h3>
+    <hr>
+    <p>Автор: <a href="mailto:atassi@arabteam2000.com">Hani Atassi</a>.</p>
+    <p><img src="richeditrc.gif" width="315" height="251"></p>
+    <p><u>Требования:</u> VC6 SP5, Win2000 SP2 </p>
+    <p>Существует множество примеров, объясняющих как
+    вставить файл bitmap в RichEdit. Но недостаток этих
+    примеров в том, что они непригодны в случае, если
+    изображение находится в виде ресурса либо в виде
+    дескриптора (HBITMAP).</p>
+    <p>Статья основывается на примере MSDN &quot;HOWTO: Insert a
+    Bitmap Into an RTF Document Using the RichEdit Control&quot;, и использует
+    интерфейс IDataObject. В статье MSDN используется OLE API
+    (OleCreateFromFile), которая использует имя файла в виде
+    строки. Так же существует множество способов
+    создания объекта OLE (IOleObject). Все эти OLE API
+    начинаются с префикса OleCreate. Одну из них я
+    использовал в данном примере (OleCreateStaticFromData),
+    которая позволяет нам создавать объект Ole,
+    который в свою очередь содержит только
+    представление без каких либо ссылок на данные.
+    Естевственно, что данные могут быть в виде
+    значения HBITMAP, которое может быть представлением
+    картинки.</p>
+    <p>Думаю не стоит объяснять - как создать OleObject
+    (IOleObject). Этот процесс хорошо описан в MSDN. Однако,
+    один составляющих OLE объектов требует некоторого
+    пояснения. В данном случае наша HBITMAP будет
+    храниться в IDataObject.</p>
+    <p>Существует два метода получения нашего HBITMAP из
+    объекта. Первый использует COleDataSource, который
+    включён в интерфейс IDataObject. Второй метод - это
+    добавить свою собственную обработку данного
+    процесса в IDataObject. Второй метод хорош тем, что нет
+    необходимости использовать MFC в приложении.</p>
+    <p>Первый метод использует следующий код:</p>
+    <pre>STGMEDIUM stgm;
+stgm.tymed = TYMED_GDI;	   <span class="codeComment">// Хранилище среднее = дескриптор HBITMAP</span>
+stgm.hBitmap = hBitmap;
+stgm.pUnkForRelease = NULL; <span
+class="codeComment">// Используем ReleaseStgMedium</span>
+ 
+COleDataSource *pDataSource = new COleDataSource;
+pDataSource-&gt;CacheData(CF_BITMAP, &amp;stgm);
+LPDATAOBJECT lpDataObject = 
+  (LPDATAOBJECT)pDataSource-&gt;GetInterface(&amp;IID_IDataObject);</pre>
+    <p>Используя возвращаемое lpDataObject а так же другие
+    объекты, Вы можете добавить объект в RichEdit.</p>
+    <p>Далее показан второй метод:</p>
+    <pre>class CImageDataObject : IDataObject
+{
+public: <span class="codeComment">
+  // Это статическая функция передающая указатель на IRochEditOle 
+  //   и дескриптор bitmap.
+  // После добавления данной функции, изображение будет добавлено 
+  //   в текущую позицию RichEdit
+  //</span>
+  static void InsertBitmap(IRichEditOle* pRichEditOle, 
+                           HBITMAP hBitmap); 
+ 
+private:
+  ULONG m_ulRefCnt;
+  BOOL  m_bRelease;
+ <span
+class="codeComment">
+  // Данные, которые будут помещены в richedit
+  //</span>
+  STGMEDIUM m_stgmed;
+  FORMATETC m_fromat;
+ 
+public:
+  CImageDataObject() : m_ulRefCnt(0) {
+    m_bRelease = FALSE;
+  }
+ 
+  ~CImageDataObject() {
+    if (m_bRelease)
+      ::ReleaseStgMedium(&amp;m_stgmed);
+  }
+ <span
+class="codeComment">
+  // Методы интерфейса IUnknown
+  // </span>
+  STDMETHOD(QueryInterface)(REFIID iid, void ** ppvObject)
+  {
+    if (iid == IID_IUnknown || iid == IID_IDataObject)
+    {
+      *ppvObject = this;
+      AddRef();
+      return S_OK;
+    }
+    else
+      return E_NOINTERFACE;
+  }
+  STDMETHOD_(ULONG, AddRef)(void)
+  {
+    m_ulRefCnt++;
+    return m_ulRefCnt;
+  }
+  STDMETHOD_(ULONG, Release)(void)
+  {
+    if (--m_ulRefCnt == 0)
+    {
+       delete this;
+    }
+ 
+    return m_ulRefCnt;
+  }
+ <span
+class="codeComment">
+  // Методы интерфейса IDataObject
+  //</span>
+  STDMETHOD(GetData)(FORMATETC *pformatetcIn, 
+                     STGMEDIUM *pmedium) {
+    HANDLE hDst;
+    hDst = ::OleDuplicateData(m_stgmed.hBitmap, 
+                              CF_BITMAP, NULL);
+    if (hDst == NULL)
+    {
+      return E_HANDLE;
+    }
+ 
+    pmedium-&gt;tymed = TYMED_GDI;
+    pmedium-&gt;hBitmap = (HBITMAP)hDst;
+    pmedium-&gt;pUnkForRelease = NULL;
+ 
+    return S_OK;
+  }
+  STDMETHOD(GetDataHere)(FORMATETC* pformatetc, 
+                         STGMEDIUM*  pmedium ) {
+    return E_NOTIMPL;
+  }
+  STDMETHOD(QueryGetData)(FORMATETC*  pformatetc ) {
+    return E_NOTIMPL;
+  }
+  STDMETHOD(GetCanonicalFormatEtc)(FORMATETC*  pformatectIn ,
+                                   FORMATETC* pformatetcOut ) {
+    return E_NOTIMPL;
+  }
+  STDMETHOD(SetData)(FORMATETC* pformatetc , 
+                     STGMEDIUM*  pmedium , 
+                     BOOL  fRelease ) {
+  m_fromat = *pformatetc;
+  m_stgmed = *pmedium;
+
+  return S_OK;
+  }
+  STDMETHOD(EnumFormatEtc)(DWORD  dwDirection , 
+                           IEnumFORMATETC**  ppenumFormatEtc ) {
+    return E_NOTIMPL;
+  }
+  STDMETHOD(DAdvise)(FORMATETC *pformatetc, 
+                     DWORD advf, 
+                     IAdviseSink *pAdvSink,
+                     DWORD *pdwConnection) {
+    return E_NOTIMPL;
+  }
+  STDMETHOD(DUnadvise)(DWORD dwConnection) {
+    return E_NOTIMPL;
+  }
+  STDMETHOD(EnumDAdvise)(IEnumSTATDATA **ppenumAdvise) {
+    return E_NOTIMPL;
+  }
+<span
+class="codeComment">
+  // Другие вспомогательные функции
+  //</span>
+  void SetBitmap(HBITMAP hBitmap);
+  IOleObject *GetOleObject(IOleClientSite *pOleClientSite, 
+                           IStorage *pStorage);
+};</pre>
+    <p>Приведённая реализация IDataObject специально
+    расчитана на хранение дескриптора HBITMAP.</p>
+    <p>Чтобы вставить картинку в RichEdit, достаточно
+    вызвать функцию CImageDataObject::InsertBitmap. Функция имеет
+    два параметра:</p>
+    <p><u>IRichEditOle* pRichEditOle :</u> Указатель на интерфейс
+    IRichEditOle для элемента управления RichEdit. Вы можете
+    использовать метод GetRichEditOle() в MFC классе CRichEditCtrl
+    для получения этого указателя или следующий код: </p>
+    <pre>::SendMessage((HWND)m_ctlRichText.GetHwnd(), 
+   EM_GETOLEINTERFACE, 
+   0, 
+   (LPARAM)&amp;m_pRichEditOle);</pre>
+    <p><u>HBITMAP hBitmap :</u> дескриптор изображения. Класс
+    отвечает за закрытие и освобождение ресурсов,
+    занимаемы дескриптором, поэтому не закрывайте
+    его самостоятельно.</p>
+    <h3>Downloads</h3>
+    <p><a href="richeditrc.zip">Download demo project - 55 Kb</a><br>
+    <a href="richeditrc_src.zip">Download source - 3 Kb</a> </p>
+    <p><a name="#how_works"></a></p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

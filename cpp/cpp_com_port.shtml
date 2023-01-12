@@ -1,0 +1,236 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="814" cellspacing="0" cellpadding="0">
+  <tr>
+    <td width="814"><hr>
+    <h3 align="center"><font color="#a0a099">Работа с COM портом в Visual C++ </font></h3>
+    <hr>
+    <p>Автор: Paul Belikian. </p>
+    <p>Обычно порт открывается как обычный файл. Как
+    только порт открыт, то в него можно записывать и
+    считывать как из обычного файла. Конечно же
+    прийдётся добавить различные проверки байтов
+    при чтении и записи.</p>
+    <p><!-- ccode --> </p>
+    <pre><tt><font color="#990000">CComPort::CComPort<font color="#220000">(</font>CString&amp; sComPort<font
+color="#220000">)</font>
+{
+	m_sComPort = sComPort;
+	m_bPortReady = FALSE;
+} // </font><font
+color="#009900">конец конструктора CComPort
+</font><font color="#990000">
+CComPort::~CComPort<font
+color="#220000">()</font>
+{
+
+} // </font><font color="#009900">конец деструктора CComPort
+</font><font
+color="#990000">
+//
+// </font><font color="#009900">инициализация COM порта
+//
+</font><font
+color="#990000">BOOL CComPort::Initialize<font color="#220000">()</font>
+{
+	DWORD	dwRC;
+	DWORD	dwError;
+	<font
+color="#0000ff">char</font>	sMsg[512];
+
+	m_bPortReady = TRUE; // </font><font color="#009900">всё OK
+</font><font
+color="#990000">
+	m_hCom = CreateFile<font color="#220000">(</font>m_sComPort, 
+		GENERIC_READ | GENERIC_WRITE,
+		0, // </font><font
+color="#009900">экслюзивно занимаем порт
+</font><font color="#990000">		NULL, <font
+color="#009900">// no security
+</font>		OPEN_EXISTING,
+		0, <font color="#009900">// no overlapped I/O
+</font>		NULL<font
+color="#220000">)</font>; <font color="#009900">// null template
+</font>
+	<font color="#0000ff">if</font> <font
+color="#220000">(</font>m_hCom == INVALID_HANDLE_VALUE<font color="#220000">)</font>
+	{
+		m_bPortReady = FALSE;
+		dwError = GetLastError<font
+color="#220000">()</font>;
+		
+		// </font><font color="#009900">обработка ошибки
+</font><font
+color="#990000">		LPVOID lpMsgBuf;
+		lpMsgBuf = NULL;
+		dwRC = FormatMessage<font
+color="#220000">(</font> 
+			FORMAT_MESSAGE_ALLOCATE_BUFFER | 
+			FORMAT_MESSAGE_FROM_SYSTEM | 
+			FORMAT_MESSAGE_IGNORE_INSERTS,
+			 NULL,
+			dwError, //  </font><font
+color="#009900">из GetLastError(),
+</font><font color="#990000">			MAKELANGID<font
+color="#220000">(</font>LANG_NEUTRAL, SUBLANG_DEFAULT<font color="#220000">)</font>, <font
+color="#009900">// 
+</font>			<font color="#220000">(</font>LPTSTR<font color="#220000">)</font> &amp;lpMsgBuf,
+			0,
+			NULL<font
+color="#220000">)</font>;
+		
+		<font color="#0000ff">if</font> <font color="#220000">(</font>dwRC &amp;&amp; lpMsgBuf<font
+color="#220000">)</font>
+		{
+			sprintf<font color="#220000">(</font>sMsg, <font color="#004488">&quot;COM open failed: Port=%s Error=%d - %s&quot;</font>,
+				m_sComPort, dwError, lpMsgBuf<font
+color="#220000">)</font>;
+			AfxMessageBox<font color="#220000">(</font>sMsg<font
+color="#220000">)</font>;
+		}
+		<font color="#0000ff">else</font>
+		{
+			sprintf<font
+color="#220000">(</font>sMsg, <font color="#004488">&quot;COM open failed: Port=%s Error=%d &quot;</font>,
+				m_sComPort, dwError<font
+color="#220000">)</font>;
+			AfxMessageBox<font color="#220000">(</font>sMsg<font
+color="#220000">)</font>;
+		} <font color="#009900">// end if
+</font>		<font color="#0000ff">if</font> <font
+color="#220000">(</font>dwRC &amp;&amp; lpMsgBuf<font color="#220000">)</font>
+		{
+			LocalFree<font
+color="#220000">(</font> lpMsgBuf <font color="#220000">)</font>;
+		} <font color="#009900">// end if
+</font> 
+	} <font
+color="#009900">// end if
+</font>
+	<font color="#0000ff">if</font> <font color="#220000">(</font>m_bPortReady<font
+color="#220000">)</font>
+	{
+		m_bPortReady = SetupComm<font color="#220000">(</font>m_hCom, 
+				128, 128<font
+color="#220000">)</font>; // </font><font color="#009900">размер буфера
+</font><font
+color="#990000">		<font color="#0000ff">if</font> <font color="#220000">(</font>!m_bPortReady<font
+color="#220000">)</font>
+		{
+			dwError = GetLastError<font color="#220000">()</font>;
+			sprintf<font
+color="#220000">(</font>sMsg, <font color="#004488">&quot;SetupComm failed: Port=%s Error=%d&quot;</font>,
+				m_sComPort, dwError<font
+color="#220000">)</font>;
+			AfxMessageBox<font color="#220000">(</font>sMsg<font
+color="#220000">)</font>;
+			
+		} <font color="#009900">// end if
+</font>	} <font color="#009900">// end if
+</font>
+	<font
+color="#0000ff">if</font> <font color="#220000">(</font>m_bPortReady<font color="#220000">)</font>
+	{
+		m_bPortReady = GetCommState<font
+color="#220000">(</font>m_hCom, &amp;m_dcb<font color="#220000">)</font>;
+		<font
+color="#0000ff">if</font> <font color="#220000">(</font>!m_bPortReady<font color="#220000">)</font>
+		{
+			dwError = GetLastError<font
+color="#220000">()</font>;
+			sprintf<font color="#220000">(</font>sMsg, <font color="#004488">&quot;GetCommState failed: Port=%s Error=%d&quot;</font>,
+				m_sComPort, dwError<font
+color="#220000">)</font>;
+			AfxMessageBox<font color="#220000">(</font>sMsg<font
+color="#220000">)</font>;
+		} <font color="#009900">// end if
+</font>	} <font color="#009900">// end if
+</font>
+	<font
+color="#0000ff">if</font> <font color="#220000">(</font>m_bPortReady<font color="#220000">)</font>
+	{
+		m_dcb.BaudRate = 9600;
+		m_dcb.ByteSize = 8;
+		m_dcb.Parity = NOPARITY;
+		m_dcb.StopBits = ONESTOPBIT;
+		m_dcb.fAbortOnError = TRUE;
+
+		m_bPortReady = SetCommState<font
+color="#220000">(</font>m_hCom, &amp;m_dcb<font color="#220000">)</font>;
+		<font
+color="#0000ff">if</font> <font color="#220000">(</font>!m_bPortReady<font color="#220000">)</font>
+		{
+			dwError = GetLastError<font
+color="#220000">()</font>;
+			sprintf<font color="#220000">(</font>sMsg, <font color="#004488">&quot;SetCommState failed: Port=%s Error = %d&quot;</font>,
+				m_sComPort, dwError<font
+color="#220000">)</font>;
+			AfxMessageBox<font color="#220000">(</font>sMsg<font
+color="#220000">)</font>;
+		}
+	} <font color="#009900">// end if
+</font>
+	<font color="#0000ff">if</font> <font
+color="#220000">(</font>m_bPortReady<font color="#220000">)</font>
+	{
+		m_bPortReady = GetCommTimeouts <font
+color="#220000">(</font>m_hCom, &amp;m_CommTimeouts<font color="#220000">)</font>;
+		<font
+color="#0000ff">if</font> <font color="#220000">(</font>!m_bPortReady<font color="#220000">)</font>
+		{
+			dwError = GetLastError<font
+color="#220000">()</font>;
+			sprintf<font color="#220000">(</font>sMsg, <font color="#004488">&quot;GetCommTimeouts failed: Port=%s Error = %d&quot;</font>,
+				m_sComPort, dwError<font
+color="#220000">)</font>;
+			AfxMessageBox<font color="#220000">(</font>sMsg<font
+color="#220000">)</font>;
+		} <font color="#009900">// end if
+</font>	} <font color="#009900">// end if
+</font>
+	<font
+color="#0000ff">if</font> <font color="#220000">(</font>m_bPortReady<font color="#220000">)</font>
+	{
+		m_CommTimeouts.ReadIntervalTimeout = 50;
+		m_CommTimeouts.ReadTotalTimeoutConstant = 50;
+		m_CommTimeouts.ReadTotalTimeoutMultiplier = 10;
+		m_CommTimeouts.WriteTotalTimeoutConstant = 50;
+		m_CommTimeouts.WriteTotalTimeoutMultiplier = 10;
+		m_bPortReady = SetCommTimeouts <font
+color="#220000">(</font>m_hCom, &amp;m_CommTimeouts<font color="#220000">)</font>;
+		<font
+color="#0000ff">if</font> <font color="#220000">(</font>!m_bPortReady<font color="#220000">)</font>
+		{
+			dwError = GetLastError<font
+color="#220000">()</font>;
+			sprintf<font color="#220000">(</font>sMsg, <font color="#004488">&quot;SetCommTimeouts failed: Port=%s Error = %d&quot;</font>,
+				m_sComPort, dwError<font
+color="#220000">)</font>;
+			AfxMessageBox<font color="#220000">(</font>sMsg<font
+color="#220000">)</font>;
+		} <font color="#009900">// end if
+</font>	} <font color="#009900">// end if
+</font>
+	<font
+color="#0000ff">return</font> m_bPortReady;
+} <font color="#009900">// end CComPort::Initialize
+</font>
+
+//
+// </font><font
+color="#009900">освобождаем COM порт
+//
+</font><font color="#990000"><font
+color="#0000ff">void</font> CComPort::Terminate<font color="#220000">()</font>
+{
+	CloseHandle<font
+color="#220000">(</font>m_hCom<font color="#220000">)</font>;
+} /
+
+</font></tt></pre>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

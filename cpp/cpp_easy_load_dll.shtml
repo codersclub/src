@@ -1,0 +1,115 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table cellspacing="0" cellpadding="0">
+  <tr>
+    <td width="814"><hr>
+    <h3 align="center"><font color="#a0a099">Упростим загрузку DLL </font></h3>
+    <hr>
+    <p>Автор: <b><a href="mailto:shoalinpanda@hotmail.com">Shoalin Panda</a> </b><br>
+    </p>
+    <h2>Описание</h2>
+    <p>Обычно Dynamic Link Librarys загружают следующим
+    способом: LoadLibrary, и GetProcAddress затем проверяют, чтобы
+    адрес каждой функции не был NULL, приведение
+    указателя функции и т.д. Всё это конечно
+    утомительно, но, оказывается есть более простой
+    способ совладать с DLL-ками. </p>
+    <p>&nbsp;</p>
+    <pre><span class="cpp-comment">//GetProcAddresses</span>
+<span class="cpp-comment">//Argument1: hLibrary - Обработчик загружаемой библиотеки</span>
+<span
+class="cpp-comment">//Argument2: lpszLibrary - Загружаемая библиотека</span>
+<span
+class="cpp-comment">//Argument3: nCount - Количество загружаемых функций</span>
+<span
+class="cpp-comment">//[Arguments Format]</span>
+<span class="cpp-comment">//Argument4: Function Address - Адрес функции</span>
+<span
+class="cpp-comment">//Argument5: Function Name -  Желаемое для нас имя функции</span>
+<span
+class="cpp-comment">//[Repeat Format]</span>
+<span class="cpp-comment">//</span>
+<span
+class="cpp-comment">//Returns: FALSE if failure</span>
+<span class="cpp-comment">//Returns: TRUE if successful</span>
+BOOL GetProcAddresses(HINSTANCE *hLibrary,LPCSTR lpszLibrary,INT nCount,...)
+{
+   va_list va;
+   va_start( va, nCount );
+
+   <span
+class="cpp-keyword">if</span> ( ( *hLibrary = LoadLibrary( lpszLibrary ) ) != NULL )
+   {
+      FARPROC * lpfProcFunction = NULL;
+      LPSTR lpszFuncName = NULL;
+      INT nIdxCount = <span
+class="cpp-literal">0</span>;
+      <span class="cpp-keyword">while</span> ( nIdxCount &lt; nCount )
+      {
+         lpfProcFunction = va_arg( va, FARPROC* );
+         lpszFuncName = va_arg( va, LPSTR );
+         <span
+class="cpp-keyword">if</span> ( ( *lpfProcFunction = GetProcAddress( *hLibrary,
+                                             lpszFuncName ) ) == NULL )
+         {
+            lpfProcFunction = NULL;
+            <span
+class="cpp-keyword">return</span> FALSE;
+         }
+         nIdxCount++;
+      }
+   }
+   <span
+class="cpp-keyword">else</span>
+   {
+      va_end( va );
+      <span class="cpp-keyword">return</span> FALSE;
+   }
+   va_end( va );
+   <span
+class="cpp-keyword">return</span> TRUE;
+}
+</pre>
+    <p>Итак, теперь можно в функции main посмотреть, как
+    это работает ( компилировалось как консольное
+    приложение )</p>
+    <pre><span class="cpp-preprocessor">#include <WINDOWS.H></span>
+
+<span class="cpp-keyword">typedef</span> <span
+class="cpp-keyword">int</span> ( WINAPI *MESSAGEBOX ) ( HWND , LPCSTR, LPCSTR, DWORD );
+<span
+class="cpp-keyword">typedef</span> <span class="cpp-keyword">int</span> ( WINAPI *MESSAGEBOXEX ) (HWND , LPCSTR, LPCSTR, DWORD , WORD);
+
+<span
+class="cpp-keyword">void</span> main(<span class="cpp-keyword">void</span>)
+{
+   MESSAGEBOX lpfMsgBox = NULL;
+   MESSAGEBOXEX lpfMsgBoxEx = NULL;
+   HINSTANCE hLib;
+   <span
+class="cpp-keyword">if</span>(GetProcAddresses( &amp;hLib, <span class="cpp-string">&quot;User32.dll&quot;</span>, <span
+class="cpp-literal">2</span>,
+                        &amp;lpfMsgBox, <span class="cpp-string">&quot;MessageBoxA&quot;</span>,
+                        &amp;lpfMsgBoxEx, <span
+class="cpp-string">&quot;MessageBoxExA&quot;</span> ) )
+   {
+       lpfMsgBox( <span
+class="cpp-literal">0</span>, <span class="cpp-string">&quot;Test1&quot;</span>, <span
+class="cpp-string">&quot;Test1&quot;</span>, MB_OK );
+       lpfMsgBoxEx( <span
+class="cpp-literal">0</span>, <span class="cpp-string">&quot;Test2&quot;</span>, <span
+class="cpp-string">&quot;Test2&quot;</span>, MB_OK, MAKELANGID( LANG_ENGLISH,
+                                                     SUBLANG_ENGLISH_US ) );
+   }
+   <span
+class="cpp-keyword">if</span> ( hLib != NULL )
+      FreeLibrary( hLib );
+}
+</pre>
+    <p>Вот собственно и всё.</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

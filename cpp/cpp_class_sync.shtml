@@ -1,0 +1,304 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <p><b>Классы синхронизации С++ в Win32 и Solaris 2.x</b></p>
+    <h2>Класс Mutex</h2>
+    <table border="0" cellpadding="0" cellspacing="0">
+      <tr>
+        <td width="750" bgcolor="#A5E4A7"><font face="Tahoma" style="font-size: 10pt" size="-1"><b>&nbsp;
+        Так выглядит реализация этого класса в Win32</b></font></td>
+      </tr>
+    </table>
+    <pre>
+class Mutex {
+ private:
+   CRITICAL_SECTION lock;
+
+ public:
+   Mutex(void) { InitializeCriticalSection(&amp;lock); }
+   void Lock(void) { EnterCriticalSection(&amp;lock); }
+   void Unlock(void) { LeaveCriticalSection(&amp;lock); }
+}; 
+</pre>
+    <table border="0" cellpadding="0" cellspacing="0">
+      <tr>
+        <td width="750" bgcolor="#A5E4A7"><font face="Tahoma" style="font-size: 10pt" size="-1"><b>&nbsp;
+        А так класс Mutex выглядит для Solaris 2.x</b></font></td>
+      </tr>
+    </table>
+    <pre>
+class Mutex {
+ private:
+   mutex_t structure_lock;   // structure access lock
+   mutex_t lock;             // mutex
+   thread_t owner;           // owner of mutex
+   unsigned int count;       // # of times owner locked mutex
+
+ public:
+   Mutex(void) { 
+          mutex_init(&amp;structure_lock, USYNC_THREAD, (void*)0);
+          mutex_init(&amp;lock, USYNC_THREAD, (void*)0);
+   }
+
+   ~Mutex(void) {
+          mutex_destroy(&amp;structure_lock);
+          mutex_destroy(&amp;lock);
+   }
+
+   void Lock(void) {
+          mutex_lock(&amp;structure_lock);
+          if (owner == thr_self()) {   // this thread already owns the lock
+             count++;
+             mutex_unlock(&amp;structure_lock);
+          }
+          else { 
+             // try to obtain the mutex. if we cannot do so immediately, release 
+             // the structure lock and wait on the mutex.
+             if (mytex_trylock(&amp;lock) != 0) {
+                  mutex_unlock(&amp;structure_lock);
+                  mutex_lock(&amp;lock);
+                  mutex_lock(&amp;structure_lock);
+                  owner = thr_self();
+             }
+             mutex_unlock(&amp;structure_lock);
+          }
+   }
+
+   void Unlock(void) {
+          mutex_lock(&amp;structure_lock);
+          if ((owner == thr_self()) &amp;&amp; (--count == 0)) 
+                  mutex_unlock(&amp;lock);
+          mutex_unlock(&amp;structure_lock);
+   }
+}; 
+</pre>
+    <table border="0" cellpadding="0" cellspacing="0">
+      <tr>
+        <td width="750" bgcolor="#A5E4A7"><font face="Tahoma" style="font-size: 10pt" size="-1"><b>&nbsp;
+        А это примерчик использования класса Mutex</b></font></td>
+      </tr>
+    </table>
+    <pre>
+class SafeInteger : private Mutex {
+ private:
+   int value;
+
+ public:
+   void SetValue(int new_value) {
+          Lock();
+          value = new_value;
+          Unlock();
+   }
+
+   int GetValue(void) {
+          Lock();
+          int ret_value = value;
+          Unlock();
+          return ret_value;
+   }
+}; 
+
+</pre>
+    <h2>Класс Semaphore</h2>
+    <table border="0" cellpadding="0" cellspacing="0">
+      <tr>
+        <td width="750" bgcolor="#A5E4A7"><font face="Tahoma" style="font-size: 10pt" size="-1"><b>&nbsp;
+        Так выглядит реализация класса Semaphore в Win32</b></font></td>
+      </tr>
+    </table>
+    <pre>
+class Semaphore {
+ private:
+    HANDLE semaphore;
+
+ public:
+    Semaphore(void) {
+             CreateSemaphore((void *)0, 0, 0x7ffffff, (void*)0);
+    }
+
+    Semaphore(int available) {
+             CreateSemaphore((void *)0, available, 0x7ffffff, (void*)0);
+    }
+
+    ~Semaphore(void) {
+                CloseHandle(semaphore);
+    }
+
+    void Wait(void) {
+                WaitForSingleObject(semaphore, INFINITE);
+    }
+
+    void Post(void) {
+                ReleaseSemaphore(semaphore, 1, (void*)0);
+    }
+
+    void Post(int how_many) {
+                ReleaseSemaphore(semaphore, how_many, (void*)0);
+    }
+}; 
+</pre>
+    <table border="0" cellpadding="0" cellspacing="0">
+      <tr>
+        <td width="750" bgcolor="#A5E4A7"><font face="Tahoma" style="font-size: 10pt" size="-1"><b>&nbsp;
+        А так класс Semaphore выглядит для Solaris 2.x</b></font></td>
+      </tr>
+    </table>
+    <pre>
+class Semaphore {
+ private:
+    sema_t semaphore;
+
+ public:
+    Semaphore(void) {
+              sema_init(&amp;semaphore, 0, USYNC_PROCESS, (void*)0);
+    }
+
+    Semaphore(int available) {
+            sema_init(&amp;semaphore, available, USYNC_PROCESS, (void*)0);
+    }
+
+    ~Semaphore(void) {
+            sema_destroy(&amp;semaphore);
+    }
+
+    void Post(void) {
+           sema_post(&amp;semaphore);
+    }
+
+    void Post(int how_many) {
+            while (how_many-- 0) sema_post(&amp;semaphore);
+    }
+
+    void Wait(void) {
+            sema_wait(&amp;semaphore);
+    }
+}; 
+</pre>
+    <table border="0" cellpadding="0" cellspacing="0">
+      <tr>
+        <td width="750" bgcolor="#A5E4A7"><font face="Tahoma" style="font-size: 10pt" size="-1"><b>&nbsp;
+        А это примерчик использования класса Semaphore</b></font></td>
+      </tr>
+    </table>
+    <pre>
+template class QueueEntry : public T {
+    public:
+          T value;
+          QueueEntry* next;
+
+          QueueEntry(const T&amp; item_value) {
+                 value = item_value;
+                 next = (QueueEntry*)0;
+         }
+};
+
+template class Queue : private Semaphore : private Mutex {
+    private:
+           QueueEntry* head;
+           QueueEntry* tail;
+
+    public:
+           Queue(void) {
+                   head = tail = (QueueEntry*)0;
+          }
+
+          void Add(const T&amp; item_value) {
+                   Lock();
+                   if (tail == QueueEntry*)0)
+                                  head = tail = new QueueEntry(item_value);
+                   else {
+                                  tail-next = new QueueEntry(item_value);
+                                  tail = tail-next;
+                   }
+                   Unlock();
+                   Post(); // wake up any waiting threads
+        }
+
+        T Wait(void) {
+                   Semaphore::Wait(); // wait for something to show up
+                   Lock();
+                   T value = head-value;
+                   QueueEntry* old = head;
+                   head = head-next;
+                   delete old;
+                   if (head == (QueueEntry*)0)
+                               tail = (QueueEntry*)0;
+                   Unlock();
+                   return value;
+        }
+};
+</pre>
+    <h2>Класс Event</h2>
+    <table border="0" cellpadding="0" cellspacing="0">
+      <tr>
+        <td width="750" bgcolor="#A5E4A7"><font face="Tahoma" style="font-size: 10pt" size="-1"><b>&nbsp;
+        Так выглядит реализация класса Event в Win32</b></font></td>
+      </tr>
+    </table>
+    <pre>
+class Event {
+ private:
+   HANDLE event;
+
+ public:
+   Event(void) {
+       event = CreateEvent((void*)0, TRUE, FALSE, (void)0);
+   }
+
+   ~Event(void) {
+       CloseHandle(event);
+   }
+
+   void Signal(void) {
+       PulseEvent(event);
+   }
+
+   void Wait(void) {
+       WaitForSingleObject(event, INFINITE);
+   }
+}; 
+</pre>
+    <table border="0" cellpadding="0" cellspacing="0">
+      <tr>
+        <td width="750" bgcolor="#A5E4A7"><font face="Tahoma" style="font-size: 10pt" size="-1"><b>&nbsp;
+        А так класс Event выглядит для Solaris 2.x</b></font></td>
+      </tr>
+    </table>
+    <pre>
+class Event {
+ private:
+   cond_t event;
+
+   // in order to wait on a condition variable you must have a locked
+   // mutex, which we don't really need.
+   mutex_t dummy_mutex;
+
+ public:
+   Event(void) {
+        cond_init(&amp;event, USYNC_PROCESS, (void*)0);
+        mutex_init(&amp;dummy_mutex, USYNC_PROCESS, (void*)0);
+   }
+
+   ~Event(void) {
+        event_destroy(&amp;event);
+   }
+
+   void Signal(void) {
+        cond_broadcast(&amp;event);
+   }
+
+   void Wait(void) {
+        mutex_lock(&amp;dummy_mutex);
+        cond_wait(&amp;event, &amp;dummy_mutex);
+        mutex_unlock(&amp;dummy_mutex);
+   }
+};
+</pre>
+    </td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->
