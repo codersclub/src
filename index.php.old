@@ -1,0 +1,380 @@
+<?php
+error_reporting  (E_ERROR | E_WARNING | E_PARSE);
+
+// Forum Root path
+//define( 'ROOT_PATH', "/usr/local/www/sources.forum/htdocs/" );
+define( 'ROOT_PATH', "/home/forum/htdocs/" );
+
+// This Site Root path
+//define( 'THIS_PATH', "/usr/local/www/sources.ru/htdocs/" );
+define( 'THIS_PATH', "/home/sources/htdocs/" );
+define( 'THIS__URL', "/" );
+
+
+
+
+
+class info {
+
+	var $member     	= array();
+	var $is_bot       	= 0;
+	var $input      	= array();
+	var $session_id 	= "";
+	var $session_type 	= "";
+	var $base_url   	= "";
+	var $vars       	= "";
+	var $skin       	= "";
+	var $skin_id    	= "0";     // Skin Dir name
+	var $skin_rid   	= "";      // Real skin id (numerical only)
+	var $lang_id    	= "en";
+	var $lang       	= "";
+	var $server_load 	= 0;
+	var $lastclick  	= "";
+	var $location   	= "";
+	var $debug_html 	= "";
+	var $perm_id    	= "";
+	var $forum_read 	= array();
+	var $topic_cache 	= "";
+	var $version    	= "v1.2";
+
+	function info() 
+	{
+		global $sess, $std, $DB, $INFO;
+		
+		$this->vars = &$INFO;
+		
+		$this->vars['TEAM_ICON_URL']   = $INFO['html_url'] . '/team_icons';
+		$this->vars['AVATARS_URL']     = $INFO['html_url'] . '/avatars';
+		$this->vars['mime_img']        = $INFO['html_url'] . '/mime_types';
+
+	}
+}
+
+
+require ROOT_PATH."../conf_global.php";
+
+
+
+
+require ROOT_PATH."sources/functions.php";
+
+$std   = new FUNC;
+
+
+
+require ROOT_PATH."sources/session.php";
+$sess  = new session();
+
+
+$INFO['sql_driver'] = !$INFO['sql_driver'] ? 'mySQL' : $INFO['sql_driver'];
+
+$to_require = ROOT_PATH."sources/Drivers/".$INFO['sql_driver'].".php";
+require ($to_require);
+
+$DB = new db_driver;
+
+$DB->obj['sql_database']     = $INFO['sql_database'];
+$DB->obj['sql_user']         = $INFO['sql_user'];
+$DB->obj['sql_pass']         = $INFO['sql_pass'];
+$DB->obj['sql_host']         = $INFO['sql_host'];
+$DB->obj['sql_tbl_prefix']   = $INFO['sql_tbl_prefix'];
+$DB->obj['debug']            = ($INFO['sql_debug'] == 1) ? $_GET['debug'] : 0;
+
+if ( !$DB->connect() )
+{
+	echo "<h1>Слишком много подключений к серверу. Пожалуйста подождите несколько минут и повторите попытку.</h1>";
+	exit;
+}
+
+
+
+
+$ibforums = new info();
+unset($INFO);
+
+
+$ibforums->input  = $std->parse_incoming();
+
+
+$ibforums->member = $sess->authorise();
+
+
+//DEBUG
+//echo "index.php started.<br>\n";
+//echo "<pre>SERVER=";
+//print_r($_SERVER);
+//echo "<hr>";
+//echo "<pre>ibforums=";
+//print_r($ibforums);
+//echo "</pre>";
+
+	if ( $ibforums->member['id'] ) {
+		$hello = "Hello, ".$ibforums->member['name'];
+	} else {
+		$hello = "Hello, guest!";
+	}
+//	echo "<br>";
+
+//--------------------------------------------------------------
+
+	$result = $DB->query("SELECT COUNT(*) FROM ibf_sessions where running_time > UNIX_TIMESTAMP()-15*60");
+
+//	$res = $DB->get_affected_rows($result); // number of selected rows
+//	$res = $DB->fetch_simple_row($result); // one row
+	$row = $DB->fetch_simple_row($result); // one row
+	$s = $row[0] == 1 ? "" : "s";
+
+//	echo $row[0]." user".$s." online"; 
+
+	$users_online = $row[0]." user".$s." online"; 
+
+//        echo "Result = ".$result;
+
+
+
+
+
+
+
+//--------------------------------------------------------------
+// Get Local Configuration
+
+require_once(THIS_PATH."_csite/config.php");
+
+//--------------------------------------------------------------
+// Load Our Functions
+
+require_once(THIS_PATH."_csite/functions.php");
+
+
+//==============================================================
+
+$MODULES = array();
+
+$MODULES['home'] = array('name'=>'Home Page','active'=>1);
+$MODULES['test'] = array('name'=>'Test Module','active'=>1);
+$module = '';
+
+//==============================================================
+$uri = $_SERVER['REQUEST_URI'];
+echo "\$uri=".$uri."<br>\n";
+
+
+$actions = '';
+if(preg_match("/\?/",$uri)) {
+  $actions = preg_replace("/^(.*)(\?.*)$/","\\2",$uri);
+  $uri = preg_replace("/\?.*$/",'',$uri);
+}
+echo "\$actions=".$actions."<br>\n";
+$uri = preg_replace("/index\.html/i",'',$uri);
+//$uri = preg_replace("/\/$/",'',$uri);
+
+echo "\$uri=".$uri."<br>\n";
+
+$root=$_SERVER['DOCUMENT_ROOT'];
+echo "\$root=".$root."<br>\n";
+define( 'ROOT', $root );
+
+$uri_parts = explode('/',$uri);
+
+//DEBUG
+echo "uri_parts:<br>\n";
+echo "<pre>";
+print_r($uri_parts);
+echo "</pre>";
+
+//  $module = $uri_parts[0];
+//  if(!$module) $module='home';
+
+
+
+if(preg_match("/\/$/",$uri)) {
+
+  $dir = ROOT.$uri;
+  echo "\$dir=".$dir."<br>\n";
+  
+  if($uri=='/' || $uri=='/index.html') {
+    $module = 'home';
+    echo "\$module=".$module."<br>\n";
+
+  } else {
+
+    $module = 'category';
+    echo "\$module=".$module."<br>\n";
+
+  }
+
+} else {
+
+    $module = 'article';
+    echo "\$module=".$module."<br>\n";
+
+    $filename = ROOT.$uri;
+    echo "\$filename=".$filename."<br>\n";
+
+    if(is_file($filename)) {
+      echo "\$filename exists<br>\n";
+    //  $f = fopen($filename,'r');
+    //  fpassthru($f);
+    //  fclose($f);
+
+    /*
+      $lines = file ($filename);
+
+      // Loop through our array, show html source as html source; and line numbers too.
+      foreach ($lines as $line_num => $line) {
+        //    echo "Line #<b>{$line_num}</b> : " . htmlspecialchars($line) . "<br>\n";
+        $ssi_file="";
+        if(preg_match('/<!--#include virtual\=\"(.+?)\"-->/i', $line))
+        {
+    //    $line = preg_replace('/<!--#\s*include virtual\=\"*(.+?)\"*\s*-->/i', "&lt;!--#include virtual=&quot;\\1&quot;--&gt;", $line);
+        $ssi_file = preg_replace('/<!--#\s*include virtual\=\"*(.+?)\"*\s*-->/i', "\\1", $line);
+
+        if(strlen($ssi_file))
+        {
+    //      echo "\$ssi_file=&quot;".$ssi_file."&quot;";
+    //      $ssi_body="&lt;!--#include virtual=&quot;{$ssi_file}&quot;--&gt;";
+          $file = trim($root.$ssi_file);
+    //      echo "\$file=".$file."<br>\n";
+    //      $ssi_body=file($file);
+          $ssi_body = implode ('', file($file));
+          //    if(is_file($filename))
+        }
+
+
+        $line = preg_replace('/<!--#\s*include virtual\=\"*(.+?)\"*\s*-->/i', $ssi_body, $line);
+    //    echo $ssi_file;
+
+    //    {
+    //      $ssi_file=\\1;
+    //      echo "&lt;!--#include virtual=&quot;".$ssi_file."&quot;--&gt;";
+    //    }
+       } // if(preg_match);
+        echo $line . "";
+      } //for
+
+      // Another example, let's get a web page into a string.  See also file_get_contents().
+    //  $html = implode ('', file ('http://www.example.com/'));
+
+    */
+
+    }
+    else
+    {
+      echo "\$filename does NOT exists.<br>\n";
+    }
+
+
+}
+
+
+if($module=='home') {
+  home();
+} else if($module=='category') {
+  category($dir);
+} else if($module=='article') {
+  article();
+} else {
+  echo "The static page not found. Need to analyze in DB!<br>";
+  echo "If will be found in DB - parse & sho it.<br>";
+  echo "If will NOT found in DB - show the 404 error page.<br>";
+}
+
+
+
+
+
+
+
+//--------------------------------------------------------------
+// Closa Database Connection
+
+$DB->close_db();
+
+exit;
+
+//=================================================
+// Module Prototypes
+function home() {
+
+  //--------------------------------------------------------------
+  // Run the Template
+
+  require_once(THIS_PATH."_csite/templates/index.php");
+
+}
+
+//=================================================
+function category($dir = '') {
+
+ echo 'category()'." started.<br>\n";
+
+  //--------------------------------------------------------------
+  // Passthru the index.html
+
+
+    if(is_dir($dir)) {
+      echo "\$dir exists<br>\n";
+      $filename = $dir.'index.html';
+      echo "\$filename=".$filename."<br>\n";
+
+      if(is_file($filename)) {
+        echo "\$filename exists<br>\n";
+        html($filename);
+      } else {
+        echo "\$filename does NOT exists.<br>\n";
+      }
+
+    } else {
+      echo "\$dir does NOT exists.<br>\n";
+    }
+}
+
+function html($filename='') {
+
+//  $f = fopen($filename,'r');
+//  fpassthru($f);
+//  fclose($f);
+
+  $lines = file ($filename);
+
+  // Loop through our array, show html source as html source; and line numbers too.
+  foreach ($lines as $line_num => $line) {
+    //    echo "Line #<b>{$line_num}</b> : " . htmlspecialchars($line) . "<br>\n";
+    $ssi_file="";
+
+//  <!--#include virtual="/xap7.php"-->
+
+    if(preg_match('/<!--#include virtual\=\"(.+?)\"-->/i', $line))
+    {
+//    $line = preg_replace('/<!--#\s*include virtual\=\"*(.+?)\"*\s*-->/i', "&lt;!--#include virtual=&quot;\\1&quot;--&gt;", $line);
+    $ssi_file = preg_replace('/<!--#\s*include virtual\=\"*(.+?)\"*\s*-->/i', "\\1", $line);
+
+    if(strlen($ssi_file))
+    {
+      echo "\$ssi_file=&quot;".$ssi_file."&quot;<br>";
+//      $ssi_body="&lt;!--#include virtual=&quot;{$ssi_file}&quot;--&gt;";
+      $file = trim(ROOT.$ssi_file);
+//      echo "\$file=".$file."<br>\n";
+//      $ssi_body=file($file);
+      $ssi_body = implode ('', file($file));
+      //    if(is_file($filename))
+    }
+
+
+    $line = preg_replace('/<!--#\s*include virtual\=\"*(.+?)\"*\s*-->/i', $ssi_body, $line);
+
+//    echo $ssi_file;
+
+//    {
+//      $ssi_file=\\1;
+//      echo "&lt;!--#include virtual=&quot;".$ssi_file."&quot;--&gt;";
+//    }
+   } // if(preg_match);
+    echo $line . "";
+  } //for
+
+  // Another example, let's get a web page into a string.  See also file_get_contents().
+//  $html = implode ('', file ('http://www.example.com/'));
+
+}
