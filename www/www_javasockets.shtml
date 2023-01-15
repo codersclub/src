@@ -1,0 +1,184 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+<title>Дополнительные сервисы на web серверах и сокеты в Java апплетах.</title>
+<meta name="keywords" content="">
+<meta name="description" content="">
+<!--#include virtual="/ssi/top2.html"-->
+<div align="center">
+
+<table width="694" cellspacing="0" cellpadding="0">
+  <tr>
+    <td width="694"><hr>
+    <h1>Дополнительные сервисы на web серверах и сокеты
+    в Java апплетах.</h1>
+    <p>Автор: <a href="/authors/pavel_negrobov.shtml">Павел Негробов.</a></p>
+    <font face="Arial,Verdana,Tahoma"><p>&nbsp;&nbsp;&nbsp; </font><b><font
+    face="Arial,Verdana,Tahoma" SIZE="2" COLOR="#000000">Иногда возникает
+    необходимость организации какого-нибудь
+    дополнительного</font><font FACE="System" SIZE="2" COLOR="#000000">
+    сервиса на Web сервере. При этом дополнительный
+    сервер цепляется на какой-нибудь нестандартный
+    порт и прослушивает его. В страничку, которую
+    пользователь получает обычным образом,
+    встраивается апплет, реализующий клиента для
+    этого нестандартного сервера. Такую схему можно
+    реализовать с помощью стандартного механизма
+    сокетов языка Java. <br>
+    &nbsp;&nbsp;&nbsp; Приведем пример реализации
+    стандартного сервиса Time, выдающего клиенту
+    текущее время. Обычно он реализуется на порту 37 и
+    выдает 4 байтовое число, которое затем необходимо
+    раскодировать, чтобы получить текущие дату и
+    время. Мы же реализуем несколько иной механизм.
+    Сервер будет посылать клиенту текущие дату и
+    время в виде обычной строки, пригодной к
+    распечатке без каких-либо перекодировок сразу
+    после подключения и немедленно отключаться.
+    Работать он будет на порту 8013.</font></b><font
+    face="Arial,Verdana,Tahoma"></p>
+    </font><b><font face="Arial,Verdana,Tahoma" SIZE="2" COLOR="#000000"><p>Полный
+    текст сервера:</p>
+    <p>// TimeServer.java<br>
+    import java.net.*;<br>
+    import java.io.*;</p>
+    <p>public class TimeServer extends Thread <br>
+    {<br>
+    private static final int kPortNumber = 8013;<br>
+    private ServerSocket fServerSocket;<br>
+    <br>
+    public TimeServer() <br>
+    {<br>
+    super(&quot;TServer&quot;);<br>
+    try <br>
+    {<br>
+    </font><font FACE="System" SIZE="2" COLOR="#000000">&nbsp; fServerSocket = new
+    ServerSocket(kPortNumber);<br>
+    &nbsp; System.out.println(&quot;Time Server started ...&quot;);<br>
+    }<br>
+    catch (IOException e) <br>
+    {<br>
+    &nbsp; System.err.println(&quot;Error: &quot;+e);<br>
+    &nbsp; System.exit(1);<br>
+    } // catch<br>
+    } // TimeServer</p>
+    <p>public void run() <br>
+    {<br>
+    Socket theClientSocket;<br>
+    while (true) <br>
+    {<br>
+    // Ожидание подключения клиента<br>
+    if (fServerSocket == null) return;<br>
+    try <br>
+    {<br>
+    theClientSocket = fServerSocket.accept();<br>
+    // Прием соединения клиента<br>
+    // Отправка клиенту сообщения</p>
+    <p>PrintWriter theWriter = new PrintWriter(new
+    OutputStreamWriter(theClientSocket.getOutputStream()));<br>
+    theWriter.println(new java.util.Date().toString());<br>
+    theWriter.flush();</p>
+    <p>// разрыв соединения</p>
+    <p>theWriter.close();<br>
+    theClientSocket.close();<br>
+    } // try<br>
+    catch (IOException e) <br>
+    {<br>
+    &nbsp; System.err.println(&quot;Exception: &quot; + e.getMessage());<br>
+    &nbsp; System.exit(1);<br>
+    } // catch<br>
+    } // while<br>
+    } // run</p>
+    <p>public static void main(String[] args) </p>
+    <p>{</p>
+    <p>TimeServer theServer = new TimeServer();</p>
+    <p>theServer.start();</p>
+    <p>} // main</p>
+    <p>} // class</p>
+    <p>Приведем теперь текст апплета, обращающегося к
+    этому серверу и HTML, запускающий его.</p>
+    <p>// GetTime.java<br>
+    import java.awt.*;<br>
+    import java.awt.event.*;<br>
+    import java.applet.*;<br>
+    import java.net.*;<br>
+    import java.io.*;</p>
+    <p>public class GetTime extends Applet implements ActionListener <br>
+    {<br>
+    TextField text;</p>
+    <p>public void init() <br>
+    { // Initialize the applet.<br>
+    //----------&gt; Добавить панель управления<br>
+    // Assign a BorderLayout manager with margins for this frame.</p>
+    <p>setLayout(new BorderLayout());</p>
+    <p>// -------------------<br>
+    // Create two panels to contain two columns of components. Use our custom<br>
+    // ColumnLayout layout manager for each. Add them on the west and<br>
+    // center of the frame's border layout</p>
+    <p>Panel column1 = new Panel();<br>
+    column1.setLayout(new ColumnLayout(5, 10, 2, ColumnLayout.LEFT));<br>
+    add(column1, &quot;West&quot;);</p>
+    <p>// -------------------<br>
+    // Create a panel to contain the buttons at the bottom of the window<br>
+    // Give it a FlowLayout layout manager, and add it along the south border</p>
+    <p>Panel buttonbox = new Panel();</p>
+    <p>buttonbox.setLayout(new FlowLayout(FlowLayout.CENTER, 100, 10));<br>
+    add(buttonbox, &quot;South&quot;);</p>
+    <p>// Create pushbuttons and add them to the buttonbox</p>
+    <p>Button accept = new Button(&quot;GetTime&quot;);</p>
+    <p>buttonbox.add(accept);<br>
+    accept.addActionListener(this);</p>
+    <p>// -------------------<br>
+    // Create two 1-line text field and add to left column, with a labels</p>
+    <p>text = new TextField(30);<br>
+    column1.add(text);<br>
+    } // init</p>
+    <p>public void actionPerformed(ActionEvent ev) <br>
+    { // Button pressed, get Time<br>
+    // Подключение к серверу</p>
+    <p>try <br>
+    {<br>
+    URL base=getDocumentBase();<br>
+    Socket theSocket = new Socket(base.getHost(), 8013);<br>
+    BufferedReader theReader = new BufferedReader(new<br>
+    InputStreamReader(theSocket.getInputStream()));</p>
+    <p>// Ожидание поступления сообщения<br>
+    // StringBuffer theStringBuffer = new StringBuffer(128);</p>
+    <p>String theLine;</p>
+    <p>int c;</p>
+    <p>while ((theLine = theReader.readLine()) != null) <br>
+    {<br>
+    // Вывод сообщения пользователю<br>
+    // System.out.println(&quot;Сервер: &quot; + theLine);</p>
+    <p>text.setText(theLine);<br>
+    break;<br>
+    } // while</p>
+    <p>// Разрыв соединения</p>
+    <p>theReader.close();<br>
+    theSocket.close();<br>
+    }<br>
+    catch (IOException e) <br>
+    {<br>
+    text.setText(&quot;Error&quot;);<br>
+    } // catch<br>
+    } // actionPerformed<br>
+    } // class</p>
+    <p>HTML для запуска этого апплета:</p>
+    <p>&lt;html&gt;<br>
+    &lt;head&gt;<br>
+    &lt;title&gt;Main page&lt;/title&gt;<br>
+    &lt;/head&gt;</p>
+    <p>&lt;body&gt;<br>
+    &lt;applet code=GetTime.class width=225 height=140&gt;<br>
+    &lt;/applet&gt;<br>
+    &lt;/body&gt;<br>
+    &lt;/html&gt;</p>
+    <p>Эта технология была проверена на IE 5.x и на Netscape
+    Navigator 4.7. На обоих броузерах она работает.</p>
+    </font></b><font face="Arial,Verdana,Tahoma"><p>Павел Негробов.</p>
+    <p>Email: pavel@imail.dc.ukrtel.net</p>
+    <p><br>
+    </font></td>
+  </tr>
+</table>
+</div>
+<!--#include virtual="/ssi/bottom.html"-->

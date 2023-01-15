@@ -1,0 +1,862 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+<title>Java формы.</title>
+<meta name="keywords" content="">
+<meta name="description" content="">
+<!--#include virtual="/ssi/top2.html"-->
+<div align="center">
+
+<table width="694" cellspacing="0" cellpadding="0">
+  <tr>
+    <td width="694"><hr>
+    <h1>Java формы.</h1>
+    <p>Автор: <a href="/authors/pavel_negrobov.shtml">Павел Негробов.</a></p>
+    <font face="Arial,Verdana,Tahoma"><p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Многие,
+    вероятно, видели web-страницы, где пользователю
+    предлагается ввести разного рода информацию. Это
+    и поисковые системы, и электронные магазины, и
+    службы, предоставляющие пользователям услуги по
+    размещению web сайтов и т.д.<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; На таких сайтах для ввода
+    информации на стороне клиента используются HTML
+    формы, а на стороне сервера - разного рода
+    скрипты, чаще всего Perl/CGI. Если же передается
+    секретная информация - имена, пароли, номера
+    кредитных карточек и т.п., то для передачи данных
+    подобного рода используется протокол HTTPS (HTTP
+    Security, технология SSL - Secure Socket Layer) вместо обычного
+    HTTPS. Он полностью идентичен HTTP, за исключением
+    того, что данные, передающиеся между серером и
+    клиентом шифруются с помощью метода с открытым
+    ключом (закрытый ключ содержится на сервере, а
+    открытые - в клиентских броузерах). Кроме того, он
+    использует по умолчанию порт 443 вместо 80 у HTTP.</p>
+    <p>Для реализации такой схемы требуются:<br>
+    1. Приложение Web сервера, поддерживающее
+    протоколы HTTP и HTTPS, а также скрипты.<br>
+    2. SSL сертификат, устанавливаемый на сервере и
+    содержащий закрытый ключ.</p>
+    <p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Что касается серверных
+    приложений, то их существует великое множество, в
+    том числе и бесплатных. Далее мы будем
+    пользоваться бесплатным сервером Apache
+    (http://www.apache.org).<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Сложнее дело обстоит с
+    сертификатом - за него нужно платить. Вы заходите,
+    например, на www.verisign.com, указываете данные о себе (в
+    том числе и номер кредитной карточки) и после
+    проверки действительности карточки сервер
+    вышлет сертификат по e-mail. На том же сайте можно
+    бесплатно получить сертификат с ограниченным
+    сроком действия - 14 дней (хотя у меня он работает
+    вот уже 2 месяца).<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Существует еще одна проблема
+    при использовании HTTPS - как показывает практика,
+    его пропускают не все proxy-сервера. Если proxy не
+    пропускает HTTPS, то клиент чаще всего получает
+    ошибку &quot;Данная страница недоступна&quot;, иногда
+    - &quot;Запрошенный узел не найден&quot;.<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Все эти причины вынуждают
+    искать другие пути решения передачи секретных
+    данных.<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Наиболее простой способ
+    заключается в использовании JavaScript/JScript/ VBScript. Они
+    позволяют реализовать шифрование, однако
+    исходный текст таких процедур находится в теле
+    HTML кода и легко читается любым текстовым
+    редактором. Кроме того, эти скрипты имеют
+    языковые особенности (например, отсутствие
+    типизации), не позволяющие реализовать
+    эффективный алгоритм шифровки.<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; В настоящее время огромную
+    популярность приобрел язык Java. Он позволяет
+    создавать обычные приложения, апплеты
+    (приложения, работающие в среде броузера) и
+    сервлеты - аналоги CGI скриптов. Разработчик языка,
+    фирма Sun, бесплатно распространяет множество
+    дополнительных пакетов (библиотек функций),
+    среди которых есть и криптографический. Он
+    называется JCE (Java Cryptography Extension). Его можно скачать
+    с сайта Sun, посвященного Java - http://java.sun.com. С его
+    помощью можно организовать самые разные виды
+    шифра, начиная от простых симметричных кодов до
+    сложных методов с открытым ключом. Однако здесь
+    мы не будем касаться этого пакета.<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Опишем реализацию на Java аналога
+    HTML форм на стороне клиента, а также серверные
+    части, необходимые для этого. Далее мы будем
+    освещать вопросы, относящиеся только к передаче
+    данных, введенных пользователем и предполагаем,
+    что читатель знаком с Java и способен реализовать в
+    апплете строку ввода, чекбокс и другие элементы
+    управления.<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Рассмотрим клиентскую часть.
+    Протокол HTTP (HTTPS) поддерживает два способа
+    передачи данных форм: GET и POST. Точнее сказать, GET и
+    POST - команды, подаваемые броузером HTTP серверу.
+    Более подробную о них можно получить из RFC
+    документов по адресам:</p>
+    <p>http://www.cis.ohio-state.edu/htbin/rfc/rfc1945.html - HTTP 1.0<br>
+    http://www.cis.ohio-state.edu/htbin/rfc/rfc2068.html - HTTP 1.1</p>
+    <p>Здесь же будут рассмотрены те аспекты этих
+    команд, которые необходимы для решения нашей
+    задачи.</p>
+    <p>Способ передачи данных броузером определяется
+    атрибутом method HTML тега FORM.</p>
+    <p>&lt;form action=/servlets/Info method=GET&gt;<br>
+    &nbsp; &lt;input type=hidden&gt;<br>
+    &nbsp; How Many Employees in your Company?<br>
+    &nbsp; &lt;BR&gt;&lt;input type=radio name=employee value=1-100&gt;1-100<br>
+    &nbsp; &lt;BR&gt;&lt;input type=radio name=employee value=100-200&gt;100-200<br>
+    &nbsp; &lt;BR&gt;&lt;input type=radio name=employee value=200-300&gt;200-300<br>
+    &nbsp; &lt;BR&gt;&lt;input type=radio name=employee value=300-400&gt;300-400<br>
+    &nbsp; &lt;BR&gt;&lt;input type=radio name=employee value=500-more&gt;500-more<br>
+    &nbsp; &lt;BR&gt;General Comments?<br>
+    &nbsp; &lt;BR&gt;&lt;input type=text name=comment&gt;<br>
+    &nbsp; &lt;BR&gt;What IDEs do you use?<br>
+    &nbsp; &lt;BR&gt;&lt;input type=checkbox name=ide value=JavaWorkShop&gt;JavaWorkShop<br>
+    &nbsp; &lt;BR&gt;&lt;input type=checkbox name=ide value=J++&gt;J++<br>
+    &nbsp; &lt;BR&gt;&lt;input type=checkbox name=ide value=Cafe&gt;Cafe<br>
+    &nbsp; &lt;BR&gt;&lt;BR&gt;<br>
+    &nbsp; &lt;input type=submit&gt;&lt;input type=reset&gt;<br>
+    &lt;/form&gt;</p>
+    <p>На месте POST здесь может стоять GET:</p>
+    <p>&lt;form action=/servlets/Info method=GET&gt;<br>
+    ...<br>
+    &lt;/form&gt;</p>
+    <p>Разница заключается только в способе передачи
+    данных серверу.</p>
+    <p>Рассмотрим ее на примере вышеприведенной
+    формы.</p>
+    <p>1) При использовании метода GET броузер передает
+    команду (в виде одной строки):</p>
+    <p>GET
+    /servlets/Info?employee=200-300&amp;comment=comment&amp;ide=JavaWorkShop&amp;ide=J%2B%2B</p>
+    <p>2) При использовании метода POST:</p>
+    <p>POST /servlets/Info<br>
+    ...<br>
+    employee=200-300&amp;comment=comment&amp;ide=JavaWorkShop&amp;ide=J%2B%2B</p>
+    <p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Строка аргументов передается
+    броузером как часть HTTP заголовка, поэтому
+    пользователь не видит ее в строке адреса, в
+    отличие от GET метода.<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Отсюда видно основное отличие -
+    GET передает все одной строкой, а POST разбивает на
+    две части - команда с именем скрипта, затем -
+    аргументы.<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; При реализации формы на Java
+    апплет должен полностью повторить приведенную
+    выше схему.</p>
+    <p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Перед рассмотрением
+    реализации каждого метода необходимо отметить,
+    что поле &lt;INPUT type=&quot;file&quot; name=&quot;XXXX&quot;&gt; в
+    апплете нереализуемо вследствие того, что в
+    подавляющем большинстве случаев апплету
+    запрещен доступ к накопителям
+    компьютера-клиента. Некоторые броузеры,
+    например, IE5.0, позволяет разрешить апплетам
+    заниматься файловым вводом-выводом, однако мы не
+    будем касаться этой темы в данной статье. Кроме
+    того, как показывает опыт, предлагаемый ниже
+    способ реализации POST не работает (не передаются
+    аргументы) на Netscape Navigator. В этом случае можно
+    использовать только GET. На IE 5.0 работают и POST и GET.</p>
+    <p>Рассмотрим реализацию каждого метода.</p>
+    <p>Сначала приведем полный текст апплета,
+    реализовывающего и GET и POST, а затем
+    проанализируем самые главные его места.</p>
+    <p>// Test.java<br>
+    import java.awt.*;<br>
+    import java.awt.event.*;<br>
+    import java.applet.*;<br>
+    import java.net.*;<br>
+    import java.util.*;<br>
+    import java.io.*;</p>
+    <p>public class Test extends Applet implements ActionListener<br>
+    {<br>
+    TextField comment;<br>
+    Checkbox[] radioBut;<br>
+    Checkbox[] checkBut;</p>
+    <p>URL docBase; // http://servername/dir1/dir2/<br>
+    String servletName, // Servlet name<br>
+    method; // &quot;GET&quot; or &quot;POST&quot;</p>
+    <p>String radioButNames[]={ &quot;1-100&quot;, &quot;100-200&quot;, &quot;200-300&quot;,
+    &quot;300-400&quot;, &quot;500-more&quot; };<br>
+    String checkButNames[]={&quot;JavaWorkShop&quot;, &quot;J++&quot;, &quot;Cafe&quot; };</p>
+    <p>public void init()<br>
+    { // Initialize the applet. Get parameters.<br>
+    // servletName=&quot;/servlets/Info&quot;;<br>
+    // method=&quot;GET&quot;;<br>
+    <br>
+    servletName = getParameter(&quot;SERVLET&quot;); // Servlet name<br>
+    method = getParameter(&quot;METHOD&quot;); // Method name</p>
+    <p>docBase = getDocumentBase();</p>
+    <p>//----------&gt; Добавить панель управления<br>
+    // Assign a BorderLayout manager with margins for this frame.</p>
+    <p>setLayout(new BorderLayout(10, 10));</p>
+    <p>// -------------------<br>
+    // Create two panels to contain two columns of components. Use our custom<br>
+    // ColumnLayout layout manager for each. Add them on the west and<br>
+    // center of the frame's border layout</p>
+    <p>Panel column1 = new Panel();<br>
+    // column1.setLayout(new ColumnLayout(5, 10, 2, ColumnLayout.LEFT));<br>
+    column1.setLayout(new ColumnLayout(5, 10, 2, ColumnLayout.LEFT));<br>
+    add(column1, &quot;West&quot;);</p>
+    <p>// -------------------<br>
+    // Create a panel to contain the buttons at the bottom of the window<br>
+    // Give it a FlowLayout layout manager, and add it along the south border</p>
+    <p>Panel buttonbox = new Panel();<br>
+    buttonbox.setLayout(new FlowLayout(FlowLayout.CENTER, 10, 10));<br>
+    add(buttonbox, &quot;South&quot;);</p>
+    <p>// Create pushbuttons and add them to the buttonbox</p>
+    <p>Button accept = new Button(&quot;Accept&quot;);<br>
+    buttonbox.add(accept);<br>
+    Button reset = new Button(&quot;Reset&quot;);<br>
+    buttonbox.add(reset);</p>
+    <p>// Handle events on the buttons</p>
+    <p>ActionListener buttonlistener = new ActionListener()<br>
+    {<br>
+    public void actionPerformed(ActionEvent e)<br>
+    {<br>
+    Button b=(Button)e.getSource();<br>
+    if(b.getLabel() == &quot;Accept&quot;)<br>
+    { // Accept button pressed - send data to server<br>
+    // Вначале формируем строку аргументов:<br>
+    // Переключатели radioBut имеют имя &quot;employee&quot;;<br>
+    // Строка comment - &quot;comment&quot;;<br>
+    // Переключатели checkBut - &quot;ide&quot;;</p>
+    <p>String argsLine; // Строка аргументов<br>
+    // employee=200-300&amp;comment=comment&amp;ide=JavaWorkShop&amp;ide=J%2B%2B<br>
+    // Записать состояния элементов управления в
+    список</p>
+    <p>Vector args = new Vector();<br>
+    for(int i=0; i&lt;radioBut.length; i++)<br>
+    if(radioBut[i].getState())<br>
+    args.addElement(&quot;employee=&quot;+radioButNames[i]);<br>
+    String commLine=comment.getText();<br>
+    if(commLine.length()!=0) args.addElement(&quot;comment=&quot;+commLine);</p>
+    <p>for(int i=0; i&lt;checkBut.length; i++)</p>
+    <p>if(checkBut[i].getState())</p>
+    <p>args.addElement(&quot;ide=&quot;+checkButNames[i]);<br>
+    argsLine=getArgsLine(args); // Перенести список в строку для
+    передачи</p>
+    <p>if(method.compareTo(&quot;GET&quot;)==0)<br>
+    { // Передаем данные, используя GET<br>
+    String link=servletName+&quot;?&quot;+argsLine;<br>
+    try<br>
+    {<br>
+    URL url = new URL(docBase, link);<br>
+    getAppletContext().showDocument(url, &quot;_self&quot;);<br>
+    } // try</p>
+    <p>catch (MalformedURLException exc)<br>
+    { // Исключение игнорируем<br>
+    // exc.printStackTrace();<br>
+    } // catch<br>
+    } // if GET</p>
+    <p>if(method.compareTo(&quot;POST&quot;)==0)<br>
+    { // Передаем данные, используя POST<br>
+    try<br>
+    {<br>
+    URL servlet = new URL(docBase, servletName);<br>
+    URLConnection conn = servlet.openConnection();<br>
+    conn.setDoOutput(true);<br>
+    conn.setUseCaches(false);</p>
+    <p>// Send data to server</p>
+    <p>PrintStream out = new PrintStream(conn.getOutputStream());<br>
+    out.print(argsLine);<br>
+    out.close(); // ESSENTIAL for this to work!</p>
+    <p>// Получить имя файла ответа</p>
+    <p>InputStream result=conn.getInputStream(); // Входной поток<br>
+    BufferedReader in = new BufferedReader(new InputStreamReader(result));<br>
+    String fname=in.readLine(); // Имя файла-ответа<br>
+    System.out.println(&quot;fname=&quot;+fname);</p>
+    <p>// Запросить ответ сервера</p>
+    <p>URL url = new URL(docBase, fname);<br>
+    getAppletContext().showDocument(url, &quot;_self&quot;);<br>
+    } // try</p>
+    <p>catch(Exception exc)</p>
+    <p>{ // Исключение игнорируем (MalformedURLException, IOException)<br>
+    // exc.printStackTrace();<br>
+    } // catch<br>
+    } // if POST<br>
+    } // if pressedAccept</p>
+    <p>if(b.getLabel() == &quot;Reset&quot;)<br>
+    { // Reset button pressed<br>
+    &nbsp;&nbsp; radioBut[0].setState(true);<br>
+    &nbsp;&nbsp; radioBut[1].setState(false);<br>
+    &nbsp;&nbsp; radioBut[2].setState(false);<br>
+    &nbsp;&nbsp; radioBut[3].setState(false);<br>
+    &nbsp;&nbsp; radioBut[4].setState(false);<br>
+    &nbsp;&nbsp; comment.setText(&quot;&quot;);<br>
+    &nbsp;&nbsp; checkBut[0].setState(false);<br>
+    &nbsp;&nbsp; checkBut[1].setState(false);<br>
+    &nbsp;&nbsp; checkBut[2].setState(false);<br>
+    } // if<br>
+    } // actionPerformed<br>
+    };</p>
+    <p>accept.addActionListener(buttonlistener);<br>
+    reset.addActionListener(buttonlistener);</p>
+    <p>// -------------------</p>
+    <p>// Create checkboxes, and group them in a CheckboxGroup to give them<br>
+    // &quot;radio button&quot; behavior.</p>
+    <p>CheckboxGroup checkbox_group = new CheckboxGroup();<br>
+    radioBut=new Checkbox[5];<br>
+    radioBut[0]=new Checkbox(radioButNames[0], checkbox_group, true);<br>
+    radioBut[1]=new Checkbox(radioButNames[1], checkbox_group, false);<br>
+    radioBut[2]=new Checkbox(radioButNames[2], checkbox_group, false);<br>
+    radioBut[3]=new Checkbox(radioButNames[3], checkbox_group, false);<br>
+    radioBut[4]=new Checkbox(radioButNames[4], checkbox_group, false);<br>
+    column1.add(new Label(&quot;How Many Employees in your Company?&quot;));<br>
+    for(int i = 0; i &lt; radioBut.length; i++) column1.add(radioBut[i]);</p>
+    <p>// -------------------</p>
+    <p>// Create one 1-line text field and add to left column, with a labels<br>
+    comment = new TextField(25);<br>
+    column1.add(new Label(&quot;General Comments?&quot;));<br>
+    column1.add(comment);</p>
+    <p>// -------------------</p>
+    <p>column1.add(new Label(&quot;What IDEs do you use? &quot;));<br>
+    checkBut=new Checkbox[3];<br>
+    checkBut[0]=new Checkbox(checkButNames[0], null, false); column1.add(checkBut[0]);<br>
+    checkBut[1]=new Checkbox(checkButNames[1], null, false); column1.add(checkBut[1]);<br>
+    checkBut[2]=new Checkbox(checkButNames[2], null, false); column1.add(checkBut[2]);</p>
+    <p>} // init</p>
+    <p>public void actionPerformed(ActionEvent ev)<br>
+    {<br>
+    } // actionPerformed</p>
+    <p>private String getArgsLine(Vector args)<br>
+    { // Encode the arguments in the property set as a URL-encoded string.<br>
+    // Multiple name=value pairs are separated by ampersands.<br>
+    // return the URLEncoded string with name=value pairs</p>
+    <p>&nbsp;&nbsp; StringBuffer sb = new StringBuffer();<br>
+    &nbsp;&nbsp; String sep = &quot;&quot;;<br>
+    &nbsp;&nbsp; Enumeration names = args.elements();</p>
+    <p>&nbsp;&nbsp; while(names.hasMoreElements())<br>
+    &nbsp;&nbsp; {<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; String name=(String)names.nextElement();<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; sb.append(sep+Encoder.encode(name));<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; sep = &quot;&amp;&quot;;<br>
+    &nbsp;&nbsp; } // while</p>
+    <p>&nbsp;&nbsp; return sb.toString();<br>
+    } // getArgsLine</p>
+    <p>/*<br>
+    public static void main(String args[])<br>
+    {<br>
+    &nbsp;&nbsp; Frame f = new Frame(&quot;Test&quot;);<br>
+    &nbsp;&nbsp; Test test = new Test();<br>
+    &nbsp;&nbsp; test.init();<br>
+    &nbsp;&nbsp; test.start();<br>
+    &nbsp;&nbsp; f.add(&quot;Center&quot;, test);<br>
+    &nbsp;&nbsp; f.setSize(300, 300);<br>
+    &nbsp;&nbsp; f.show();<br>
+    } // main<br>
+    */</p>
+    <p>} // class Test</p>
+    <p>class Encoder<br>
+    {<br>
+    static BitSet dontNeedEncoding;<br>
+    static final int caseDiff = ('a' - 'A');<br>
+    static<br>
+    {<br>
+    &nbsp;&nbsp; dontNeedEncoding = new BitSet(256);<br>
+    &nbsp;&nbsp; int i;<br>
+    &nbsp;&nbsp; for (i = 'a'; i &lt;= 'z'; i++) dontNeedEncoding.set(i);<br>
+    &nbsp;&nbsp; for (i = 'A'; i &lt;= 'Z'; i++) dontNeedEncoding.set(i);<br>
+    &nbsp;&nbsp; for (i = '0'; i &lt;= '9'; i++) dontNeedEncoding.set(i);<br>
+    &nbsp;&nbsp; dontNeedEncoding.set(' '); /* encoding a space to a + is done in the encode()
+    method */<br>
+    &nbsp;&nbsp; dontNeedEncoding.set('-');<br>
+    &nbsp;&nbsp; dontNeedEncoding.set('_');<br>
+    &nbsp;&nbsp; dontNeedEncoding.set('.');<br>
+    &nbsp;&nbsp; dontNeedEncoding.set('*');<br>
+    &nbsp;&nbsp; dontNeedEncoding.set('=');<br>
+    } // static</p>
+    <p>public static String encode(String s)<br>
+    {<br>
+    int maxBytesPerChar = 10;<br>
+    StringBuffer out = new StringBuffer(s.length());<br>
+    ByteArrayOutputStream buf = new ByteArrayOutputStream(maxBytesPerChar);<br>
+    OutputStreamWriter writer = new OutputStreamWriter(buf);</p>
+    <p>for (int i = 0; i &lt; s.length(); i++)<br>
+    {<br>
+    int c = (int)s.charAt(i);<br>
+    if (dontNeedEncoding.get(c))<br>
+    {<br>
+    if (c == ' ') c = '+';<br>
+    out.append((char)c);<br>
+    } // if<br>
+    else<br>
+    {<br>
+    // convert to external encoding before hex conversion<br>
+    try<br>
+    {<br>
+    writer.write(c);<br>
+    writer.flush();<br>
+    } // try<br>
+    catch(IOException e)<br>
+    {<br>
+    buf.reset();<br>
+    continue;<br>
+    } // catch</p>
+    <p>byte[] ba = buf.toByteArray();<br>
+    for (int j = 0; j &lt; ba.length; j++)<br>
+    {<br>
+    out.append('%');<br>
+    char ch = Character.forDigit((ba[j] &gt;&gt; 4) &amp; 0xF, 16);<br>
+    // converting to use uppercase letter as part of<br>
+    // the hex value if ch is a letter.</p>
+    <p>if (Character.isLetter(ch)) ch -= caseDiff;<br>
+    out.append(ch);<br>
+    ch = Character.forDigit(ba[j] &amp; 0xF, 16);<br>
+    if (Character.isLetter(ch)) ch -= caseDiff;<br>
+    out.append(ch);<br>
+    } // for<br>
+    buf.reset();<br>
+    } // else<br>
+    } // for<br>
+    return out.toString();<br>
+    } // encode<br>
+    } // class</p>
+    <p>И простой HTML код для запуска данного апплета
+    (test.htm):</p>
+    <p>&lt;html&gt;<br>
+    &lt;head&gt;<br>
+    &lt;title&gt;Test&lt;/title&gt;<br>
+    &lt;/head&gt;</p>
+    <p>&lt;body&gt;<br>
+    &lt;TABLE border=0&gt;<br>
+    &lt;TR&gt;<br>
+    &lt;TD&gt;<br>
+    &lt;applet code=Test.class width=300 height=350&gt;<br>
+    &lt;param name=servlet value=/servlets/Info&gt;<br>
+    &lt;param name=method value=POST&gt;<br>
+    &lt;/applet&gt;<br>
+    &lt;/TD&gt;<br>
+    &lt;TD&gt;<br>
+    &lt;form action=/servlets/InfoF method=POST&gt;<br>
+    &lt;input type=hidden&gt;<br>
+    How Many Employees in your Company?<br>
+    &lt;BR&gt;&lt;input type=radio name=employee value=1-100&gt;1-100<br>
+    &lt;BR&gt;&lt;input type=radio name=employee value=100-200&gt;100-200<br>
+    &lt;BR&gt;&lt;input type=radio name=employee value=200-300&gt;200-300<br>
+    &lt;BR&gt;&lt;input type=radio name=employee value=300-400&gt;300-400<br>
+    &lt;BR&gt;&lt;input type=radio name=employee value=500-more&gt;500-more<br>
+    &lt;BR&gt;General Comments?<br>
+    &lt;BR&gt;&lt;input type=text name=comment&gt;<br>
+    &lt;BR&gt;What IDEs do you use?<br>
+    &lt;BR&gt;&lt;input type=checkbox name=ide value=JavaWorkShop&gt;JavaWorkShop<br>
+    &lt;BR&gt;&lt;input type=checkbox name=ide value=J++&gt;J++<br>
+    &lt;BR&gt;&lt;input type=checkbox name=ide value=Cafe&gt;Cafe<br>
+    &lt;BR&gt;&lt;BR&gt;<br>
+    &lt;input type=submit&gt;<br>
+    &lt;input type=reset&gt;<br>
+    &lt;/form&gt;<br>
+    &lt;/TD&gt;<br>
+    &lt;/TR&gt;<br>
+    &lt;/TABLE&gt;<br>
+    &lt;/body&gt;<br>
+    &lt;/html&gt;</p>
+    <p>Этот файл показывает как запускать данный
+    апплет и реализовывает аналогичную ему HTML форму.
+    Все действия по отправке данных реализованы в
+    функции actionPerformed подкласса ActionListener,
+    обрабатывающего реакцию на нажатие кнопок.
+    Функция actionPerformed запускается при нажатии на
+    любую из двух кнопок (Accept и Reset). Далее
+    проверяется, какая кнопка была нажата. Если
+    нажали Accept, то конструируется строка, содержащая
+    аргументы. Эта строка приблизительно выглядит
+    так: employee=200-300&amp;comment=comment&amp;ide=JavaWorkShop&amp;ide=J%2B%2B. Для
+    этого состояние всех элементов управления
+    заносятся в список, а затем функция getArgsLine
+    формирует строку. Класс Encoder, применяющийся при
+    этом, является переделкой стандартного
+    java.net.URLEncoder. Его пришлось переделать из-за того,
+    что он превращает знак равенства в %3D, в
+    результате чего сервер не может автоматически
+    разбить строку на части.</p>
+    <h3 align="center">Реализация метода GET</h3>
+    <p>Этот способ использует стандартную функцию
+    showDocument стандартного интерфейса AppletContext. Эта
+    функция имеет две формы:</p>
+    <p>public void showDocument(URL url);<br>
+    public void showDocument(URL url, String target);</p>
+    <p>Они позволяют отобразить в окне броузера
+    указанную аргументом url страницу. Первая форма
+    открывает указанную страницу в том же окне
+    (фрейме), где находится сам апплет. Вторая
+    позволяет явно указать имя окна (фрейма), в
+    котором требуется отобразить страницу. Это те же
+    самые имена, которые допускаются в
+    необязательном атрибуте TARGET тега &lt;A HREF&gt; языка
+    HTML. Более подробно об этом можно прочитать в
+    справочнике по HTML или в описании указанных
+    функций в документации по Java, поставляемой с JDK. В
+    документации также указано, что эти функции
+    могут игнорироваться броузером. В этом случае
+    для приема данных от клиента можно использовать
+    только HTML формы.</p>
+    <p>Все, что нам требуется - это сформировать строку
+    аргументов GET (см. выше) и передать ее функции
+    showDocument, вместе с именем серверного скрипта,
+    который обработает запрос.</p>
+    <h3 align="center">Реализация метода POST</h3>
+    <p>&nbsp;&nbsp;&nbsp;&nbsp; Реализовать метод POST несколько
+    сложнее, поскольку Java API не имеет функции, его
+    инкасулирующей.<br>
+    &nbsp;&nbsp;&nbsp;&nbsp; Выходом из этой ситуации является
+    создание выходного потока и вывод в него той же
+    самой строки с аргументами, что и для GET. Обо всем
+    остальном заботится броузер.<br>
+    &nbsp;&nbsp;&nbsp;&nbsp; Единственное, на что хотелось бы
+    обратить внимание, - способ принятия ответа от
+    сервера. Дело в том, что IE не открывает канал
+    ввода после отсылки. Иными словами, ответ сервера
+    игнорируется и клиент его не увидит.<br>
+    &nbsp;&nbsp;&nbsp;&nbsp; Обойти это ограничение позволяет
+    следующий прием: серверный скрипт обрабатывает
+    запрос клиента, генерирует у себя на серверном
+    жестком диске HTML файл-результат и пересылает
+    клиенту его имя. После чего клиент просто
+    запрашивает этот файл через showDocument. Единственный
+    недостаток - это не работает на Netscape Navigator.<br>
+    &nbsp;&nbsp;&nbsp;&nbsp; Рассмотрим теперь серверную часть.<br>
+    &nbsp;&nbsp;&nbsp;&nbsp; Для того, чтобы сервер мог
+    принимать и обрабатывать данные от клиентов, на
+    нем должен работать соответствующее приложение.
+    В настоящее время существут множество разных
+    серверных скриптов, мы же рассмотрим Java сервлеты.
+    Они гораздо эффективней CGI/Perl аналогов, т. к.
+    требуют гораздо меньше накладных расходов,
+    особенно при запуске и останове.</p>
+    <p>&nbsp;&nbsp;&nbsp;&nbsp; Для запуска приведенных ниже
+    сервлетов необходимо иметь:<br>
+    &nbsp;&nbsp;&nbsp;&nbsp; - приложение Web сервера,
+    поддерживающее Java сервлеты;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp; - пакет JSDK (Java Servlet Development Kit),
+    желательно версии 2.0, он доступен на сайте java.sun.com.</p>
+    <p>&nbsp;&nbsp;&nbsp;&nbsp; Мне известны три таких сервера
+    (больше я не искал): Apache Web Server (www.apache.org), Java Web Server
+    (java.sun.com) и Vqserver (www.vqserver.com). Все они бесплатные,
+    доступны для свободного скачивания с указанных
+    сайтов и устанавливаются без проблем. Apache сам по
+    себе не поддерживает Java, для этого существует
+    специальный модуль - Apache JServ (Apache Java Server). Его можно
+    взять на том же сайте. JServ требует, чтобы на том же
+    компьютере были установлены: JDK - Java Development Kit (или
+    JRE - Java Runtime Environment) и JSDK.<br>
+    &nbsp;&nbsp;&nbsp;&nbsp; Приведенные ниже сервлеты
+    необходимо откомпилировать и поместить .class туда,
+    куда требует использемый Вами сервер и прописать
+    путь к сервлету в приведеном выше HTML файле.</p>
+    <p>// Info.java<br>
+    import java.io.*;<br>
+    import java.util.*;<br>
+    import javax.servlet.*;<br>
+    import javax.servlet.http.*;</p>
+    <p>public class Info extends HttpServlet<br>
+    {<br>
+    ServletConfig config;<br>
+    String dir; // Здесь должен быть путь к временному
+    файлу<br>
+    String fname; // Здесь должно быть имя временного файла<br>
+    <br>
+    public void init(ServletConfig tconfig) throws ServletException<br>
+    {<br>
+    &nbsp;&nbsp; super.init(tconfig);<br>
+    &nbsp;&nbsp; config=tconfig;<br>
+    &nbsp;&nbsp; dir=getInitParameter(&quot;dir&quot;);<br>
+    &nbsp;&nbsp; fname=getInitParameter(&quot;fname&quot;);<br>
+    } // init</p>
+    <p>public String getServletInfo()<br>
+    {<br>
+    &nbsp;&nbsp;&nbsp; return &quot;Info servlet&quot;;<br>
+    } // getServletInfo</p>
+    <p>public void doGet(HttpServletRequest req, HttpServletResponse rep) throws
+    ServletException, IOException<br>
+    {<br>
+    &nbsp;&nbsp; PrintWriter os=rep.getWriter();<br>
+    &nbsp;&nbsp; dostuff(os, req, rep);<br>
+    }</p>
+    <p>public void doPost(HttpServletRequest req, HttpServletResponse rep) throws
+    ServletException, IOException<br>
+    {<br>
+    // Создать временный HTML файл, записать в него
+    результаты работы<br>
+    String filename=dir+System.getProperty(&quot;file.separator&quot;)+fname;<br>
+    // log(&quot;dir=&quot;+dir);<br>
+    // log(&quot;fname=&quot;+fname);<br>
+    // log(&quot;filename=&quot;+filename);</p>
+    <p>File f=new File(filename);<br>
+    if(f.exists()) f.delete(); // Если существует, удалить<br>
+    PrintWriter os=new PrintWriter(new FileOutputStream(f));<br>
+    dostuff(os, req, rep);<br>
+    os.close();<br>
+    // передать имя сгенерированного файла клиенту<br>
+    os=rep.getWriter();<br>
+    os.print(fname);<br>
+    os.flush();<br>
+    } // doPost</p>
+    <p>private void pp(PrintWriter os, String name, String value)<br>
+    {<br>
+    &nbsp;&nbsp; os.print(&quot;&lt;b&gt;&quot;+name+&quot;: &lt;/b&gt;&quot;);<br>
+    &nbsp;&nbsp; if (value==null) os.print(&quot;&lt;b&gt;none&lt;/b&gt;&quot;);<br>
+    &nbsp;&nbsp; else os.print(value);<br>
+    &nbsp;&nbsp; os.println(&quot;&lt;br&gt;&quot;);<br>
+    } // pp</p>
+    <p>private void pp(PrintWriter os, String name, int value)<br>
+    {<br>
+    &nbsp;&nbsp; pp(os, name, String.valueOf(value));<br>
+    } // pp</p>
+    <p>public void dostuff(PrintWriter os, HttpServletRequest req, HttpServletResponse rep)
+    throws ServletException, IOException<br>
+    {<br>
+    log(&quot;invoked&quot;);<br>
+    rep.setContentType(&quot;text/html&quot;);<br>
+    os.println(&quot;&lt;html&gt;&quot;);<br>
+    os.println(&quot;&lt;head&gt;&lt;title&gt;Info servlet&lt;/title&gt;&lt;/head&gt;&quot;);<br>
+    os.println(&quot;&lt;body bgcolor=#add8af&gt;&quot;);<br>
+    os.println(&quot;&lt;table border=0 cellspacing=0 cellpadding=2 cols=3
+    width=100%&gt;&quot;);<br>
+    os.println(&quot;&lt;tr&gt;&lt;td valign=top&gt;&quot;);<br>
+    os.println(&quot;&lt;h1 align=center&gt;Info servlet&lt;/h1&gt;&quot;);<br>
+    os.println(&quot;&lt;hr&gt;&quot;);<br>
+    os.println(&quot;&lt;p&gt;This page was generated by &lt;i&gt;Info&lt;/i&gt;
+    servlet./&quot;);<br>
+    os.println(&quot;&lt;i&gt;Info&lt;/i&gt; lists its initialisation parameters, information
+    about the http request which invoked it and the http request parameters passed to
+    it.&lt;/p&gt;&quot;);<br>
+    os.println(&quot;&lt;hr&gt;&quot;);<br>
+    os.println(&quot;&lt;h3&gt;Servlet initialisation parameters&lt;/h3&gt;&quot;);</p>
+    <p>Enumeration e=config.getInitParameterNames();<br>
+    if (!e.hasMoreElements()) os.println(&quot;&lt;b&gt;None!&lt;/b&gt;&quot;);<br>
+    else<br>
+    while (e.hasMoreElements())<br>
+    {<br>
+    &nbsp;&nbsp; String name=(String) e.nextElement();<br>
+    &nbsp;&nbsp; String value=config.getInitParameter(name);<br>
+    &nbsp;&nbsp; pp(os, name, value);<br>
+    } // while</p>
+    <p>os.println(&quot;&lt;hr&gt;&quot;);<br>
+    os.println(&quot;&lt;h3&gt;Request parameters&lt;/h3&gt;&quot;);<br>
+    pp(os, &quot;Request method&quot;, req.getMethod());<br>
+    pp(os, &quot;Request URI&quot;, req.getRequestURI());<br>
+    pp(os, &quot;Request protocol&quot;, req.getProtocol());<br>
+    pp(os, &quot;Servlet path&quot;, req.getServletPath());<br>
+    pp(os, &quot;Path info&quot;, req.getPathInfo());<br>
+    pp(os, &quot;Path translated&quot;, req.getPathTranslated());<br>
+    pp(os, &quot;Query string&quot;, req.getQueryString());<br>
+    pp(os, &quot;Content length&quot;, req.getContentLength());<br>
+    pp(os, &quot;Content type&quot;, req.getContentType());<br>
+    pp(os, &quot;Server name&quot;, req.getServerName());<br>
+    pp(os, &quot;Server port&quot;, req.getServerPort());<br>
+    pp(os, &quot;Remote user&quot;, req.getRemoteUser());<br>
+    pp(os, &quot;Remote address&quot;, req.getRemoteAddr());<br>
+    pp(os, &quot;Remote host&quot;, req.getRemoteHost());<br>
+    pp(os, &quot;Authorization scheme&quot;, req.getAuthType());<br>
+    os.println(&quot;&lt;hr&gt;&quot;);<br>
+    os.println(&quot;&lt;h3&gt;Request headers&lt;/h3&gt;&quot;);<br>
+    e=req.getHeaderNames();</p>
+    <p>if(!e.hasMoreElements()) os.println(&quot;&lt;b&gt;None!&lt;/b&gt;&quot;);<br>
+    else<br>
+    while (e.hasMoreElements())<br>
+    {<br>
+    &nbsp;&nbsp; String name=(String) e.nextElement();<br>
+    &nbsp;&nbsp; String value=(String) req.getHeader(name);<br>
+    &nbsp;&nbsp; pp(os, name, value);<br>
+    } // while</p>
+    <p>os.println(&quot;&lt;hr&gt;&quot;);<br>
+    os.println(&quot;&lt;h3&gt;Servlet parameters&lt;/h3&gt;&quot;);</p>
+    <p>e=req.getParameterNames();</p>
+    <p>if (!e.hasMoreElements()) os.println(&quot;&lt;b&gt;None!&lt;/b&gt;&quot;);<br>
+    else<br>
+    while (e.hasMoreElements())<br>
+    {<br>
+    &nbsp;&nbsp; String name=(String) e.nextElement();<br>
+    &nbsp;&nbsp; String value=req.getParameter(name);<br>
+    &nbsp;&nbsp; StringBuffer tbuffer=new StringBuffer();<br>
+    &nbsp;&nbsp; pp(os, name, value);<br>
+    } // while</p>
+    <p>os.println(&quot;&lt;hr&gt;&quot;);<br>
+    os.println(&quot;&lt;h3&gt;Servlet parameters (Multiple Value style):&lt;/h3&gt;&quot;);<br>
+    e = req.getParameterNames();<br>
+    if (!e.hasMoreElements()) os.println(&quot;&lt;b&gt;None!&lt;/b&gt;&quot;);<br>
+    else<br>
+    while(e.hasMoreElements())<br>
+    {<br>
+    String name=(String)e.nextElement();<br>
+    String vals[]=(String [])req.getParameterValues(name);<br>
+    if(vals!=null)<br>
+    {<br>
+    for (int i=0; i&lt;vals.length; i++)<br>
+    {<br>
+    os.print(&quot;&lt;b&gt;&quot; + name + &quot; = &lt;/b&gt;&quot;);<br>
+    os.print(vals[i]+&quot;&lt;br&gt;&quot;);<br>
+    } // for<br>
+    } // if<br>
+    } // while</p>
+    <p>os.println(&quot;&lt;/table&gt;&quot;);<br>
+    os.println(&quot;&lt;/body&gt;&lt;/html&gt;&quot;);<br>
+    os.flush();<br>
+    } // doStuff<br>
+    } // Info</p>
+    <p>&nbsp;</p>
+    <p>Сервлет для HTML формы:</p>
+    <p>// InfoF.java<br>
+    import java.io.*;<br>
+    import java.util.*;<br>
+    import javax.servlet.*;<br>
+    import javax.servlet.http.*;<br>
+    public class InfoF extends HttpServlet<br>
+    {<br>
+    ServletConfig config;</p>
+    <p>public void init(ServletConfig tconfig) throws ServletException<br>
+    {<br>
+    &nbsp;&nbsp; super.init(tconfig);<br>
+    &nbsp;&nbsp; config=tconfig;<br>
+    } // init</p>
+    <p>public String getServletInfo()<br>
+    {<br>
+    &nbsp;&nbsp; return &quot;Info servlet&quot;;<br>
+    } // getServletInfo</p>
+    <p>public void doGet(HttpServletRequest req, HttpServletResponse rep) throws
+    ServletException, IOException<br>
+    {<br>
+    &nbsp;&nbsp; PrintWriter os=rep.getWriter();<br>
+    &nbsp;&nbsp; dostuff(os, req, rep);<br>
+    } // doGet</p>
+    <p>public void doPost(HttpServletRequest req, HttpServletResponse rep) throws
+    ServletException, IOException<br>
+    {<br>
+    &nbsp;&nbsp; PrintWriter os=rep.getWriter();<br>
+    &nbsp;&nbsp; dostuff(os, req, rep);<br>
+    } // doPost</p>
+    <p>private void pp(PrintWriter os, String name, String value)<br>
+    {<br>
+    &nbsp;&nbsp; os.print(&quot;&lt;b&gt;&quot;+name+&quot;: &lt;/b&gt;&quot;);<br>
+    &nbsp;&nbsp; if (value==null) os.print(&quot;&lt;b&gt;none&lt;/b&gt;&quot;);<br>
+    &nbsp;&nbsp; else os.print(value);<br>
+    &nbsp;&nbsp; os.println(&quot;&lt;br&gt;&quot;);<br>
+    } // pp</p>
+    <p>private void pp(PrintWriter os, String name, int value)<br>
+    {<br>
+    &nbsp;&nbsp; pp(os, name, String.valueOf(value));<br>
+    } // pp</p>
+    <p>public void dostuff(PrintWriter os, HttpServletRequest req, HttpServletResponse rep)
+    throws ServletException, IOException<br>
+    {<br>
+    log(&quot;invoked&quot;);<br>
+    rep.setContentType(&quot;text/html&quot;);<br>
+    os.println(&quot;&lt;html&gt;&quot;);<br>
+    os.println(&quot;&lt;head&gt;&lt;title&gt;Info servlet&lt;/title&gt;&lt;/head&gt;&quot;);<br>
+    os.println(&quot;&lt;body bgcolor=#add8af&gt;&quot;);<br>
+    os.println(&quot;&lt;table border=0 cellspacing=0 cellpadding=2 cols=3
+    width=100%&gt;&quot;);<br>
+    os.println(&quot;&lt;tr&gt;&lt;td valign=top&gt;&quot;);<br>
+    os.println(&quot;&lt;h1 align=center&gt;Info servlet&lt;/h1&gt;&quot;);<br>
+    os.println(&quot;&lt;hr&gt;&quot;);<br>
+    os.println(&quot;&lt;p&gt;This page was generated by &lt;i&gt;Info&lt;/i&gt;
+    servlet./&quot;);<br>
+    os.println(&quot;&lt;i&gt;Info&lt;/i&gt; lists its initialisation parameters, information
+    about the http request which invoked it and the http request parameters passed to
+    it.&lt;/p&gt;&quot;);<br>
+    os.println(&quot;&lt;hr&gt;&quot;);<br>
+    os.println(&quot;&lt;h3&gt;Servlet initialisation parameters&lt;/h3&gt;&quot;);</p>
+    <p>Enumeration e=config.getInitParameterNames();<br>
+    if (!e.hasMoreElements()) os.println(&quot;&lt;b&gt;None!&lt;/b&gt;&quot;);<br>
+    else<br>
+    while (e.hasMoreElements())<br>
+    {<br>
+    String name=(String) e.nextElement();<br>
+    String value=config.getInitParameter(name);<br>
+    pp(os, name, value);<br>
+    } // while<br>
+    os.println(&quot;&lt;hr&gt;&quot;);<br>
+    os.println(&quot;&lt;h3&gt;Request parameters&lt;/h3&gt;&quot;);<br>
+    pp(os, &quot;Request method&quot;, req.getMethod());<br>
+    pp(os, &quot;Request URI&quot;, req.getRequestURI());<br>
+    pp(os, &quot;Request protocol&quot;, req.getProtocol());<br>
+    pp(os, &quot;Servlet path&quot;, req.getServletPath());<br>
+    pp(os, &quot;Path info&quot;, req.getPathInfo());<br>
+    pp(os, &quot;Path translated&quot;, req.getPathTranslated());<br>
+    pp(os, &quot;Query string&quot;, req.getQueryString());<br>
+    pp(os, &quot;Content length&quot;, req.getContentLength());<br>
+    pp(os, &quot;Content type&quot;, req.getContentType());<br>
+    pp(os, &quot;Server name&quot;, req.getServerName());<br>
+    pp(os, &quot;Server port&quot;, req.getServerPort());<br>
+    pp(os, &quot;Remote user&quot;, req.getRemoteUser());<br>
+    pp(os, &quot;Remote address&quot;, req.getRemoteAddr());<br>
+    pp(os, &quot;Remote host&quot;, req.getRemoteHost());<br>
+    pp(os, &quot;Authorization scheme&quot;, req.getAuthType());<br>
+    os.println(&quot;&lt;hr&gt;&quot;);<br>
+    os.println(&quot;&lt;h3&gt;Request headers&lt;/h3&gt;&quot;);</p>
+    <p>e=req.getHeaderNames();</p>
+    <p>if(!e.hasMoreElements()) os.println(&quot;&lt;b&gt;None!&lt;/b&gt;&quot;);<br>
+    else<br>
+    while (e.hasMoreElements())<br>
+    {<br>
+    &nbsp;&nbsp; String name=(String) e.nextElement();<br>
+    &nbsp;&nbsp; String value=(String) req.getHeader(name);<br>
+    &nbsp;&nbsp; pp(os, name, value);<br>
+    } // while</p>
+    <p>os.println(&quot;&lt;hr&gt;&quot;);<br>
+    os.println(&quot;&lt;h3&gt;Servlet parameters&lt;/h3&gt;&quot;);</p>
+    <p>e=req.getParameterNames();</p>
+    <p>if (!e.hasMoreElements()) os.println(&quot;&lt;b&gt;None!&lt;/b&gt;&quot;);<br>
+    else<br>
+    while (e.hasMoreElements())<br>
+    {<br>
+    &nbsp;&nbsp; String name=(String) e.nextElement();<br>
+    &nbsp;&nbsp; String value=req.getParameter(name);<br>
+    &nbsp;&nbsp; StringBuffer tbuffer=new StringBuffer();<br>
+    &nbsp;&nbsp; pp(os, name, value);<br>
+    } // while</p>
+    <p>os.println(&quot;&lt;hr&gt;&quot;);<br>
+    os.println(&quot;&lt;h3&gt;Servlet parameters (Multiple Value style):&lt;/h3&gt;&quot;);</p>
+    <p>e = req.getParameterNames();</p>
+    <p>if (!e.hasMoreElements()) os.println(&quot;&lt;b&gt;None!&lt;/b&gt;&quot;);<br>
+    else<br>
+    while(e.hasMoreElements())<br>
+    {<br>
+    String name=(String)e.nextElement();<br>
+    String vals[]=(String [])req.getParameterValues(name);<br>
+    if(vals!=null)<br>
+    {<br>
+    for (int i=0; i&lt;vals.length; i++)<br>
+    {<br>
+    os.print(&quot;&lt;b&gt;&quot; + name + &quot; = &lt;/b&gt;&quot;);<br>
+    os.print(vals[i]+&quot;&lt;br&gt;&quot;);<br>
+    } // for<br>
+    } // if<br>
+    } // while</p>
+    <p>os.println(&quot;&lt;/table&gt;&quot;);<br>
+    os.println(&quot;&lt;/body&gt;&lt;/html&gt;&quot;);<br>
+    os.flush();<br>
+    } // doStuff<br>
+    } // InfoF</p>
+    <p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Когда сервер фиксирует
+    обращение к сервлету, от вызывает либо doGet, либо
+    doPost, в зависимости от того, что указано
+    атрибуте/параметре method. Далее сервлет
+    запрашивает данные через функции getParameterNames и
+    getParameterValues и обрабатывает их. В нашем случае он
+    просто выдает их обратно клиенту в теле HTML
+    файла-ответа.<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Следует обратить внимание, на
+    то, что для сервлета Info требуется один
+    инициализационный параметр, содержащий полное
+    имя каталога, где находятся HTML файлы. Это
+    необходимо для того, чтобы сервлет создавал файл
+    там, откуда сервер сможет его взять по запросу
+    клиента.</p>
+    <p>Вот собственно и все, что требуется для
+    реализации Java форм.</p>
+    <p>Павел Негробов.</p>
+    <p>Email: pavel@imail.dc.ukrtel.net</p>
+    <p>&nbsp;</p>
+    <p><br>
+    <br>
+    </font></td>
+  </tr>
+</table>
+</div>
+<!--#include virtual="/ssi/bottom.html"-->
