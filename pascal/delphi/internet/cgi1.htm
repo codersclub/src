@@ -1,0 +1,270 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<HTML><HEAD><TITLE>Программирование CGI в Delphi и Kylix - Передача параметров</TITLE>
+<meta content="" name=description>
+<meta name="keywords" content="delphi, network, internet, cgi, programm, programming, source code, sources, сетевое, программирование, на, delphi, исходники">
+
+<!--#include virtual="/ssi/top2.html"-->
+
+<table border=0 align="center" width=700>
+<tr><td>
+<a href="http://www.sources.ru/delphi/index.html"><b>Delphi</b></a> &gt;&gt;&gt;
+<a href="http://www.sources.ru/delphi/delphi_network.shtml"><b>Сетевое программирование</b></a>
+<H2>Программирование CGI в Delphi и Kylix</H2>
+Автор: <a href="mailto:tothpaul@free.fr?subject='Ta page CGI'">Paul TOTH</a>
+<br>
+Перевод с французского: <a href="mailto:rswag@sources.ru">Valery Votintsev</a>
+
+
+<h3>Содержание:</h3>
+<ul>
+ <li><a href="cgi.htm">Введение</a></li>
+ <li><!--a href="cgi1.htm"-->Передача параметров</a></li>
+ <li><a href="cgi2.htm">Переадресация</a></li>
+ <li><a href="cgi3.htm">Вывод изображений</a></li>
+ <li><a href="cgi4.htm">Защита паролем</a></li>
+ <li><a href="cgi5.htm">Куки (Cookies)</a></li>
+ <li><a href="cgi6.htm">Работа с Базами Данных</a></li>
+ <li><a href="cgifaq.htm">Частые Вопросы и Ответы</a></li>
+</ul>
+
+<hr>
+
+<H2>Передача параметров</H2>
+<dir>
+<h3>Методы GET и POST</h3>
+
+Существует по крайней мере два метода передачи параметров CGI-программе.
+<pre>
+ &lt;form method=<b>GET</b> action="program.exe"&gt;
+ &lt;form method=<b>POST</b> action="program.exe"&gt;
+</pre>
+
+Чтобы определить, каким именно методом CGI-программе переданы параметры,
+достаточно в вашей программе проверить переменную среды <b>REQUEST_METHOD</b>.
+<br>
+<br>
+Ниже привдена функция, с помощью которой можно
+получить значение переменной среды окружения:
+
+<pre>
+<b>function</b> getvar(varname:<b>string</b>):<b>string</b>;
+<font color=blue><i>{$IFDEF LINUX}</i></font>
+ <b>begin</b>
+  result:=getenv(PChar(varname));
+ <b>end</b>;
+<font color=blue><i>{$ELSE}</i></font>
+ <b>var</b>
+  buffer:<b>array</b>[0..1024] <b>of</b> char;
+  size:integer;
+ <b>begin</b>
+  size:=GetEnvironmentVariable(PChar(varname),buffer,sizeof(buffer));
+  <b>if</b> size=0 <b>then</b> getvar:='' else getvar:=<b>String</b>(buffer);
+ <b>end</b>;
+<font color=blue><i>{$ENDIF}</i></font>
+</pre>
+
+Автор предпочитает работать не с массивами, а со строками,
+поэтому результат функции преобразовывается в строку...
+<br>
+<br>
+
+Теперь посмотрим, как определить значение переменной среды
+под DOS в .BAT файле:
+
+<pre>@ECHO OFF
+ECHO content-type: text/html
+ECHO.
+ECHO ^&lt;HTML^&gt;^&lt;HEAD^&gt;^&lt;TITLE^&gt;^&lt;/TITLE^&gt;^&lt;/HEAD^&gt;^&lt;BODY^&gt;
+ECHO REQUEST_METHOD=%REQUEST_METHOD%
+ECHO ^&lt;/BODY^&gt;^&lt;/HTML^&gt;
+</pre>
+
+Обратите внимание, что специальные символы, используемые в DOS
+(такие, как "&lt;", "&gt;", "&amp;",...), необходимо предварять знаком "^". 
+<br>
+<br>
+
+Таким образом, если мы обратимся к функции в виде
+<b>GetVar('REQUEST_METHOD')</b>, то получим в виде строки метод,
+которым были переданы параметры: <b>'GET'</b> или <b>'POST'</b>.
+<br>
+<br>
+
+Согласно <a href="http://hoohoo.ncsa.uiuc.edu/cgi/interface.html">Спецификации CGI</a>, параметры могут быть прочитаны:
+<ul>
+ <li>Из переменной окружения QUERY_STRING для метода GET
+ <li>Из стандартного ввода (STDIN) с помощью процедуры ReadLn для метода POST
+</ul>
+<br>
+Метод POST используется в тех случаях, когда необходимо передать большое
+количество параметров или большой объем данных.
+При использовании же метода GET для хранения всех передаваемых параметров
+используется переменная среды окружения, а она, как вы понимаете,
+не резиновая, так что ее максимального
+размера в некоторых случаях может не хватить...
+<br>
+<br>
+<hr>
+
+<h3>Метод GET и переменная QUERY_STRING</h3>
+
+Переменная среды окружения QUERY_STRING содержит список имен и значений
+параметров, переданных из формы... Но сначала рассмотри код HTML:
+<pre>
+&lt;form method="GET" action="program.exe"&gt;
+&lt;input type=text name="toto" value="titi"&gt;
+&lt;input type=submit value="GO"&gt;
+&lt;/form&gt;
+</pre>
+
+На экране эта форма выглядит следующим образом:
+<form method="GET" action="program.exe">
+<input type=text name="toto" value="titi">
+<input type=submit value="GO">
+</form>
+
+Кликнув на "GO" (здесь кликать не надо, это просто пример!),
+вы запускаете на сервере программу "program.exe"
+передавая серверу запрос в виде:
+<br>
+http://www.ваш_сервер/cgi-bin/program.exe?toto=titi
+<br>
+<br>
+Вы видите, что сразу за именем программы следует знак вопроса
+и передаваемый в программу параметр. В переменную QUERY_STRING как раз и будет
+помещено все, что находится после символа "?".
+Заметим, что точно так же можно задать параметры
+и в обычной ссылке:
+<br>
+&lt;a href="http://www.ваш_сервер/cgi-bin/program.exe?toto=titi"&gt;...&lt;/a&gt;
+<br>
+<br>
+
+И последнее уточнение: если запрос содержит несколько параметров,
+то они отделяются друг от друга амперсандом <b>&amp;</b>.
+Кроме того, некоторые символы в значениях параметров (например, "&amp;")
+должны быть представлены в шестнадцатеричной форме %hh, где "hh" -
+шестнадцатеричный код символа в таблице ANSI.
+Например, символ амперсанда "&amp;" должен быть представлен в виде
+"%26".
+
+<br>
+<br>
+
+Представьте, что вам требуется на сайте yahoo.com найти результаты
+поиска по ключевым словам <b>cgi</b> и <b>delphi</b>,
+для чего в окне поиска вы вводите "cgi + delphi".
+<br>
+Тогда в результате вашего запроса будет сгенерирован следующий URL:
+<br>
+<pre>http://search.yahoo.com/bin/search?p=cgi+%2B+delphi</pre>
+
+Тем самым, вы обратитесь к программе "search"
+и зададите значение параметра "p" равным
+"cgi&nbsp;+&nbsp;delphi", при этом символ "+" будет автоматически
+заменен браузером на "%2B", а пробелы - на "+".
+<br>
+<br>
+
+<hr>
+
+<h3>Метод POST</h3>
+
+Для получения данных, переданных по методу POST,
+необходимо читать данные из "устройства стандартного ввода" STDIN.
+Размер данных, переданных по этому методу,
+помещается сервером в переменную окружения CONTENT_LENGTH.
+
+<br>
+Посмотрим, как это выглядит в Delphi:
+<pre>
+ <font color=blue><i>// Получение переданных параметров</i></font>
+  <b>if</b> getvar('REQUEST_METHOD')='POST' <b>then begin</b>
+   parmstring:=getvar('CONTENT_LENGTH');
+   <b>if</b> parmstring<>'' <b>then begin</b>
+    size:=strtoint(parmstring);
+    setlength(parmstring,size);
+    <b>for</b> i:=1 to size <b>do</b> read(parmstring[i]);
+   <b>end</b>;
+  <b>end else</b>
+   parmstring:=getvar('QUERY_STRING'); 
+</pre>
+<br>
+
+В заключение я предлагаю вашему вниманию маленькую CGI-программу,
+которая просто выводит то, что происходит на сервере:
+
+<pre>
+<b>program</b> log;
+
+<font color=blue><i>{$apptype console}</i></font>
+
+<font color=blue><i>// прикручивание к Linux попробуйте сделать сами :)</i></font>
+
+<b>uses</b>
+  windows, sysutils;
+
+<b>var</b>
+ i:integer;
+ s:string;
+ p:pchar;
+
+ flog:textfile;
+
+<b>begin</b>
+ assignfile(flog,'c:\temp\log.txt');
+ rewrite(flog);
+
+ WriteLn('Content-Type: text/html');
+ WriteLn('');
+
+ WriteLn('&lt;html&gt;&lt;head&gt;&lt;title&gt;Dump CGI&lt;/title&gt;&lt;/head&gt;&lt;body&gt;');
+ WriteLn('&lt;h1&gt;Dump CGI:&lt;/h1&gt;');
+ WriteLn('&lt;a href=#Parms&gt;Параметры программы&lt;/a&gt;&lt;br&gt;');
+ WriteLn('&lt;a href=#Query&gt;Параметры CGI&lt;/a&gt;&lt;br&gt;');
+ WriteLn('&lt;a href=#Env&gt;Переменные окружения&lt;/a&gt;&lt;br&gt;');
+ WriteLn('&lt;a href=#Info&gt;Дополнительная информация о CGI&lt;/a&gt;&lt;br&gt;');
+ WriteLn('&lt;hr&gt;');
+
+ WriteLn('&lt;a name=Parms&gt;&lt;h2&gt;ParamCount=',IntToStr(ParamCount),'&lt;/h2&gt;&lt;ul&gt;');
+ WriteLn(fLog,'ParamCount=',IntToStr(ParamCount));
+
+  <b>for</b> i:=0 <b>to</b> ParamCount <b>do begin</b>
+   WriteLn('&lt;li&gt;',ParamStr(i));
+   WriteLn(fLog,'-',ParamStr(i));
+  <b>end</b>;
+
+ <font color=blue><i>// Стандартный Ввод</i></font>
+ WriteLn(fLog,'Input :');
+ WriteLn('&lt;h2&gt;StdInput:&lt;/h2&gt;&lt;ul&gt;');
+ <b>if Not</b> Eof(Input) <b>then begin</b>
+  Read(Input,s);
+  WriteLn('&lt;li&gt;',s);
+  WriteLn(fLog,s);
+ <b>end</b>;
+
+ Writeln(fLog,'QUERY_STRING=',ParmString);
+
+ WriteLn('&lt;a name=Env&gt;&lt;h2&gt;Переменные окружения:&lt;/h2&gt;&lt;ul&gt;');
+ p:=GetEnvironmentStrings;
+ <b>while</b> StrLen(p)<>0 <b>do begin</b>
+  WriteLn('&lt;li&gt;',p);
+  WriteLn(fLog,':',p);
+  p:=strend(p);
+  inc(p);
+ <b>end</b>;
+ WriteLn('&lt;/ul&gt;&lt;hr&gt;');
+
+ WriteLn('&lt;a name=Info&gt;&lt;a href="http://www.multimania.com/tothpaul"&gt;');
+ WriteLn('Дополнительная информация о CGI&lt;/a&gt;');
+ WriteLn('&lt;/body&gt;&lt;/html&gt;');
+
+<b>end</b>.
+</pre>
+Примечание:
+<br>
+Кроме стандартного вывода информация параллельно выводится
+еще и в лог-файл.
+<br>
+
+<!--#include virtual="/ssi/bottom.html"-->

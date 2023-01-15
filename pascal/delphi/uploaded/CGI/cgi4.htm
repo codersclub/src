@@ -1,0 +1,107 @@
+<html>
+<head><title>Programmation CGI avec Delphi et Kylix</title></head>
+<body bgcolor="#c0c0c0">
+
+[<a href="index.php3">MySoft on the Web</a>]
+-<a href="cgi.htm">Sommaire</a>
+- <a href="cgi1.htm">Les Paramètres</a>
+- <a href="cgi2.htm">Redirection</a>
+- <a href="cgi3.htm">Les Images</a>
+- protection par mot de passe
+-<a href="cgi5.htm">Les cookies</a>
+-<a href="cgi6.htm">Base de Données</a>
+-<a href="cgifaq.htm">FAQ</a>
+<hr>
+<h2>Programmes CGI avec Delphi et Kylix - La protection par mot de passe</h2>
+<hr>
+<h3>Ce que l'on sait déjà</h3>
+ Lorsque le programme CGI renseigne l'entête CGI, le serveur la complète avec divers informations;
+ notamment il indique que la requête c'est bien déroulée :
+ <pre>
+  HTTP/1.0 200 OK
+ </pre>
+<h3>Ce qu'il faut savoir</h3>
+ Si vous utiliser mon "browser web text" (voir <a href="http://tothpaul.free.fr/delphi.htm">page delphi</a>), vous verrez
+ que l'entête HTTP d'un site sécurisé est un peu particulière :
+ <pre>
+  HTTP/1.0 401 Unauthorized
+  Content-type: text/html
+  WWW-Authenticate: Basic realm="/MyRealm"
+
+  &lt;html&gt;&lt;head&gt;&lt;title&gt;401 Unauthorized&lt;/title&gt;&lt;/head&gt;&lt;body&gt;
+  &lt;h1&gt;You need a password to access this page !&lt;/h1&gt;
+  &lt;/body&gt;&lt;/html&gt;
+ </pre>
+ ici le serveur renvoie l'erreur <b>401 Unauthorized</b>, dès lors votre browser sait qu'il
+ se trouve sur un site protégé. Sans afficher d'erreur il va vous demander le mot de passe
+ pour le domaine précisé (realm="/MyRealm"). Si vous saisissez un profile/mot de passe valide
+ pour le serveur, celui-ci vous donnera accès à la page désirée, sinon le browser affiche
+ le message qui suit l'entête 401.<br>
+ <br>
+ vous n'avez pas tout compris, bon, relisez tranquillement toute l'info y est !
+<hr> 
+<h3>L'entête HTTP</h3>
+ Si vous avez compris ce qui précède, vous êtes déjà en train de saisir le programme suivant :
+ <table bgcolor=#ffffff><tr><td><pre>
+ <b>Program</b> EssaiPWD;
+ <font color=blue><i>{$apptype console}</i></font>
+ <b>begin</b>
+  WriteLn('HTTP/1.0 401 Unauthorized');
+  WriteLn('Content-type: text/html');
+  WriteLn('WWW-Authenticate: Basic realm="/Essai"');
+  WriteLn;
+  WriteLn('mot de passe s.v.p.');
+ <b>end</b>;
+ </pre></td></tr></table>
+ ...et vous ralez déjà contre votre serveur (ou contre moi), car ça marche pas !
+ Pas de panique ! C'est normal, je vous avais déjà dit que le serveur complétait l'entête HTTP...
+ et bien, le CGI ci-dessus arrive sur le browser de cette façon :
+ <pre>
+  HTTP/1.0 200 OK
+  HTTP/1.0 401 Unauthorized
+  Content-type: text/html
+  WWW-Authenticate: Basic realm="/Essai"
+ 
+  mot de passe s.v.p.
+ </pre>
+ La première ligne indique donc que la requête se passe bien (merci le serveur), la seconde
+ est ignorée. J'ai pas mal galèré pour trouver comment éviter ça, finalement la réponse est
+ tout simplement dans la norme CGI : <i>le nom du CGI doit commencer par "nph-" s'il gère
+ lui même l'entête HTTP.</i><br>
+ <br>
+ Et voilà, tout est dit, il suffit de <b>renommer</b> le programme ci-dessus en "<u>NPH-</u>ESSAIPWD.EXE" 
+ et ça marche !<br>
+ <br>
+ Enfin, ça marche presque puisque le mot de passe n'est pas validé !
+<hr>
+<h3>WWW-Authenticate</h3>
+ 
+ Alors, le browser reçoit une demande d'authentification : WWW-Authenticate: Basic realm="/MyRealm"<br>
+ En réponse, le CGI reçoit le profile/mot de passe dans la variable d'environnement <b>HTTP_AUTHORIZATION</b>
+ <pre>
+  HTTP_AUTHORIZATION=Basic dXNlcjpwYXNzd29yZA==
+ </pre>
+ Pour valider cette information, il faut la décoder...elle est en effet au format Base64.<br>
+ <br>
+ Petit rappel sur les bases (cours de mathématique de primaire ! ):<br>
+ <ul>
+  <li>Habituellement on travaille en base 10 : 0..9
+  <li>En informatique on utilise couramment la base 16 : 0..9,'A'..F'
+  <li>Sur internet on utilise la base 64 : 'A'..'Z','a'..z','+','/'
+ </ul>
+ Vous trouverez dans le programme <a href="zip/LOGIN.ZIP">exemple</a> une unité Base64 qui prend en charge de codage/décodage
+ d'un type String en base 64.<br>
+ <br>
+ le texte ci-dessus une fois décodé donne tout simplement : "user:password"<br>
+ <br>
+ Il ne reste plus au CGI qu'a accepter le mot de passe en envoyant les informations demandées ou
+ renvoyer l'erreur 401.<br>
+ Une autre alternative sur un mot de passe invalide étant de 
+ <a href="cgi2.htm">rediriger</a> sur la page d'acceuil par exemple.<br>
+ <br>
+ Pour la mise en pratique, téléchargez le programme <a href="zip/LOGIN.ZIP">login</a> (sans oublier de 
+ renommer l'executable et le point ini en nph-login.exe et npg-login.ini)<br>
+ <br>
+ c'est tout !
+A +
+</body></html>
