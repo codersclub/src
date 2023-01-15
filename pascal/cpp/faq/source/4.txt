@@ -1,0 +1,83 @@
+§NAME: Как расшарить папку
+§AUTHOR: Drunkard
+§EMAIL: drunk@sources.ru
+
+[b]Вариант 2 (NT)[/b]
+[code]// Открытие общего доступа к папке в WinNT, Win2000
+// Один из самых простых способов по критерию трудозатрат программиста
+// Для организации общего доступа используем командный процессор и команду net.
+// С этой целью в командной строке следовало бы написать, например :
+// net share sharefold=d:\temp\myserv
+// Вот и реализуем этот метод через функцию на языке С
+// Полное описание net share смотри по команде net help share
+
+#include <stdlib.h>
+// Описание функции
+BOOL OpenShareNT(char* NetName, char* LocalName);
+// В случае успеха возвращает TRUE, иначе FALSE.
+// Первый параметр: LocalName - полный локальный путь к "расшариваемой" папке
+// например "d:\\temp\\myserv" (Внимание! Путь не должен заканчиваться символом '\\')
+// Второй параметр: NetName - имя, которое будет видно в сети (например "sharefold")
+
+BOOL OpenShareNT(char* LocalName, char* NetName)
+{
+    BOOL AddShare=FALSE;
+    char Str[MAX_PATH];
+    int Error;
+// Проверим доступен ли командный процессор
+    Error=system(NULL);
+
+    if(Error < 0)
+    {
+     // Обработчик ошибки: Командный процессор Windows недоступен.
+    }
+    else
+    {
+        sprintf(Str, "net share %s=%s", NetName, LocalName);
+// При исполнении системной команды мелькнет черный экран - не пугайтесь :)
+        Error=system(Str);
+
+        if(Error < 0)
+        {
+         // Обработчик ошибки: Невозможно открыть Общий доступ к папке.
+        }
+        else AddShare=TRUE; // Успешно
+    }
+    return AddShare;
+}
+
+// Закрытие общего доступа к папке в WinNT, Win2000
+#include <stdlib.h>
+// Описание функции
+BOOL CloseShareNT(char* NetName);
+// В случае успеха возвращает TRUE, иначе FALSE.
+// Параметр: NetName - существующее сетевое имя
+
+BOOL CloseShareNT(char* NetName)
+{
+    BOOL CloseShare=FALSE;
+
+    char Str[MAX_PATH];
+    int Error;
+// Проверим доступен ли командный процессор
+    Error=system(NULL);
+
+    if(Error < 0)
+    {
+     // Обработчик ошибки: Командный процессор Windows недоступен.
+    }
+    else
+    {
+        sprintf(Str, "net share %s /DELETE", NetName);
+// При исполнении системной команды мелькнет черный экран - не пугайтесь :)
+        Error=system(Str);
+        if(Error < 0)
+        {
+         // Обработчик ошибки: Невозможно закрыть Общий доступ к папке.
+        }
+        else CloseShare=TRUE; // Успешно
+    }
+    return CloseShare;
+}[/code]
+
+Очевидно, что обе функции легко объединить в одну, и добавив третий параметр в список параметров первой функции, анализировать действие, толи открывать доступ, толи закрывать.

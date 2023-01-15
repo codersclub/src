@@ -1,0 +1,69 @@
+§NAME: Как скрыть окно из панели задач
+§AUTHOR: SUnteXx
+§EMAIL: SUnteXx@sources.ru
+
+Самый простой и не красивый, имхо, способ - поставить окну стиль ех WS_EX_TOOLWINDOW. Делается это так: 
+[code]LONG l = GetWindowLong(hWnd, GWL_STYLEEX); // получаем текущий ExСтиль окна
+l |= WS_EX_TOOLWINDOW; // добовляем наш стиль
+SetWindowLong(hWnd, GWL_STYLEEX, l); // ставим стиль![/code]
+Но этот способ не очень хорош тем, что окно чуть-чуть изменяет размеры и внешний вид. С этим стилем у окна проподают кнопки Minimize (Свернуть), Maximize (Развернуть), а так же еще и иконка в правом верхнем углу.
+
+Что же делать в таком случае?
+
+Все очень просто. Создаем родителя окна где-нить не в прямой видимости десктопа, ставим ему выше указанный стиль, скрываем и ставим нашему окну этого скрытого родителя. Вот как это сделать:
+[code]// для начала зарегестрируем отдельный класс для "скрытого" родителя.
+// Можно и не делать этого, а воспользоваться классом главного онка!
+
+WNDCLASSEX        WndClass;
+
+char            szClassName[] = "HiddenWindow";
+
+WndClass.style = CS_HREDRAW | CS_VREDRAW;
+WndClass.lpfnWndProc = (WNDPROC)ParentWindowProc;
+WndClass.cbClsExtra = 0;
+WndClass.cbWndExtra = 0;
+WndClass.hInstance = hInstance;
+WndClass.hIcon = 0l;
+WndClass.hCursor = NULL;
+WndClass.hbrBackground = (HBRUSH) GetStockObject (GRAY_BRUSH);
+WndClass.lpszMenuName = NULL;
+WndClass.lpszClassName = szClassName;
+WndClass.hIconSm = 0l;
+
+if (!RegisterClassEx(&WndClass))
+{
+    if (!RegisterClass((LPWNDCLASS)&WndClass.style))
+    {
+        MessageBox(NULL, "Can't register the class", "Error", MB_APPLMODAL | MB_ICONSTOP);
+        return; // или "return 0;" Смотря что надо вернуть
+    }
+}
+
+// Так как каждому классу надо поставить обработчик сообщений, то делаем это:
+
+LRESULT CALLBACK ParentWindowProc (HWND hWnd, UINT uMessage, UINT wParam, LONG lParam)
+{
+    return DefWindowProc(hWnd, uMessage, wParam, lParam);
+}
+
+// Теперь надо создать по этому классу окно
+
+HWND hWndParent = CreateWindow (szClassName, "Hidden Window by SUnteXx",
+                        WS_THICKFRAME | WS_BORDER | WS_EX_TOOLWINDOW,
+                        -31000,
+                        -31000,
+                        -30900,
+                        -30900,
+                        NULL, 
+                        NULL,
+                        hInstance, 
+                        NULL);
+
+// Теперь необходимо поставить родителя нашему главному окошку
+
+LONG l = SetWindowLong(hWnd, GWL_HWNDPARENT, (LONG)hWndParent); // l будет равен указателю на старый родитель (или 0)!
+
+// Если главное окно создаем после создания "скрытого" окна, то можно сразу при создании указать нашего родителя![/code]
+Ну вот вроде бы и все!
+
+Правда Есть еще несколько способов по скрыванию окон из ТаскБара, но я их пока не знаю. Узнаю - напишу!

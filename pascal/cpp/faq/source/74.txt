@@ -1,0 +1,411 @@
+§NAME: Рисуем меню сами
+§AUTHOR: SUnteXx
+§EMAIL: SUnteXx@sources.ru
+
+Понравиться вам эта статья или нет, но все что тут написано работает (по крайней мере у меня) :)
+
+                             [gray][i]Лучше [b]coolmenu.h[/b] и [b]coolmenu.cpp[/b] не трогать...[/i][/gray]
+
+[b]CoolMenu.cpp:[/b]
+[code]/*
+   Created by SUnteXx
+   Special thanks to Codemaster
+
+   CoolMenu.cpp
+*/
+	#include <windows.h>
+	#include <windowsx.h>
+
+#include "coolmenu.h"
+
+/************************ Константы цветов ************************/
+#define GRAY(x) RGB(x,x,x) // Макрос для серого цвета
+
+#define DEFAULT_ITEM_COLOR                      RGB(0,0,255)
+
+#define TEXTCOLOR				GRAY(0)
+#define TEXTOVER				GRAY(255)
+#define TEXTGRAY				GRAY(128)
+#define DEFAULT					DEFAULT_ITEM_COLOR
+
+#define LIGHT					0x00e2eff1
+#define HILIGHT					GRAY(230)
+#define SHADOW					0x00a19d9d
+#define DKSHADOW				0x00646f71
+
+#define HILIGHTITEM				GRAY(180)
+#define MENUCOLOR				GRAY(239)
+#define LEFTSTRIPE				GRAY(219)
+/******************************************************************/
+
+#define BORDERWIDTH	24	// Размеры рамки слева
+#define TEXTSPACE	7	// Отступ слева от рамки для рисования текста
+
+// Рисуем треугольник
+void DrawTriangle(HDC hDC, HBRUSH hbr, POINT pt[3], POINT p)
+{
+	POINT ptLast;
+
+	for (int i = 0; i < 3; i++)
+	{
+		pt[i].x += p.x;
+		pt[i].y += p.y;
+	}
+
+	MoveToEx(hDC, pt[0].x, pt[0].y, &ptLast);
+	LineTo(hDC, pt[1].x, pt[1].y);
+	LineTo(hDC, pt[2].x, pt[2].y);
+	LineTo(hDC, pt[0].x, pt[0].y);
+
+	HRGN hRgn  = CreatePolygonRgn(pt, 3, ALTERNATE);
+	FillRgn(hDC, hRgn, hbr);
+	DeleteRgn(hRgn);
+	return;
+}
+
+// Рисуем линию
+void DrawLine(HDC hDC, RECT R)
+{
+	HPEN hilightpen=CreatePen(PS_SOLID,1,HILIGHT),
+		shadowpen=CreatePen(PS_SOLID,1,SHADOW);
+
+	HPEN hbrOld = (HPEN)SelectObject(hDC, shadowpen);
+
+	MoveToEx(hDC, R.left, R.top, 0l);
+	LineTo(hDC, R.right, R.top);
+
+	SelectObject(hDC, hilightpen);
+
+	MoveToEx(hDC, R.left, R.top+1, 0l);
+	LineTo(hDC, R.right, R.top+1);
+
+	SelectObject(hDC, hbrOld);
+	DeleteObject(hilightpen);
+	DeleteObject(shadowpen);
+}
+
+// Переводы RECT из экранных координат в клиентские
+inline void RectToClient(HWND hWnd, LPRECT lpRect)
+{
+	MapWindowPoints(0,hWnd,(LPPOINT)lpRect,2);
+
+}
+
+// Переводы RECT из клиентских координат в экранные
+inline void RectToScreen(HWND hWnd, LPRECT lpRect)
+{
+	MapWindowPoints(hWnd,0,(LPPOINT)lpRect,2);
+}
+
+// Рисуем сепаратор
+bool DrawSeparator(HDC dc, RECT rc,
+							HBRUSH hbrmenu, HBRUSH hbrstripe,
+							HPEN lightpen, HPEN hilightpen)
+{
+	RECT rc1;
+
+	CopyRect(&rc1, &rc);
+	rc1.right = BORDERWIDTH;
+
+	FillRect(dc, &rc1, hbrstripe);
+
+	rc1.left = rc1.right;
+	rc1.right = rc.right;
+
+	FillRect(dc, &rc1, hbrmenu);
+
+	rc1.top += (rc1.bottom - rc1.top) / 2;
+	rc1.bottom = rc1.top + 1;
+
+	DrawLine(dc, rc1);
+
+	return 1;
+}
+
+// Рисуем строку меню
+bool DrawMenuString(HDC dc,
+							RECT rc,
+							LPSTR sz,
+							HICON icon,
+							bool bHilight, bool bDefault, bool bSubMenu, bool bEnable,
+							HFONT boldfont,
+							HBRUSH hbrmenu, HBRUSH hbrhilight, HBRUSH hbrstripe,
+							HPEN lightpen, HPEN hilightpen, HPEN shadowpen, HPEN darkpen)
+{
+	RECT rc1;
+
+	CopyRect(&rc1, &rc);
+	rc1.right = BORDERWIDTH;
+
+	FillRect(dc, &rc1, (bHilight)?hbrhilight:hbrstripe);
+
+	DrawIconEx(dc, rc.left+3, rc.top+2, icon, 16, 16, 0, 0, DI_NORMAL);
+
+	rc1.left = rc1.right;
+	rc1.right = rc.right;
+
+	FillRect(dc, &rc1, (bHilight)?hbrhilight:hbrmenu);
+
+	rc1.left += 5;
+
+	SetTextColor(dc, (bEnable)?((bHilight)?TEXTOVER:TEXTCOLOR):TEXTGRAY);
+	SelectObject(dc, (bDefault)?boldfont:GetStockObject(DEFAULT_GUI_FONT));
+
+	DrawText(dc, sz, strlen(sz), &rc1, DT_LEFT|DT_SINGLELINE|DT_VCENTER);
+
+	if (bSubMenu)
+	{
+		POINT pt[] = {
+			{0, 0},
+			{3, 3},
+			{0, 6},
+		};
+
+		POINT p = {rc.right - 10, rc.top+5};
+
+		HBRUSH hbr = CreateSolidBrush(RGB(0,0,0));
+		DrawTriangle(dc, hbr, pt, p);
+		DeleteObject(hbr);
+
+	}
+
+	return 1;
+}
+
+// Максро для "сокращение" параметров
+#define DrawMenuItem(dc,rc,text,icon,hili,def,sub,enable) 	DrawMenuString(dc,rc,text,icon,hili,def,sub,enable,boldfont,hbrmenu,hbrhilight,hbrstripe,lightpen, hilightpen, shadowpen, darkpen)
+
+// Сюды заходим при каждом рисовании меню
+LRESULT DrawCoolMenu(HWND HWindow, WPARAM ,LPARAM lParam)
+{
+	LPDRAWITEMSTRUCT lpdis = (LPDRAWITEMSTRUCT) lParam;
+	HDC dc=lpdis->hDC;
+	if (!dc || lpdis->CtlType != ODT_MENU)
+		return 0;
+
+	HBRUSH	hbrmenu		= CreateSolidBrush(MENUCOLOR),
+			hbrhilight	= CreateSolidBrush(HILIGHTITEM),
+			hbrstripe	= CreateSolidBrush(LEFTSTRIPE);
+
+	HPEN	lightpen	= CreatePen(PS_SOLID,1,LIGHT),
+			hilightpen	= CreatePen(PS_SOLID,1,HILIGHT),
+			shadowpen	= CreatePen(PS_SOLID,1,SHADOW),
+			darkpen		= CreatePen(PS_SOLID,1,DKSHADOW),
+			hPenOld=0l;
+
+	LOGFONT lf;
+	ZeroMemory(&lf, sizeof(LOGFONT));
+
+	GetObject(GetStockObject(DEFAULT_GUI_FONT), sizeof(LOGFONT), &lf);
+	lf.lfWeight = 800;
+
+	HFONT boldfont = CreateFontIndirect(&lf);
+	HFONT oldfont = (HFONT) SelectObject(dc,GetStockObject(DEFAULT_GUI_FONT));
+
+	SetBkMode(dc, TRANSPARENT);
+
+	HMENU hMenu = (HMENU)lpdis->hwndItem;
+	MENU * menu = (MENU*) lpdis->itemData;
+	RECT rc;
+	UINT i, iMax = GetMenuItemCount(hMenu);
+	
+	CopyRect(&rc, &lpdis->rcItem);
+
+	if (lpdis->itemAction & ODA_DRAWENTIRE)				// First draw
+	{
+		FillRect(dc, &rc, hbrmenu);
+
+		MENUITEMINFO mii;
+
+		for (i = 0; i < iMax; i++)
+		{
+			mii.cbSize = sizeof(mii);
+			mii.fMask=MIIM_STATE|MIIM_TYPE|MIIM_ID|MIIM_DATA|MIIM_SUBMENU;
+			mii.cbSize=sizeof(MENUITEMINFO);
+			GetMenuItemInfo(hMenu, i, 1, &mii);
+
+			GetMenuItemRect(HWindow, hMenu, i, &rc);
+			RectToClient(HWindow, &rc);
+
+			if (mii.fType != MFT_SEPARATOR)
+			{
+				DrawMenuItem(dc, rc,
+										((MENU*)mii.dwItemData)->text,
+										((MENU*)mii.dwItemData)->icon,
+										0,
+										(((MENU*)mii.dwItemData)->flags & MFS_DEFAULT) != 0,
+										(mii.hSubMenu) != 0,
+										!(mii.fState & MFS_GRAYED));
+			}
+			else
+			{
+				DrawSeparator(dc, rc, hbrmenu, hbrstripe,
+										lightpen, hilightpen);
+
+			}
+		}
+	}
+	else
+	{
+		bool bEnabled = !(lpdis->itemState & ODS_GRAYED);
+		bool bSubMenu = (menu->flags & MFT_POPUP) != 0;
+		bool bDefault = (menu->flags & MFS_DEFAULT) != 0;
+		
+		if (lpdis->itemState & ODA_DRAWENTIRE)					// Hilight the string
+		{
+			DrawMenuItem(dc, rc, menu->text, menu->icon, 1, bDefault, bSubMenu, bEnabled);
+		}
+		else if (!(lpdis->itemAction & ODA_DRAWENTIRE))				// Unhilight the string
+		{
+			DrawMenuItem(dc, rc, menu->text, menu->icon, 0, bDefault, bSubMenu, bEnabled);
+		}
+	}
+
+	SelectObject(dc, oldfont);
+	
+	DeleteFont(boldfont);
+
+	DeleteBrush(hbrmenu);
+	DeleteBrush(hbrhilight);
+	DeleteBrush(hbrstripe);
+
+	DeleteBrush(lightpen);
+	DeleteBrush(hilightpen);
+	DeleteBrush(shadowpen);
+	DeleteBrush(darkpen);
+
+	return TRUE;	
+}
+
+// Здесь задаються размеры строки меню
+LRESULT MeasureCoolMenu(WPARAM ,LPARAM lParam)
+{
+	LPMEASUREITEMSTRUCT lpmi = (LPMEASUREITEMSTRUCT)lParam;
+	MENU * m =(MENU*)lpmi->itemData;
+	HDC dc=GetWindowDC(GetDesktopWindow());
+	HFONT oldfont=(HFONT) SelectObject(dc,GetStockObject(DEFAULT_GUI_FONT));
+	SIZE size;
+	GetTextExtentPoint32(dc,m->text,lstrlen(m->text),&size);
+	SelectObject(dc,oldfont);
+	ReleaseDC(GetDesktopWindow(),dc);
+	int iconheight=GetSystemMetrics(SM_CYSMICON);
+	lpmi->itemHeight = 4+((iconheight>size.cy)?iconheight:size.cy);
+	lpmi->itemWidth = size.cx+BORDERWIDTH+TEXTSPACE+5;//GetSystemMetrics(SM_CXSMICON)+5;
+	return TRUE;
+}
+
+// Функция создания нашего CoolMenu
+HMENU CreateCoolMenu(MENU * menu, int n)
+{
+	MENUITEMINFO mii;
+	HMENU m = CreatePopupMenu();
+	mii.fMask=MIIM_TYPE|MIIM_ID|MIIM_DATA|MIIM_SUBMENU;
+	mii.cbSize=sizeof(MENUITEMINFO);
+	for(int i=0;i<n;i++)
+	{
+		mii.hSubMenu=0;
+		
+		if(menu[i].flags==MFT_SEPARATOR)
+		{
+			mii.fType=MFT_SEPARATOR;
+		}
+		
+		else if(menu[i].flags==MFT_POPUP)
+		{
+			mii.fType=MFT_OWNERDRAW;
+			mii.hSubMenu=(HMENU)menu[i].id;
+		}
+		
+		else
+			mii.fType=MFT_OWNERDRAW;
+		
+		mii.wID=menu[i].id;
+		mii.dwItemData=(DWORD)&menu[i];
+		InsertMenuItem(m,i,TRUE,&mii);
+	}
+	
+	return m;
+}[/code]
+
+[b]CoolMenu.h:[/b]
+[code]#ifndef COOLMENU_H
+#define COOLMENU_H
+
+#define MFT_POPUP 33333
+
+// Наша структура строки меню
+struct MENU
+{
+	char * text; // поинтер на строку (т.е. на текст, который будет показываться)
+	HICON icon;  // иконка, т.е. поинтер на нее (если не нужна, то 0)
+	UINT id;     // идентификатор строки, а если это строка с подменю - то тогда поинтер на подменю
+	UINT flags;  // флаги
+};
+
+HMENU CreateCoolMenu(MENU * menu, int n);
+LRESULT DrawCoolMenu(HWND HWindow, WPARAM ,LPARAM lParam);
+LRESULT MeasureCoolMenu(WPARAM ,LPARAM lParam);
+
+#endif
+[/code]
+
+А вот [b]пример функции[/b], в которой создаеться и показываеться:
+[code]void CreateMenu(HWND hwnd)
+{
+	char sz[]  = "String Number 1";
+	char sz1[] = "String Number 2";
+	char sz2[] = "String Number 3";
+
+	MENU m1[]={
+		{sz,(HICON)LoadImage(hInst, MAKEINTRESOURCE(IDI_ICON1), IMAGE_ICON, 16, 16, LR_DEFAULTCOLOR),1000,0},
+		{sz1,(HICON)LoadImage(hInst, MAKEINTRESOURCE(IDI_ICON2), IMAGE_ICON, 16, 16, LR_DEFAULTCOLOR),2000,0},
+		{0,0,0,MFT_SEPARATOR},
+		{sz2,(HICON)LoadImage(hInst, MAKEINTRESOURCE(IDI_ICON3), IMAGE_ICON, 16, 16, LR_DEFAULTCOLOR),3000,MFS_DEFAULT},
+	};
+	
+	HMENU hMenu1=CreateCoolMenu(m1,sizeof(m1)/sizeof(MENU));
+
+	MENU m[]={
+		{sz,(HICON)LoadImage(hInst, MAKEINTRESOURCE(IDI_ICON1), IMAGE_ICON, 16, 16, LR_DEFAULTCOLOR),1000,0},
+		{sz1,(HICON)LoadImage(hInst, MAKEINTRESOURCE(IDI_ICON2), IMAGE_ICON, 16, 16, LR_DEFAULTCOLOR),(UINT)hMenu1,MFT_POPUP},
+		{0,0,0,MFT_SEPARATOR},
+		{sz2,(HICON)LoadImage(hInst, MAKEINTRESOURCE(IDI_ICON3), IMAGE_ICON, 16, 16, LR_DEFAULTCOLOR),3000,0},
+	};
+
+	HMENU hMenu=CreateCoolMenu(m,sizeof(m)/sizeof(MENU));
+
+
+	EnableMenuItem(hMenu, 0, MF_GRAYED | MF_BYPOSITION);
+
+	RECT r;
+	GetWindowRect(GetDlgItem(HWindow,IDCANCEL),&r);
+	TrackPopupMenuEx(hMenu,TPM_RIGHTBUTTON, r.left,r.bottom,HWindow,0);
+	SendMessage(HWindow, WM_UNINITMENUPOPUP, (WPARAM)hMenu, (LPARAM)-1);
+	SendMessage(HWindow, WM_UNINITMENUPOPUP, (WPARAM)hMenu1, (LPARAM)-1);
+	DestroyMenu(hMenu);
+	DestroyMenu(hMenu1);
+}
+[/code]
+
+А теперь поясняю...
+
+Для того, чтобы создать наше меню, нужно заполнить структуру MENU:
+[code]struct MENU
+{
+	char* text; // поинтер на строку (т.е. на текст, который будет показываться)
+	HICON icon; // иконка, т.е. поинтер на нее (если не нужна, то 0)
+	UINT id;    // идентификатор строки, а если это строка с подменю - то тогда поинтер на подменю
+	UINT flags; // флаги
+};[/code]
+
+и вызвать функцию CreateCoolMenu:
+[code]HMENU CreateCoolMenu(
+			MENU * menu, // поинтер на структуру MENU
+			int n);      // количество эллементов меню (включая сепараторы и т.п.)
+[/code]
+
+Флаги могут быть:
+[b]MFT_POPUP[/b]   - для строки с подменю
+[b]MFS_DEFAULT[/b] - для строки по умолчанию
+
+Вроде все... Кто не понял, пишите на мыло!

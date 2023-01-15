@@ -1,0 +1,116 @@
+§NAME: Как скрыть свое приложение от ProcessViewer
+§AUTHOR: SUnteXx
+§EMAIL: SUnteXx@sources.ru
+§WHENCE: www.xakep.ru
+§LINK: http://www.xakep.ru/post/14033/default.htm
+
+Я довольно долго пытался сделать свою программу невидимой в Windows 2000. Максимум, что я смог найти в интернете - это то что основой любого диспетчера задач является функция NtQuerySystemInformation, ее описание, а также то, что обмануть эту функцию невозможно. Не знаю, почему так говорят, но обмануть ее можно и это очень просто. 
+
+Вот, что мне удалось нарыть про эту функцию: 
+[code]NTAPI Hook_NtQuerySystemInformation(
+
+LONG type, // тип требуемой информации
+PVOID SystemInformation, // указатель на буфер, в который вернется информация
+LONG SystemInformationLength, // размер буфера в байтах
+PLONG ReturnLength // сколько байт было возвращено или требуется
+);[/code]
+Как было указано, первый параметр отвечает за тип требуемой информации. Нас интересует только информация о процессах (type = 5). Далее работаем со следующими структурами: 
+[code]typedef struct {
+    FILETIME ProcessorTime;
+    ULONG unk2, unk3;
+    FILETIME CreateTime;
+    ULONG unk6;
+    ULONG StartAddress;
+    ULONG ProcessID;
+    ULONG ThreadID;
+    ULONG CurrentPriority;
+    ULONG BasePriority;
+    ULONG ContextSwitchesPerSec;
+    ULONG ThreadState;
+    ULONG ThreadWaitReason;
+    ULONG unk15;
+} SYSTEM_THREAD_INFORMATION;
+
+typedef struct {
+    ULONG NextOffest; // следующий процесс
+    ULONG ThreadCount;
+    ULONG unk2, unk3, unk4, unk5, unk6, unk7;
+    FILETIME CreateTime;
+    FILETIME UserTime;
+    FILETIME KernelTime;
+    ULONG unk14;
+    WCHAR *pModuleName; /* unicode */
+    ULONG BasePriority;
+    ULONG ProcessID;
+    ULONG InheritedFromUniqueProcessID; 
+    ULONG HandleCount;
+    ULONG unk20, unk21;
+    ULONG PeekVirtualSize;
+    ULONG VirtualSize;
+    ULONG PageFaultCountPerSec;
+    ULONG PeakWorkingSetSize;
+    ULONG WorkingSetSize;
+    ULONG PeekPagedPoolUsage; 
+    ULONG PagedPoolUsage;
+    ULONG PeekNonPagedPoolUsage; 
+    ULONG NonPagedPoolUsage;
+    ULONG unk31; /* PagefileUsage ? */
+    ULONG PeakPagefileUsage;
+    ULONG unk33; /* PrivateBytes ? */
+    SYSTEM_THREAD_INFORMATION ThreadInfos[1]; // потоки данного процесса
+} SYSTEM_PROCESS_INFORMATION;[/code]
+После вызова функции, если не произошло ошибки, первым элементом буфера окажется структура SYSTEM_PROCESS_INFORMATION, описывающая отдельный процесс. Первым членом этой структуры будет смещение, указывающее на следующий процесс или NULL, если это последний процесс в списке. 
+
+Теперь осталось только перехватить все вызовы этой функции и немного поменять смещения, чтобы вызывающая функцию программа перепрыгнула через наш процесс. Наш это процесс или не наш определяем по идентификатору процесса progProcessId, определяемому при запуске программы. Теперь, после перехвата функции NtQuerySystemInformation (все детали перехвата очень подробно описаны в книге Рихтера или смотрите исходники), вместо оригинальной функции сначала вызывается наша: 
+[code]NTAPI Hook_NtQuerySystemInformation(
+    LONG type, // тип информации
+    PVOID SystemInformation, // указатель на буфер
+    LONG SystemInformationLength, // размер буфера в байтах
+    PLONG ReturnLength // указатель на 32-битное число
+)
+{
+    SYSTEM_PROCESS_INFORMATION *pinfo, *pinfo_last;
+
+// вызываем оригинальную функцию 
+    ((PFNNtQuerySystemInformation)(PROC) g_NtQuerySystemInformation)
+    (type, SystemInformation, SystemInformationLength, ReturnLength);
+
+// если получается информация о процессах 
+    if(type == 5)
+    {
+        if(SystemInformationLength > 20000)
+        {
+            pinfo = (SYSTEM_PROCESS_INFORMATION*)SystemInformation;
+            for(;;)
+            {
+// если идентификатор процесса равен идентификатору нашего процесса 
+                if(pinfo->ProcessID == progProcessId)
+                {
+// если наш процесс последний в списке
+                    if(pinfo->NextOffest == 0)
+                    {
+// предпоследний процесс теперь стал последним, а наш исчез
+                        pinfo_last->NextOffest = 0;
+                    }
+                    else
+                    {
+// или прыгаем через наш процесс
+                        pinfo_last->NextOffest + = pinfo->NextOffest;
+                    }
+                }
+
+                if(pinfo->NextOffest == 0)
+                    break;
+// предудущий процесс теперь равен текущему
+                pinfo_last = pinfo;
+// переходим к следующему процессу
+                pinfo = (SYSTEM_PROCESS_INFORMATION*)((char *)pinfo + pinfo->NextOffest);
+            }
+        }
+    }
+}[/code]
+Теперь любая вызывающая программа при просмотре возвращенного буфера будет прыгать через наш процесс. Вот и все. В исходниках находится программа, демонстрирующая все вышеизложенное. Сначала компилируем библиотеку, затем программу. 
+
+Конечно для полного сокрытия программы в WINDOWS 2000 этого маловато, стоит также перехватить функции просмотра загруженных библиотек, FindFirstFile, FindNextFile, подставляя вместо нужного файла "..". 
+
+Если есть какие-то замечания, предложения или что-то еще, то пишите: [email]researcher@land.ru[/email].

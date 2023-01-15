@@ -1,0 +1,68 @@
+§NAME: Вложенный CSplitterWnd
+§AUTHOR: Leprecon
+§EMAIL: leprecon@pisem.net
+
+Иногда нужно разделить фрэйм на два вида, а один из них разделить еще на два. Т.е. в один сплиттер вложить еще один. Вот как это можно реализовать:
+1. Создайте в классе фрейма две переменные: 
+[h5]
+	CSplitterWnd m_wndSplitter1; // Это будет основной сплиттер.
+	CSplitterWnd m_wndSplitter2; // Это будет внутренний сплиттер.[/h5]
+
+2. Переопределяете функцию [h5]BOOL CMainFrame::OnCreateClient(LPCREATESTRUCT lpcs, CCreateContext* pContext);[/h5]	Это можно сделать с помощью AppWizard, выбрав в нем виртуальную функцию OnCreateClient
+
+3. Изначально она выглядит так:[code]BOOL CMainFrame::OnCreateClient(LPCREATESTRUCT lpcs, CCreateContext* pContext) 
+{
+	// TODO: Add your specialized code here and/or call the base class
+	
+	return CFrameWnd::OnCreateClient(lpcs, pContext);
+}[/code]
+
+4. Вот этот код вам нужно в нее вставить:[code]BOOL CMainFrame::OnCreateClient(LPCREATESTRUCT lpcs, CCreateContext* pContext) 
+{
+	// TODO: Add your specialized code here and/or call the base class
+	if(!m_wndSplitter1.CreateStatic(this, 2, 1))
+		return FALSE;
+
+	if(!m_wndSplitter1.CreateView(0, 0, RUNTIME_CLASS(CMyView), CSize(100, 300), pContext))
+		return FALSE;
+
+	if(!m_wndSplitter2.CreateStatic(&m_wndSplitter1, 1, 2, WS_CHILD | WS_VISIBLE, m_wndSplitter1.IdFromRowCol(1,0)))
+		return FALSE;
+
+	if(!m_wndSplitter2.CreateView(0, 0, RUNTIME_CLASS(CMyView), CSize(300, 100), pContext))
+		return FALSE;
+
+	if(!m_wndSplitter2.CreateView(0, 1, RUNTIME_CLASS(CMyView), CSize(300, 100), pContext))
+		return FALSE;
+
+	return TRUE;
+}[/code]
+
+Все теперь у вас на фрейме будет три вида. Один горизонтальный сверху и два внизу на одной линии.
+Класс CSplitterWnd каждому внутреннему окну назначает собственный уникальный идентификатор. В его значение он зашифровывает столбец и строку этого окна. Вот как он это делает: [code]int CSplitterWnd::IdFromRowCol(int row, int col) const 
+{
+	ASSERT_VALID(this);
+	ASSERT(row >= 0);
+	ASSERT(row < m_nRows);
+	ASSERT(col >= 0);
+	ASSERT(col < m_nCols);
+
+	return AFX_IDW_PANE_FIRST + row * 16 + col;
+}[/code]Отсюда можно понять как добавить на панель сплиттера вместо вида, любое окно. К примеру если вы хотите создать на сплиттере Таб Контрол, вам нужно будет вставить такой код:[code]BOOL CMainFrame::OnCreateClient(LPCREATESTRUCT lpcs, CCreateContext* pContext) 
+{
+	// TODO: Add your specialized code here and/or call the base class
+	if(!m_wndSplitter1.CreateStatic(this, 2, 1))
+		return FALSE;
+
+	if(!m_wndSplitter1.CreateView(0, 0, RUNTIME_CLASS(CMyView), CSize(100, 300), pContext))
+		return FALSE;
+
+	if(!m_wndTabCtrl::Create(WS_CHILD | WS_VISIBLE, CRect(0, 0, 0, 0,), &m_wndSplitter1, m_wndSplitter1.IdFromRowCol(1,0)))
+		return FALSE;
+
+	return TRUE;
+}[/code]
+
+ 
+Если есть какие-то замечания, предложения или что-то еще, то пишите: 
+[email]leprecon@pisem.net[/email].

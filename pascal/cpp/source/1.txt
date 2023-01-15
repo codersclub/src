@@ -1,0 +1,106 @@
+§NAME: Определение MAC-адреса
+§AUTHOR: server_mouse
+§EMAIL: server_mouse@mail.ru
+
+Для определения MAC-адреса удалённого компьютера можно использовать NetBios: 
+[code]NCB SNcb;     // Структура для работы с NetBios
+UCHAR rc = 0;     //Код возврата 
+UCHAR Status[256]; // Буфер для получения данных 
+UCHAR HostName[]=_T("SomeHost"); // Имя удалённого компа 
+BYTE MAC[6];    //Буфер для нашего MAC-адреса. 
+
+memset( &SNcb, 0, sizeof(SNcb) ); 
+SNcb.ncb_command = NCBRESET; 
+SNcb.ncb_lana_num = 0; 
+rc=Netbios( &SNcb ); //Сбрасываем NetBios
+
+//Если HostName вдруг больше 15 символов его надо обрезать. 
+while( lstrlen(HostName) - 15) 
+    lstrcat(HostName, " "); 
+
+memset(&SNcb, 0, sizeof(NCB)); 
+SNcb.ncb_command = NCBASTAT; 
+SNcb.ncb_buffer = (unsigned char*)Status; 
+SNcb.ncb_length = 256;
+lstrcpy((char*)SNcb.ncb_callname, HostName); 
+SNcb.ncb_lana_num = 0;    //Сетевой адаптор по умалчанию 
+rc = Netbios( &SNcb ); 
+if(rc==NRC_GOODRET) //Если всё ОК 
+memcpy(MAC, Status, 6);[/code]
+[gray]Declared in Nb30.h 
+Use Netapi32.lib [/gray]
+
+НО! На машине NetBios может быть и выключен. Тогда можно вытащить его из таблицы IPMAC если хост вообще использует IP-протокол. Технология следующая: мы посыалем хосту любой IP-пакет, например по UDP. Система обязательно широковещательным ARP-пакетом запросит его MAC-адрес и если получит, занесёт его в таблицу IPMAC. Откуда мы его и заберём. Абсолютно неважно, какой IP-based протокол будет использован, и будет ли он установлен и/или принят удалённым хостом. Важно лишь то, что система захочет отослать IP-пакет, а для этого она обязательно должна узнать его MAC. 
+Пример консольного приложения:
+[code]//--------stdafx.h-------- 
+#include <stdio.h>
+#include <windows.h>
+#include <Winsock2.h>
+//Use Ws2_32.lib 
+#include <Iphlpapi.h>
+//Use Iphlpapi.lib (in SDK) 
+////==================== 
+
+////-------- cpp-файл ---------- 
+
+#include "stdafx.h" 
+char ip[]="192.168.100.1"; 
+
+int main(int argc, char* argv[]) 
+{ 
+//Будем использовать сокеты 
+    WSADATA WsaData; 
+    DWORD _ip=inet_addr(ip); 
+    if (WSAStartup(0x0202, &WsaData)==NULL)    
+        printf("WSA Starup OK!\n"); 
+
+//Создаём UDP-сокет и отсылаем по нему любые данные 
+    SOCKET udp_s; 
+    SOCKADDR_IN udp_sin; 
+    udp_s=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP); 
+    if(udp_s!=SOCKET_ERROR) 
+    { 
+        udp_sin.sin_family = AF_INET; 
+        udp_sin.sin_port = htons(5232); //Шлём на любой порт. 
+        udp_sin.sin_addr.s_addr = _ip; 
+        if(sendto(udp_s, "TEST", 5, NULL, (SOCKADDR*)&udp_sin, sizeof(udp_sin))>0) 
+        { //Пакет отослан. Вытаскиваем MAC-адрес из системы 
+            MIB_IPNETTABLE * pIpNetTable = (MIB_IPNETTABLE *) new char[0xFFFF]; 
+            ULONG cbIpNetTable = 0xFFFF; 
+            if (NO_ERROR == GetIpNetTable (pIpNetTable, &cbIpNetTable, TRUE)) 
+            { 
+                for (DWORD i = 0; i < pIpNetTable->dwNumEntries; i++)
+                { 
+                    if(pIpNetTable->table[i].dwAddr==_ip&&pIpNetTable->table[i].dwType!=2) 
+                    { 
+                        printf("IP:%s MAC:%X-%X-%X-%X-%X-%X\n", ip, 
+                                    pIpNetTable->table[i].bPhysAddr[0], 
+                                    pIpNetTable->table[i].bPhysAddr[1], 
+                                    pIpNetTable->table[i].bPhysAddr[2], 
+                                    pIpNetTable->table[i].bPhysAddr[3], 
+                                    pIpNetTable->table[i].bPhysAddr[4], 
+                                    pIpNetTable->table[i].bPhysAddr[5]); 
+                                    delete[] pIpNetTable; 
+                                    closesocket(udp_s); 
+                         WSACleanup(); 
+                         return 0; 
+                    } 
+             } 
+             printf("MAC-address not found\n"); 
+             delete[] pIpNetTable; 
+            } 
+            else printf("ERROR Open IPMAC table\n"); 
+        } 
+        else printf("Send data ERROR!\n"); 
+
+        closesocket(udp_s); 
+    } 
+    else printf("ERROR open socket\n"); 
+
+    WSACleanup();         //Освобождаем ресурсы 
+    return 0; 
+}[/code]
+PS: Последний способ действует только для той подсети, где сам находишься. Если использовать HOST_IP из др. подсети, то в IPMAC таблице будет находится IP и MAC шлюза к HOST_IP. 
+
+PPS: MAC-адрес этто физический адрес устройства, и в общем случае
+может иметь длинну отличную от 6 байт.

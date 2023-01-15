@@ -1,0 +1,88 @@
+§NAME: Список фреймов в MDI приложении
+§AUTHOR: Leprecon
+§EMAIL: leprecon@pisem.net
+
+Чтобы сделать перебор всех фреймов в приложении, нужно перебрать все документы. В каждом из них перебрать все виды и получить родительский фрэйм для каждого вида. Проблема в том, что в одном фрэйме может быть несколько видов, разделенных сплиттером к примеру. В этом случае этот фрейм попадется нам несколько раз. Запоминать все фрэймы и сравнивать с текущим не самая лучшая идея. Но в MFC все фрэймы одного документа пронумерованы и номер фрэйма находится в переменной:[h5]int CFrameWnd::m_nWindow[/h5]Эта переменная принимает следующие значения:[h5]-1 		- неизвестное окно.
+ 0 		- единственный фрэйм у документа.
+ 1, 2, и т.д. 	- номер фрэйма, если у документа их несколько.[/h5]
+
+[code]int CountFrames()
+{
+	CDocManager* pDocManager = AfxGetApp()->m_pDocManager;
+	
+	int nFrameCount = 0;
+	POSITION posTemplate = pDocManager->GetFirstDocTemplatePosition();
+	while(posTemplate)
+	{
+		CDocTemplate* pTemplate = pDocManager->GetNextDocTemplate(posTemplate);
+		
+		POSITION posDoc = pTemplate->GetFirstDocPosition();
+		while(posDoc)
+		{
+			CDocument* pDoc = pTemplate->GetNextDoc(posDoc);
+
+			// Пометим все видимые фрэймы как непосчитанные.
+			POSITION posView = pDoc->GetFirstViewPosition();
+			while(posView)
+			{
+				CView* pView = pDoc->GetNextView(posView);
+				if (pView->IsWindowVisible())   // Не считаем невидимые окна.
+				{
+					CFrameWnd* pFrame = pView->GetParentFrame();
+					if (pFrame != NULL) pFrame->m_nWindow = -1; 
+				}
+			}
+
+			// Считаем фрэймы.
+			int nFrames = 0;
+			posView = pDoc->GetFirstViewPosition();
+			while(posView)
+			{
+				CView* pView = pDoc->GetNextView(posView);
+				if (pView->IsWindowVisible())   // Не считаем невидимые окна.
+				{
+					CFrameWnd* pFrame = pView->GetParentFrame();
+					if (pFrame != NULL && pFrame->m_nWindow == -1) 
+					{
+						// Пометим фрэйм как подсчитанный.
+						// Номер фрэйма должен быть больше нуля.
+						pFrame->m_nWindow = ++nFrames;
+
+						// Вот сюда можно вставить какие-то действия над фрэймом.
+						// pFrame->DoSomething();
+					}
+				}
+			}
+
+			// Если открытый фрэйм для этого документа один, надо пометить его нулем.
+			if(nFrames == 1)
+			{
+				posView = pDoc->GetFirstViewPosition();
+				while(posView)
+				{
+					CView* pView = pDoc->GetNextView(posView);
+					if (pView->IsWindowVisible())  // Не считаем невидимые окна.
+					{
+						CFrameWnd* pFrame = pView->GetParentFrame();
+						if (pFrame != NULL) 
+						{
+							pFrame->m_nWindow = 0; 
+							// Единственный открытый фрэйм нельзя закрывать без сохранения.
+							// MFC закрывает фрэймы помеченные не нулем без сохранения.
+						}
+					}
+				}
+			}
+
+			nFrameCount += nFrames;
+		}
+	}
+
+	return nFrameCount;
+}[/code]
+
+[b]Примечание:[/b] 
+в классе документа есть функция подсчета фрэймов.[h5]void CDocument::UpdateFrameCounts();[/h5]Идея взята из этой функции.
+
+Если есть какие-то замечания, предложения или что-то еще, то пишите: 
+[email]leprecon@pisem.net[/email].

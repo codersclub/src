@@ -1,0 +1,143 @@
+§NAME: Как вырезать окно по картинке
+§AUTHOR: SUnteXx
+§EMAIL: SUnteXx@sources.ru
+
+[b]Вариант 1[/b]
+
+В связи с появлением всяких разных программ, в которых окна нестандартной формы, почему-то всех тянет сделать свое окно таким же... Для многих окон используются маски... Т.е. точки, цвет которых совпадает или не совпадает, удаляются, а то что останется и будет нашей формой.
+
+Вот и я решил сделать функцию, чтобы это можно было делать за о-о-очень короткое время. Вот она:
+[code]HRGN CreateRgnFromBitmap(LPTSTR szFileName = NULL, UINT Num = NULL, LPPOINT pPoint = NULL, BOOL bEqaul = 1)
+// szFileName - путь к файлу *.bmp, из которого грузим битмапу
+// Num - номер битмапы в ресурсах
+// pPoint - указатель на координаты точки, цвет который нас интересует в качестве маски
+// bEqual - Если 1, то оставляются все точки, цвет которой задан в маске. Если 0, то наоборот, все точки с заданным цветом "удалятся"
+{
+	HBITMAP hBmp;
+
+	if (strlen(szFileName))  // Если предали путь к файлу *.bmp, то 
+	{
+		hBmp = (HBITMAP)LoadImage( NULL, szFileName, IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE );  // грузим битмапу из файла
+		if (!hBmp)  // если не получилось загрузить битмапу, то показываем мессагу
+		{
+			MessageBox(hWND, "There is not bitmap", "Error", MB_OK | MB_ICONEXCLAMATION);
+			hBmp = LoadBitmap(hInst, MAKEINTRESOURCE(Num));
+			strcpy(szFileName, "");
+		}
+	}
+	else if (Num)  // если передали номер ресурсы
+	{
+		hBmp = LoadBitmap(hInst, MAKEINTRESOURCE(Num));
+	}
+	else  // иначе выход...
+		return 0;
+
+	if (!hBmp)  // если битмапы нету...
+	{
+		MessageBox(hWND, "Can't load bitmap", "Error", MB_OK | MB_ICONSTOP);
+		CloseWindow(hWND);  // выход... можно еще "return 0;"
+	}
+
+	BITMAP bi;
+	GetObject(hBmp, sizeof(BITMAP), &bi);  // получаем размеры битмапы...
+	int iScreenWidth = GetSystemMetrics(SM_CXSCREEN);
+	int iScreenHeight = GetSystemMetrics(SM_CYSCREEN);
+	RECT R;
+	GetWindowRect(hWND, &R);
+
+	MoveWindow(hWND, 
+					R.left, 
+					R.top, 
+					bi.bmWidth,
+					bi.bmHeight,
+					1);  // меняем размеры окна
+
+	BYTE bpp;
+	DWORD e;
+	DWORD f, t;
+	INT x, y;
+	bool b = false;
+	HRGN Rgn, ResRgn = CreateRectRgn( 0, 0, 0, 0 );  // создаем пустой регион
+	
+	GetObject( hBmp, sizeof( BITMAP ), &bi );  // получаем опять размеры (хотя зачем еще раззз)
+	bpp = bi.bmBitsPixel >> 3;
+	
+	BYTE *pBits = new BYTE[ bi.bmWidth * bi.bmHeight * bpp ];  // выделяем буфер на биты
+	int p = GetBitmapBits( hBmp, bi.bmWidth * bi.bmHeight * bpp, pBits );  // получаем биты
+	
+	 // далее получаем цвет точки, которые выкалывать/оставлять
+	if ( pPoint == NULL || pPoint->x >= bi.bmWidth || pPoint->y >= bi.bmHeight )
+		e = *(DWORD*)pBits;
+	else
+		e = *(DWORD*)(pBits + (pPoint->y * bi.bmWidth + pPoint->x) * bpp );
+	
+	if (bEqaul)  // если 1, то оставлять точки только данного цвета
+	{
+		for ( y = 0; y < bi.bmHeight; y++ )
+			for ( x = 0; x < bi.bmWidth; x++ )
+			{
+				 // далее получаем цвета каждой точки + некоторые навороты...
+				t = *(DWORD*)(pBits + (y * bi.bmWidth + x) * bpp) 
+					if ( t == e )
+					{
+						if ( !b )
+						{
+							f = x;
+							b = true;
+						}
+						else if ( x == (bi.bmWidth - 1) )
+						{
+							Rgn = CreateRectRgn( f, y, x, y + 1 );
+							CombineRgn( ResRgn, ResRgn, Rgn, RGN_OR );
+							b = false;
+						}
+					}
+					else if ( b )
+					{
+						Rgn = CreateRectRgn( f, y, x, y + 1 );
+						CombineRgn( ResRgn, ResRgn, Rgn, RGN_OR );
+						b = false;
+					}
+			}
+	}
+	else  // в противном случае выкалываем все точки, цвет которой совпадает с цветом заданной точки
+	{
+		for ( y = 0; y < bi.bmHeight; y++ )
+			for ( x = 0; x < bi.bmWidth; x++ )
+			{
+				t = *(DWORD*)(pBits + (y * bi.bmWidth + x) * bpp) 
+					if ( t != e )
+					{
+						if ( !b )
+						{
+							f = x;
+							b = true;
+						}
+						else if ( x == (bi.bmWidth - 1) )
+						{
+							Rgn = CreateRectRgn( f, y, x, y + 1 );
+							CombineRgn( ResRgn, ResRgn, Rgn, RGN_OR );
+							b = false;
+						}
+					}
+					else if ( b )
+					{
+						Rgn = CreateRectRgn( f, y, x, y + 1 );
+						CombineRgn( ResRgn, ResRgn, Rgn, RGN_OR );
+						b = false;
+					}
+			}
+	}
+	delete pBits;  // удаляем биты
+	return ResRgn;  // и возвращаем указатель на регион
+}[/code]
+А теперь где-нибудь в программе делаем так:
+[code]POINT pt;
+pt.x = 0; pt.y = 0; // координаты точки, цвет которой будет считаться за маску
+
+HRGN hRgn = CreateRgnFromBitmap(szFileNameBuf, IDB_BITMAP, &pt, 0);
+// szFileNameBuf - путь к файлу с битмапой (в качестве маски)
+// IDB_BITMAP - идентификатор битмапы в ресурсах
+
+SetWindowRgn(hWnd, hRgn, TRUE);[/code]
+Вот и вся любовь ;D

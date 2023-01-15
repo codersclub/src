@@ -1,0 +1,177 @@
+§NAME: Как получить загруженность процессора
+§AUTHOR: SUnteXx
+§EMAIL: SUnteXx@sources.ru
+[code]#include <stdio.h>
+#include <pdh.h>
+#include <conio.h>
+
+/*****************************************************************************/
+/********                                                             ********/
+/********           не забудьте включить в проект "pdh.lib"           ********/
+/********                                                             ********/
+/********    Project -> Settings -> Link -> Object/Library Modules    ********/
+/********                                                             ********/
+/*****************************************************************************/
+
+
+/*****************************************************************************/
+/**********                                                         **********/
+/**********            PDH - performance data helper                **********/
+/**********                                                         **********/
+/*****************************************************************************/
+
+
+/************************** Описание наших функций ***************************/
+
+#define PDH_ERROR -1
+
+// Функция инициализирует PDH (performance data helper)
+PDH_STATUS pdh_Init (HQUERY &hQuery, HCOUNTER &hCounter);
+
+
+// Функция возвращает в случае удачи загруженность проца, в противном случае PHG_ERROR (-1)
+int GetCPUUsage (HQUERY hQuery, HCOUNTER hCounter, PDH_STATUS &pdhStatus);
+
+
+// Функция анинициализирует PDH
+void pdh_Uninit (HQUERY hQuery, HCOUNTER hCounter);
+
+
+// Функция показывает сообщение об ошибке
+void ShowErrorMessage(PDH_STATUS pdhStatus);
+
+
+// хмм... в названии функции все сказано!
+void begin();
+
+/****************************************************************************/
+
+
+void main(void)
+{
+	begin();
+	
+	printf(TEXT("Press any key to continue")); // нажмите "any key" на клавиатуре :P
+	while (!_getch()); // ждем, пока юзверь не "клацнет" "any key"
+}
+
+void begin()
+// хмм... в названии функции все сказано!
+{
+	PDH_STATUS  pdhStatus      = 0;
+
+	HQUERY hQuery;
+	HQUERY hCounter;
+	int iUsage = 0;
+	pdhStatus = pdh_Init(hQuery, hCounter); // инициализируем PDH
+
+ // если не произошел облом с иницализации PDH, то
+	if ( pdhStatus == ERROR_SUCCESS )
+	{
+ // пока юзверь не зажмет клавишу Esc, то
+		while (GetKeyState(VK_ESCAPE) >= 0)
+		{
+ // получаем загруженность проца
+			iUsage = GetCPUUsage(hQuery, hCounter, pdhStatus);
+
+ // если не произошла ошибка (т.е. не вернулось значение PHG_ERROR)
+			if (iUsage != PDH_ERROR)
+				printf("%3i%%\r\n", iUsage); // выводим значение
+			else // а если произошла ошибка, то
+
+// показываем сообщение, что произошла ошибка такая-то
+			ShowErrorMessage(pdhStatus);
+
+			Sleep(500); // ждем 0.5 секунд(ы)
+		}
+
+// если юзверь все-таки клацнул Esc, то флаг ему в руки :)
+		pdh_Uninit(hQuery, hCounter); // заканчиваем работу с PDH
+	}
+	else // если произошла ошибка при инициализации PDH
+		ShowErrorMessage(pdhStatus); // показываем Еррорное сообщение
+}
+
+void ShowErrorMessage(PDH_STATUS pdhStatus)
+// Сама функция показа сообщения об ошибке
+{
+	LPSTR szMessage = NULL;
+
+// грузим строку с ошибкой в szMessage. Память выделит функция
+	FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER |
+					FORMAT_MESSAGE_FROM_HMODULE,
+					GetModuleHandle("PDH.DLL"), pdhStatus,
+					MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+					szMessage, 0, NULL);
+
+	printf("Error №%i:  %s\r\n", pdhStatus, szMessage); // показываем ошибку
+
+	LocalFree(szMessage); // очищаем буфер
+}
+
+PDH_STATUS pdh_Init(HQUERY &hQuery, HCOUNTER &hCounter)
+// инициализируем PDH
+{
+	PDH_STATUS  pdhResult   = 0;
+	TCHAR       szCounterPath[1024];
+	DWORD       dwPathSize  = 1024;
+	PDH_COUNTER_PATH_ELEMENTS pe;
+	DWORD       dwType      = 0;
+	
+	pdhResult = PdhOpenQuery( NULL, 0, &hQuery ); // запрос на открытие PDH 
+	
+	if ( pdhResult != ERROR_SUCCESS ) // если была ошибка, то
+		return pdhResult; // выходим, возвращая номер ошибки
+
+	pe.szMachineName     = 0l;
+	pe.szObjectName      = "Processor";
+	pe.szInstanceName    = "_Total";
+	pe.szParentInstance  = NULL;
+	pe.dwInstanceIndex   = 0;
+	pe.szCounterName     = "% Processor Time";
+
+// создаем путь к счетчику PDH
+	pdhResult = PdhMakeCounterPath(&pe, szCounterPath, &dwPathSize, 0);
+
+	if (pdhResult != ERROR_SUCCESS) // если была ошибка, то
+		return pdhResult; // выходим, возвращая номер ошибки
+
+// открываем счетчик PDH
+	pdhResult = PdhAddCounter(hQuery, szCounterPath, 0, &hCounter);
+
+	if (pdhResult != ERROR_SUCCESS) // если была ошибка, то
+		return pdhResult; // выходим, возвращая номер ошибки
+
+ // если дошли до этого места, то ошибки на 100% не было!
+	return pdhResult;
+}
+
+int GetCPUUsage(HQUERY hQuery, HCOUNTER hCounter, PDH_STATUS &pdhStatus)
+// получаем загруженность проца
+{
+	DWORD       dwType      = 0;
+
+// даем запрос на сборы инфы
+	pdhStatus = PdhCollectQueryData(hQuery);
+
+	if (pdhStatus != ERROR_SUCCESS) // если была ошибка, то
+		return PDH_ERROR; // выходим, возвращая ошибку
+
+	_PDH_FMT_COUNTERVALUE pfci;
+	ZeroMemory(&pfci, sizeof(pfci)); // очищаем структуру pfci
+
+// Получаем инфу о загруженности проца!
+	pdhStatus = PdhGetFormattedCounterValue( hCounter, PDH_FMT_DOUBLE, &dwType, &pfci);
+	
+	if (pdhStatus != ERROR_SUCCESS) // если была ошибка, то
+		return PDH_ERROR; // выходим, возвращая ошибку
+
+	return (int)pfci.doubleValue; // возвращаем загруженность проца!
+} 
+
+void pdh_Uninit(HQUERY hQuery, HCOUNTER hCounter)
+// анинициализация 
+{
+	PdhRemoveCounter(hCounter); // удаляем счетчик
+	PdhCloseQuery(hQuery); // закрываем запрос
+}[/code]

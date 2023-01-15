@@ -1,0 +1,100 @@
+§NAME: Работа с CTabCtrl (MFC)
+§AUTHOR: HOMO PROGRAMMATIS
+§EMAIL: HOMO_PROGRAMMATIS@rambler.ru
+
+На нашем основном диалоге (там где будут сидеть вкладки) рисуем ТабКонтрол (он №19 на панели инструментов) по размеру соответствующий желаемым размерам будущих страниц.
+
+Создаём шаблоны диалогов в редакторе ресурсов (это наши будущие страницы), на второй странице их св-в ([i]щелчок правой кнопкой мыши на диалоге -> Properties[/i]) ставим каждому
+[b]Style[/b] = [i]child[/i]
+[b]Border[/b] = [i]None[/i]
+[b]Title bar[/b] = [i]no[/i]
+
+Размеры диалогов значения не имеет, им вовсе не обязательно быть одинаковыми и совпадать по размеру с ТабКонтролом.
+
+Пусть класс нашего основного диалога зовётся COurDlg.
+Тогда:
+
+Члены класса COurDlg:
+[code]HWND m_TabPages[_d_TabPagesNum];[/code]
+
+В заголовке класса COurDlg объявим количество будущих страниц в ТабКонтроле
+[code]#define _d_TabPagesNum 2[/code]
+
+В конструкторе COurDlg::COurDlg
+[code]ZeroMemory(m_TabPages, sizeof(m_TabPages));[/code]
+
+В COurDlg::OnInitDialog()
+[code]      //.........................
+      //.........................
+
+      //Счетчик для циклов
+      int i;
+
+      //Создадим страницы если ещё не созданы
+      //(!!!) здесь предполагается что идентификаторы шаблонов диалогов равны IDD_DIALOG1, IDD_DIALOG1 + 1 и т.д.
+      if (!m_TabPages[0])
+      {
+            for (i = 0; i < _d_TabPagesNum; i++)
+            {
+                  m_TabPages[i] = CreateDialog(AfxGetInstanceHandle(),
+                                               MAKEINTRESOURCE(IDD_DIALOG1 + i), m_TabCtrl, NULL);
+            }
+      }
+
+      //Зададим страницам правильные размер и положение на ТабКонтроле
+      CRect l_Rect;
+      m_TabCtrl.GetClientRect(l_Rect);
+      l_Rect.top            += 25;
+      l_Rect.left           += 2;
+      l_Rect.right          -= 2;
+      l_Rect.bottom         -= 2;
+
+      for (i = 0; i < _d_TabPagesNum; i++)
+      {
+            ::MoveWindow(m_TabPages[i], l_Rect.left, l_Rect.top, l_Rect.Width(), l_Rect.Height(), true);
+      }
+      
+      //Создаём закладки в контроле
+      for (i = 0; i < _d_TabPagesNum; i++)
+      {
+            CString c_Caption;
+            c_Caption.Format("%d", i);
+            m_TabCtrl.InsertItem(i, c_Caption /*Впишите сюда свои названия закладок*/);
+      }
+
+      //Делаем первую страницу активной
+      m_TabCtrl.SetCurSel(0);
+      ActivateTabPage(0);[/code]
+
+Далее, создаём функцию-член класса COurDlg (она будет отображать нужную нам страницу и прятать остальные)
+[code]void COurDlg::ActivateTabPage(int p_NumPageToActivate)
+{
+      for (int i = 0; i < _d_TabPagesNum; i++)
+      {
+            ::ShowWindow(m_TabPages[i], ((i == p_NumPageToActivate) ? SW_SHOW : SW_HIDE));
+      }
+}[/code]
+
+
+2) ТабКонтрол -> TCN_SELCHANGE
+[code]void COurDlg::OnSelchange***(NMHDR* pNMHDR, LRESULT* pResult) 
+{
+      ActivateTabPage(m_TabCtrl.GetCurSel());
+      
+      *pResult = 0;
+}[/code]
+
+3) Если вы также хотите обрабатывать смену страницы (в смысле - в зависимости от каких-то критериев менять страницу или нет), то делаем так: 
+ 
+Создаём обработчик ТабКонтрол -> TCN_SELCHANGING 
+[code]void COurDlg::OnSelchanging***(NMHDR* pNMHDR, LRESULT* pResult)
+{
+      int l_OldPageNum = m_TabCtrl.GetCurSel();
+
+      //если разрешить менять страницу то
+      *pResult = 0;
+      //если запретить менять страницу то
+      *pResult = 1;
+}[/code]
+
+Всё. Радуемся жизни :)

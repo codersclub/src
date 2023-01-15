@@ -1,0 +1,344 @@
+§NAME: Как расшарить папку
+§AUTHOR: Drunkard
+§EMAIL: drunk@sources.ru
+
+[b]Вариант 1 (All Systems)[/b]
+[code]// Две функции: 1)Разрешает общий доступ к папке. 2) Запрещает его.
+// Работают под Win9x/ME/NT/2000/XP
+// Кодирование на WIN_32_API
+// Компилятор BC++ 5.01
+#define _UNICODE
+// Кроме прочего нужно добавить нижеследующие строчки
+#include <lm.h>
+// svrapi.h не включать!
+// Кусок из файла SVRAPI.H
+// т.к. подключить его полностью невозможно
+#define SHI50F_RDONLY 0x0001
+#define SHI50F_FULL 0x0002
+#define SHI50F_DEPENDSON (SHI50F_RDONLY|SHI50F_FULL)
+#define SHI50F_ACCESSMASK (SHI50F_RDONLY|SHI50F_FULL)
+#define SHI50F_PERSIST 0x0100
+#define SHI50F_SYSTEM 0x0200
+
+struct share_info_50
+{
+    char shi50_netname[LM20_NNLEN+1];    /* share name */
+    unsigned char shi50_type;                 /* see below */
+    unsigned short shi50_flags;                /* see below */
+    char FAR * shi50_remark;                 /* ANSI comment string */
+    char FAR * shi50_path;                     /* shared resource */
+    char shi50_rw_password[SHPWLEN+1]; /* read-write password (share-level security) */
+    char shi50_ro_password[SHPWLEN+1]; /* read-only password (share-level security) */
+}; /* share_info_50 */
+
+// Описание функций
+BOOL CrShare(HWND, char*, char*, WORD);// Расшаривает папку. При успехе возвращает TRUE
+BOOL DelShare(HWND, char*, WORD);// Запрещает общий доступ. При успехе возвращает TRUE
+
+// Name - локальный путь к расшарив. папке. Последн. символ не должен быть '\'
+// NetName - имя будущего общего ресурса. Длина имени меньше LM20_NNLEN
+// WORD WinVer содержит версию Windows. WINNT - предопределенная в программе константа.
+
+BOOL CrShare(HWND hwnd, char* Name, char* NetName, WORD WinVer)
+{
+    HINSTANCE hIn;
+    HANDLE hShareAdd;
+    DWORD nLevel;
+    NET_API_STATUS nStatus;
+    DWORD Error;
+    char Str[MAX_PATH+80], BufErr[80];
+    char *sTitle = "Функция предоставления общего доступа";
+
+    CharUpper(Name); // Преобразование в верхний регистр внесено в тело функции по просьбе klep-а
+    CharUpper(NetName); // Преобразование в верхний регистр внесено в тело функции по просьбе klep-а
+
+    if(WinVer == WINNT)
+    {// Если NT/2000/XP
+        typedef NET_API_STATUS (*SHAREADDNT)(LPWSTR servername, DWORD level, LPBYTE buf, LPDWORD parm_err);
+        SHAREADDNT pShareAdd;
+        SHARE_INFO_502 si;
+        WCHAR wsName[MAX_PATH], wsNetName[MAX_PATH], wsRemark, wsPasswd;
+
+// Преобразуем в UNICODE
+        if(!MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, NetName, -1, wsNetName, MAX_PATH))
+        {
+            Error = GetLastError();
+            FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, Error, LANG_SYSTEM_DEFAULT, BufErr, 80, NULL);
+            sprintf(Str, "Затрудняюсь преобразовать в UNICODE сетевое имя папки.\nОшибка %u: %s", Error, BufErr);
+            MessageBox(hwnd, Str, sTitle, MB_SYSTEMMODAL|MB_OK);
+            return FALSE;
+        };
+
+        if(!MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, Name, -1, wsName, MAX_PATH))
+        {
+            Error = GetLastError();
+            FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, Error, LANG_SYSTEM_DEFAULT, BufErr, 80, NULL);
+            sprintf(Str, "Затрудняюсь преобразовать в UNICODE путь к папке.\nОшибка %u: %s", Error, BufErr);
+            MessageBox(hwnd, Str, sTitle, MB_SYSTEMMODAL|MB_OK);
+            return FALSE;
+        };
+
+        wsRemark = (WCHAR)0;
+        wsPasswd = (WCHAR)0;
+        memset(&si,0,sizeof(SHARE_INFO_502));
+
+        nLevel = 502;
+        si.shi502_netname = (LPTSTR)wsNetName;
+        si.shi502_type = STYPE_DISKTREE;
+        si.shi502_remark = (LPTSTR)&wsRemark;
+        si.shi502_permissions = ACCESS_ALL;
+        si.shi502_max_uses = -1;
+        si.shi502_current_uses = 0;
+        si.shi502_path = (LPTSTR)wsName;
+        si.shi502_passwd = (LPTSTR)&wsPasswd;
+        si.shi502_reserved = 0;
+        si.shi502_security_descriptor = NULL;
+
+        hIn = LoadLibrary("NETAPI32.DLL");
+        if(hIn == NULL)
+        {
+            sprintf(Str, "Затрудняюсь загрузить библиотеку NETAPI32.DLL");
+            MessageBox(hwnd, Str, sTitle, MB_SYSTEMMODAL|MB_OK);
+            return FALSE;
+        };
+
+        hShareAdd = GetModuleHandle("NETAPI32.DLL");
+        if(hShareAdd)
+        {
+            pShareAdd = (SHAREADDNT)GetProcAddress((HMODULE)hShareAdd, "NetShareAdd");
+
+            if(!pShareAdd)
+            {
+                MessageBox(hwnd, "Затрудняюсь получить адрес функции NetShareAdd в NETAPI32.DLL", sTitle, MB_SYSTEMMODAL|MB_OK);
+                CloseHandle(hShareAdd);
+                FreeLibrary(hIn);
+                return FALSE;
+            };
+        }
+        else
+        {
+            Error = GetLastError();
+            FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, Error, LANG_SYSTEM_DEFAULT, BufErr, 80, NULL);
+            sprintf(Str, "Затрудняюсь получить указатель на NETAPI32.DLL\nОшибка %u: %s", Error, BufErr);
+            MessageBox(hwnd, Str, sTitle, MB_SYSTEMMODAL|MB_OK);
+            FreeLibrary(hIn);
+            return FALSE;
+        }
+        nStatus = pShareAdd(NULL, nLevel, (LPBYTE)&si, NULL);
+
+        if(nStatus! = NERR_Success)
+        {
+            sprintf(Str, "Затрудняюсь открыть общий доступ к папке %s\nОшибка: %u", Name, nStatus);
+
+            if(nStatus == NERR_DuplicateShare) // Шареное имя уже есть точно такое же
+                strcat(Str, "\nСетевое имя уже существует.");
+
+            MessageBox(hwnd, Str, sTitle, MB_SYSTEMMODAL|MB_OK);
+            CloseHandle(hShareAdd);
+            FreeLibrary(hIn);
+            return FALSE;
+        };
+
+        CloseHandle(hShareAdd);
+        FreeLibrary(hIn);
+    }
+    else
+    {     // Win9x
+        typedef NET_API_STATUS (*SHAREADD)(char* servername, short level, char* buf, unsigned short parm_err);
+        SHAREADD pSvrApi;
+        struct share_info_50 si50;
+        DWORD SizeSI50;
+        CHAR sRemark;
+
+        SizeSI50 = sizeof(struct share_info_50);
+        memset(&si50,0,SizeSI50);
+        sRemark=(CHAR)0;
+        nLevel = 50;
+        strcpy(si50.shi50_netname, NetName);
+        si50.shi50_type = STYPE_DISKTREE;
+        si50.shi50_flags = SHI50F_FULL|SHI50F_PERSIST;
+//        si50.shi50_remark = NULL;                                        BUG в Win98. Выявлен   klep-ом 
+        si50.shi50_remark=(LPTSTR)&sRemark;   // Решение найденное klep-ом и мной :)
+        si50.shi50_path = Name;
+        si50.shi50_rw_password[0] = '\0';
+        si50.shi50_ro_password[0] = '\0';
+        hIn = LoadLibrary("SVRAPI.DLL");
+
+        if(hIn == NULL)
+        {
+            sprintf(Str, "Затрудняюсь загрузить библиотеку SVRAPI.DLL");
+            MessageBox(hwnd, Str, sTitle, MB_SYSTEMMODAL|MB_OK);
+            return FALSE;
+        };
+
+        hShareAdd = GetModuleHandle("SVRAPI.DLL");
+
+        if(hShareAdd)
+        {
+            pSvrApi = (SHAREADD)GetProcAddress((HMODULE)hShareAdd, "NetShareAdd");
+
+            if(!pSvrApi)
+            {
+                MessageBox(hwnd, "Затрудняюсь получить адрес функции NetShareAdd в SVRAPI.DLL", sTitle, MB_SYSTEMMODAL|MB_OK);
+                CloseHandle(hShareAdd);
+                FreeLibrary(hIn);
+                return FALSE;
+            };
+        }
+        else
+        {
+            Error = GetLastError();
+            FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, Error, LANG_SYSTEM_DEFAULT, BufErr, 80, NULL);
+            sprintf(Str, "Затрудняюсь получить указатель на SVRAPI.DLL\nОшибка %u: %s", Error, BufErr);
+            MessageBox(hwnd, Str, sTitle, MB_SYSTEMMODAL|MB_OK);
+            FreeLibrary(hIn);
+            return FALSE;
+        }
+
+        nStatus = pSvrApi(NULL, (short)nLevel, (char*)&si50, (unsigned short)SizeSI50);
+
+        if(nStatus! = NERR_Success)
+        {
+            sprintf(Str, "Затрудняюсь открыть общий доступ к папке %s\nОшибка: %u", Name, nStatus);
+
+            if(nStatus == NERR_DuplicateShare) // Шареное имя уже есть точно такое же
+                strcat(Str, "\nСетевое имя уже существует.");
+
+            MessageBox(hwnd, Str, sTitle, MB_SYSTEMMODAL|MB_OK);
+            CloseHandle(hShareAdd);
+            FreeLibrary(hIn);
+            return FALSE;
+    };
+
+    CloseHandle(hShareAdd);
+    FreeLibrary(hIn);
+}
+return TRUE;
+}
+
+// NetName - имя существующего общего ресурса.  Длина имени меньше LM20_NNLEN 
+// WORD WinVer содержит версию Windows. WINNT - предопределенная в программе константа.
+
+BOOL DelShare(HWND hwnd, char* NetName, WORD WinVer)
+{
+    HINSTANCE hIn;
+    HANDLE hShareDel;
+    NET_API_STATUS nStatus;
+    DWORD Error;
+    char Str[MAX_PATH+80], BufErr[80];
+    char *sTitle = "Функция отмены общего доступа";
+
+    CharUpper(NetName); // Преобразование в верхний регистр внесено в тело функции по просьбе klep-а
+
+    if(WinVer == WINNT)
+    {
+        typedef NET_API_STATUS (*SHAREDELNT)(LPWSTR servername, LPWSTR netname, DWORD parm);
+        SHAREDELNT pShareDel;
+        WCHAR wsNetName[MAX_PATH];
+
+// Преобразуем в UNICODE 
+        if(!MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, NetName, -1, wsNetName, MAX_PATH))
+        {
+            Error = GetLastError();
+            FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, Error, LANG_SYSTEM_DEFAULT, BufErr, 80, NULL);
+            sprintf(Str, "Затрудняюсь преобразовать в UNICODE сетевое имя папки.\nОшибка %u: %s", Error, BufErr);
+            MessageBox(hwnd, Str, sTitle, MB_SYSTEMMODAL|MB_OK);
+            return FALSE;
+        };
+
+        hIn = LoadLibrary("NETAPI32.DLL");
+
+        if(hIn == NULL)
+        {
+            sprintf(Str, "Затрудняюсь загрузить библиотеку NETAPI32.DLL");
+            MessageBox(hwnd, Str, sTitle, MB_SYSTEMMODAL|MB_OK);
+            return FALSE;
+        };
+
+        hShareDel = GetModuleHandle("NETAPI32.DLL");
+
+        if(hShareDel)
+        {
+            pShareDel = (SHAREDELNT)GetProcAddress((HMODULE)hShareDel, "NetShareDel");
+
+            if(!pShareDel)
+            {
+                MessageBox(hwnd, "Затрудняюсь получить адрес функции NetShareDel в NETAPI32.DLL", sTitle, MB_SYSTEMMODAL|MB_OK);
+                CloseHandle(hShareDel);
+                FreeLibrary(hIn);
+                return FALSE;
+            };
+        }
+        else
+        {
+            Error = GetLastError();
+            FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, Error, LANG_SYSTEM_DEFAULT, BufErr, 80, NULL);
+            sprintf(Str, "Затрудняюсь получить указатель на NETAPI32.DLL\nОшибка %u: %s", Error, BufErr);
+            MessageBox(hwnd, Str, sTitle, MB_SYSTEMMODAL|MB_OK);
+            FreeLibrary(hIn);
+            return FALSE;
+        }
+
+        nStatus = pShareDel(NULL, wsNetName, 0);
+
+        if(nStatus! = NERR_Success)         {
+            sprintf(Str, "Затрудняюсь закрыть общий доступ к ресурсу %s\nОшибка сети : %u", NetName, nStatus);
+            MessageBox(hwnd, Str, sTitle, MB_SYSTEMMODAL|MB_OK);
+            CloseHandle(hShareDel);
+            FreeLibrary(hIn);
+            return FALSE;
+        };
+    }
+    else
+    {
+// Win9x
+        typedef NET_API_STATUS (*SHAREDEL)(LPTSTR servername, LPTSTR netname, DWORD parm);
+        SHAREDEL pSvrApi;
+
+        hIn = LoadLibrary("SVRAPI.DLL");
+        if(hIn == NULL)
+        {
+            sprintf(Str, "Затрудняюсь загрузить библиотеку SVRAPI.DLL");
+            MessageBox(hwnd, Str, sTitle, MB_SYSTEMMODAL|MB_OK);
+            return FALSE;
+        };
+
+        hShareDel = GetModuleHandle("SVRAPI.DLL");
+
+        if(hShareDel)
+        {
+            pSvrApi = (SHAREDEL)GetProcAddress((HMODULE)hShareDel, "NetShareDel");
+
+            if(!pSvrApi)
+            {
+                MessageBox(hwnd, "Затрудняюсь получить адрес функции NetShareDel в SVRAPI.DLL", sTitle, MB_SYSTEMMODAL|MB_OK);
+                CloseHandle(hShareDel);
+                FreeLibrary(hIn);
+                return FALSE;
+            };
+        }
+        else
+        {
+            Error = GetLastError();
+            FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, Error, LANG_SYSTEM_DEFAULT, BufErr, 80, NULL);
+            sprintf(Str, "Затрудняюсь получить указатель на SVRAPI.DLL\nОшибка %u: %s", Error, BufErr);
+            MessageBox(hwnd, Str, sTitle, MB_SYSTEMMODAL|MB_OK);
+            FreeLibrary(hIn);
+            return FALSE;
+        }
+
+        nStatus = pSvrApi(NULL, NetName, 0);
+        if(nStatus! = NERR_Success)
+        {
+            sprintf(Str, "Затрудняюсь закрыть общий доступ к ресурсу %s\nОшибка: %u", NetName, nStatus);
+            MessageBox(hwnd, Str, sTitle, MB_SYSTEMMODAL|MB_OK);
+            CloseHandle(hShareDel);
+            FreeLibrary(hIn);
+            return FALSE;
+        };
+    }
+
+    CloseHandle(hShareDel);
+    FreeLibrary(hIn);
+    return TRUE;
+}[/code]

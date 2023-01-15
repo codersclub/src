@@ -1,0 +1,235 @@
+§NAME: Создание потоков (MFC)
+§AUTHOR: Muran
+§EMAIL: muran@km.ru
+
+Поток – отдельная ветвь выполнения программы. Имеет свой стек и работает независимо от других потоков приложения.
+
+Создание простейшего потока
+AfxBeginThread(ProcName,param,priority)
+ProcName – имя функции, которая будет выполнятся в новом потоке
+param – указатель типа LPVOID или void* на аргумент ProcName
+priority – константа, определяющая приоритет нового потока по отношению к основному
+
+Может принимать одно из следующих значений:
+[code]THREAD_PRIORITY_ABOVE_NORMAL  // на один пункт ниже нормального
+THREAD_PRIORITY_BELOW_NORMAL  //на один пункт выше нормального
+THREAD_PRIORITY_HIGHEST  //на два пункта выше нормального
+THREAD_PRIORITY_IDLE  //базовый приоритет равный 1
+THREAD_PRIORITY_LOWEST  //на два пункта ниже нормального
+THREAD_PRIORITY_NORMAL  //нормальный приоритет
+THREAD_PRIORITY_TIME_CRITICAL  //приоритет равный 15[/code]
+Приоритет потока определяет, как часто по отношению к другим выполняющимся потокам система будет передавать управление данному потоку
+[code]UINT ThreadProc(LPVOID param)  //Создание потоковой функции
+{
+    ::MessageBox((HWND)param, ”Thread activated”,”Message from Thread” ,MB_OK);
+    return 0;
+}
+
+SomeFunc()
+{
+    AfxBeginThread(ThreadProc,GetSafeHwnd()); //Запуск потока
+}[/code]
+
+[b]Синхронизация работы потоков.[/b]
+
+1. [i]Глобальная переменная[/i]
+[code]bool bThreadstop;  //контрольная переменная
+
+UINT ThreadProc(LPVOID param)  //Создание потоковой функции 
+{
+    ::MessageBox((HWND)param, ”Thread activated”,”Message from thread”,MB_OK);
+    while(!bThreadstop)
+    {
+         //Выполнение опреаций
+    }
+
+    ::MessageBox((HWND)param, ”Thread ended”,”Message from thread”,MB_OK);
+    return 0;
+}
+
+SomeFunc()
+{
+    bThreadstop=false;
+    AfxBeginThread(ThreadProc,GetSafeHwnd());  //Запуск потока
+}
+
+StopThread()
+{
+	bThreadstop=true;  //остановка потока
+} [/code]
+
+2. [i]Взаимодействие с помощью сообщений [/i]
+[code]const WM_THREADENDED = WM_USER+1;  //Это надо добавить в катры сообщений
+
+afx_msg LONG OnThreadEnded(WPARAM wParam,LPARAM lParam);
+
+ON_MESSAGE(WM_THREADENDDED,OnThreadEnded)
+
+bool bThreadstop;  //контрольная переменная 
+
+UINT ThreadProc(LPVOID param)  //Создание потоковой функции 
+{
+    ::MessageBox((HWND)param, ”Thread activated”,”Message from thread”,MB_OK);
+    while(!bThreadstop)
+    {
+         //Выполнение опреаций
+    }
+
+    ::PostMessage((HWND)param,WM_THREADENDED,(WPARAM)param,0); //Сообщение
+    return 0;
+} 
+
+SomeFunc()
+{
+    bThreadstop=false;
+    AfxBeginThread(ThreadProc,GetSafeHwnd()); //Запуск потока
+}
+
+StopThread()
+{
+    bThreadstop=true;  //остановка потока
+}
+
+LONG OnThreadEnded(WPARAM wParam, LPARAM lParam)
+{
+    ::MessageBox((HWND)wParam,”Thread Ended”,”Message from thread”, MB_OK);
+}
+
+//Данный пример закрывает главное окно после выполнения потоковой функции[/code]
+
+3. [i]Взаимодействие с помощью объектов событий[/i]
+
+Объект событий CEvent может находится в одном из двух состояний – сигнализирует или молчит. Потоки отслеживают момент, когда объект события начинает сигнализировать, и начинаю выполнение операций.
+[code]CEvent ThreadStart;  //объект автоматически устанавливается в состояние молчания
+
+ThreadStart.SetEvent();  //установка состояния сигнализации[/code]
+Отслеживание состояния объекта осуществляется с помощью функции WinAPI WaitForSingleObject();
+[code]:: WaitForSingleObject(ThreadStart.m_hObject,INFINITE);[/code]
+- первый параметр – дескриптор отслеживаемого события.
+- второй параметр – время отслеживания. INFINITE – бесконечно.
+
+В момент установки события WaitForSingleObject() вернет управление потоку.
+В момент сброса события поток должен прекратить свою работу.
+Для этого надо организовать постоянный опрос состояния события.
+
+Это можно сделать следующим способом:
+[code]::WaitForSingleObject(ThreadStart.m_hObject,0);[/code]
+Время 0 говорит о том, что надо опросить событие.
+Если результат вызова этой функции равен WAIT_OBJECT_0, то объект в остоянии сигнализации. В других случаях – молчит.
+[code]CEvent ThreadStart;  //Объект начала работы потока
+CEvent ThreadEnd;  //Объект окончания работы потока
+
+UINT ThreadProc(LPVOID param)  //Создание потоковой функции
+{
+    :: WaitForSingleObject(ThreadStart.m_hObject,INFINITE);  //ожидание запуска потока
+    ::MessageBox((HWND)param, ”Thread activated”,”Message from thread”,MB_OK);
+    bool Running=true;
+    int result;
+    while(Running)
+    {
+         //Выполнение опреаций
+
+        result=:: WaitForSingleObject(ThreadEnd.m_hObject,0);  //проверка завершения
+        if(result==WAIT_OBJECT_0)
+            Running=false;
+    }
+
+    ::PostMessage((HWND)param,WM_CLOSE,0,0); //Сообщение
+
+    return 0;
+}
+
+Start()  //запуск потока
+{
+    ThreadStart.SetEvent();
+}
+
+End()  //завершение потока
+{
+    ThreadEnd.SetEvent();
+}[/code]
+Поток нужно создавать независимо от состояния событий.
+
+
+[b]Синхронизация работы нескольких потоков[/b]
+
+Для синхронизации нескольких потоков используют следующие объекты: критические секции, семафоры, защелки. 
+
+1. [i]Критические секции.[/i]
+
+Критические секции используются для контроля доступа к защищенным данным.
+
+Их можно использовать внутри одного класса для синхронизации чтения-доступа к данным.
+[code]class cls
+{
+private:
+    int val;
+    CCriticalSection section;
+public:
+    void write(int);
+    void read(int*);
+}
+
+void cls::write(int n)
+{
+    section.Lock();
+    val=n;
+    section.Unlock();
+}
+
+void cls::read(int * n)
+{
+    section.Lock();
+    *n=val;
+    section.Unlock();
+}[/code]
+При вызове метода Lock() происходит блокировка секции, и последующие вызовы этого метода не возвратят управление вызывающему потоку до тех пор, пока секция не будет освобождена.
+Из данного примера видно, что при записи нового значения невозможно прочитать старое. Соответственно при чтении значения его невозможно изменить. Если в работе участвуют большие объемы данных, то для предотвращения сбоя необходим контроль. Критические секции обеспечивают минимальную защиту от сбоев.
+
+2. [i]Защелки(MUTEXes) [/i]
+
+Использование защелок CMutex при синхронизации потоков одного приложения не отличается от использования критических секций. Работа с ними осуществляется с использованием следующих объектов: CSingleLock и CMultiLock. Для получения доступа к защелке используется методо Lock(). Для освобождения защелки нужно вызвать метод Unlock()
+[code]CMutex mutex;  //создание защелки
+
+CSingleLock sLock(&mutex);  //захват защелки
+
+sLock.Lock();
+
+sLock.Unlock();  //освобождение защелки
+
+class cls
+{
+private:
+    int val;
+    CMutex mutex;
+public:
+    void write(int);
+    void read(int*);
+}
+
+void cls::write(int n)
+{
+    CSingleLock sLock(&mutex);
+
+    sLock.Lock();
+    val=n;
+} 
+
+void cls::read(int * n)
+{
+    CSingleLock sLock(&mutex);
+
+    sLock.Lock();
+    *n=val;
+}[/code]
+Использование метода Unlock() в данном случае необязательно т.к. при вызове деструктора sLock защелка автоматически освобождается.
+
+3. [i]Семафор[/i]
+
+Использование этого объекта ничем не отличается от использования предыдущих. Разница заключается в том, что семафор дает право на использование контролируемых параметров определенному числу потоков. В семафоре хранится количество объектов, которые в данный момент имеют доступ к данным. 
+[code]CSemaphore semaphore(2,2);  //создание семафора[/code]
+При создании семафора указывается начальное и максимальное значение счетчика 
+[code]CSingleLock sLock(&semaphore);  //Захват семафора
+sLock.Lock(); [/code]
+При вызове метода Lock() значение счетчика внутри семафора уменьшается. Когда оно достигнет нуля, метод Lock() будет ждать освобождения семафора. После этого захватит семафор и вернет управление вызывающей функции
+[code]sLock.Unlock();  //Освобождение семафора[/code]

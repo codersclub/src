@@ -1,0 +1,85 @@
+§NAME: Работа с переменными в других процессах
+§AUTHOR: SUnteXx
+§EMAIL: SUnteXx@sources.ru
+
+[b]Ниже приведеный код работает тока на линейке NT: NT, 2000, XP и т.д.[/b]
+
+Приведенный ниже пример показывает, как можно получить название всех кнопок Таскбара. Для этого нам необходимо "внедриться" в чужой процесс, создав там строку и считав туда названия, а потом уже получить переменную из того процесса!
+[code]#include <stdio.h>
+#include <conio.h>
+#include <windows.h>
+#include <commctrl.h>
+
+void GetButtonText(HWND hwndTaskbar, int iNum, char *szText, UINT iMax)
+{
+	DWORD d;
+	char **lp;
+
+	if (!hwndTaskbar)
+	{
+		hwndTaskbar = FindWindow("Shell_TrayWnd", NULL); // Панелька внизу
+		hwndTaskbar = FindWindowEx(hwndTaskbar, NULL, "ReBarWindow32", NULL); // Панель левее кнопки пуск
+		hwndTaskbar = FindWindowEx(hwndTaskbar, NULL, "MSTaskSwWClass", NULL); // Панель, там где минимизированные окна и т.п.
+		hwndTaskbar = FindWindowEx(hwndTaskbar, NULL, "ToolbarWindow32", NULL); // хм... таскбар
+	}
+
+// получаем ID процесса таскбара
+	GetWindowThreadProcessId(hwndTaskbar, &d);
+
+// открываем процесс на запись/чтение
+	HANDLE h = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE, 0, d);
+
+// создаем переменную в другом процессе	
+	lp = (LPSTR*)VirtualAllocEx(h, NULL, iMax, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE); 
+
+// очищаем нашу строку, куда будем считывать текст окна из таскбара
+	memset(szText, 0, iMax);
+
+// пишем пустую строку в процесс.
+// Этого, в данном случае можно не делать. Просто показал как это делается
+	WriteProcessMemory(h, (LPVOID)lp, szText, iMax, NULL);
+
+// получаем название кнопки в выделенную в другом процессе строку
+	SendMessage(hwndTaskbar, TB_GETBUTTONTEXT, iNum, (LPARAM)lp);
+
+// читаем значение строки из другого процесса в наш
+	ReadProcessMemory(h, (LPVOID)lp, szText, iMax, 0l);
+
+// удаляем переменную в другом процессе
+	VirtualFreeEx(h, lp, 0, MEM_RELEASE);
+
+// заканчиваем работу с другим процессом
+	CloseHandle(h);
+}
+
+void main(void)
+{
+	char szText[200];
+	HWND hwndTaskbar;
+	
+// ищем окно Таскбара	
+	hwndTaskbar = FindWindow("Shell_TrayWnd", NULL); // Панелька внизу
+	hwndTaskbar = FindWindowEx(hwndTaskbar, NULL, "ReBarWindow32", NULL); // Панель левее кнопки пуск
+	hwndTaskbar = FindWindowEx(hwndTaskbar, NULL, "MSTaskSwWClass", NULL); // Панель, там где минимизированные окна и т.п.
+	hwndTaskbar = FindWindowEx(hwndTaskbar, NULL, "ToolbarWindow32", NULL); // хм... таскбар
+
+// получаем количество кнопок в таскбаре	
+	int max = SendMessage(hwndTaskbar, TB_BUTTONCOUNT, 0, 0);
+
+	for (int i = 0; i <= max; i++)
+	{
+// если данная кнопка под номером i не видна (скрыта), то
+		if (SendMessage(hwndTaskbar, TB_ISBUTTONHIDDEN, i, 0))
+			continue; // переходим к следующей кнопку
+
+// получаем текст кнопки №i в таскбаре
+		GetButtonText(hwndTaskbar, i, szText, 200);
+		printf("%s\r\n", szText); // выводим название
+	}
+	
+	printf("\r\nPress any key to continue"); // просим юзверя нажать "any key" на клавиатуре
+
+	while(!_getch()); // ждем нажатия кнопки
+
+	return; // выходим
+}[/code]

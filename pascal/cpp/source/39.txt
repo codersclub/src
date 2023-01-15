@@ -1,0 +1,209 @@
+§NAME: Как показать диалог выбора папки
+§AUTHOR: SUnteXx
+§EMAIL: SUnteXx@sources.ru
+
+Прежде всего надо не забыть добавить вот эту строку: 
+[code]#include <shlobj.h>[/code]
+Без этой строки будет много ошибок.
+На всякий случай (если используется ф-ция sprintf) пишем такую строчку:
+[code]#include <stdio.h>[/code]
+Чтобы показать диалогом выбора папки, нам надо вызвать ф-цию SHBrowseForFolder, прежде заполнив структуру BROWSEINFO.
+
+Для того, чтобы нам добавить на всякий случай кнопку в выбор этого диалога, то заполняем структуру так:
+[code]BROWSEINFO bi= {hWnd,  // Родитель
+                        NULL,  // не помню, т.е. не надо
+                        (LPSTR)szWorkDir,  //Начальная директория
+                        "Please, choose the folder...",  // Заголовок
+                        BIF_DONTGOBELOWDOMAIN | BIF_RETURNONLYFSDIRS | BIF_EDITBOX | BIF_BROWSEFORCOMPUTER,  // Стили
+                        BrowseCallbackProc,  // ф-ция обработки мессаг
+                        NULL, // Не нужно нам такого
+                        0}; // Это не для нас[/code]
+Заполнили? Теперь вызываем ф-цию:
+[code]LPCITEMIDLIST lpItemDList;
+if(!(lpItemDList=SHBrowseForFolder(&bi)))
+{
+// Где-то был баг!
+}
+// Достаем полный путь через
+SHGetPathFromIDList(lpItemDList, sz); // где sz - строка, куда достанем путь...[/code]
+Если вы в структуре bi поставили функцию обработки мессаг, то читайте дальше, если поставили 0, то вам это не пригодится. Если надо добавлять кнопки или еще что-нить, то обработка мессаг должна быть!!!
+
+Если вы новичок, то лучше поставте 0, а то запутаетесь еще больше... 
+А теперь ловим мессаги и, соответственно, добовляем кнопки...:
+[code]BOOL WINAPI BrowseProc (HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM lParam); // Описали ф-цию
+#define BUTTONID 1000 // идентификатор первой кнопки
+#define BUTTONID_1 1001 // идентификатор второй кнопки
+
+WNDPROC MainBrowseProc; // дефолтовский процесс
+
+HINSTANCE hInst; // HINSTANCE нашей проги
+
+char szAutoSaveInPath[MAX_PATH]; // просто переменная. хранится
+
+int CALLBACK BrowseCallbackProc(HWND hWnd, UINT uMessage, LPARAM wParam, LPARAM lParam)
+{
+    TCHAR szDir[MAX_PATH]; // Имя папка будет храниться здесь
+    switch(uMessage)
+    {
+    case BFFM_INITIALIZED:
+    {
+        RECT R;
+        GetClientRect(hWnd, &R);
+        HWND h = CreateWindow("Button",
+                        "Create new folder",
+                        WS_CHILDWINDOW | WS_VISIBLE | WS_GROUP | WS_TABSTOP | BS_TEXT | BS_PUSHBUTTON,
+                        R.right - 120, R.top + 10, 110, 23,
+                        hWnd,
+                        (HMENU)BUTTONID,
+                        hInst,
+                        NULL); // Создали батон по созданию новой папки
+
+        HANDLE hFont = (HANDLE)SendMessage(FindWindowEx(hWnd, NULL, "Button", NULL), 
+                                        WM_GETFONT,
+                                        (WPARAM)NULL,
+                                        (LPARAM)NULL);
+
+        SendMessage(h, WM_SETFONT, (LPARAM)hFont, true); // поставили ему шрифт
+
+        HWND hwndTmp;
+        hwndTmp = FindWindowEx(hWnd, NULL, "Static", NULL);
+        MoveWindow(hwndTmp, 
+                    R.left + 10,
+                    R.top + 15,
+                    200,
+                    23,
+                    1); // подвинули статик, чтоб не мешал батону
+
+        h = CreateWindow("Button",
+                        "Set default folder",
+                        WS_CHILDWINDOW | WS_VISIBLE | WS_GROUP | WS_TABSTOP | BS_TEXT | BS_PUSHBUTTON,
+                        R.left + 10, R.bottom - 36, 110, 23,
+                        hWnd,
+                        (HMENU)BUTTONID_1,
+                        hInst,
+                        NULL); // создали кнопку по перемещении нас к папке по умолчанию
+
+        SendMessage(h, WM_SETFONT, (LPARAM)hFont, true); // все те же шрифты
+
+        l = GetWindowLong(hWnd, GWL_STYLE);
+        l -= DS_CONTEXTHELP;
+        SetWindowLong(hWnd, GWL_STYLE, (LONG)l); // убрали кнопку ХЕЛПа в заголовке окна
+
+        l = GetWindowLong(hWnd, GWL_EXSTYLE);
+        l -= WS_EX_CONTEXTHELP;
+        SetWindowLong(hWnd, GWL_EXSTYLE, (LONG)l); // убрали эту кнопку навсегда :)
+
+        hwndTmp = FindWindowEx(hWnd, NULL, "Edit", NULL);
+        l = GetWindowLong(hwndTmp, GWL_STYLE);
+        l |= ES_LOWERCASE ;
+        SetWindowLong(hwndTmp, GWL_STYLE, (LONG)l); // в едите делаем только нижний регистр букв
+
+        MainBrowseProc = (WNDPROC)SetWindowLong(hWnd, GWL_WNDPROC, (LONG)BrowseProc); // Хммм... Это тоже надо :)
+// Будем обрабатывать нажатие батонов именно там
+
+        SetWindowText(hWnd, "Choose the folder"); // Меняем название окна
+
+        if (strlen(szAutoSaveInPath)) // Если была какая-то папка выбрана раньше - выбираем ее
+        {
+            DWORD d = SendMessage(hWnd, BFFM_SETSELECTION, 1, (LPARAM)szAutoSaveInPath);
+        }
+        break;
+    }
+
+    case BFFM_SELCHANGED:
+    {
+        LPITEMIDLIST lp1 = (LPITEMIDLIST)lParam;
+        if (SHGetPathFromIDList((LPITEMIDLIST)wParam ,szDir))
+        {
+            HWND hwndTmp;
+            hwndTmp = FindWindowEx(hWnd, NULL, "Edit", NULL);
+            SetWindowText(hwndTmp, szDir);
+        }
+        break;
+    }
+    default:
+        break;
+    }
+    return 0;
+}
+
+/************************/
+
+BOOL WINAPI BrowseProc (HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM lParam) // Обрабатываем здесь нажатия батонов
+{
+    switch (uMessage)
+    {
+    case WM_RBUTTONDOWN: // Если нажата правая кнопка крысы - посылаем юзера погулять...
+        return 0;
+
+    case WM_COMMAND:
+    {
+        switch(LOWORD(wParam))
+        {
+        case BUTTONID_1: // Если нажата кнопка дефолтовской папки
+        {
+            char CVPath[MAX_PATH]; // у меня здесь хранится путь к exe файлу
+            _strnset(szAutoSaveInPath, '\0', MAX_PATH);
+            strcpy(szAutoSaveInPath, CVPath);
+            strcat(szAutoSaveInPath, "\\AUTOSAVES\0");
+
+            DWORD d; d = CreateDirectory(szAutoSaveInPath, (LPSECURITY_ATTRIBUTES)NULL); // создаем эту директорию (если нету)
+
+            if (!d)
+            {
+                d = GetLastError();
+                if (d != 183)
+                {
+                    char szTmp[MAX_PATH + 40];
+                    sprintf(szTmp, "Can't create folder \"%s\"", szAutoSaveInPath);
+                    return ErrMsg_S(hWnd, NULL, MB_OK | MB_ICONSTOP, szTmp);
+                }
+            }
+            d = SendMessage(hWnd, BFFM_SETSELECTION, 1, (LPARAM)szAutoSaveInPath); // и выбираем ее
+            HWND hwndTmp;
+            hwndTmp = FindWindowEx(hWnd, NULL, "Edit", NULL);
+            SetWindowText(hwndTmp, szAutoSaveInPath); // Ставим данный путь в Едитбокс
+            break;
+        }
+
+        case IDOK: // Нажата кнопка ОК
+        case BUTTONID: // или кнопка "создать директорию"
+            HWND hwndTmp;
+            hwndTmp = FindWindowEx(hWnd, NULL, "Edit", NULL);
+            char sz[MAX_PATH];
+            GetWindowText(hwndTmp, sz, MAX_PATH); // получаем путь из Едитбокса
+
+            DWORD d = CreateDirectory(sz, (LPSECURITY_ATTRIBUTES)NULL); // создаем на всякий случай директорию (вдруг юзверь отредактировал путь)
+
+            if (!d) // Если у юзера руки не от туда растут, то
+            {
+                d = GetLastError(); // проверяем, откуда они растут
+                if (d != 183) // Растут они из -= Цензура =-
+                {
+                    char szTmp[MAX_PATH + 40];
+                    sprintf(szTmp, "Can't create folder \"%s\"", sz);
+                    return ErrMsg_S(hWnd, NULL, MB_OK | MB_ICONSTOP, szTmp);
+                }
+                else if (LOWORD(wParam) == BUTTONID) // Если папка уже существует и нажата кнопка "создания папки"
+                {
+                    char szTmp[MAX_PATH + 40];
+                    sprintf(szTmp, "The folder \"%s\" is exist", sz);
+                    ErrMsg_S(hWnd, NULL, MB_OK | MB_ICONEXCLAMATION, szTmp); // покажем мессагу...
+                    SetFocus(hwndTmp);
+                    d = SendMessage(hWnd, BFFM_SETSELECTION, 1, (LPARAM)sz);
+                    return 0;
+                }
+            }
+
+            d = SendMessage(hWnd, BFFM_SETSELECTION, 1, (LPARAM)sz);
+
+            break;
+        }
+        break;
+    }
+
+    default:
+        break;
+    }
+    return CallWindowProc(MainBrowseProc, hWnd, uMessage, wParam, lParam);
+}[/code]

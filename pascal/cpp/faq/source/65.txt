@@ -1,0 +1,174 @@
+§NAME: Подключен ли компьютер к интернету
+§AUTHOR: SUnteXx
+§EMAIL: SUnteXx@sources.ru
+
+[b]Вариант 2[/b]
+
+Есть еще один способ проверки соединения компа с интернетом.
+[code]#include <stdio.h>
+#include <pdh.h>
+#include <conio.h>
+
+/*******************************************************************************/
+/********                                                               ********/
+/********                                                               ********/
+/********            не забудьте включить в проект "pdh.lib"            ********/
+/********                                                               ********/
+/********    Project -> Settings -> Link -> Object / Library Modules    ********/
+/********                                                               ********/
+/********                                                               ********/
+/*******************************************************************************/
+
+
+/*******************************************************************************/
+/***********                                                         ***********/
+/***********            PDH - performance data helper                ***********/
+/***********                                                         ***********/
+/*******************************************************************************/
+
+
+/**************************** Описание наших функций ***************************/
+
+#define PDH_ERROR -1
+
+// Функция инициализирует PDH (performance data helper)
+PDH_STATUS pdh_Init (HQUERY &hQuery, HCOUNTER &hCounter);
+
+
+// Функция возвращает в случае удачи скорость соединения, в противном случае PHG_ERROR (-1)
+int GetInternetSpeed (HQUERY hQuery, HCOUNTER hCounter, PDH_STATUS &pdhStatus);
+
+
+// Функция анинициализирует PDH
+void pdh_Uninit (HQUERY hQuery, HCOUNTER hCounter);
+
+
+// Функция показывает сообщение об ошибке
+void ShowErrorMessage(PDH_STATUS pdhStatus);
+
+
+// хмм... в названии функции все сказано!
+void begin();
+
+/****************************************************************************/
+
+
+void main(void)
+{
+	begin();
+	
+	printf(TEXT("Press any key to continue")); // нажмите "any key" на клавиатуре :P
+	while (!_getch()); // ждем, пока юзверь не "клацнет" "any key"
+}
+
+void begin()
+// хмм... в названии функции все сказано!
+{
+	PDH_STATUS  pdhStatus      = 0;
+
+	HQUERY hQuery;
+	HQUERY hCounter;
+	int iSpeed;
+	pdhStatus = pdh_Init(hQuery, hCounter); // инициализируем PDH
+
+ // если не произошел облом с иницализации PDH, то
+	if ( pdhStatus == ERROR_SUCCESS )
+	{
+		printf("Press Esc to exit\r\n");
+ // пока юзверь не зажмет клавишу Esc, то
+		while (GetKeyState(VK_ESCAPE) >= 0)
+		{
+ // получаем скорость соединения
+			iSpeed = GetInternetSpeed(hQuery, hCounter, pdhStatus);
+
+ // если не произошла ошибка (т.е. не вернулось значение PHG_ERROR)
+			if (iSpeed != PDH_ERROR)
+				printf("Online. Speed: %i\r\n", iSpeed); // выводим значение
+			else // а если произошла ошибка, то
+				printf("Offline\r\n");
+
+			Sleep(500); // ждем 0.5 секунд(ы)
+		}
+
+// если юзверь все-таки клацнул Esc, то флаг ему в руки :)
+		pdh_Uninit(hQuery, hCounter); // заканчиваем работу с PDH
+	}
+	else // если произошла ошибка при инициализации PDH
+		ShowErrorMessage(pdhStatus); // показываем Еррорное сообщение
+	pdh_Uninit(hQuery, hCounter); // заканчиваем работу с PDH
+}
+
+void ShowErrorMessage(PDH_STATUS pdhStatus)
+// Сама функция показа сообщения об ошибке
+{
+	LPSTR szMessage = NULL;
+
+// грузим строку с ошибкой в szMessage. Память выделит функция
+	FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER |
+					FORMAT_MESSAGE_FROM_HMODULE,
+					GetModuleHandle("PDH.DLL"), pdhStatus,
+					MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+					szMessage, 0, NULL);
+
+	if (szMessage)
+		printf("Error №%i:  %s\r\n", pdhStatus, szMessage); // показываем ошибку
+	else
+		printf("Offline\r\n");
+
+	LocalFree(szMessage); // очищаем буфер
+}
+
+PDH_STATUS pdh_Init(HQUERY &hQuery, HCOUNTER &hCounter)
+// инициализируем PDH
+{
+	PDH_STATUS  pdhResult   = 0;
+	CHAR        szCounterPath[1024];
+	DWORD       dwType      = 0;
+	
+	pdhResult = PdhOpenQuery( NULL, 0, &hQuery ); // запрос на открытие PDH 
+	
+	if ( pdhResult != ERROR_SUCCESS ) // если была ошибка, то
+		return pdhResult; // выходим, возвращая номер ошибки
+
+	strcpy(szCounterPath, "\\Network Interface(WAN [PPP_SLIP] Interfacee)\\Current Bandwidth");
+
+// открываем счетчик PDH
+	pdhResult = PdhAddCounter(hQuery, szCounterPath, 0, &hCounter);
+
+	if (pdhResult != ERROR_SUCCESS) // если была ошибка, то
+		return pdhResult; // выходим, возвращая номер ошибки
+
+ // если дошли до этого места, то ошибки на 100% не было!
+	return pdhResult;
+}
+
+int GetInternetSpeed(HQUERY hQuery, HCOUNTER hCounter, PDH_STATUS &pdhStatus)
+// получаем скорость соединения
+{
+	pdhStatus = 0;
+	DWORD       dwType      = 0;
+
+// даем запрос на сборы инфы
+	pdhStatus = PdhCollectQueryData(hQuery);
+
+	if (pdhStatus != ERROR_SUCCESS) // если была ошибка, то
+		return PDH_ERROR; // выходим, возвращая ошибку
+
+	_PDH_FMT_COUNTERVALUE pfci;
+	ZeroMemory(&pfci, sizeof(pfci)); // очищаем структуру pfci
+
+// Получаем инфу о скорости!
+	pdhStatus = PdhGetFormattedCounterValue( hCounter, PDH_FMT_DOUBLE, &dwType, &pfci);
+	
+	if (pdhStatus != ERROR_SUCCESS) // если была ошибка, то
+		return PDH_ERROR; // выходим, возвращая ошибку
+
+	return (int)pfci.doubleValue; // возвращаем скорость соединения!
+} 
+
+void pdh_Uninit(HQUERY hQuery, HCOUNTER hCounter)
+// анинициализация 
+{
+	PdhRemoveCounter(hCounter); // удаляем счетчик
+	PdhCloseQuery(hQuery); // закрываем запрос
+}[/code]

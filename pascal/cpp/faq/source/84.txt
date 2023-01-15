@@ -1,0 +1,65 @@
+§NAME: Вид без фрейма, на обычном окне
+§AUTHOR: Leprecon
+§EMAIL: leprecon@pisem.net
+
+Иногда бывает нужно создать вид, но не на фрейме, а на любом другом окне. Например, если во фрейме вы создали слева CControlBar и на нем хотели бы разместить еще один вид для существующего документа, который отображал бы какую-нибудь дополнительную информацию.
+
+Что для этого нужно:[h5]
+1. CWnd *pParentWnd 			- родительское окно.
+2. CDocument* pDoc 				- документ, для которого вы хотите создать вид.
+3. CRect rect 					- положение вида на родителе.
+4. CRuntimeClass* pViewClass 	- runtime class нового вида.
+5. UINT nViewID					- идентификатор вида на его родителе.[/h5]
+
+Вот такая функция по этим параметрам создаст новый вид:[code]CView* CreateDlgView(CWnd *pParentWnd, CDocument* pDoc, CRect rect, CRuntimeClass* pViewClass, UINT nViewID)
+{
+	// Сначало мы создаем экземпляр класса вида.
+	CView* pView = (CView*) pViewClass->CreateObject();
+	
+	// Теперь для создания вида нам нужно заполнить структуру CCreateContext
+	CCreateContext CreateContext;
+	CreateContext.m_pCurrentDoc	= pDoc; // Документ, для которого создаем вид.
+	CreateContext.m_pCurrentFrame	= NULL;
+	CreateContext.m_pLastView	= NULL;
+
+	CreateContext.m_pNewDocTemplate	= pDoc->GetDocTemplate(); // Шаблон документа.
+	CreateContext.m_pNewViewClass	= pViewClass; // runtime class вида.
+
+	// Вот здесь мы создаем окно вида на его родителе.
+	if (!pView->Create(NULL, NULL, AFX_WS_DEFAULT_VIEW,
+		rect, pParentWnd, nViewID, &CreateContext))
+	{
+		return NULL;        
+	}
+
+	// Первая функция, которую мы должны вызвать после создания вида, это OnInitialUpdate()
+	pView->OnInitialUpdate();
+	// Перерисуем вид.
+	pView->RedrawWindow();
+
+	// И все готово. Теперь мы можем его использовать как обычный контрол.
+	return pView;
+}[/code]
+
+[b]Примечание: [/b]
+Когда уничтожается документ, он удаляет все виды, привязанные к нему. При удалении, вида, документ ищет среди родителей вида первый попавшийся фрейм и уничтожает. Такая ситуация чревата опасностями. Когда я делал в MDI приложении дополнительный вид справа для каждого документа, то столкнулся с ситуацией когда при закрытии одного из документов у меня закрывалось все приложение. Проблема оказалась в том, что мой дополнительный вид расположен на контрол баре, который расположен на главном фрейме. При закрытии одного из документов, этот документ сначала удалял главный вид и CChildFrame, на котором этот вид расположен. Потом документ удалял второй, дополнительный вид, ближайшим родительским фреймом для которого, был CMainFrame. Соответственно он удалял главное окно приложения.
+
+Происходит это в функции void CDocument::OnCloseDocument(). Вот кусок кода из нее, в которой удаляются все виды и их фреймы.[code]
+	while (!m_viewList.IsEmpty())
+	{
+		// get frame attached to the view
+		CView* pView = (CView*)m_viewList.GetHead();
+		ASSERT_VALID(pView);
+		CFrameWnd* pFrame = pView->GetParentFrame();
+		ASSERT_VALID(pFrame);
+
+		// and close it
+		PreCloseFrame(pFrame);
+		pFrame->DestroyWindow();
+			// will destroy the view as well
+	}[/code]
+Если переопределить эту функцию, то можно избежать такой ситуации.
+ 
+Если есть какие-то замечания, предложения или что-то еще, то пишите: 
+[email]leprecon@pisem.net[/email].
+

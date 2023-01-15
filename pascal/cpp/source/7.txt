@@ -1,0 +1,50 @@
+§NAME: Работа с сокетами на VCL
+§AUTHOR: Del
+§EMAIL: bezdelnick@pisem.net
+
+Нам надо переслать текст с одного компа на другой (это простейший пример, от него идут все остальные) 
+
+1 комп (клиент, посылает сообшение) - прога №1 
+2 комп (сервер, принимает его)- пргоа №2 
+
+[b]Прога №1: [/b]
+TClientSocket1 кидаем на форму. 
+Заполняем поля: 
+[code]ClientSocket1->Port = 1100; // почти любой, лучше после 1000 
+ClientSocket1->Host = "Server"; // кому идёт мессага[/code]
+Коннектимся к серваку: 
+[code]ClientSocket1->Open(); //можно ClientSocket1->Active = true; [/code]
+Отсылаем мессагу: 
+[code]ClientSocket1->Socket->SendText("Хай!"); // это сообшение получит сервер[/code]
+
+[b]Прога №2: [/b]
+ServerSocket1 кидаем на форму. 
+Заполняем поля: 
+[code]ServerSocket1->Port = 1100; // должен быть одинаковым с клиентом[/code]
+Функция обработчик события "Пришла мессага": 
+[code]
+void __fastcall TfmMain::ServerSocket1ClientRead (TObject *Sender, TCustomWinSocket *Socket) 
+{     AnsiString sMsg = Socket->ReceiveText(); // полученный текст 
+    ShowMessage(sMsg); 
+}[/code]
+Как серверу послать мессагу клиенту? 
+
+Используя ServerSocket1->Socket->Connections[i ]->SendText("Текст мессаги для клиента"); 
+
+i - номер соединения, т.е. для отправки мессаг всем присоединившимся к серверу надо: 
+[code]for (int i = 0; i < ServerSocket1->Socket->ActiveConnections; i++) 
+ServerSocket1->Socket->Connections[i ]->SendText("Текст мессаги для клиента"); [/code]
+Соответственно послать мессагу последнеиу присоединившемуся к серверу: 
+[code]int lu = ServerSocket1->Socket->ActiveConnections - 1; 
+ServerSocket1->Socket->Connections[lu]->SendText("Текст последнему клиенту"); [/code]
+
+У клиента функция-обработчик события пришла мессага аналогичен серверному, называеться 
+[code]void __fastcall TfmMain::ClientSocket1Read (TObject *Sender, TCustomWinSocket *Socket) [/code]
+Закрыть соединение: 
+для клиента: ClientSocket1->Close(); 
+для сервера: ServerSocket1->Close(); 
+
+Узнать имя своего компа в сети: 
+[code]ServerSocket1->Open(); 
+AnsiString CompName = ServerSocket->Socket->LocalHost; 
+ServerSocket1->Close();[/code]

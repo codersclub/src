@@ -1,0 +1,309 @@
+§NAME: Ресурсы локальной сети
+§AUTHOR: andyag
+
+Для получения списка ресурсов локальной сети нужно использовать функции lan manager:
+WNetOpenEnum - начать перечисление,
+WNetEnumResource - перечислить ресурсы,
+WNetCloseEnum - закончить перечисление.
+
+3 вышеописанные функции дают список имен серверов, принтеров, и т. д. Для получения информации о конкретном сервере можно воспользоваться функцией NetServerGetInfo.
+
+Также, иногда интересно узнать IP адрес компа - здесь нужен WinSock и его gethostbyname.
+
+Пример консольной проги, реализующей все вышеописанное:
+[code]
+#pragma comment(lib, "netapi32.lib")
+#pragma comment(lib, "mpr.lib")
+#pragma comment(lib, "ws2_32.lib")
+
+#include <windows.h>
+#include <stdio.h>
+#include <lm.h>
+
+// Максимум ресурсов в container'е
+#define MAX_NET_RESOURCES (1024)
+
+// Рекурсивная функция, которая, собственно, и пишет всю инфу
+int ResFunc(NETRESOURCE *pNr,  // pNr - NETRESOURCE container'а, где смотреть содержимое
+            int sp);  // sp - количество пробелов для отступа
+
+// Удалось ли проинициализировать WinSock
+BOOL bWSA;
+
+// Дни недели
+char *szWeekDays[] = { "Sun", "Mon", "Tue", "Wed", 
+                        "Thu", "Fri", "Sat"};
+// Месяцы
+char *szMonths[] = {"Jan", "Feb", "Mar", "Apr", 
+                    "May", "Jun", "Jul", "Aug", 
+                    "Sep", "Oct", "Nov", "Dec"};
+
+int main()
+{
+     // Для определения IP адресов нужен WinSock
+     // Попытаемся проинициализировать WinSock
+    WORD wVersion = MAKEWORD(1, 1);
+    WSADATA wsaData;
+    DWORD dwRes = WSAStartup(wVersion, &wsaData);
+    bWSA = (dwRes == 0);
+    if(!bWSA)  // Если WinSock не работает, то определение IP будет не доступно :-(
+        printf("WSAStartup() failed with %d, gethostbyname() unavailable\n", dwRes);
+
+     // Начнем сканирование с самого верхнего уровня
+    ResFunc(NULL, 0);
+
+     // Освободим WinSock
+    if(bWSA)
+        WSACleanup();
+
+    return 0;
+}
+
+int ResFunc(NETRESOURCE *pNr, int sp)
+{
+    HANDLE hEnum;
+    DWORD dwRes;
+
+     // Начнем перечисление сетевых ресурсов
+    dwRes = WNetOpenEnum( RESOURCE_GLOBALNET,  // область видимости - вся сеть
+                            RESOURCETYPE_ANY,  // тип ресурсов - диски и принтеры
+                            0,  // тип ресурсов - подключаемые и содержащие
+                            pNr,  // начать с pNr
+                            &hEnum);  // передать хендл в hEnum
+    if(dwRes!=NO_ERROR)  // ошибка
+    {
+        printf("WNetOpenEnum failed with %d\n", dwRes);
+        if(dwRes==ERROR_EXTENDED_ERROR)
+        {
+            DWORD dwError;
+            char szErrorBuff[256], szNameBuff[256];
+
+            WNetGetLastError(&dwError, szErrorBuff, 256, szNameBuff, 256);
+            printf("%s [%d]: %s\n", szNameBuff, dwError, szErrorBuff);
+        }
+
+        return 1;
+    }
+
+    NETRESOURCE NetResource[MAX_NET_RESOURCES];  // буффер для хранения информации про ресурсы
+    DWORD dwCount = 0xFFFFFFFF, dwSize = sizeof(NETRESOURCE)*MAX_NET_RESOURCES;
+
+     // Перечислим ресурсы в текущем container'е
+    dwRes = WNetEnumResource(hEnum,  // хендл на перечисление
+                        &dwCount,  // количество ресурсов
+                        (LPVOID*)&NetResource,  // буффер для хранения информации про ресурсы
+                        &dwSize);
+
+    if(dwRes!=NO_ERROR)  // ошибка
+    {
+        printf("WNetEnumResource failed with %d\n", dwRes);
+        if(dwRes==ERROR_EXTENDED_ERROR)
+        {
+            DWORD dwError;
+            char szErrorBuff[256], szNameBuff[256];
+
+            WNetGetLastError(&dwError, szErrorBuff, 256, szNameBuff, 256);
+            printf("%s [%d]: %s\n", szNameBuff, dwError, szErrorBuff);
+        }
+
+        return 2;
+    }
+
+     // Будем перебирать все ресурсы
+    DWORD dw;
+    for(dw=0; dw < dwCount; dw++)
+    {
+        for(int i=0; i < sp; i++) // Нарисуем отступ
+
+         // Если ресурс - сервер
+        if(NetResource[dw].dwDisplayType == RESOURCEDISPLAYTYPE_SERVER)
+        {
+            char szIP[256];
+            if(bWSA)  // Если WinSock доступен, то определим IP адрес
+            {
+                char szName[256];
+                for(int i=0; NetResource[dw].lpRemoteName[i+1]!='\0'; i++)
+                    szName[i]=NetResource[dw].lpRemoteName[i+2];
+
+                struct hostent *hp = gethostbyname(szName);
+                if(!hp)
+                    strcpy(szIP, "ip=???");
+                else
+                {
+                    DWORD dwIP = ((in_addr*)hp->h_addr_list[0])->S_un.S_addr;
+                
+                    int a = LOBYTE(LOWORD(dwIP));
+                    int b = HIBYTE(LOWORD(dwIP));
+                    int c = LOBYTE(HIWORD(dwIP));
+                    int d = HIBYTE(HIWORD(dwIP));
+
+                    sprintf(szIP, "%d.%d.%d.%d", a, b, c, d);
+                }
+            }
+            else
+                sprintf(szIP, "ip=???");
+
+             // Буфферы для информации в текстовом виде
+            char szOS[256];
+            char szOS_Version[256], szOS_Platform[256], szOS_Soft[256];
+            
+             // Буффер для информации о сервере
+            SERVER_INFO_101 *pSI101;
+            NetApiBufferAllocate(sizeof(SERVER_INFO_101), (LPVOID*)&pSI101);
+            
+            wchar_t wcName[256];
+            mbstowcs(wcName, NetResource[dw].lpRemoteName, 256);
+            
+             // Получим информацию о сервере
+            NET_API_STATUS nasRes;
+            nasRes = NetServerGetInfo( (char*)&wcName, 
+                                        101, 
+                                        (UCHAR**)&pSI101);
+            if(nasRes!=NERR_Success)
+            {
+                printf("NetServerGetInfo failed with %d\n", nasRes);
+                continue;
+            }
+
+             // Версия системы
+            sprintf(szOS_Version, "%d.%d", 
+                pSI101->sv101_version_major & MAJOR_VERSION_MASK, 
+                pSI101->sv101_version_minor);
+
+             // Тип системы
+            switch(pSI101->sv101_platform_id)
+            {
+                case PLATFORM_ID_DOS: strcpy(szOS_Platform, "DOS"); break;
+                case PLATFORM_ID_OS2: strcpy(szOS_Platform, "OS2"); break;
+                case PLATFORM_ID_NT: strcpy(szOS_Platform, "NT"); break;
+                case PLATFORM_ID_OSF: strcpy(szOS_Platform, "OSF"); break;
+                case PLATFORM_ID_VMS: strcpy(szOS_Platform, "VMS"); break;
+                default: strcpy(szOS_Platform, "ost=???");
+            }
+
+             // Сервисы
+            strcpy(szOS_Soft, "");
+            if(pSI101->sv101_type & SV_TYPE_WORKSTATION)     strcat(szOS_Soft, "Wst, ");
+            if(pSI101->sv101_type & SV_TYPE_SERVER)         strcat(szOS_Soft, "Serv, ");
+            if(pSI101->sv101_type & SV_TYPE_SQLSERVER)     strcat(szOS_Soft, "SQL Serv, ");
+            if(pSI101->sv101_type & SV_TYPE_DOMAIN_CTRL)     strcat(szOS_Soft, "PDC, ");
+            if(pSI101->sv101_type & SV_TYPE_DOMAIN_BAKCTRL)     strcat(szOS_Soft, "BDC, ");
+            if(pSI101->sv101_type & SV_TYPE_TIME_SOURCE)     strcat(szOS_Soft, "TimeSource, ");
+            if(pSI101->sv101_type & SV_TYPE_AFP)         strcat(szOS_Soft, "AFP, ");
+            if(pSI101->sv101_type & SV_TYPE_NOVELL)         strcat(szOS_Soft, "Novell Serv, ");
+            if(pSI101->sv101_type & SV_TYPE_DOMAIN_MEMBER)     strcat(szOS_Soft, "Domain Member, ");
+            if(pSI101->sv101_type & SV_TYPE_PRINTQ_SERVER)     strcat(szOS_Soft, "Printer Serv, ");
+            if(pSI101->sv101_type & SV_TYPE_DIALIN_SERVER)     strcat(szOS_Soft, "Dial Serv, ");
+            if(pSI101->sv101_type & SV_TYPE_XENIX_SERVER)     strcat(szOS_Soft, "Unix Serv, ");
+            if(pSI101->sv101_type & SV_TYPE_NT)         strcat(szOS_Soft, "NT Wst/Serv, ");
+            if(pSI101->sv101_type & SV_TYPE_SERVER_NT)     strcat(szOS_Soft, "NT non-DC, ");
+            if(pSI101->sv101_type & SV_TYPE_WFW)         strcat(szOS_Soft, "WFW, ");
+            if(pSI101->sv101_type & SV_TYPE_SERVER_MFPN)     strcat(szOS_Soft, "MFPN, ");
+            if(pSI101->sv101_type & SV_TYPE_SERVER_OSF)     strcat(szOS_Soft, "OSF, ");
+            if(pSI101->sv101_type & SV_TYPE_SERVER_VMS)     strcat(szOS_Soft, "VMS, ");
+            if(pSI101->sv101_type & SV_TYPE_DFS)         strcat(szOS_Soft, "DFS, ");
+            if(pSI101->sv101_type & SV_TYPE_CLUSTER_NT)     strcat(szOS_Soft, "NT Cluster, ");
+            if(pSI101->sv101_type & SV_TYPE_DCE)         strcat(szOS_Soft, "IBM DSS, ");
+            if(pSI101->sv101_type & SV_TYPE_POTENTIAL_BROWSER) strcat(szOS_Soft, "PBR, ");
+            if(pSI101->sv101_type & SV_TYPE_BACKUP_BROWSER)     strcat(szOS_Soft, "BBR, ");
+            if(pSI101->sv101_type & SV_TYPE_MASTER_BROWSER)     strcat(szOS_Soft, "MBR, ");
+            if(pSI101->sv101_type & SV_TYPE_DOMAIN_MASTER)     strcat(szOS_Soft, "Domain master, ");
+            if(pSI101->sv101_type & SV_TYPE_DOMAIN_ENUM)     strcat(szOS_Soft, "Primary domain, ");
+            if(pSI101->sv101_type & SV_TYPE_WINDOWS)        strcat(szOS_Soft, "W95, ");
+
+            szOS_Soft[strlen(szOS_Soft)-2]='\0';
+
+            sprintf(szOS, "%s | %s", szOS_Platform, szOS_Version);
+
+            NetApiBufferFree((LPVOID)pSI101);
+
+             // Буфферы для хранения информации о времени
+            char szTime[256];
+            TIME_OF_DAY_INFO *pTODI = NULL;
+
+             // Получим время на сервере
+            nasRes = NetRemoteTOD(wcName, (LPBYTE*)&pTODI);
+
+            if(nasRes==NERR_Success)
+            {
+                sprintf(szTime, "%02d:%02d:%02d %02d/%s/%02d  ", 
+                    pTODI->tod_hours - pTODI->tod_timezone/60, 
+                    pTODI->tod_mins, pTODI->tod_secs, 
+                    pTODI->tod_day, 
+                    szMonths[pTODI->tod_month-1], 
+                    pTODI->tod_year, 
+                    szWeekDays[pTODI->tod_weekday], 
+                    pTODI->tod_timezone);
+            }
+            else
+                sprintf(szTime, "NetRemoteTOD failed");
+
+            NetApiBufferFree((LPVOID*)pTODI);
+
+             // Напишем то, что удалось узнать
+            DWORD j;
+            
+            printf("%s [%s] [%s]\n", NetResource[dw].lpRemoteName, szIP, szOS);
+
+            for(j=0; j < sp + strlen(NetResource[dw].lpRemoteName) + 1; j++) printf(" ");
+             printf("[%s]\n", szOS_Soft);
+            
+            for(j=0; j < sp + strlen(NetResource[dw].lpRemoteName) + 1; j++) printf(" ");
+             printf("[%s]\n", szTime);
+            
+            for(j=0; j < sp + strlen(NetResource[dw].lpRemoteName) + 1; j++) printf(" ");
+             printf("(%s) is ", NetResource[dw].lpComment);
+        }
+        else
+         printf("%s (%s) is ", NetResource[dw].lpRemoteName, NetResource[dw].lpComment);
+        
+         // Напишем тип ресурса
+        switch(NetResource[dw].dwDisplayType)
+        {
+            case RESOURCEDISPLAYTYPE_GENERIC:     printf("generic, "); break; 
+            case RESOURCEDISPLAYTYPE_DOMAIN:        printf("domain, "); break;
+            case RESOURCEDISPLAYTYPE_SERVER:        printf("server, "); break;
+            case RESOURCEDISPLAYTYPE_SHARE:         printf("share, "); break;
+            case RESOURCEDISPLAYTYPE_FILE:         printf("file, "); break;
+            case RESOURCEDISPLAYTYPE_GROUP:         printf("group, "); break;
+            case RESOURCEDISPLAYTYPE_NETWORK:     printf("network, "); break;
+            case RESOURCEDISPLAYTYPE_ROOT:         printf("root, "); break;
+            case RESOURCEDISPLAYTYPE_SHAREADMIN:     printf("shareadmin, "); break;
+            case RESOURCEDISPLAYTYPE_DIRECTORY:     printf("directory, "); break;
+            case RESOURCEDISPLAYTYPE_TREE:         printf("tree, "); break;
+            case RESOURCEDISPLAYTYPE_NDSCONTAINER:     printf("nds, "); break;
+            default: printf("rdt=???, "); break;
+        }
+
+         // connectable - то, что можно подключить (диск, принтер, ...)
+        if(NetResource[dw].dwUsage & RESOURCEUSAGE_CONNECTABLE)
+            printf("connectable, ");
+
+         // container - то, что содержит connectable :-)
+        if(NetResource[dw].dwUsage & RESOURCEUSAGE_CONTAINER)
+            printf("container, ");
+
+         // Напишем, чем является ресурс
+        switch(NetResource[dw].dwType)
+        {
+            case RESOURCETYPE_ANY:     printf("any"); break;
+            case RESOURCETYPE_DISK:     printf("disk"); break;
+            case RESOURCETYPE_PRINT:    printf("print"); break;
+            case RESOURCETYPE_RESERVED: printf("reserved"); break;
+            case RESOURCETYPE_UNKNOWN: printf("unknown"); break;
+
+            default: printf("rt=???"); break;
+        }
+
+        printf("\n");
+        
+         // Если ресурс является container'ом, то посмотрим, что в нем есть :-)
+        if(NetResource[dw].dwUsage & RESOURCEUSAGE_CONTAINER)
+            ResFunc(&NetResource[dw], sp+1);
+    }
+
+     // Закроем перечисление
+    WNetCloseEnum(hEnum);
+
+    return 0;
+}[/code]

@@ -1,0 +1,84 @@
+§NAME: Как определить, какие файлы и папки есть в директории
+§AUTHOR: SUnteXx
+§EMAIL: SUnteXx@sources.ru
+
+Данный пример выводит содержимое диска "c:", т.е. все его файлы, директории и файлы во всех вложенных папках!
+[code]#include <windows.h>
+#include <stdio.h>
+#include <conio.h>
+
+int i = 1; // наш счетчик количества файлов и папок
+
+char szWriteInFile[MAX_PATH+40]; // переменная, в которой будет храниться строка для записи в файл
+
+void GetFilesInDir(LPSTR lp, HANDLE hFile)
+// Функция, которая производит поиск в папке с именем lp
+{
+	char tmp[MAX_PATH]; // временный массив
+	strcpy(tmp, lp);
+// раз мы хотим вывести все файлы директории, то надо добавить маску "*.*" (без ковычек).
+	strcat(tmp, "\\*.*");
+
+	HANDLE hSearch = 0;
+	WIN32_FIND_DATA wfd;
+	DWORD d = 0;
+
+	
+// если файлы или папки соществуют, то делаем поиск
+	if ((hSearch = FindFirstFile(tmp, &wfd)) == INVALID_HANDLE_VALUE)		
+		return; // в противном случае выходим
+
+	do
+	{
+// в каждой папке есть две папки с именами "." и ".."
+// и эти папки мы не трогаем
+
+// пропускаем папки "." и ".."
+		if (!strncmp(wfd.cFileName, ".", 1) || !strncmp(wfd.cFileName, "..", 2))			
+			continue;
+		
+		sprintf(szWriteInFile, "%6i) %s\\%s\r\n", i, lp, wfd.cFileName); // генерим строку из данных о файле/папке
+		printf(szWriteInFile); // выводим данные о файле/папке
+	
+		WriteFile(hFile, szWriteInFile, strlen(szWriteInFile), &d, 0); // пишем инфу в файл
+
+		if (wfd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) // если мы нашли папку
+		{
+			strcpy(tmp, lp);
+			strcat(tmp, "\\");
+			strcat(tmp, wfd.cFileName);
+			GetFilesInDir(tmp, hFile); // то заходим в нее и делаем поиск в ней
+		}
+
+		i++; // увеличиваем счетчик
+	}
+	while (FindNextFile(hSearch, &wfd)); // ищем следующий файл
+
+	FindClose (hSearch); // заканчиваем поиск
+}
+
+void main(void)
+{
+	char dir[MAX_PATH] = TEXT("c:");
+
+// создаем файл в корне диска "c:" с именем "files.tmp" для записи имен файлов и папок диска	
+	HANDLE hFile = CreateFile((LPCTSTR)"c:\\files.tmp",
+								GENERIC_WRITE,
+								FILE_SHARE_WRITE,
+								NULL,
+								CREATE_ALWAYS,
+								FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN,
+								(HANDLE)NULL);
+
+	if ((!hFile) || (hFile == (void*)0xffffffff)) // если наш файл не создался
+		return; // выходим
+
+	GetFilesInDir(dir, hFile); // начать поиск
+	CloseHandle(hFile); // закрыть файл
+
+	printf("Press any key to continue"); 
+	// нажмите "any key" на вашей клавиатуре для продолжения ;)
+	
+	while (!_getch()); // делать до тех пор, пока юзверь не нажал "any key" :)
+	return; // выход!
+}[/code]

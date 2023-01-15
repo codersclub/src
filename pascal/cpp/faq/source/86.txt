@@ -1,0 +1,73 @@
+§NAME: Диалог создания/выбора нового документа. CNewTypeDlg
+§AUTHOR: Leprecon
+§EMAIL: leprecon@pisem.net
+
+Всем, кто хоть раз создавал в MDI приложении больше одного шаблона документа, известна ситуация, когда при запуске приложения или создания нового документа вылезает стандартный МФСишный диалог "Новый документ". В нем вам предлагается выбрать один из созданных вами шаблонов. По этому шаблону приложение создаст новый документ, фрейм и представление для него. Описан этот диалог в файле "docmgr.cpp" - class CNewTypeDlg : public CDialog и нам он в общем-то недоступен. Вот что необходимо для создания собственного диалога выбора нового документа:
+1. Создать свой класс менеджера документов.[code]class CMyDocManager : public CDocManager
+{
+public:
+	CMyDocManager();
+
+public:
+
+public:
+// Overrides
+	// ClassWizard generated virtual function overrides
+	//{{AFX_VIRTUAL(CMyDocManager)
+	public:
+	virtual void OnFileNew();
+	//}}AFX_VIRTUAL
+
+};[/code]
+2. В нем нам необходима лишь одна виртуальная функция [h5]void CDocManager::OnFileNew();[/h5] Именно в ней вызывается стандартный диалог выбора шаблона для нового документа.
+3. Необходимо создать свой класс диалога выбора [h5]class CMyNewTypeDlg : public CDialog[/h5]
+4. В функции void CMyDocManager::OnFileNew() вызываем свой диалог:[code]void CMyDocManager::OnFileNew()
+{
+	if (m_templateList.IsEmpty())
+	{
+		TRACE0("Error: no document templates registered with CWinApp.\n");
+		AfxMessageBox(AFX_IDP_FAILED_TO_CREATE_DOC);
+		return;
+	}
+
+	// Если всего один зарегистрированный шаблон документа,
+	// то не вызываем диалог выбора, а создаем документ этого типа. 
+	CDocTemplate* pTemplate = (CDocTemplate*)m_templateList.GetHead();
+	if (m_templateList.GetCount() > 1)
+	{
+		// more than one document template to choose from
+		// bring up dialog prompting user
+		CMyNewTypeDlg dlg(&m_templateList);
+		int nID = dlg.DoModal();
+		if (nID == IDOK)
+		{
+			// Берем указатель на выбранный шаблон документа.
+			CDocTemplate* pTemplate = dlg.m_pSelectedTemplate;
+		}
+	}
+
+	// Создаем новый документ по этому шаблону.
+	CDocument* pDoc = pTemplate->OpenDocumentFile(NULL);
+}[/code]
+5. Меняем МФСишный менеджер документов на свой. Создание менеджера происходит в функции [h5]void CWinApp::AddDocTemplate(CDocTemplate* pDocTemplate);[/h5][code]void CMyApp::AddDocTemplate(CDocTemplate* pTemplate)
+{
+	if (m_pDocManager == NULL)
+		m_pDocManager = new CMyDocManager;
+	m_pDocManager->AddDocTemplate(pTemplate);
+}[/code]
+
+[b]Примечание:[/b]
+Если при запуске MDI приложения, новый документ вообще не нужно создавать, то вставьте следующую строчку в функцию InitInstance(), вашего приложения: [code]	...........
+	// Parse command line for standard shell commands, DDE, file open
+	CCommandLineInfo cmdInfo;
+	ParseCommandLine(cmdInfo);
+
+	// Dispatch commands specified on the command line
+	cmdInfo.m_nShellCommand = CCommandLineInfo::FileNothing; // Вот эту строчку!
+	if (!ProcessShellCommand(cmdInfo))
+		return FALSE;
+	.........
+[/code] 
+ 
+Если есть какие-то замечания, предложения или что-то еще, то пишите: 
+[email]leprecon@pisem.net[/email].

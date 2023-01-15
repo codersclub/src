@@ -1,0 +1,60 @@
+§NAME: Как сделать окно прозрачным
+§AUTHOR: Alfa
+§EMAIL: alfa7@pisem.net
+
+Однозначного ответа нет. В Windows 2000 есть отдельная функция: 
+[code]SetWindowLong(hwnd, GWL_EXSTYLE, GetWindowLong(hwnd, GWL_EXSTYLE) | WS_EX_LAYERED); 
+SetLayeredWindowAttributes(hwnd, 0, 100, LWA_ALPHA);//100-уровень прозрачности (максимум 256) [/code]
+где hwnd-хэндл нашего окна 
+
+Однако, Мелкософт не включил эту фишку в Win 9x, так что тут все гораздо хуже: я не видел ни одной проги под Win 9x, которая бы умела становиться полупрозрачной. Можно сделать полностью прозрачное окно, но оно будет "съедать" кучу системных ресурсов. Сделать это можно, например, через CreateEllipticRgn или назначая "маску" диалоговому окну. 
+A: 
+This article shows how you can make your apps transparent using the new functions provided with Win2K.
+If you download the Platform SDK from Microsoft then these functions will be available, but those of you without fast Internet connections this article could be useful.
+This is a mix of stuff I found on the net so if anyone feels that I have stolen something and should get the credit, sorry...
+The functions you want are included in the USER32.DLL in Win2K, but the SDK provides the header files and the source code in libraries. But to use the functions one could just import the functions from the USER32.DLL. So here it goes... 
+
+First some constants must be declared: 
+[code]
+#ifndef WS_EX_LAYERED 
+#define WS_EX_LAYERED     0x00080000 
+#define LWA_COLORKEY 0x00000001 
+#define LWA_ALPHA     0x00000002 
+#endif // ndef WS_EX_LAYERED 
+[/code]
+
+Then some declarations in the header-file: 
+// Preparation for the function we want to import from USER32.DLL 
+typedef BOOL (WINAPI *lpfnSetLayeredWindowAttributes)(HWND hWnd, COLORREF crKey, BYTE bAlpha, DWORD dwFlags); 
+
+lpfnSetLayeredWindowAttributes m_pSetLayeredWindowAttributes 
+That is all for the header file, now to the implementation! 
+[code]// Here we import the function from USER32.DLL 
+HMODULE hUser32 = GetModuleHandle(_T("USER32.DLL")); 
+m_pSetLayeredWindowAttributes = (lpfnSetLayeredWindowAttributes)GetProcAddress(hUser32, "SetLayeredWindowAttributes"); 
+
+// If the import did not succeed, make sure your app can handle it! 
+if (NULL == m_pSetLayeredWindowAttributes) 
+return FALSE; //Bail out!!! [/code]
+
+If the function was imported correctly we must set the dialog we want to make transparent into "transparent-mode". E.G. Set the style for the dialog so that it can be transparent, and that is done with the flag WS_EX_LAYERED defined earlier. 
+[code]
+// Check the current state of the dialog, and then add the WS_EX_LAYERED attribute 
+SetWindowLong(m_hWnd, GWL_EXSTYLE, GetWindowLong(m_hWnd, GWL_EXSTYLE) | WS_EX_LAYERED);[/code]
+Now when that is done its time to describe the function we imported, and to tell you the truth I'm not 100% sure about all of the parameters... 
+hwnd [in] Handle to the layered window. 
+
+crKey [in] Pointer to a COLORREF value that specifies the transparency color key to be used. (When making a certain color transparent...) 
+
+bAlpha [in] Alpha value used to describe the opacity of the layered window. 0 = Invisible, 255 = Fully visible 
+
+dwFlags [in] Specifies an action to take. This parameter can be LWA_COLORKEY (When making a certain color transparent...) or LWA_ALPHA. 
+[code]// Sets the window to 70% visibility. 
+m_pSetLayeredWindowAttributes(m_hWnd, 0, (255 / 70) * 100, LWA_ALPHA); [/code]
+
+One thing you must make sure of is to disable this function if the app is running under any OS other then Win2K. And there is probably some very easy way to do that, but here is how I did it: 
+[code]OSVERSIONINFO os = { sizeof(os) }; 
+GetVersionEx(&os); 
+// use m_bWin2k before any call to the m_pSetLayeredWindowAttributes to make sure we are runninng Win2K 
+BOOL m_bWin2K = ( VER_PLATFORM_WIN32_NT == os.dwPlatformId && os.dwMajorVersion >= 5 ); [/code]
+That's about it!

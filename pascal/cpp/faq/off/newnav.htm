@@ -1,0 +1,328 @@
+<html>
+<head>
+<title>Why Do Certain Win32 Technologies Misbehave in Windows NT Services?--MSJ, March 1998</title>
+
+<meta name="description" content="A service is a background Win32 process with special requirements. It requires a unique entry point and a callback function. The callback function is referred to as 
+the service control handler. The new entry point is usually called ServiceMain, but you can name it anything you want.">
+<meta name="ms.locale" content="EN-US">
+<meta HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso8859-1">
+</head>
+<body bgcolor="ffffff" background="msjwater.gif" link="000080" vlink="800000">
+<!--TOOLBAR_START-->
+
+<!--TOOLBAR_EXEMPT-->
+
+<!--TOOLBAR_END-->
+
+<center><font size="3" color="ff0080" face="verdana, arial, helv"><b><a href="http://www.microsoft.com/msj/0398/inthisissuefeatures0398.htm" TARGET="_parent">March  1998</b></a></font></center><p>
+<center><a href="http://www.microsoft.com/msj/default.asp" target="_top"><img border="0" src="msjheade.gif" width="399" height="33" alt="Microsoft Systems Journal Homepage"></a></center>
+<hr color="000080" width="300">
+
+
+<center>
+<table width="100%">
+<tr><td>
+<center>
+<font size="5" face="verdana, arial, helvetica" color="000080"><b>Why Do Certain Win32 Technologies Misbehave in Windows NT Services?</b></font></center> 
+ <p></td></tr></table>
+</center>
+<center>Frank Kim</center><p>
+<center>
+<table width="300"><tr><td><font size="2" color="cc6699" face="verdana, arial, helvetica"><b><center>A service is a background Win32 process with special requirements. It requires a unique entry point and a callback function. The callback function is referred to as 
+the service control handler. The new entry point is usually called ServiceMain, but you can name it anything you want.</center></b></font></td></tr></table></center>
+<p>
+
+<center>
+<table border="0" width="100%" bgcolor="cccccc"><tr><td align="center">
+<font size="1" face="verdana, arial, helv" color="000000"><b>This article assumes you&#146;re familiar with Win32</b></font></td></tr></table></center>
+<p>
+<!--------<center><font size=2>Code for this article: <a href="/msj/0398/code/ccccccc.exe">services.exe</a> (52KB)</font></center>--------->
+<center>
+<table border="0" width="100%"><tr><td>
+<center><font size="2"><i>
+ Frank Kim is a support engineer for Microsoft specializing in Kernel/Base technologies. He enjoys spending his free time playing the stock market. He can be reached at <a >franki@microsoft.com</a>.</i></font></center><p>
+</font></td></tr></table></center><p>
+<center>
+<table width="100%"><tr><td>
+<font SIZE="4" face="verdana, arial, helv" color="770000"><b>Four years ago</b></font>
+<font size="2">  I was introduced to Windows NT</font><font size="1">®</font><font size="2"> services. Like many other programmers, I found them both interesting and bizarre. Unlike a Windows</font><font size="1">®</font><font size="2">-based application, services usually do not have any direct user interaction. Developers often tell me that some piece of code works from their Windows-based application but not from their service. The major problem is a lack of understanding in the &quot;environmental&quot; differences. The service's &quot;environment&quot; or outlook is very different from the &quot;environment&quot; a Windows-based or console application launched by the user encounters. What I mean by &quot;environment&quot; refers not only to the environment variables for the process; you also have to include window stations and desktops, registry hives, and loads of security. 
+<br><img src="indent00.gif" width="10" height="4">Many Win32</font><font size="1">®</font><font size="2"> technologies, such as MFC, ODBC and MAPI, can behave differently in a service, owing to the differences in the service's &quot;environment.&quot; Let's explore why these different technologies appear to misbehave in a service. 
+<br><img src="indent00.gif" width="10" height="4">Before I explain the &quot;environmental&quot; differences, let's go over what a service is, exactly. A service is a background Win32 process with special requirements. It requires a unique entry point and a callback function. The callback function is referred to as the service control handler. The new entry point is usually called ServiceMain, but you can name it anything you want through the LPSERVICE_
+MAIN_FUNCTION member in the SERVICE_TABLE_
+ENTRY structure. 
+</font></td></tr></table></center><center><table width="100%"><tr><td><pre><font size="1">
+ typedef struct _SERVICE_TABLE_ENTRY { // ste 
+      LPTSTR lpServiceName; 
+      LPSERVICE_MAIN_FUNCTION lpServiceProc; 
+  } SERVICE_TABLE_ENTRY,      
+ *LPSERVICE_TABLE_ENTRY; </font></pre></td></tr></table></center><center><table width="100%"><tr><td><font size="2"><img src="indent00.gif" width="10" height="4">The service is manipulated (installed, started, stopped, and configured) through a subset of the Win32 API. You can pass a server name to manipulate services remotely over a network. A service can be configured to run in either a specific user account or the LocalSystem account (see <b>Figure 1</b>). Either account is referred to as the service account. A service can be configured to start running when the system is first booted or at the discretion of a user with the proper security. 
+</font></td></tr>
+ </table>
+</font></td></tr></table></center>
+<center><table width="301"><tr><td>
+<img src="servicef.gif" width="300" height="348" alt="Figure&nbsp;1&nbsp;Configuring&nbsp;a&nbsp;Service"></td></tr>
+<tr><td><img src="indent00.gif" width="10" height="4"><font size="1" face="verdana, arial, helv"><b>Figure&nbsp;1&nbsp;Configuring&nbsp;a&nbsp;Service</b></font></td></tr></table></center>
+
+<center>
+<table width="100%">
+<tr>
+<td>
+<p>
+<font size="2">
+<br><img src="indent00.gif" width="10" height="4">Since a service is a background process, it can continue to run when there are no interactively logged-on users. Services are usually not directly manipulated by the interactive user. (I'll go over some of the exceptions later.) They are intended to be background processes processing data or offering services on a Windows NT server locked in a closet somewhere. This means that a service should not display dialog boxes to prompt users for input. It should not display information on the system tray. It shouldn't send messages to a user-launched application. 
+<br><img src="indent00.gif" width="10" height="4">Another feature of services is the ability for many services to share the same process. If you look at the configuration information for all the services on your system, you'll notice that many of the services originate from the same process, services.exe: 
+<blockquote>Alerter
+<br>Computer Browser
+<br>DHCP Client
+<br>Eventlog
+<br>Server
+<br>Workstation
+<br>TCP/IP NetBios Helper
+<br>Messenger
+<br>NT LM Security Support Provider
+<br>Plug And Play
+</blockquote>
+<img src="indent00.gif" width="10" height="4">For further information, please refer to the Platform SDK documentation and &quot;<a href="http://www.microsoft.com/msj/1097/winnt.htm">Design a Windows NT service to Exploit Special Operating System Facilities</a>,&quot; by Jeffrey Richter (<i>MSJ</i>, October 1997).
+<br><img src="indent00.gif" width="10" height="4">I'd like to emphasize that a process launched from a service using the CreateProcess API is not a service itself and should not be referred to as a service. It is definitely a background process running in the same &quot;environment&quot; as the service&#151;but that's it. The documentation of the Windows NT Resource Kit misleads users into thinking that using the Srvany utility will magically turn their application into a service. This is not true. The utility just launches your application via a CreateProcess API 
+call. This is very similar to the AT command available on Windows NT. But even though your app launched via CreateProcess is technically not a service, it is still running in the same &quot;environment,&quot; so many of my comments will also apply to it.
+<br><img src="indent00.gif" width="10" height="4">In this article, I will describe the environmental differences between a service and a process launched by the interactive user. I define the interactive user as somebody who logs onto a Windows NT machine via the Ctrl+Alt+
+Delete secured key combination dialog box (see <b>Figure 2</b>).
+</font></td></tr>
+ </table>
+</font></td></tr></table></center>
+<center><table width="301"><tr><td>
+<img src="serviceg.gif" width="300" height="169" alt="Figure 2&nbsp;Logon Dialog"></td></tr>
+<tr><td><img src="indent00.gif" width="10" height="4"><font size="1" face="verdana, arial, helv"><b>Figure 2&nbsp;Logon Dialog</b></font></td></tr></table></center>
+
+<center>
+<table width="100%">
+<tr>
+<td>
+<p>
+<font size="2">
+<br><img src="indent00.gif" width="10" height="4">I wanted to make this very clear since you can technically have other processes running in different security contexts that can be considered interactive. In addition to the differences, I will point out some items you should consider when designing a service and the solutions to the problems caused by the environmental differences.
+</font><p>
+<center><font size="4" color="000080" face="verdana, arial, helvetica"><b> Windows NT Security</b></font></center>
+
+<font size="2">
+<br><img src="indent00.gif" width="10" height="4">Before I begin discussing the environmental security differences, let me briefly explain Windows NT security. One of the requirements of C2 level security is the ability to control access to a secured resource. This is done by granting or denying access to one or more users or groups to a particular securable object. Windows NT accomplishes this through two basic components, the access token and the security descriptor. When a user first logs on, a username and password is given to the system. If this information is correct, the system assigns an access token to all processes associated with the user. The access token contains information on the user's ID (known as the security identifier or SID), the user's group memberships, and the list of privileges granted to the user. The system uses the access token as an identification badge. 
+<br><img src="indent00.gif" width="10" height="4">The security descriptor, on the other hand, is associated with a securable object. It indicates who owns the object and defines what kind of access control a user or group may have to the object. This is known as the discretionary access control list (DACL). The DACL contains a list of access-control entries (ACE). Each ACE describes a user or group 
+based on its SID (also known as trustees) and what kind of access can be granted or denied to the 
+securable object. 
+<br><img src="indent00.gif" width="10" height="4">The system uses these two components to determine whether a handle to access the securable object should be returned to the user. It does so by walking the list of ACEs in the security descriptor of the object. The system will check every ACE to see if the user is granted the specified access to the object. If none of the ACEs grant the user the access requested, the system does not return a handle for the object. If the DACL contains an ACE denying access to the user, the search immediately ends and no handle is returned to the user. If the DACL does not contain any ACEs, all users are denied access to the object. If the security descriptor does not contain a DACL, all users are granted access to the object (see <b>Figure 3</b>). This is better known as a NULL DACL.
+</font></td></tr>
+ </table>
+</font></td></tr></table></center>
+<center><table width="301"><tr><td>
+<img src="serviceh.gif" width="300" height="253" alt="Figure 3&nbsp; Security Components"></td></tr>
+<tr><td><img src="indent00.gif" width="10" height="4"><font size="1" face="verdana, arial, helv"><b>Figure 3&nbsp; Security Components</b></font></td></tr></table></center>
+
+<center>
+<table width="100%">
+<tr>
+<td>
+<p>
+<font size="2">
+<br><img src="indent00.gif" width="10" height="4">Windows NT Security is, of course, the first major environmental difference a developer will encounter with a service. Multitudes of Win32 APIs contain the SECURITY_
+ATTRIBUTES parameter, such as CreateDesktop, CreateDirectory, CreateDirectoryEx, CreateEvent, CreateFile, CreateFileMapping, and CreateMailSlot.
+</font></td></tr></table></center><center><table width="100%"><tr><td><pre><font size="1">
+ typedef struct _SECURITY_ATTRIBUTES { // sa 
+      DWORD nLength; 
+      LPVOID lpSecurityDescriptor; 
+      BOOL bInheritHandle; 
+ } SECURITY_ATTRIBUTES; </font></pre></td></tr></table></center><center><table width="100%"><tr><td><font size="2">
+For most developers, passing NULL for this parameter 
+is sufficient. This is fine as long as all processes manipulating the securable object are running in the same 
+security context. 
+<br><img src="indent00.gif" width="10" height="4">In a Windows NT service, this technique may or may not work. Service accounts allow a service to run as a different user. If you have ever looked at the services installed on a Windows NT machine, you know that a majority of them are configured for the System account, also known as the LocalSystem account. The System account is a special account known only locally to your machine. This means that this account cannot be used to access network resources relying on NT LAN Manager (NTLM) authentication. These resources include file shares, named pipes, the registry, and access to a remote computer's eventlog or Service Control Manager. Why isn't this possible? 
+<br><img src="indent00.gif" width="10" height="4">NTLM authentication is based on encrypted credentials containing a username and password. If the operating system encounters a user without any credentials, the user is regarded as having NULL credentials. When the system attempts to access a secured network resource based on NULL credentials, this is referred to as a NULL session. Access is only allowed if the remote machine allows NULL session access. This is configurable through the registry. (See Knowledge Base article Q122702 for more information.) The only other workaround would be to impersonate a user with valid credentials or use a service account that has access to the secured network resource. Winsock and NetBIOS are not secured NTLM resources, so they don't run into the above security restriction. 
+<br><img src="indent00.gif" width="10" height="4">This seems likes a major problem. So why are so many services configured to use the LocalSystem account? The LocalSystem account is granted all privileges available on the operating system. Privileges allow a user to manipulate various system resources, such as changing the system time, interactively logging on, and shutting down from a remote system (see <b>Figure 4</b>). 
+</font></td></tr>
+ </table>
+</font></td></tr></table></center>
+<center><table width="318"><tr><td>
+<img src="servicei.gif" width="400" height="317" alt="Figure 4&nbsp;User Manager Granting Privileges"></td></tr>
+<tr><td><img src="indent00.gif" width="10" height="4"><font size="1" face="verdana, arial, helv"><b>Figure 4&nbsp;User Manager Granting Privileges</b></font></td></tr></table></center>
+
+<center>
+<table width="100%">
+<tr>
+<td>
+<p>
+<font size="2">
+<br><img src="indent00.gif" width="10" height="4">Privileges are granted relative to the local machine. This means that a domain account must be granted the privilege on the local machine itself and not on the domain controller. For example, if the user Fester belonging to the Redmond domain logs on to machine A and B, each machine would be required to grant Redmond\Fester the privilege &quot;log on locally&quot; for Fester to interactively log on to both machines. One confusing aspect of privileges is that they have an associated attribute indicating whether they are enabled or disabled. Some Win32 APIs require the user to have the privilege and have the privilege enabled to successfully use an API. You can consider enabling a privilege as a safety switch. For example, the LogonUser API requires &quot;Act as part of the operating system.&quot; The programmer does not need to enable this privilege. This API enables it for you. 
+<br><img src="indent00.gif" width="10" height="4">On the other hand, the &quot;Backup files and directories&quot; privilege needs to be enabled to obtain a file handle a user doesn't have any access to. (Please refer to Knowledge Base article Q106383 for more information.) APIs vary on which privileges they require and whether the privileges need 
+to be enabled; see the Platform SDK documentation for more information.
+<br><img src="indent00.gif" width="10" height="4">What about a user who belongs to the local administrators group? Won't the user account have access to securable network resources and be granted all available privileges? It turns out that the administrator group is not granted all privileges. You can verify this through User Manager. (Make sure to check Show Advanced User Rights.) This makes the LocalSystem account very attractive. You don't have to worry about whether the service account has the necessary privileges. You can assume it has all of them. 
+<br><img src="indent00.gif" width="10" height="4">If you decide to use a non-LocalSystem service account, you can grant privileges to a user via two methods. The user attempting to grant privileges to another user must belong to either the local administrators group or be the LocalSystem account. The first method is to grant the privilege manually via the User Manager application. The programmatic method requires you to write a lot of code using the Local Security Authority (LSA) API. (Knowledge Base article Q132958 has the details for this.)
+<br><img src="indent00.gif" width="10" height="4">Many programmers assume that if two accounts have 
+the same privileges, they have the same security access. This is incorrect. While some objects will allow a user access based solely on the privileges the user has in their token, other objects will permit access based on the account name of the user and/or groups that are in that user's token, regardless of privileges. Note that privileges associated with a user are not changed dynamically. The privileges associated with an access token are only generated when the token is created. This means if the privileges are being changed, the user needs to log off and back on to receive the newly granted privilege.
+<br><img src="indent00.gif" width="10" height="4">Another reason to consider using the LocalSystem account for your service is that you'll have full access control to all objects in a Windows NT system which were created via the default DACL mechanism. This mechanism is used by the operating system to apply a DACL to a securable object when no DACL is defined. As a programmer, you use the default DACL mechanism all the time. Many of the Win32 APIs contain a SECURITY_ATTRIBUTES structure. This structure contains security and inheritance information for the securable object. In most cases, programs ignore this parameter and a NULL is passed to it. By specifying a NULL, you are instructing the operating 
+system to create a DACL for the securable object. The system creates the DACL for the object based on the default DACL information located in the user's access token. <a name="fig5" href="http://www.microsoft.com/msj/0398/servicetextfigs.htm#fig5"><b>Figure 5</b></a> lists the default DACLs for different users on a Windows NT machine.
+<br><img src="indent00.gif" width="10" height="4">GENERIC access is used by the operating system to map specific access rights pertaining to a securable object. For example, GENERIC_READ for a file is actually mapped to FILE_GENERIC_READ; while for a service object, GENERIC_READ is mapped to the following access rights: STANDARD_RIGHTS_READ, SERVICE_QUERY_
+CONFIG, SERVICE_QUERY_STATUS, SERVICE_
+ENUMERATE_DEPENDENT, SERVICE_INTERROGATE. Although there are no APIs for determining what specific access rights pertain to a GENERIC mapping for a securable object, you can create your own generic masks through the MapGenericMask API. If you are wondering whether the default DACL for a user's process token can be changed, the answer is yes. You can customize the default DACL such that when NULL is passed for the SECURITY_
+ATTRIBUTES parameter, a predetermined DACL is created for any securable object from a given user.
+<br><img src="indent00.gif" width="10" height="4">Now why have I spent a lot of time explaining this to you? The first problem a service developer will encounter is the Access Denied error. Let's say you want to share some memory between your service and a client application launched by the interactive user. As you have always done for the SECURITY_ATTRIBUTES parameter, you pass a NULL in for CreateFileMapping. You write the service, and then you write the client application, which uses OpenFileMapping to obtain a handle with full access to the named memory mapped file. The first time you test the applications, the client application fails with error code 5 (&quot;Access denied&quot;) when calling OpenFileMapping. The reason it failed is because of the default DACL mechanism used to create the DACL for the memory mapped file. As I explained, the DACL for the memory mapped file gives GENERIC_ALL access to the LocalSystem account but only GENERIC_
+READ and GENERIC_EXECUTE access to the local Administrators Group. If the user who launches the client application does not belong to the local Administrators Group, the client process will not have full access to the memory mapped file, which is fine unless the client application needs to write to the memory mapped file. The problem above only occurs when you start sharing named objects between processes running in different security contexts. This was never an issue when all processes were running in the same security context, but it can be with services, since they can be configured to run in a different security context.
+<br><img src="indent00.gif" width="10" height="4">There are several ways to resolve this problem. The easiest method is applying a NULL DACL to the object, if securing the object isn't a concern. As I stated earlier, a NULL DACL gives every user and group full access to the object. (Knowledge Base article Q106387 will help you out here.) If access control to the object is a concern, the best method is to create an ACE granting the specific access control for the trustee. This new ACE would be applied to the DACL for the securable object. One last method would be to modify the default DACL for the process's access token. With this method, you can still pass NULL for the security attributes parameter and let the system create 
+the DACL for you. The only difference is that you are controlling the DACL that will be created for your objects. This means you won't have to keep passing in your customized SECURITY_ATTRIBUTES to every object 
+you create.
+</font><p>
+<center><font size="4" color="000080" face="verdana, arial, helvetica"><b> Window Stations and Desktops </b></font></center>
+
+<font size="2">
+<br><img src="indent00.gif" width="10" height="4">Window stations and desktops are probably the most difficult aspect of Windows NT services. Most programmers do not directly encounter either of these objects, although users come across them all the time. Both the window station and desktop objects are securable just like other Windows NT objects such as events, mutexes, and semaphores. A window station object contains a clipboard, a set of global atoms, and zero or more desktop objects. A window station can be either visible or nonvisible. A visible window station receives user input that could originate from either the mouse or the keyboard. A display device is also associated with it so that information can be displayed to the interactive user (see <b>Figure 6</b>).
+</font></td></tr>
+ </table>
+</font></td></tr></table></center>
+<center><table width="250"><tr><td>
+<img src="servicej.gif" width="250" height="266" alt="Figure 6 Window Station and Desktops"></td></tr>
+<tr><td><img src="indent00.gif" width="10" height="4"><font size="1" face="verdana, arial, helv"><b>Figure 6 Window Station and Desktops</b></font></td></tr></table></center>
+
+<center>
+<table width="100%">
+<tr>
+<td>
+<p>
+<font size="2">
+<br><img src="indent00.gif" width="10" height="4">On Windows NT 4.0, only one window station can be visible, WinSta0. The visible window station is also defined as interactive. A nonvisible window station is noninteractive. A nonvisible window station does not receive any user input and no display device is associated with it. 
+<br><img src="indent00.gif" width="10" height="4">As stated earlier, desktops are contained within window station objects, just as a directory contains files. A desktop object contains a logical display surface and includes windows, menus, and hooks. Only desktops belonging to the visible window station can be seen and receive user input and only one desktop can be seen and receive input at a time. This desktop is known as the active desktop. 
+<br><img src="indent00.gif" width="10" height="4">As the interactive user you come across three different desktops at one time or another: Default, Winlogon, and Screen-saver. The Winlogon desktop contains the logon dialog box that appears when pressing the Ctrl+Alt+Delete key combination. The Default desktop contains Explorer or your specified shell and all processes launched by the interactive user. This is better known as the interactive or application desktop. The final desktop is Screen-saver, which displays your screen saver. You may have noticed that the operating system can switch between desktops. When a user presses Ctrl+Alt+Delete, the operating system switches from the Default to the Winlogon desktop. When you hit Cancel in the logon dialog box, the system switches back to the Default desktop. Sometimes I'm asked whether everything on the other desktop is destroyed when you switch; the answer is no. You don't see the other desktop but it is still there. 
+<br><img src="indent00.gif" width="10" height="4">All processes in the system are associated with a window station and desktop. When a user first logs on, the interactive window station, WinSta0, and the Default desktop are associated with the shell process for the user. This allows the user to see the shell. If this wasn't the case, the user couldn't see anything. After this, all processes launched by the shell will also be associated with WinSta0 and Default (see <b>Figure 7</b>).
+</font></td></tr>
+ </table>
+</font></td></tr></table></center>
+<center><table width="420"><tr><td>
+<img src="servicek.gif" width="420" height="144" alt="Figure 7&nbsp; Interactive Processes versus Services"></td></tr>
+<tr><td><img src="indent00.gif" width="10" height="4"><font size="1" face="verdana, arial, helv"><b>Figure 7&nbsp; Interactive Processes versus Services</b></font></td></tr></table></center>
+
+<center>
+<table width="100%">
+<tr>
+<td>
+<p>
+<font size="2">
+<br><img src="indent00.gif" width="10" height="4">You can also specify which window station and desktop you want your process to be associated with through the lpDesktop member of the STARTUPINFO structure (see <a name="fig8" href="http://www.microsoft.com/msj/0398/servicetextfigs.htm#fig8"><b>Figure 8</b></a>). This structure is passed to CreateProcess and CreateProcessAsUser. You can initialize lpDesktop to NULL, which instructs CreateProcess to use the same window station and desktop that the calling process uses. You can specify your own window station and desktop combination such as &quot;WinSta0\Default,&quot; or you can pass in an empty string. This instructs the operating system to create a new nonvisible window station and desktop for the launched process. The security associated with the new objects grants the Everyone group full access to both objects. 
+<br><img src="indent00.gif" width="10" height="4">Window stations and desktops are securable objects. 
+The process associated with the window station and desktop must have proper access to these objects. If the process doesn't have access, you'll see one of two messages, &quot;User32.dll initialization failure&quot; or &quot;Kernel32.dll initialization failure.&quot; The exit code returned by the process will be 128 or ERROR_NO_WAIT_CHILDREN. What do I mean by proper access? Say you have an object such as a file. You can create a DACL for a file allowing the user foo read access to a file. Window station and desktops work in the same way. 
+<br><img src="indent00.gif" width="10" height="4">One of the access rights for a desktop object is DESKTOP_CREATEWINDOW. If the user is not granted this access right, any processes launched by this user will not be able to create a window. Unfortunately, USER APIs such as CreateWindow do not return an &quot;Access Denied&quot; message when security is a problem as CreateFile or CreateMutex do. The Windows application will die in User32.dll, causing the DLL initialization error message. Kernel32.dll initialization occurs when creating a console window. One example is launching cmd.exe when it doesn't have proper access to the window station and desktop object. Unfortunately, CreateProcess doesn't have any mechanism to check for this error. It doesn't return an error if the user doesn't have the proper access control to the window station and desktop. CreateProcess will launch the application and the application itself will die when the DLL fails. 
+<br><img src="indent00.gif" width="10" height="4">There is one other way for a programmer to come across the &quot;User32.dll initialization failure&quot; message. The system has a heap to allocate memory for window station objects. This memory is limited. The default settings allow the creation of seven or eight window station objects. If you run out of memory, you'll get this message. Fortunately, there is a registry key to increase this setting. (Please refer to Knowledge Base article Q142676 for more information.)
+<br><img src="indent00.gif" width="10" height="4">Window stations and desktops aren't really issues if you're not developing a service. Your application will just be associated with the interactive desktop, WinSta0\Default. If you are developing a service, it can be associated with one of the following window station and desktop combinations:
+<ul><li>
+	WinSta0\Default</li><br>
+	<li>Service-0x0-3e7$\Default</li><br>
+
+	<li><i>Service Account's Logon SID</i>\Default</li></ul>
+
+<img src="indent00.gif" width="10" height="4">WinSta0\Default is associated with a service running in the LocalSystem account and is interacting with the desktop. (The SERVICE_INTERACTIVE_PROCESS flag must be included for the ServiceType.) If the service is not interacting with the desktop, it is associated with Service-0x0-3e7$\Default. This is a nonvisible window station. If you are wondering what the heck 0x0-3e7$ is, it's the logon SID for the service. The logon SID is unique for this particular logon session. It refers to a group that the user belongs to. All users on a system will have a logon SID. The final choice above is a nonvisible window station for the service based upon the service account's logon SID. 
+<br><img src="indent00.gif" width="10" height="4">One interesting thing to note is even though you may have two services configured for the same service account, each will have a unique window station and desktopOne interesting thing to note is even though you may have two services configured for the same service account, each will have a unique window station and desktop since their logon SIDs are different. The user SID is the same but each will have a unique logon session since each were run in a separate service account logon session. This is not the case for interactive and noninteractive LocalSystem services since they are either associated with WinSta0 or Service-0x0-3e7$.
+<br><img src="indent00.gif" width="10" height="4">Now why is it so important to know which window stations and desktops are associated with a service? The first problem is interactivity. If your service is not associated with WinSta0\Default, it will not be able to display any USER objects to the user by default. This means you cannot display a window or obtain user input. You can display a MessageBox for a noninteractive service. The key flag types are MB_SERVICE_NOTIFICATION and MB_
+DEFAULT_DESKTOP. (Please refer to the Platform SDK docs for more information.) In addition, you can't install a window hook or even send messages. These two actions are relative to the desktop your process is associated with. You cannot do these two things without reassigning the process with the correct window station and desktop. This means that window hooks and messages cannot go across desktops. 
+<br><img src="indent00.gif" width="10" height="4">The other two window station and desktop combinations based upon the service account's logon SID are nonvisible. As I just mentioned, processes associated with a nonvisible window station will never be able to display or receive input from the interactive user (except for the MessageBox using the two special flags). You can still create USER objects&#151;but the user will never see them. One mistake a lot of service developers make is displaying a dialog box prompting a user for some information. When the service is tested, the developer will notice that the service is hanging. The hang is caused by the fact that the service is associated with a nonvisible window station. The operating system has successfully created the dialog box. The problem is that the user can't see it. 
+<br><img src="indent00.gif" width="10" height="4">So how do you get your service to display and obtain information from the user? Write a client application for the user to launch. The client application would display and obtain information from the user and then use some sort of interprocess communication to send the information back to the service. The great thing about this is you don't have to worry about window stations and desktops. A drawback is that this requires the user to do something to start your client application. 
+<br><img src="indent00.gif" width="10" height="4">The other method requires you to configure your service for the LocalSystem account specifying the service type 
+as SERVICE_INTERACTIVE_PROCESS. This would associate your service with the correct window station and desktop. The only problem is that the service would not have any network access through NTLM security. This can be resolved in one of two ways. NULL session access can be regulated on the server side via the registry. If the service developer has proper security access to the server, the registry keys can be changed to allow access for a LocalSystem process. 
+<br><img src="indent00.gif" width="10" height="4">Another way to do this would be to impersonate a user who has access to the NTLM secured network resource. The only problem is the service must know the user's password to generate the user's token via the LogonUser API. Why can't a user configure the service for a service account and then just reassign the service with the interactive window station and desktop? The problem is security. The only users with full access to the interactive window station and desktop are the LocalSystem account and the interactive user if there is one. The reason I mention full access is because users, who belong to the local Administrators Group have partial access to the interactive window station and desktop. Certain USER API calls may or may not work based on the security.
+<br><img src="indent00.gif" width="10" height="4">The best bet is to work with full access using the local administrators account at your own risk. The access allowed ace for the interactive user is based on the group logon SID and not the individual user's SID. This means you may have a service configured for the same account as the interactive user but the group logon SIDs will be different. The only way to allow a service configured for a service account to access the interactive window station and desktop would be for the interactive user to modify the security to allow the service access or have another process running in LocalSystem account do it. (See Knowledge Base article Q165194 for more information.)
+<br><img src="indent00.gif" width="10" height="4">Now that you have a service configured for the interactive window station and desktop, what are some of the gotchas you can run into? The first consideration is what happens when the user logs out. If a service is interactive, does that mean the Default desktop is destroyed? No. The Default desktop is still there. The only difference is that the Winlogon desktop is now the active desktop. When the next user logs on to the machine, the system will switch back to the Default desktop. Anything displayed by the user will be seen by the interactive user. 
+<br><img src="indent00.gif" width="10" height="4">One difference between an interactive service and a process launched by the interactive user is, of course, that a service can run when nobody is logged on. This leads to some interesting problems. For example, for security reasons the operating system clears the global atom table when the interactive user logs out. If an interactive service relies on information stored in the global atom table, the information will disappear when the interactive user logs off. Another example is an auto-started interactive service. The Default desktop is not created until the first interactive user logs on. This means that an interactive service attempting to display information before the user logs on will run into problems. 
+<br><img src="indent00.gif" width="10" height="4">One last thing I want to discuss is that an interactive service is exposed to interactive users, who can kill the service via the Task Manager if the service has a top-level window. If you have a service running in the LocalSystem account, the interactive user doesn't have the necessary security to kill your process. Say you go into Task Manager and tab to the list of processes. If you hit the End Process button for a process running in the LocalSystem account, you'll get an &quot;Access is denied&quot; message box as expected. But if this service has a top- level window, you can tab to the list of applications in Task Manager. If you hit the End Task button, you can kill the service through this exposed window. One way to avoid this is to prevent your window from appearing in the applications tab. Create a hidden window; then make the visible window a child of this hidden window. 
+<br><img src="indent00.gif" width="10" height="4">Remember, make you service interactive only as a last resort. The best option would be to create an interactive client application. 
+</font><p>
+<center><font size="4" color="000080" face="verdana, arial, helvetica"><b> Registry Hives </b></font></center>
+
+<font size="2">
+<br><img src="indent00.gif" width="10" height="4">Hives are used by the operating system to store user-specific registry information. Information stored in the registry includes desktop, application, printing, and network settings. The system backs up the user-specific registry information in a file known as the hive. Every user on Windows NT is assigned a hive. This hive can be located either locally or on a remote server (roaming hives). When a user logs on to a Windows NT machine, the system loads the user's hive into the registry. The hive is loaded under the HKEY_USERS key. The registry key name representing the hive is based upon the user's SID. If you examine the registry keys under HKEY_USERS through regedt32.exe or regedit.exe, you will see at least two subkeys, .DEFAULT and a long string beginning with S-1-blah blah blah. This is the user's SID. If you've ever wondered what HKEY_CURRENT_USER represents, it basically is a mapping of HKEY_
+USERS\user's SID. You can verify this with regedt32.exe or regedit.exe (see <b>Figure 9</b>).
+</font></td></tr>
+ </table>
+</font></td></tr></table></center>
+<center><table width="351"><tr><td>
+<img src="servicel.gif" width="350" height="159" alt="Figure 9&nbsp;Regedt32.exe"></td></tr>
+<tr><td><img src="indent00.gif" width="10" height="4"><font size="1" face="verdana, arial, helv"><b>Figure 9&nbsp;Regedt32.exe</b></font></td></tr></table></center>
+
+<center>
+<table width="100%">
+<tr>
+<td>
+<p>
+<font size="2">
+<br><img src="indent00.gif" width="10" height="4">The subkeys for HKEY_USER\user's SID and HKEY_
+CURRENT_USER will be exactly the same. When an application refers to HKEY_CURRENT_USER, the system maps the user to the correct hive based upon the user's security context. This will contain the user's SID, which is then used to find the correct hive under HKEY_
+USERS. If for some reason a user's hive is not loaded, the system will map the user's hive to .DEFAULT. The only times a user's hive is loaded is for a service account or an interactive user. A user's hive would map to .DEFAULT if a server application impersonated the client and then made a registry reference to HKEY_CURRENT_USER. The system would attempt to find the user's hive based upon its SID. If this hive is not found under HKEY_USERS, the system will map the user's hive to .DEFAULT. This happens with services configured for the LocalSystem account because it does not have a hive associated with it. 
+<br><img src="indent00.gif" width="10" height="4">This sounds OK, but can lead to many problems. First of all, a service may depend on user-specific registry information. Most applications store user-specific information within HKEY_CURRENT_USER. For example, a user's printing information is stored in the user's hive. If a service is configured for a different account, the service will not have any printing information. Not all services use the .DEFAULT hive. If the service is configured for a service account owning a hive, the Service Control Manager will load the user's hive. This feature was added to Windows NT 4.0. 
+<br><img src="indent00.gif" width="10" height="4">One thing the Service Control Manager will not do is properly prepare a user's environment for a service. Environment variables are stored in the user's hive. The only environment variables a service will inherit are from the Service Control Manager. Its environment is based upon the system environment variables. If you make changes to the system environment variables, they will not be propagated back to your service until you reboot the machine. The Service Control Manager does not handle the WM_SETTINGCHANGE message as other system processes do when system environment variables change.
+<br><img src="indent00.gif" width="10" height="4">Let's go back to the case of the LocalSystem account. How can you get a properly configured hive? You have several options. If you have control of the application creating 
+the registry keys, you can create the keys twice. One reference would be to HKEY_CURRENT_USER and the other would be to HKEY_USERS\Default. Another approach would be to determine what keys an application created and reproduce them. This can be done either manually or programmatically. 
+<br><img src="indent00.gif" width="10" height="4">If you don't want to mess with the registry, you could programmatically load the hive yourself. If you know a user with a properly initialized hive, the service could determine the location of the hive based upon the user. Load the hive via the RegLoadKey API and then impersonate the user such that any references to HKEY_CURRENT_USER would map to the correct hive. 
+<br><img src="indent00.gif" width="10" height="4">The problem is that you need a process token to impersonate a user. A process token can be generated via the LogonUser API call. Of course, you need the user's password. If for some reason the user you are interested in has some processes running on the system, the service could enumerate processes until 
+it found one running in the security context of the targeted user. Once a process is located, the service could obtain a token for the user through a call to OpenProcessToken. At this point, the service could impersonate the user with this token. (For more information on loading a user's hive, please refer to Knowledge Base article Q168877, <a href="http://support.microsoft.com/support/kb/articles/q168/8/77.asp" target="_top">HOWTO: Load a User's Hive Programmatically
+</a>.) 
+<br><img src="indent00.gif" width="10" height="4">The one gotcha I want to mention when impersonating 
+a user and using their hive is the mapping of HKEY_
+CURRENT_USER. Say you have a service configured for the LocalSystem account. The service needs to access registry information for the user HOSUN. The password for HOSUN is known and you load the user's hive and impersonate HOSUN. Remember, HKEY_CURRENT_USER 
+is a mapping to HKEY_USERS\user's SID. If for some reason the user's hive is not loaded, the system uses HKEY_USERS\.DEFAULT. Now, if the service references HKEY_CURRENT_USER before impersonating the user HOSUN, any references to HKEY_CURRENT_USER in the security context of HOSUN will still go to HKEY_
+USERS\.DEFAULT instead of HKEY_USERS\HOSUN's SID. The system is not smart enough to remap HKEY_
+USERS to the correct security context. To work around the problem, you can call RegCloseKey with HKEY_CURRENT_
+USER. This will tell the system to remap HKEY_CURRENT_USER when another reference is made with HOSUN's security context.
+</font><p>
+<center><font size="4" color="000080" face="verdana, arial, helvetica"><b> Wrap-up </b></font></center>
+
+<font size="2">
+<br><img src="indent00.gif" width="10" height="4">I discussed some &quot;environmental&quot; differences between 
+a Windows NT service and an application launched by 
+the interactive user. I discussed the big three areas of concern for a service developer: Windows NT security, 
+window stations and desktops, and registry hives. This information should make the experience of developing a Windows NT service easier and can be applied to other technologies used in a service to explain these occasional mysterious behaviors.          <img align="right" src="end00000.gif" WIDTH="12" HEIGHT="12"> 
+
+                                                 
+</font>
+
+
+<p>
+<center><font SIZE="2" COLOR="#000000"><i>From the March 1998   issue of <a href="http://www.microsoft.com/msj/default.asp" target="_top">Microsoft Systems Journal</a>.
+ Get it at your local newsstand, or better yet, </i><a target="_top" HREF="http://www.microsoft.com/isapi/gomsdn.asp?TARGET=/msdnmag/subscribe.asp"><i>subscribe</i></a>.</font>
+</center>
+<p>
+</tr>
+</table>
+</center>
+
+<center>
+<table width="382" cellpadding="5"> <tr>
+	<td><!--bgcolor=ccccff-->
+<center><img src="msdn2000.gif" width="100%" height="31"><br>
+<font size="1" face="verdana, arial, helv">
+For related information see: <i>Using SC.EXE to Develop Windows NT Services,</i> <a  target="_top">http://premium.microsoft.com/msdn/library/techart/scmslite.htm</a>. <br>Also check <a _top"> http://www.microsoft.com/msdn</a> for daily updates on developer programs, resources and events.
+</font></center></td>
+</tr>
+</table>
+</center>
+
+</font>
+</td>
+</tr>
+</table>
+</center>
+<!--Footer-->
+<center>
+<table>
+<tr><td WIDTH="100%">
+
+<hr>
+
+<center><font SIZE="1"><i><a href="http://www.microsoft.com/misc/cpyright.htm">© 1998 Microsoft Corporation. All rights reserved.<br> Terms of Use</a>.
+</i></font></center>
+</td>
+</tr>
+</table>
+</center>
+
+</body>
+
+</html>
+
+
+
+
+<!-- This document saved from http://www.microsoft.com/msj/0398/service2.htm -->

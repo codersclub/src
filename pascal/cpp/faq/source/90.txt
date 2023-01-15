@@ -1,0 +1,119 @@
+§NAME: Метод класса в новом потоке
+§AUTHOR: Leprecon
+§EMAIL: leprecon@pisem.net
+
+Иногда функциональности глобальной функции или статического метода класса не хватает при запуске нового потока. С методом класса новый поток не создашь. Компилятор выдаст вот такую ошибку: [quote]error C2664: 'CreateThread' : cannot convert parameter 3 from 'unsigned long (__thiscall CMyClass::*)(void *)' to 'unsigned long (__stdcall *)(void *)'[/quote] Функцию [blue]__thiscall[/blue] просто так к [blue]__stdcall[/blue] не приведешь, ведь для метода передается еще указатель на класс. Но если немного схитрить, то это можно обойти. Вместо метода мы создадим поток со статической функцией. А в качестве данных, передадим указатель на структуру, в которую положим:
+1. Указатель на экземпляр класса.
+2. Указатель на метод класса.
+3. Указатель на дествительные данные для метода.
+Когда новый поток запустится, то статическая функция, зная указатель на класс и нужный метод, запустит этот метод в новом потоке. [code]
+class CMyClass;
+typedef DWORD (CMyClass::*LPTHREAD_METHOD)(LPVOID pParam);
+
+// Структура параметров для статической функции.
+typedef struct STARTUP_PARAM
+{
+	CMyClass*		pClass;
+	LPTHREAD_METHOD	pMethod;
+	LPVOID			pParam;
+} *LPSTARTUP_PARAM;
+
+// Объявление класса.
+class CMyClass
+{
+public:
+	// Метод, который мы хотели бы запустить в новом потоке.
+	DWORD	Process			(LPVOID pParam);
+
+	// Функция, которая создает новый поток.
+	HANDLE	StartThread		(LPTHREAD_METHOD pMethod, LPVOID pParam, 
+							 LPDWORD pdwThreadID = NULL, 
+							 LPSECURITY_ATTRIBUTES pSecurity = NULL , 
+							 DWORD dwStackSize = 0 , 
+							 DWORD dwFlags = 0);
+protected:
+	// Статическая функция, которая запустит метод.
+	static  DWORD StartFunc	(LPSTARTUP_PARAM pStartup);
+};
+
+// В этом методе можно реализовать вычисления, которые вам нужны.
+DWORD CMyClass::Process(LPVOID pParam)
+{
+	Sleep(1000);
+	return 0;
+}
+
+HANDLE CMyClass::StartThread(LPTHREAD_METHOD pMethod, LPVOID pParam, 
+							 LPDWORD pdwThreadID /* = NULL */, 
+							 LPSECURITY_ATTRIBUTES pSecurity /* = NULL */, 
+							 DWORD dwStackSize /* = 0 */, 
+							 DWORD dwFlags /* = 0 */)
+{
+	// Создаем структуру и упаковываем данные для статической функции.
+	LPSTARTUP_PARAM pStartup = new STARTUP_PARAM;
+	pStartup->pClass	= this;
+	pStartup->pMethod	= pMethod;
+	pStartup->pParam	= pParam;
+
+	// Создаем новый поток.
+	return CreateThread(pSecurity, dwStackSize, (LPTHREAD_START_ROUTINE)StartFunc, pStartup, dwFlags, pdwThreadID);
+}
+
+// В новом потоке вначале вызывается функция CMyClass::StartFunc(...)
+// А она запускает наш метод.
+DWORD CMyClass::StartFunc(LPSTARTUP_PARAM pStartup)
+{
+	// Распаковываем данные в новом потоке.
+	// Получаем указатель на класс и на метод класса.
+	CMyClass* pClass		= pStartup->pClass;
+	LPTHREAD_METHOD pMethod = pStartup->pMethod;
+	LPVOID pParam			= pStartup->pParam;
+
+	// Запускаем метод класса в новом потоке.
+	DWORD dwResult = (pClass->*pMethod)(pParam);
+
+	// Удаляем временные данные и возвращаем код возврата из нового потока.
+	delete pStartup;
+	return dwResult;
+}
+[/code]
+
+Подробнее остановимся на функции [b]CMyClasss::StartThread[/b]
+Функция создает новый поток в виртуальном адресном пространстве вызывающего процесса.
+[code]HANDLE CMyClass::StartThread(
+	LPTHREAD_METHOD pMethod, LPVOID pParam, 
+	LPDWORD pdwThreadID /* = NULL */, 
+	LPSECURITY_ATTRIBUTES pSecurity /* = NULL */, 
+	DWORD dwStackSize /* = 0 */, 
+	DWORD dwFlags /* = 0 */
+);[/code]Эта функция аналогична функции Win32 API [code]HANDLE CreateThread(
+	LPSECURITY_ATTRIBUTES lpThreadAttributes,
+	SIZE_T dwStackSize,
+	LPTHREAD_START_ROUTINE lpStartAddress,
+	LPVOID lpParameter,
+	DWORD dwCreationFlags,
+	LPDWORD lpThreadId
+);[/code]
+[b]Параметры:[/b]
+&nbsp;&nbsp;&nbsp;&nbsp;[b]pMethod [in][/b] указатель на метод класса, для вызова в новом потоке.
+&nbsp;&nbsp;&nbsp;&nbsp;[b]pParam [in][/b] указатель на данные для нового потока.
+&nbsp;&nbsp;&nbsp;&nbsp;[b]pdwThreadID [out][/b] указатель на переменную, которая получит идентификатор потока.
+&nbsp;&nbsp;&nbsp;&nbsp;[b]pSecurity [in][/b] указатель на структуру [b]SECURITY_ATTRIBUTES[/b], которая устанавливает, может ли дочерний процесс унаследовать возвращаемый хендл потока. Если pSecurity равно NULL, хендл не может быть унаследован. [b]Windows NT/2000/XP:[/b] Поле [b]lpSecurityDescriptor[/b] структуры, устанавливает атрибуты безопастности для нового потока. Если pSecurity равно NULL, потоку даются атрибуты по умолчанию. 
+&nbsp;&nbsp;&nbsp;&nbsp;[b]dwStackSize [in][/b] Изначальный размер стека, в байтах. Система округлит это значение до ближайшей страницы. Если значение равно нулю, новый поток возьмет размер по умолчанию. 
+&nbsp;&nbsp;&nbsp;&nbsp;[b]dwCreationFlags [in][/b] Флаги для создания потока. Если установлен флаг CREATE_SUSPENDED, поток создается в приостановленном состоянии и не будет запущен, пока не будет вызвана фугкция [b]ResumeThread[/b]. Если значение равно нулю, то поток запустится сразу после создания.
+[b]Результат:[/b]
+&nbsp;&nbsp;&nbsp;&nbsp;В случае успеха, возвратится хендл созданного потока.
+&nbsp;&nbsp;&nbsp;&nbsp;В случае неудачи, возвратится NULL. 
+
+[b]Пример:[/b][code]CMyClass MyClass;
+
+char* pStr = new char [6];
+strcpy(pStr, "Hello");
+
+DWORD dwThreadID;
+HANDLE hThread = MyClass.StartThread(CMyClass::Process, (LPVOID)pStr, &dwThreadID);[/code]Метод [b]CMyClass::Process[/b], запустится в новом потоке и значение [blue]this[/blue] будет равно указателю на класс MyClass.
+
+[b]Примечание:[/b] При работе с классами в разных потоках не забывайте о синхронизации.
+
+Если есть какие-то замечания, предложения или что-то еще, то пишите: 
+[email]leprecon@pisem.net[/email].
