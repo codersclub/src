@@ -1,0 +1,89 @@
+<style type="text/css">
+<!--
+.btlnk, .btlnk a {
+	font-family: "MS Sans Serif", sans-serif;
+	font-size: 10px; }
+-->
+</style>
+<TABLE border="0" align="center" cellpadding="0" cellspacing="0" width="750" style="margin-bottom:15px;">
+<TR>
+<TD class="btlnk">
+<?php
+/* ѕараметры
+   
+   $SL_convert - кодировка сайта
+   ƒопустимые значени€:
+   w - windows-1251 (cp1251)
+   k - koi8-r, koi8-u
+   d - dos (cp866)
+   i - iso8859-5
+   m - mac-cyrillic
+   u - utf-8 (unicode)
+   
+   $SL_connection_timeout - врем€ ожидани€ ответа, секунды
+*/
+//echo "linkator.php started";
+
+$SL_convert = 'w';
+$SL_connection_timeout = 3;
+
+@error_reporting(0);
+@ini_set('display_errors', 0);
+$SL_linkator_host = 'linkator.3.seonet.ru';
+$SL_uri   = "/getlink.html?host=".urlencode($_SERVER['HTTP_HOST'])."&uri=".urlencode($_SERVER['REQUEST_URI']);
+$SL_ua    = 'SLS/1.0';
+$SL_delim = "\r\n";
+if(function_exists('iconv'))
+     $SL_cvar = create_function('$str, $from="CP1251", $to="UTF-8"', 'return iconv($from, $to, $str);');
+elseif(function_exists('libiconv')) 
+     $SL_cvar = create_function('$str, $from="CP1251", $to="UTF-8"', 'return libiconv($from, $to, $str);');
+elseif(function_exists('mb_convert_encoding')) 
+     $SL_cvar = create_function('$str, $from="CP1251", $to="UTF-8"', 'return mb_convert_encoding($str, $to, $from);');
+else $SL_cvar = create_function('$str, $from="CP1251", $to="UTF-8"', 'return $str;');     
+$SL_result = $SL_du = '';
+$SL_get = "GET $SL_uri HTTP/1.1\r\nHost: $SL_linkator_host\r\nUser-Agent: $SL_ua\r\nConnection: close\r\n\r\n";
+if(function_exists('curl_init')) {
+  $SL_du = 'cURL';
+  $SL_ses = curl_init("http://$SL_linkator_host{$SL_uri}");
+  curl_setopt($SL_ses, CURLOPT_RETURNTRANSFER, 1);
+  curl_setopt($SL_ses, CURLOPT_TIMEOUT, $SL_connection_timeout);
+  curl_setopt($SL_ses, CURLOPT_USERAGENT, $SL_ua);
+  $SL_result = curl_exec($SL_ses);
+  if(strlen($SL_result)<5) $SL_result = '';
+  curl_close($SL_ses);
+} elseif(function_exists('fsockopen') || function_exists('stream_socket_client')) {
+  $SL_du = 'stream';
+  $SL_sp = function_exists('fsockopen') ? 
+           fsockopen($SL_linkator_host, 80, $SL_errno, $SL_errstr, $SL_connection_timeout) :
+           stream_socket_client("tcp://$SL_linkator_host:80", $SL_errno, $SL_errstr, $SL_connection_timeout);
+  if($SL_sp) { 
+    fwrite($SL_sp, $SL_get);
+    while(!feof($SL_sp)) {
+      $SL_result .= fgets($SL_sp, 1024);
+    } fclose($SL_sp);
+  }
+} elseif(function_exists('socket_create') && function_exists('gethostbyname')) {
+  $SL_du = 'socket';
+  $SL_addr = gethostbyname($SL_linkator_host);
+  $SL_sock = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
+  socket_connect($SL_sock, $SL_addr, 80);
+  socket_write($SL_sock, $SL_get, strlen($SL_get));
+  while($SL_tmp = socket_read($SL_sock, 2048)) {
+    $SL_result .= $SL_tmp;
+  } socket_close($SL_sock);
+} else {
+  $SL_du = 'direct';
+  $SL_result = file_get_contents("http://$SL_linkator_host{$SL_uri}");
+}
+if($SL_du=='socket' || $SL_du=='stream') {
+  $SL_result = substr($SL_result, strpos($SL_result, $SL_delim.$SL_delim)+strlen($SL_delim)*2);
+  $SL_clen   = hexdec(substr($SL_result, 0, strpos($SL_result, $SL_delim)));
+  $SL_result = substr($SL_result, strlen($SL_clen)+strlen($SL_delim), $SL_clen);
+}
+if($SL_convert!='w') {
+  if($SL_convert=='u') $SL_result = $SL_cvar($SL_result);
+  else $SL_result = convert_cyr_string($SL_result, 'w', $SL_convert);
+} echo $SL_result; ?>
+</TD>
+</TR>
+</TABLE>
