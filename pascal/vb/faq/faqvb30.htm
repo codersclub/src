@@ -1,0 +1,235 @@
+<html>
+<head>
+<meta http-equiv=Content-Type content="text/html; charset=windows-1251">
+<title>Как расшарить папку</title>
+<link src="style.css" href='style.css' rel='stylesheet' type='text/css'>
+</head>
+
+<body bgcolor="FFFFFF"; link = "; 0; ff; "; alink = "; 8000; "; vlink = "; 0; ff; "; onload = "; window.focus(); " > 
+<center><br><font size=4>Часто задаваемые вопросы и ответы по программированию на VB</font><br>
+Последнее обновление: 02.04.03<hr></center>
+<font name="tahoma" size="-1" color=#000000 style="padding-top : 0; padding-right : 1%; padding-bottom : 0; padding-left : 1%;">
+  Q: Как завершить работу Windows?<BR>
+  A1 (flangie): Завершение WinXP производится так.<BR>
+<BR>
+Private Type LUID<BR>
+  LowPart As Long<BR>
+  HighPart As Long<BR>
+End Type<BR>
+ <BR>
+Private Type TOKEN_PRIVILEGES<BR>
+  PrivilegeCount As Long<BR>
+  LuidUDT As LUID<BR>
+  Attributes As Long<BR>
+End Type<BR>
+ <BR>
+Const TOKEN_ADJUST_PRIVILEGES = &H20<BR>
+Const TOKEN_QUERY = &H8<BR>
+Const SE_PRIVILEGE_ENABLED = &H2<BR>
+Const EWX_SHUTDOWN = 1<BR>
+Const EWX_REBOOT = 2<BR>
+Const EWX_FORCE = 4<BR>
+Const ewx_off = 8<BR>
+ <BR>
+ <BR>
+Private Declare Function GetVersion Lib "kernel32" () As Long<BR>
+Private Declare Function GetCurrentProcess Lib "kernel32" () As Long<BR>
+Private Declare Function OpenProcessToken Lib "advapi32" (ByVal ProcessHandle As Long, ByVal DesiredAccess As Long, _ <BR>
+        TokenHandle As Long) As Long<BR>
+Private Declare Function LookupPrivilegeValue Lib "advapi32" Alias "LookupPrivilegeValueA" (ByVal lpSystemName As _<BR>
+        String, ByVal lpName As String, lpLuid As LUID) As Long<BR>
+Private Declare Function AdjustTokenPrivileges Lib "advapi32" (ByVal TokenHandle As Long, _<BR>
+        ByVal DisableAllPrivileges As Long, NewState As TOKEN_PRIVILEGES, ByVal BufferLength As Long, _<BR>
+        PreviousState As Any, ReturnLength As Any) As Long<BR>
+Private Declare Function ExitWindowsEx Lib "user32" (ByVal dwOptions As Long, ByVal dwReserved As Long) As Long<BR>
+ <BR>
+ <BR>
+Function ShutDownWindows(ByVal Reboot As Boolean, Optional ByVal Force As Boolean, Optional ByVal off As Boolean)<BR>
+Dim hToken As Long<BR>
+Dim tp As TOKEN_PRIVILEGES<BR>
+Dim flags As Long<BR>
+'Windows NT/2000/XP требует специального подтверждения того,<BR>
+'что вызывающий процесс имеет право на выключение или перезагрузку компьютера<BR>
+If GetVersion() >= 0 Then<BR>
+'Открываем процесс для установки нужных привилегий<BR>
+OpenProcessToken GetCurrentProcess(), (TOKEN_ADJUST_PRIVILEGES Or TOKEN_QUERY), hToken<BR>
+'Устанавливаем необходимые привилегии процесса<BR>
+LookupPrivilegeValue "", "SeShutdownPrivilege", tp.LuidUDT<BR>
+tp.PrivilegeCount = 1<BR>
+tp.Attributes = SE_PRIVILEGE_ENABLED<BR>
+AdjustTokenPrivileges hToken, False, tp, 0, ByVal 0&, ByVal 0&<BR>
+End If<BR>
+ <BR>
+'Подготовка к выключению<BR>
+ <BR>
+flags = EWX_SHUTDOWN<BR>
+If Reboot Then flags = flags Or EWX_REBOOT<BR>
+If Force Then flags = flags Or EWX_FORCE<BR>
+If off Then flags = flags Or ewx_off<BR>
+'Выключение или перезагрузка компа<BR>
+ExitWindowsEx flags, &HFFFF<BR>
+End Function<BR>
+ <BR>
+ <BR>
+Private Sub Command1_Click()<BR>
+On Error GoTo error1<BR>
+ShutDownWindows(False, True, True) = True<BR>
+error1:<BR>
+If Err <> 0 Then<BR>
+End If<BR>
+End Sub<BR>
+<BR>
+  A2 (Crew): Для остальных Win...<BR>
+<BR>
+Public Const EWX_LOGOFF = 0<BR>
+Public Const EWX_REBOOT = 2<BR>
+Public Const EWX_SHUTDOWN = 1<BR>
+Public Const EWX_FORCE = 4 ' Закрывает все программы без приглашения сохранить файлы. <BR>
+Public Const EWX_POWEROFF = 8 ' Завершает работу системы и если есть возможность выключает компьютер. <BR>
+<BR>
+Public Declare Function ExitWindowsEx Lib "user32" (ByVal uFlags As Long, ByVal dwReserved As Long) As Long<BR>
+<BR>
+Private Sub Command1_Click()<BR>
+  Call ExitWindowsEx(EWX_LOGOFF, 0) ' Завершение сеанса<BR>
+End Sub<BR>
+<BR>
+Private Sub Command2_Click()<BR>
+  Call ExitWindowsEx(EWX_REBOOT, 0) ' Перезагрузка<BR>
+End Sub<BR>
+<BR>
+Private Sub Command3_Click()<BR>
+  Call ExitWindowsEx(EWX_SHUTDOWN, 0) ' Выключение<BR>
+End Sub<BR>
+<BR>
+  A3 (flangie): Для WinNT...<BR>
+<BR>
+'Модуль <BR>
+'====== <BR>
+Private Const EWX_LOGOFF = 0 <BR>
+Private Const EWX_SHUTDOWN = 1 <BR>
+Private Const EWX_REBOOT = 2 <BR>
+Private Const EWX_FORCE = 4 <BR>
+Private Const TOKEN_ADJUST_PRIVILEGES = &H20 <BR>
+Private Const TOKEN_QUERY = &H8 <BR>
+Private Const SE_PRIVILEGE_ENABLED = &H2 <BR>
+Private Const ANYSIZE_ARRAY = 1 <BR>
+Private Const VER_PLATFORM_WIN32_NT = 2 <BR>
+<BR>
+Type OSVERSIONINFO <BR>
+    dwOSVersionInfoSize As Long <BR>
+    dwMajorVersion As Long <BR>
+    dwMinorVersion As Long <BR>
+    dwBuildNumber As Long <BR>
+    dwPlatformId As Long <BR>
+    szCSDVersion As String * 128 <BR>
+End Type <BR>
+<BR>
+Type LUID <BR>
+    LowPart As Long <BR>
+    HighPart As Long <BR>
+End Type <BR>
+<BR>
+Type LUID_AND_ATTRIBUTES <BR>
+    pLuid As LUID <BR>
+    Attributes As Long <BR>
+End Type <BR>
+<BR>
+Type TOKEN_PRIVILEGES <BR>
+    PrivilegeCount As Long <BR>
+    Privileges(ANYSIZE_ARRAY) As LUID_AND_ATTRIBUTES <BR>
+End Type <BR>
+<BR>
+Private Declare Function GetCurrentProcess Lib "kernel32" () As Long <BR>
+Private Declare Function OpenProcessToken Lib "advapi32" (ByVal ProcessHandle As Long, ByVal DesiredAccess As Long, <BR>
+TokenHandle As Long) As Long <BR>
+Private Declare Function LookupPrivilegeValue Lib "advapi32" Alias "LookupPrivilegeValueA" _<BR>
+        (ByVal lpSystemName As String, ByVal lpName As String, lpLuid As LUID) As Long <BR>
+Private Declare Function AdjustTokenPrivileges Lib "advapi32" (ByVal TokenHandle As Long, _<BR>
+        ByVal DisableAllPrivileges As Long, NewState As TOKEN_PRIVILEGES, ByVal BufferLength As Long, _<BR>
+        PreviousState As TOKEN_PRIVILEGES, ReturnLength As Long) As Long <BR>
+Private Declare Function ExitWindowsEx Lib "user32" (ByVal uFlags As Long, ByVal dwReserved As Long) As Long <BR>
+Private Declare Function GetVersionEx Lib "kernel32" Alias "GetVersionExA" _<BR>
+        (ByRef lpVersionInformation As OSVERSIONINFO) As Long <BR>
+<BR>
+'Detect if the program is running under Windows NT <BR>
+Public Function IsWinNT() As Boolean <BR>
+    Dim myOS As OSVERSIONINFO <BR>
+    myOS.dwOSVersionInfoSize = Len(myOS) <BR>
+    GetVersionEx myOS <BR>
+    IsWinNT = (myOS.dwPlatformId = VER_PLATFORM_WIN32_NT) <BR>
+End Function <BR>
+<BR>
+'set the shut down privilege for the current application <BR>
+Private Sub EnableShutDown() <BR>
+    Dim hProc As Long <BR>
+    Dim hToken As Long <BR>
+    Dim mLUID As LUID <BR>
+    Dim mPriv As TOKEN_PRIVILEGES <BR>
+    Dim mNewPriv As TOKEN_PRIVILEGES <BR>
+    hProc = GetCurrentProcess() <BR>
+    OpenProcessToken hProc, TOKEN_ADJUST_PRIVILEGES + TOKEN_QUERY, hToken <BR>
+    LookupPrivilegeValue "", "SeShutdownPrivilege", mLUID <BR>
+    mPriv.PrivilegeCount = 1 <BR>
+    mPriv.Privileges(0).Attributes = SE_PRIVILEGE_ENABLED <BR>
+    mPriv.Privileges(0).pLuid = mLUID <BR>
+    ' enable shutdown privilege for the current application <BR>
+    AdjustTokenPrivileges hToken, False, mPriv, 4 + (12 * mPriv.PrivilegeCount), mNewPriv, 4 + (12 * _<BR>
+                          mNewPriv.PrivilegeCount) <BR>
+End Sub <BR>
+<BR>
+' Shut Down NT <BR>
+Public Sub ShutDownNT(Force As Boolean) <BR>
+    Dim ret As Long <BR>
+    Dim Flags As Long <BR>
+    Flags = EWX_SHUTDOWN <BR>
+    If Force Then Flags = Flags + EWX_FORCE <BR>
+    If IsWinNT Then EnableShutDown <BR>
+    ExitWindowsEx Flags, 0 <BR>
+End Sub <BR>
+<BR>
+'Restart NT <BR>
+Public Sub RebootNT(Force As Boolean) <BR>
+    Dim ret As Long <BR>
+    Dim Flags As Long <BR>
+    Flags = EWX_REBOOT <BR>
+    If Force Then Flags = Flags + EWX_FORCE <BR>
+    If IsWinNT Then EnableShutDown <BR>
+    ExitWindowsEx Flags, 0 <BR>
+End Sub <BR>
+<BR>
+'Log off the current user <BR>
+Public Sub LogOffNT(Force As Boolean) <BR>
+    Dim ret As Long <BR>
+    Dim Flags As Long <BR>
+    Flags = EWX_LOGOFF <BR>
+    If Force Then Flags = Flags + EWX_FORCE <BR>
+    ExitWindowsEx Flags, 0 <BR>
+End Sub <BR>
+ <BR>
+'Форма <BR>
+'====== <BR>
+'This project needs a form with three command buttons <BR>
+Private Sub Command1_Click() <BR>
+    LogOffNT True <BR>
+End Sub <BR>
+<BR>
+Private Sub Command2_Click() <BR>
+    RebootNT True <BR>
+End Sub <BR>
+<BR>
+Private Sub Command3_Click() <BR>
+    ShutDownNT True <BR>
+End Sub <BR>
+<BR>
+Private Sub Form_Load() <BR>
+    Command1.Caption = "Log Off NT" <BR>
+    Command2.Caption = "Reboot NT" <BR>
+    Command3.Caption = "Shutdown NT" <BR>
+End Sub <BR>
+<CENTER>
+<HR>
+FAQ составлен по материалам Форума на <A
+href="http://www.sources.ru/">Исходниках.Ру</A>.<BR>Составитель:
+<A href="mailto:Crew@Sources.ru.ru">Crew</A><BR>Copyright © 2002 by <A
+href="http://www.sources.ru/">Sources.ru</A>. All rights
+reserved.</CENTER></BODY></HTML>

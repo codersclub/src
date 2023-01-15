@@ -1,0 +1,131 @@
+<html>
+<head>
+<meta http-equiv=Content-Type content="text/html; charset=windows-1251">
+<title>Как расшарить папку</title>
+<link src="style.css" href='style.css' rel='stylesheet' type='text/css'>
+</head>
+
+<body bgcolor="FFFFFF"; link = "; 0; ff; "; alink = "; 8000; "; vlink = "; 0; ff; "; onload = "; window.focus(); " > 
+<center><br><font size=4>Часто задаваемые вопросы и ответы по программированию на VB</font><br>
+Последнее обновление: 02.04.03<hr></center>
+<font name="tahoma" size="-1" color=#000000 style="padding-top : 0; padding-right : 1%; padding-bottom : 0; padding-left : 1%;">
+  Q: Как сохранять настройки формы в реестре?<BR>
+  A (Vasya2000):<BR>
+<BR>
+В модуле находятся две подпрограммы.  <BR>
+ <BR>
+Public Sub SaveOptions(Frm As Form) - запись настроек в реестр  <BR>
+Public Sub LoadOptions(Frm As Form) - чтение настроек из реестра  <BR>
+Настройки записываются текущему пользователю. Т.е. в Windows NT каждый пользователь будет иметь свои настройки. <BR>
+ <BR>
+Использование:  <BR>
+ <BR>
+1) Выбрать форму, которая будет хранить в своих элементах настройки. Например в калькуляторе - frmMain <BR>
+ <BR>
+2) В обработчик события формы OnLoad вставить строку <BR>
+ <BR>
+LoadOptions Me <BR>
+ <BR>
+3) В обработчик события формы OnUnload вставить строку: <BR>
+ <BR>
+SaveOptions Me <BR>
+ <BR>
+По умолчанию сохраняются/записываются только положение и размер окна приложения. <BR>
+ <BR>
+Если Вы хотите сохранить в реестре ещё значение какого-нибудь элемента формы, то надо в свойствах этого элемента в <BR>
+поле Tag поставить значение "Save" (в процессе разработки формы, а не в RunTime)  <BR>
+ <BR>
+Например в калькуляторе можно было бы сохранять значения поля lcd0  <BR>
+ <BR>
+Для этого надо просто присвоить свойству Tag этого поля значение Save <BR>
+ <BR>
+И тогда, если вы вставляли ранее описанные строки в обработчики OnLoad и OnUnload, то значение этого поля будут <BR>
+записываться и считываться при запуске приложения и выходе из него. <BR>
+ <BR>
+Это - в модуль.  <BR>
+ <BR>
+Option Explicit <BR>
+ <BR>
+Public Sub SaveOptions(Frm As Form) <BR>
+Dim Cont As Control <BR>
+SaveSetting App.Title, Frm.Name, "(name)", Frm.Caption <BR>
+With Frm <BR>
+If Frm.WindowState <> vbMinimized Then <BR>
+SaveSetting App.Title, Frm.Name, "_Form Wight", .Width <BR>
+SaveSetting App.Title, Frm.Name, "_Form Height", .Height <BR>
+SaveSetting App.Title, Frm.Name, "_Form Top", .Top <BR>
+SaveSetting App.Title, Frm.Name, "_Form Left", .Left <BR>
+End If <BR>
+'Общие параметры приложение <BR>
+Dim НазваниеПараметра As String <BR>
+For Each Cont In Frm <BR>
+Select Case Left$(Cont.Tag, 5) <BR>
+Case "Save:" <BR>
+НазваниеПараметра = Mid$(Cont.Tag, 6, Len(Cont.Tag) - 5) <BR>
+SaveSetting App.Title, "Shared", НазваниеПараметра, Cont <BR>
+Case Else <BR>
+End Select <BR>
+Next <BR>
+ <BR>
+'Параметры окна <BR>
+For Each Cont In Frm <BR>
+Select Case Cont.Tag <BR>
+Case "Save" <BR>
+Select Case IsArray(Cont) <BR>
+Case False <BR>
+SaveSetting App.Title, Frm.Name, Cont.Name, Cont <BR>
+Case True <BR>
+SaveSetting App.Title, Frm.Name, Cont.Name & " [" &Trim$(Str$(Cont.Index)) & "]", Cont <BR>
+End Select <BR>
+Case Else <BR>
+End Select <BR>
+Next <BR>
+End With <BR>
+End Sub <BR>
+ <BR>
+Public Sub LoadOptions(Frm As Form) <BR>
+Dim Cont As Control <BR>
+ <BR>
+With Frm <BR>
+Frm.Width = GetSetting(App.Title, Frm.Name, "_Form Wight", .Width) <BR>
+Frm.Height = GetSetting(App.Title, Frm.Name, "_Form Height", .Height) <BR>
+Frm.Top = GetSetting(App.Title, Frm.Name, "_Form Top", .Top) <BR>
+Frm.Left = GetSetting(App.Title, Frm.Name, "_Form Left", .Left) <BR>
+ <BR>
+'Общие параметры приложение <BR>
+Dim НазваниеПараметра As String <BR>
+For Each Cont In Frm <BR>
+Select Case Left$(Cont.Tag, 5) <BR>
+Case "Save:" <BR>
+НазваниеПараметра = Mid$(Cont.Tag, 6, Len(Cont.Tag) - 5) <BR>
+Cont = GetSetting(App.Title, "Shared", НазваниеПараметра, Cont) <BR>
+Case Else <BR>
+End Select <BR>
+Next <BR>
+ <BR>
+For Each Cont In Frm <BR>
+Select Case Cont.Tag <BR>
+Case "Save" <BR>
+Select Case IsArray(Cont) <BR>
+Case False <BR>
+Cont = GetSetting(App.Title, Frm.Name, Cont.Name, Cont) <BR>
+Case True <BR>
+Cont = GetSetting(App.Title, Frm.Name, Cont.Name & " [" &Trim$(Str$(Cont.Index)) & "]", Cont) <BR>
+End Select <BR>
+Case Else <BR>
+End Select <BR>
+Next <BR>
+End With <BR>
+End Sub <BR>
+ <BR>
+Public Function Параметр(НазваниеПараметра As String, Optional Default) <BR>
+Параметр = GetSetting(App.Title, "Shared", НазваниеПараметра, Default) <BR>
+End Function <BR>
+  <BR>
+<CENTER>
+<HR>
+FAQ составлен по материалам Форума на <A
+href="http://www.sources.ru/">Исходниках.Ру</A>.<BR>Составитель:
+<A href="mailto:Crew@Sources.ru.ru">Crew</A><BR>Copyright © 2002 by <A
+href="http://www.sources.ru/">Sources.ru</A>. All rights
+reserved.</CENTER></BODY></HTML>

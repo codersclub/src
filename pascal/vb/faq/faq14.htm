@@ -1,0 +1,178 @@
+<html>
+
+<head>
+<title> 
+ЧаВо Sources.ru</title>
+<style type="text/css">
+	a:link { color: #005177; text-decoration: underline; }
+	a:visited { color: #665066; text-decoration: underline; }
+	a:hover { color: #cc3333; text-decoration: underline; }
+
+	.title { font-family: Verdana, Arial, Helvetica, sans-serif; font-size: 16pt; text-decoration: none; font-weight: bold; }
+	.list { font-family: Verdana, Arial, Helvetica, sans-serif; font-size: 10pt; text-align: justify; }
+	.text { font-family: Verdana, Arial, Helvetica, sans-serif; font-size: 10pt; }
+	.question { font-family: Verdana, Arial, Helvetica, sans-serif; font-size: 10pt; color: #ffffff; text-decoration: none; font-weight: bold; text-align: justify; }
+	.answer { font-family: Verdana, Arial, Helvetica, sans-serif; font-size: 10pt; text-align: justify; }
+	.mono { font-family: "Courier New", Courier, Mono; font-size: 9pt; color: #000000; }
+</style>
+</head>
+
+
+<body bgcolor=#f8f8f8 leftmargin=30 topmargin=30>
+
+<center><br><font size=4>Часто задаваемые вопросы и ответы по программированию на 
+
+VB
+
+</font><br>
+Последнее обновление: 
+
+20.05.03 
+
+<br>
+<br>
+</center>
+
+<!-- Header -->
+
+<table cellspacing=1 cellpadding=5 bgcolor=#6394bd width=100%>
+<tr><td bgcolor=#6394bd><b>
+
+  Q: Как определить IP адрес?<BR>
+
+</b></td></tr>
+<tr><td bgcolor=#dedfdf>
+<dir>
+<br>
+
+  A (Razum):<BR>
+<BR>
+'This project requires the following components:<BR>
+' - a form (Form1) with a textbox (Text1, Multiline=True)<BR>
+'   and a command button (Command1)<BR>
+' - a module (Module1)<BR>
+<BR>
+'in Form1:<BR>
+Private Sub Command1_Click()<BR>
+   Module1.Start<BR>
+End Sub<BR>
+<BR>
+'In Module1:<BR>
+<BR>
+'With this small application , you can detect the IP's installed on your computer,<BR>
+'including subnet mask , BroadcastAddr..<BR>
+'<BR>
+'I've wrote this because i've a programm that uses the winsock control, but,<BR>
+'if you have multiple ip's  installed on your pc , you could get by using the Listen<BR>
+' method the wrong ip ...<BR>
+'Because Winsock.Localip => detects the default ip installed on your PC ,<BR>
+' and in most of the cases it could be the LAN (nic) not the WAN (nic)<BR>
+'So then you have to use the Bind function ,to bind to your right ip..<BR>
+'but how do you know & find that ip ?<BR>
+'you can find it now by this appl.. it check's in the api.. IP Table..<BR>
+'******************************************************************<BR>
+<BR>
+<BR>
+Const MAX_IP = 5   'To make a buffer... i dont think you have more than 5 ip on your pc..<BR>
+<BR>
+Type IPINFO<BR>
+    dwAddr As Long   ' IP address<BR>
+   dwIndex As Long '  interface index<BR>
+   dwMask As Long ' subnet mask<BR>
+   dwBCastAddr As Long ' broadcast address<BR>
+   dwReasmSize  As Long ' assembly size<BR>
+   unused1 As Integer ' not currently used<BR>
+   unused2 As Integer '; not currently used<BR>
+End Type<BR>
+<BR>
+Type MIB_IPADDRTABLE<BR>
+   dEntrys As Long   'number of entries in the table<BR>
+   mIPInfo(MAX_IP) As IPINFO  'array of IP address entries<BR>
+End Type<BR>
+<BR>
+Type IP_Array<BR>
+   mBuffer As MIB_IPADDRTABLE<BR>
+   BufferLen As Long<BR>
+End Type<BR>
+<BR>
+Public Declare Sub CopyMemory Lib "kernel32" Alias "RtlMoveMemory" (Destination As Any, Source As Any, ByVal Length As Long)<BR>
+Public Declare Function GetIpAddrTable Lib "IPHlpApi" (pIPAdrTable As Byte, pdwSize As Long, ByVal Sort As Long) As Long<BR>
+Sub main()<BR>
+Form1.Show<BR>
+End Sub<BR>
+<BR>
+'converts a Long  to a string<BR>
+Public Function ConvertAddressToString(longAddr As Long) As String<BR>
+   Dim myByte(3) As Byte<BR>
+   Dim Cnt As Long<BR>
+   CopyMemory myByte(0), longAddr, 4<BR>
+   For Cnt = 0 To 3<BR>
+       ConvertAddressToString = ConvertAddressToString + CStr(myByte(Cnt)) + "."<BR>
+   Next Cnt<BR>
+   ConvertAddressToString = Left$(ConvertAddressToString, Len(ConvertAddressToString) - 1)<BR>
+End Function<BR>
+<BR>
+Public Sub Start()<BR>
+Dim Ret As Long, Tel As Long<BR>
+Dim bBytes() As Byte<BR>
+Dim Listing As MIB_IPADDRTABLE<BR>
+<BR>
+Form1.Text1 = ""<BR>
+<BR>
+On Error GoTo END1<BR>
+   GetIpAddrTable ByVal 0&, Ret, True<BR>
+<BR>
+   If Ret <= 0 Then Exit Sub<BR>
+   ReDim bBytes(0 To Ret - 1) As Byte<BR>
+   'retrieve the data<BR>
+   GetIpAddrTable bBytes(0), Ret, False<BR>
+     <BR>
+   'Get the first 4 bytes to get the entry's.. ip installed<BR>
+   CopyMemory Listing.dEntrys, bBytes(0), 4<BR>
+   'MsgBox "IP's found : " & Listing.dEntrys    => Founded ip installed on your PC..<BR>
+   Form1.Text1 = Listing.dEntrys & "   IP addresses found on your PC !!" & vbCrLf<BR>
+   Form1.Text1 = Form1.Text1 & "----------------------------------------" & vbCrLf<BR>
+   For Tel = 0 To Listing.dEntrys - 1<BR>
+       'Copy whole structure to Listing..<BR>
+      ' MsgBox bBytes(tel) & "."<BR>
+       CopyMemory Listing.mIPInfo(Tel), bBytes(4 + (Tel * Len(Listing.mIPInfo(0)))), Len(Listing.mIPInfo(Tel))<BR>
+        Form1.Text1 = Form1.Text1 & "IP address                   : " & ConvertAddressToString(Listing.mIPInfo(Tel).dwAddr) & vbCrLf<BR>
+        Form1.Text1 = Form1.Text1 & "IP Subnetmask            : " & ConvertAddressToString(Listing.mIPInfo(Tel).dwMask) & vbCrLf<BR>
+        Form1.Text1 = Form1.Text1 & "BroadCast IP address  : " & ConvertAddressToString(Listing.mIPInfo(Tel).dwBCastAddr) & vbCrLf<BR>
+        Form1.Text1 = Form1.Text1 & "**************************************" & vbCrLf<BR>
+   Next<BR>
+<BR>
+'MsgBox ConvertAddressToString(Listing.mIPInfo(1).dwAddr)<BR>
+Exit Sub<BR>
+END1:<BR>
+MsgBox "ERROR"<BR>
+End Sub <BR>
+
+<br>
+<br>
+</dir>
+</td></tr>
+
+</table>
+
+<center>
+<br>
+FAQ составлен по материалам Форума на <a
+href="http://www.sources.ru/">Исходниках.Ру</a>.<br>Составитель:
+<a href="mailto:
+
+crew@sources.ru
+
+">
+
+Crew
+
+</a><br>Copyright © 2003 by <a
+href="http://www.sources.ru/">Sources.ru</a>. All rights
+reserved.
+</center>
+
+
+</body>
+
+</html>
