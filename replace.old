@@ -1,0 +1,150 @@
+#!/usr/bin/perl
+
+$start = qq~<\!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+<title>$title</title>
+<meta name="keywords" content="">
+<meta name="description" content="">
+~;
+
+@tokill =   ("\r", "<tbody>", "<\/tbody>",
+	     "<title>.*</title>"
+	    );
+
+@toreplace = (
+	["<title>.*</title>",	"\"/img/t1.gif"],
+        ["\=\"msdn/",	"\=\"/msdn/"],
+	["\"t1.gif",	"\"/img/t1.gif"],
+        ["\"rt.gif",	"\"/img/rt.gif"],
+	["href\=\"http://www\.sources\.ru/", "href\=\"/"],
+	["<\!\-\-\#include virtual\=\"/ssi/top\.html\"\-\->",  "<\!\-\-#include virtual\=\"/ssi/top2\.html\"\-\->"]
+
+             );
+
+#    for ($i = 0; $i < scalar(@tokill); $i++) {
+#      $repstr = $tokill[$i];
+#print "   \"$repstr\"\n";
+#    }
+
+#$t = <>;
+
+#    for ($i = 0; $i < scalar(@toreplace); $i++) {
+#      $repstr = $toreplace[$i][0];
+#      $newstr = $toreplace[$i][1];
+#print "   \"$repstr\" -\> \"$newstr\"\n";
+#    }
+
+#$t = <>;
+#exit;
+
+opendir(DIR, ".");
+#@files = sort(grep(/\.s*html*/, readdir(DIR)));
+@files = sort(grep(/\.s*tst/, readdir(DIR)));
+closedir(DIR); 	                #
+
+
+$i = 0;       #
+
+foreach $filename(@files) {
+
+  chomp($filename);
+#print "$filename\n";
+
+  $title = "";
+  $changed=0;
+
+  open(ORD,"<./$filename") || die("Can't open the $filename\n");
+  @lines = <ORD>;
+  close(ORD);
+
+  @save = @lines;
+ 
+
+#  if (empty($lines[0])) {
+#    while (empty($lines[0])) { shift @lines } # kill start empty strings
+#    $changed=1;
+#  }
+
+
+#  $lines[0] =~ s/^\s+//;
+#  $lines[0] =~ s/\s+$/\n/;
+#  $lines[0] =~ s/<B>\s*([A-Za-z\s\-\w\,\/\.]+)<\/B>/$1/;
+
+
+  foreach $line(@lines) {
+
+    if ($title eq "") {($title) = ($html_text =~ m#<h3 align="center">\s*(.*?)\s*</h3>#is)};
+    if ($title eq "") {($title) = ($html_text =~ m#<h3>\s*(.*?)\s*</h3>#is)};
+    if ($title eq "") {$title = "No title"};
+
+    }
+
+    for ($i = 0; $i < scalar(@tokill); $i++) {
+      $killstr=$tokill[$i];
+      chomp($killstr);
+      if ($line =~ m~$killstr~i) {
+        $line =~ s~$killstr~~ig;
+	#$killstr =~ s~\r~\\r~;
+	#print "   $killstr removed.\n";
+        $changed=1;
+      }
+    }
+
+    for ($i = 0; $i < scalar(@toreplace); $i++) {
+      $repstr = $toreplace[$i][0];
+      $newstr = $toreplace[$i][1];
+      chomp($repstr);
+      chomp($newstr);
+      $repstr =~ s~\$~\\\$~g;
+      $repstr =~ s~\.~\\\.~g;
+      $repstr =~ s~\*~\\\*~g;
+      $repstr =~ s~\=~\\\=~g;
+      $repstr =~ s~\-~\\\-~g;
+      $repstr =~ s~\+~\\\+~g;
+      $repstr =~ s~\"~\\\"~g;
+      $repstr =~ s~\[~\\\[~g;
+      $repstr =~ s~\]~\\\]~g;
+      $repstr =~ s~\(~\\\(~g;
+      $repstr =~ s~\)~\\\)~g;
+      if ($line =~ m~$repstr~i) {
+        $line =~ s~$repstr~$newstr~eig;
+	#print "   $repstr -\> $newstr\n";
+        $changed=1;
+      }
+    }
+
+
+#     $line =~ s~(\b[A-Z\_\-\d]+)</B>~<a href="$ltmp.htm">~;   
+   
+  } # foreach line 
+
+#  exit;
+
+  if ($changed) {
+    print "$filename";
+    
+    open(ORD,">./$filename.bak") || die("Can't rewrite the $filename.bak\n");
+    print ORD @save;
+    close(ORD);
+
+    open(ORD,">./$filename") || die("Can't rewrite the $filename\n ");
+    print ORD @lines;
+    close(ORD);
+
+    print " - MODIFIED.";
+#    $tmp = <>;
+    print "\n";
+  } # if changed
+}  # foreach filename
+
+exit;
+
+####################################
+sub empty {
+ ($tmp) = @_;
+ chomp($tmp);
+ $tmp =~ s/\s//g;
+ return 1 if ($tmp eq ''); 
+ return 0;
+}
+

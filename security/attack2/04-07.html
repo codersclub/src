@@ -1,0 +1,489 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+<title>Мифические удаленные атаки в сети Internet</title>
+<meta name="keywords" content="">
+<meta name="description" content="">
+<!--#include virtual="/ssi/top2.html"-->
+
+<table align="center" cellspacing="0" cellpadding="0" width="750">
+<tr>
+  <td>
+<a href="../index.html">Безопасность</a> &gt;&gt;&gt;
+
+<h1><a href="index.html">АТАКА НА INTERNET</a></h1>
+
+
+<div class=smallr align=right><a href="04.html" class=hml>Удаленные атаки на хосты Internet</a></div>
+<br>
+<div class=captionl><b>Мифические удаленные атаки в сети Internet</b></div>
+<br>
+<p>Завершая тему, мы хотели бы рассказать о так называемых мифических удаленных атаках. К ним можно отнести "почти" осуществимые угрозы, основанные на реальных особенностях протоколов Internet. На практике такое воздействие либо нельзя осуществить (например, IP-фрагментацию как способ проникновения через Firewall), либо вероятность его успеха чрезвычайно мала (например, превышение максимально возможного размера IP-пакетa, или Ping Death). Однако шумиха, поднимаемая некоторыми зарубежными "экспертами" по безопасности Internet, вводит в заблуждение многих пользователей, создавая миф об этих атаках, которые на самом деле никому не угрожают.
+<h3>Фрагментация IP как способ проникновения через Firewall</h3>
+<p>Как известно из описания протокола IP (RFC 791), максимальный размер IP-пакета может достигать 2<sup>16</sup>-1 байт. Однако размер пакета (дейтаграммы), пересылаемого непосредственно по каналу связи, зависит от типа среды передачи. Например, в среде Ethernet максимальный размер дейтаграммы - 1 500 байт, в среде АТМ - 56 байт. Для того чтобы IP-пакеты могли передаваться по сетям любых типов, в протоколе IP предусмотрена IP-фрагментация, то есть разбиение одного большого пакета на соответствующее количество дейтаграмм меньших размеров. Применение такой фрагментации в Internet делает ее более гибкой и инвариантной но отношению к разнообразным физическим средам передачи. На рис. 4.17 приведен формат IP-пакета версии IPv4.
+
+
+<p class="c" align="center">
+<table width=100% bgcolor="black" cellpadding=0 cellspacing=0><tr><td>
+<table width=100% cellpadding=3 cellspacing=1>
+<tr>
+<td width=12% bgcolor=white>
+4-bit<br>Version
+</td>
+<td width=13% bgcolor=white>
+4-bit<br>Header Length
+</td>
+<td width=25% bgcolor=white>
+8-bit<br>Type of Service
+</td>
+<td width=50% bgcolor=white colspan=2>
+16-bit<br>Total Length
+</td>
+</tr>
+<tr>
+<td width=50% bgcolor=white colspan=3>
+16-bit<br>Identification
+</td>
+<td width=10% bgcolor=white>
+3-bit<br>Flags
+</td>
+<td width=40% bgcolor=white>
+13-bit<br>Fragment Offset
+</td>
+</tr>
+<tr>
+<td width=25% bgcolor=white colspan=2>
+8-bit<br>Time to Live
+</td>
+<td width=25% bgcolor=white>
+8-bit<br>Protocol
+</td>
+<td width=50% bgcolor=white colspan=2>
+16-bit<br>Header Checksum
+</td>
+</tr>
+<tr>
+<td width=100% bgcolor=white colspan=5>
+32-bit<br>Source Address
+</td>
+</tr>
+<tr>
+<td width=100% bgcolor=white colspan=5>
+32-bit<br>Destination Address
+</td>
+</tr>
+<tr>
+<td width=100% bgcolor=white colspan=5>
+Options & Padding
+</td>
+</tr>
+<tr>
+<td width=100% bgcolor=white colspan=5>
+Data
+</td>
+</tr>
+
+</table>
+</td></tr>
+</table>
+<br><i>Рис. 4.17. Формат IP-пакета версии IPv4</i>
+
+
+<p>Обратим внимание на поля Fragment Offset (Смещение фрагмента) и Flags (Индикаторы фрагментации) в IP-заголовке (RFC 791). Поле Flags показывает, фрагментирован пакет или нет. В поле Fragment Offset содержится значение смещения фрагмента относительно начала дейтаграммы, <i>измеряемое восьмерками байт</i>. Именно на эту особенность и не обратил внимания д-р Коэн (F.В.Cohen) в своей статье "Packet Fragmentation Attacks" ("Атаки посредством фрагментации пакетов") [20]: единица в таком поле означает смещение на 8 байт от начала дейтаграммы.
+<p>Каков же механизм предполагаемого воздействия? Как известно, одной из основных функций всех межсетевых экранов (МЭ) является фильтрация проходящего через них сетевого трафика. При фильтрации на сетевом уровне ограничивается возможность доступа к определенным службам защищаемых хостов. Тип службы, на которую направляется пакет, определяется параметром "порт назначения" в заголовке пакета TCP или UDP (рис. 4.18, 4.19), поэтому МЭ анализирует этот параметр, проверяя его соответствие установленным правилам фильтрации. Если пакет отвечает заданным условиям, то он пропускается дальше, в противном случае - отфильтровывается.
+<p class="c" align="center">
+<table width=100% bgcolor="black" cellpadding=0 cellspacing=0><tr><td>
+<table width=100% cellpadding=3 cellspacing=1>
+<tr>
+<td width=50% bgcolor=white colspan=3>
+16-bit<br>Source Port Number
+</td>
+<td width=50% bgcolor=white>
+16-bit<br>Destination Port Number
+</td>
+</tr>
+<tr>
+<td width=100% bgcolor=white colspan=4>
+32-bit<br>Sequence Number
+</td>
+</tr>
+<tr>
+<td width=100% bgcolor=white colspan=4>
+32-bit<br>Acknowledgement Number
+</td>
+</tr>
+<tr>
+<td width=14% bgcolor=white>
+4-bit<br>Header Length
+</td>
+<td width=18% bgcolor=white>
+6-bit<br>Reserved
+</td>
+<td width=18% bgcolor=white>
+6-bit<br>Flags
+</td>
+<td width=50% bgcolor=white>
+16-bit<br>Window Size
+</td>
+</tr>
+<tr>
+<td width=50% bgcolor=white colspan=3>
+16-bit<br>TCP Checksum
+</td>
+<td width=50% bgcolor=white>
+16-bit<br>Urgent Pointer
+</td>
+</tr>
+<tr>
+<td width=100% bgcolor=white colspan=4>
+Options & Padding
+</td>
+</tr>
+<tr>
+<td width=100% bgcolor=white colspan=4>
+Data
+</td>
+</tr>
+
+</table>
+</td></tr>
+</table>
+<br><i>Рис. 4.18. Формат TCP-пакета</i>
+
+
+<p class="c" align="center">
+<table width=400 bgcolor="black" cellpadding=0 cellspacing=0 align=center><tr><td>
+<table width=400 cellpadding=3 cellspacing=1>
+<tr>
+<td width=50% bgcolor=white>
+16-bit<br>Source Port Number
+</td>
+<td width=50% bgcolor=white>
+16-bit<br>Destination Port Number
+</td>
+</tr>
+<tr>
+<td width=50% bgcolor=white>
+16-bit<br>Length
+</td>
+<td width=50% bgcolor=white>
+16-bit<br>Checksum
+</td>
+</tr>
+<tr>
+<td width=100% bgcolor=white colspan=2>
+Data
+</td>
+</tr>
+
+</table>
+</td></tr>
+</table>
+<br><i>Рис. 4.19. Формат UDP-пакета</i>
+
+<p>В статье "Packet Fragmentation Attacks", опубликованной в конференции All.net, доктор Коэн предложил следующий сценарий предполагаемой атаки, заключающейся в прохождении фрагментироваиного пакета через Firewall без фильтрации. Взломщик разбивает пакет на два фрагмента, из них первый содержит фиктивный TCP- или UDP-заголовок с номером порта назначения, который не фильтруется межсетевым экраном (например, 25-й порт - почтовый SMTP-сервер), а второй имеет такое смещение (равное 1) в поле Fragment Offset, что перекрывает первый пакет и записывает в поле "порт назначения" истинное значение порта той службы, к которой доступ через МЭ запрещен.
+
+<p>
+<table width=100% bgcolor="#F5F5F5" cellpadding=3 cellspacing=0 align=center>
+<tr>
+<td valign=top><img src="images/.pict1.gif" border=0 width=44 height=44></td>
+<td>
+С этой статьей д-ра Коэна [20] происходили с течением времени довольно любопытные изменения. В статье, которую авторы нашли на WWW-сервере all.net в мае 1996 года, для осуществления атаки предлагалось занести в поле Fragment Offset значение, равное 1 (далее будет показано, что в этом случае подобная атака в принципе невозможна). Однако после посещения одного из серверов уже в мае 1997 года авторы с удивлением обнаружили ту же статью, но с одним "небольшим" исправлением: предлагалось заносить в это поле уже не 1, а 0! Во всем остальном статья осталась неизменной.
+</td>
+</tr>
+</table>
+
+<p>В этом случае правила фильтрации пропустят такой IP-пакет, так как сборкой фрагментированных пакетов занимается не МЭ, а операционная система получателя, не проверяя, как правило, накладываются ли части пакета друг на друга. Собранный пакет сетевая ОС передает соответствующей службе, основываясь на данных в поле "порт назначения".
+<p>На первый взгляд атака состоялась: фрагментированный пакет, направленный одной службе, прошел через МЭ и после сборки был передан другой службе, доступ на которую был запрещен правилами фильтрации. Однако д-р Коэн не учел одного важного факта: значение в поле смещения согласно спецификации указывается в восьмерках байт, и даже если установить это значение равным единице и предположить, что сетевая ОС не проверяет наложения фрагментов, то такое наложение произойдет только после первых восьми байт TCP- или UDP-заголовка, в которых, как видно из рис. 4.19, и содержатся поля портов назначения.
+<p>Через некоторое время д-р Коэн, видимо, обнаружил описанную выше ошибку и исправил сценарий: единица в поле Fragment Ottset была заменена им на ноль. Проанализируем, насколько это изменение сделает возможным осуществление такой атаки.
+<p>Действительно, в этом случае кракер может заполнить нужным ему образом ноле Flags (об этом поле в сценарии атаки д-р Коэн даже не упоминает) во втором пакете, а ведь сетевая ОС должна принимать решение о начале сборки фрагментов именно на основании значения из этого поля. Но анализ исходных текстов ядра операционных систем Linux и FreeBSD показал, что <i>IP-пакет будет воспринят этими ОС как фрагмент только тогда, когда значение в поле Fragment Offset не равно 0</i>. Тем не менее, так как в алгоритме сборки фрагментов, описанном в RFC 791, не требуется обязательной проверки значения этого поля, возможно, что некоторые сетевые ОС ее не производят, и, следовательно, атака может иметь успех.
+<p>Как нам кажется, сама идея наложения фрагментов достаточно любопытна. Другое дело, что применение ее для проникновения пакетов атакующего через Firewall в существующем стандарте IPv4 представляется маловероятным.
+<p>
+<h3>Превышение максимально возможного размера IP-пакета, или Ping Death</h3>
+<p>В максимальный размер IP-пакета (65 535 байт) включаются длина IP-заголовка и длина поля данных в IP-пакете. Так как минимальный размер IP-заголовка - 20 байт (максимальный - 60), то соответственно размер данных, передаваемых в одном IP-пакете, не может превышать 65 535 - 20 = 65 515 байт. А что будет, если превысить это число?
+<p>Тестировать свои программы на предельных критических значениях - стандартный для любого программиста ход. Подобные тесты позволяют выявить такие неприятные ошибки, как всевозможные переполнения (буфера, стека, переменной и т. д.).
+<p>Но вернемся к IP. В принципе ничто не мешает атакующему сформировать набор фрагментов, которые после сборки превысят максимально возможный размер IP-пакета. Собственно в этой фразе и сформулирована основная идея данной атаки.
+<p>Итак, 18 декабря 1996 года на информационном сервере СЕКТ появились сообщения о том, что большинство сетевых операционных систем, поддерживающих протоколы TCP/IP, обладают следующей уязвимостью: при передаче на них IP-пакета длиной, превышающей максимально допустимое значение, в этих ОС переполняется буфер или переменная, в результате система "зависает" или перезагружается, то есть налицо отказ в обслуживании. Был приведен и список потенциально опасных платформ:
+<ul>
+<li>Berkeley Software Design, Inc. (BSDI);
+<li>Computer Associates, Intl. (products for NCR);
+<li>Cray Research;
+<li>Digital Equipment Corporation;
+<li>FreeBSD, Inc.; 
+<li>Hewlett-Packard Company;
+<li>IBM Corporation;
+<li>Linux Systems;
+<li>NEC Corporation;
+<li>Open Software Foundation (OSF);
+<li>The Santa Cruz Operation, Inc. (SCO);
+<li>Sun Microsystems, Inc.
+</ul>
+<p>Мы с удивлением прочитали этот перечень операционных систем на различных платформах, а потом принялись за эксперименты. Наше глубочайшее изумление вызвал тот факт, что элементарную ошибку переполнения буфера в модуле IP ядра ОС за почти 20 лет активного функционирования протокола IP разработчики сегодняшних систем до сих пор не замечали. Поэтому мы позволили себе не поверить столь уважаемой организации, как CERT. Но прежде чем начать эксперименты, было решено посмотреть по указанной в CERT ссылке (<u>http://www.sophist.demon.co.uk/ping</u>) на WWW-сервер, где экспертами проводились подобные исследования на различных ОС. На WWW-сервере предлагалось реализовать такое воздействие следующим образом: необходимо выполнить на рабочей станции с ОС Windows 95 или Windows NT следующую команду: ping -l 65527 victim.destination.IP.address (по этой команде атака и получила свое название - Ping Death).
+<p>Так как обычный размер IP-заголовка составляет 20 байт, а размер IСМР-заголовка - 8 байт, то подобный ICMP-пакет будет превышать максимально возможный размер IP-пакета на 20 байт: 65 527 +20+8-65 535 = 20.
+<p>Основываясь на приведенном расчете, эти "эксперты" декларировали, что обычной командой ping можно нарушить работоспособность практически любой сетевой ОС. В завершение предлагалась следующая таблица тестирования различных операционных систем (здесь она приводится в сокращении), на которые данная удаленная атака якобы произвела необходимый эффект. Итак, мы начали тестирование и, честно говоря, абсолютно не удивились, когда исследуемые ОС - IRIX, AIX, VMS, SunOs, FreeBSD, Linux, Windows NT 4.0, даже Windows 95 и Windows for WorkGroups 3.11 - абсолютно не реагировали на подобный некорректный запрос, продолжая нормально функционировать. Тогда были предприняты специальные поиски операционной системы, которую бы действительно вывела из строя данная атака. Ей оказалась Windows 3.11 с WinQVT - эта ОС действительно "зависла".
+
+<p>Таблица 4.2. Уязвимые операционные системы
+<table width=100% bgcolor="black" cellpadding=0 cellspacing=0><tr><td>
+<table width=100% cellpadding=3 cellspacing=1>
+<tr>
+<td bgcolor=white align=center>
+<b>Операционная система</b>
+</td>
+<td bgcolor=white align=center>
+<b>Версия ПО</b>
+</td>
+<td bgcolor=white align=center>
+<b>Симптомы</b>
+</td>
+</tr>
+<tr>
+<td bgcolor=white align=center>
+Solaris (x86)
+</td>
+<td bgcolor=white align=center>
+2.4, 2.5, 2.51
+</td>
+<td bgcolor=white align=center>
+Перезагрузка
+</td>
+</tr>
+<tr>
+<td bgcolor=white align=center>
+Minix
+</td>
+<td bgcolor=white align=center>
+1.7.4, v2.0 и, возможно, другие
+</td>
+<td bgcolor=white align=center>
+Сбой
+</td>
+</tr>
+<tr>
+<td bgcolor=white align=center>
+HP3000 MPE/iX
+</td>
+<td bgcolor=white align=center>
+4.0, 5.0, 5.5
+</td>
+<td bgcolor=white align=center>
+Сброс системы
+</td>
+</tr>
+<tr>
+<td bgcolor=white align=center>
+Convex SPP-UX
+</td>
+<td bgcolor=white align=center>
+Все версии
+</td>
+<td bgcolor=white align=center>
+Сбой
+</td>
+</tr>
+<tr>
+<td bgcolor=white align=center>
+Apple Mac
+</td>
+<td bgcolor=white align=center>
+MacOS 7.x.x
+</td>
+<td bgcolor=white align=center>
+Сбой
+</td>
+</tr>
+<tr>
+<td bgcolor=white align=center>
+Windows 3.11 with Trumpet Winsock
+</td>
+<td bgcolor=white align=center>
+?
+</td>
+<td bgcolor=white align=center>
+Смешанные отчеты
+</td>
+</tr>
+<tr>
+<td bgcolor=white align=center>
+Novell NetWare
+</td>
+<td bgcolor=white align=center>
+3.x
+</td>
+<td bgcolor=white align=center>
+Смешанные результаты
+</td>
+</tr>
+<tr>
+<td bgcolor=white align=center>
+Windows 95
+</td>
+<td bgcolor=white align=center>
+Все
+</td>
+<td bgcolor=white align=center>
+Сбой
+</td>
+</tr>
+<tr>
+<td bgcolor=white align=center>
+AIX
+</td>
+<td bgcolor=white align=center>
+3 и 4
+</td>
+<td bgcolor=white align=center>
+Сброс системы
+</td>
+</tr>
+<tr>
+<td bgcolor=white align=center>
+Linux
+</td>
+<td bgcolor=white align=center>
+2.0.23
+</td>
+<td bgcolor=white align=center>
+Спонтанная перезагрузка или зависание (kernel panic)
+</td>
+</tr>
+<tr>
+<td bgcolor=white align=center>
+DEC Unix/OSF1
+</td>
+<td bgcolor=white align=center>
+2.0 и выше
+</td>
+<td bgcolor=white align=center>
+Зависание (kernel panic)
+</td>
+</tr>
+<tr>
+<td bgcolor=white align=center>
+Open VMS for AXP
+</td>
+<td bgcolor=white align=center>
+Различные
+</td>
+<td bgcolor=white align=center>
+Смешанные отчеты
+</td>
+</tr>
+<tr>
+<td bgcolor=white align=center>
+Open VMS for VAX
+</td>
+<td bgcolor=white align=center>
+v6.2, UCX v4.0 и другие
+</td>
+<td bgcolor=white align=center>
+Перезагрузка
+</td>
+</tr>
+<tr>
+<td bgcolor=white align=center>
+HP-UX
+</td>
+<td bgcolor=white align=center>
+9.0 по 10.20
+</td>
+<td bgcolor=white align=center>
+Сбой, перезагрузка, зависание
+</td>
+</tr>
+<tr>
+<td bgcolor=white align=center>
+Windows NT
+</td>
+<td bgcolor=white align=center>
+3.5.1
+</td>
+<td bgcolor=white align=center>
+Смешанные результаты
+</td>
+</tr>
+<tr>
+<td bgcolor=white align=center>
+Irix
+</td>
+<td bgcolor=white align=center>
+5.3
+</td>
+<td bgcolor=white align=center>
+Зависание (kernel panic)
+</td>
+</tr>
+<tr>
+<td bgcolor=white align=center>
+Windows NT
+</td>
+<td bgcolor=white align=center>
+4
+</td>
+<td bgcolor=white align=center>
+Сбой
+</td>
+</tr>
+<tr>
+<td bgcolor=white align=center>
+SCO Openserver
+</td>
+<td bgcolor=white align=center>
+4.2, 5.0.x
+</td>
+<td bgcolor=white align=center>
+Уязвима
+</td>
+</tr>
+<tr>
+<td bgcolor=white align=center>
+DEC TOPS-20, TOPS-10
+</td>
+<td bgcolor=white align=center>
+Все
+</td>
+<td bgcolor=white align=center>
+Ошибки
+</td>
+</tr>
+<tr>
+<td bgcolor=white align=center>
+Digital Firewall
+</td>
+<td bgcolor=white align=center>
+?
+</td>
+<td bgcolor=white align=center>
+Уязвима
+</td>
+</tr>
+<tr>
+<td bgcolor=white align=center>
+AltaVista Firewall for UNIX
+</td>
+<td bgcolor=white align=center>
+?
+</td>
+<td bgcolor=white align=center>
+Уязвима
+</td>
+</tr>
+
+</table>
+</td>
+</tr>
+</table>
+
+<p>Этим "экспертам", которым столь доверяют CERT и СIАС, мы послали запрос, где попросили прояснить возникшую ситуацию, а также уточнить сведения из вышеприведенной таблицы. В полученном нами ответе говорилось, что успех данной атаки зависит от многих факторов, а именно: программного и аппаратного обеспечения, установленного на компьютере, и, самое главное, от фазы Луны. Как говорится, без комментариев. Для полноты картины мы хотели бы привести описание exploit, созданного для Windows NT 4.0, задача которого, используя ping, "завесить" <i>собственный компьютер</i> (!). Сначала предлагалось запустить Web Browser, затем - taskmgr (Task Manager): так Ping Death якобы лучше работает (еще не хватает шаманского бубна!). И наконец, требовалось запустить 18 ping-процессов (почему не 100?). Если вы думаете, что после всего этого ваша ОС немедленно "повиснет", то ошибаетесь! В комментариях к exploit до получения эффекта предлагалось ждать примерно 10 минут, а может быть, несколько больше или несколько меньше.
+<p>Можно сделать вывод, что опасения по поводу данного воздействия ни на чем не основаны, и нам остается только назвать эту атаку очередной программистской байкой и причислить ее к разряду практически неосуществимых.
+
+<table align="center" cellspacing="0" cellpadding="0">
+<tr>
+    <td align="right"><a href="04-06.html" target="_self">&laquo;</a>&nbsp;&nbsp;</td>
+    <td align="right">&nbsp;&nbsp;<a href="04-08.html" target="_self">&raquo;</a></td>
+</tr>
+</table>
+
+</td>
+</tr>
+</table>
+
+<!--#include virtual="/ssi/bottom.html"-->
