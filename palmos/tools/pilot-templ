@@ -1,0 +1,368 @@
+#!/usr/bin/perl -w
+
+# pilot-template 1.31 : Create the template files for a PalmOS application
+# Copyright (C) 1998 Ian Goldberg <iang@cs.berkeley.edu>
+#
+# Ported to PalmOS SDK 3.5-4.0 (C) 2001 Belousov Oleg
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+use strict 'vars';
+
+print <<'EOC';
+
+pilot-template 1.31 by Ian Goldberg <iang@cs.berkeley.edu>
+
+EOC
+
+my $Usage = <<EOU;
+Usage: $0 [-pbitm] prcname appname iconname CrID
+  [-pbitm]: If -pbitm is specified, make a blank icon in pbitm format;
+            otherwise, make a blank icon in pbm format
+  prcname : The desired name for the .prc file
+  appname : The desired name for the application (up to 31 chars)
+  iconname: The desired (short) name to appear in the application launcher
+  CrID    : The desired four-character Creator ID
+             (This _must_ be unique for every application in the world;
+	      get a creator id at
+	      http://palmpilot.3com.com/devzone/crid/crid.html)
+
+Example: $0 template.prc 'Template application' 'Test app' Tmpl
+EOU
+
+my $iconext = 'pbm';
+if ($#ARGV >= 0 && $ARGV[0] eq '-pbitm') {
+    $iconext = 'pbitm';
+    shift @ARGV;
+}
+
+die $Usage unless $#ARGV == 3;
+
+my ($prcname, $appname, $iconname, $crid) = @ARGV;
+
+die $Usage unless length($crid) == 4 && length($appname) < 32;
+
+## Strip the .prc, if any, from the prcname
+$prcname =~ s/\.prc$//;
+
+## Make sure none of the files already exists
+my $f;
+foreach $f ("Makefile", $prcname.".c", $prcname.".".${iconext},
+		$prcname.".rcp", $prcname."Rsc.h", "callback.h") {
+    die "File $f already exists - aborting.\n" if -e $f;
+}
+
+## Create the files
+open(F, ">Makefile") or die "Cannot write Makefile: $!\n";
+print F <<EOFILE;
+## Makefile for $appname
+
+TARGET = $prcname
+APPNAME = "$appname"
+APPID = "$crid"
+EOFILE
+print F <<'EOFILE';
+
+OBJS = $(TARGET).o
+LIBS =
+
+CC = m68k-palmos-coff-gcc
+
+CFLAGS = -Wall -g -O2
+
+PILRC = pilrc
+OBJRES = obj-res
+NM = m68k-palmos-coff-nm
+BUILDPRC = build-prc
+PILOTXFER = pilot-xfer
+
+all: $(TARGET).prc
+
+.S.o:
+	$(CC) $(TARGETFLAGS) -c $<
+
+.c.s:
+	$(CC) $(CSFLAGS) $<
+
+$(TARGET).prc: code0000.$(TARGET).grc code0001.$(TARGET).grc data0000.$(TARGET).grc pref0000.$(TARGET).grc rloc0000.$(TARGET).grc bin.res
+	$(BUILDPRC) $(TARGET).prc $(APPNAME) $(APPID) code0001.$(TARGET).grc code0000.$(TARGET).grc data0000.$(TARGET).grc *.bin pref0000.$(TARGET).grc rloc0000.$(TARGET).grc
+
+code0000.$(TARGET).grc: $(TARGET)
+	$(OBJRES) $(TARGET)
+
+code0001.$(TARGET).grc: code0000.$(TARGET).grc
+
+data0000.$(TARGET).grc: code0000.$(TARGET).grc
+
+pref0000.$(TARGET).grc: code0000.$(TARGET).grc
+
+rloc0000.$(TARGET).grc: code0000.$(TARGET).grc
+
+EOFILE
+print F <<EOFILE;
+bin.res: \$(TARGET).rcp \$(TARGET).$iconext
+EOFILE
+print F <<'EOFILE';
+	$(PILRC) $(TARGET).rcp .
+	touch bin.res
+
+$(TARGET): $(OBJS)
+	$(CC) $(CFLAGS) $(OBJS) -o $(TARGET) $(LIBS)
+	! $(NM) -u $(TARGET) | grep .
+
+send: $(TARGET).prc
+	$(PILOTXFER) -i $(TARGET).prc
+
+depend:
+	makedepend -Y -I. *.c
+
+clean:
+	-rm -f *.[oa] $(TARGET) *.bin bin.res *.grc Makefile.bak
+
+veryclean: clean
+	-rm -f $(TARGET).prc pilot.ram pilot.scratch
+
+EOFILE
+close(F);
+
+open(F, ">${prcname}.c") or die "Cannot write ${prcname}.c: $!\n";
+print F <<EOFILE;
+/* Main code for $appname */
+
+#include <PalmOS.h>
+#include <PalmCompatibility.h>
+#include "callback.h"
+
+#include "${prcname}Rsc.h"
+
+static Boolean MainFormHandleEvent (EventPtr e)
+{
+    Boolean handled = false;
+    FormPtr frm;
+    
+    CALLBACK_PROLOGUE
+
+    switch (e->eType) {
+    case frmOpenEvent:
+	frm = FrmGetActiveForm();
+	FrmDrawForm(frm);
+	handled = true;
+	break;
+
+    case menuEvent:
+	MenuEraseStatus(NULL);
+
+	switch(e->data.menu.itemID) {
+	}
+
+    	handled = true;
+	break;
+
+    case ctlSelectEvent:
+	switch(e->data.ctlSelect.controlID) {
+	}
+	break;
+
+    default:
+        break;
+    }
+
+    CALLBACK_EPILOGUE
+
+    return handled;
+}
+
+static Boolean ApplicationHandleEvent(EventPtr e)
+{
+    FormPtr frm;
+    Word    formId;
+    Boolean handled = false;
+
+    if (e->eType == frmLoadEvent) {
+	formId = e->data.frmLoad.formID;
+	frm = FrmInitForm(formId);
+	FrmSetActiveForm(frm);
+
+	switch(formId) {
+	case MainForm:
+	    FrmSetEventHandler(frm, MainFormHandleEvent);
+	    break;
+	}
+	handled = true;
+    }
+
+    return handled;
+}
+
+/* Get preferences, open (or create) app database */
+static Word StartApplication(void)
+{
+    FrmGotoForm(MainForm);
+    return 0;
+}
+
+/* Save preferences, close forms, close app database */
+static void StopApplication(void)
+{
+    FrmSaveAllForms();
+    FrmCloseAllForms();
+}
+
+/* The main event loop */
+static void EventLoop(void)
+{
+    Word err;
+    EventType e;
+
+    do {
+	EvtGetEvent(&e, evtWaitForever);
+	if (! SysHandleEvent (&e))
+	    if (! MenuHandleEvent (NULL, &e, &err))
+		if (! ApplicationHandleEvent (&e))
+		    FrmDispatchEvent (&e);
+    } while (e.eType != appStopEvent);
+}
+
+/* Main entry point; it is unlikely you will need to change this except to
+   handle other launch command codes */
+DWord PilotMain(Word cmd, Ptr cmdPBP, Word launchFlags)
+{
+    Word err;
+
+    if (cmd == sysAppLaunchCmdNormalLaunch) {
+
+	err = StartApplication();
+	if (err) return err;
+
+	EventLoop();
+	StopApplication();
+
+    } else {
+	return sysErrParamErr;
+    }
+
+    return 0;
+}
+EOFILE
+close(F);
+
+open(F, ">${prcname}Rsc.h") or die "Cannot write ${prcname}Rsc.h: $!\n";
+print F "#define MainForm 1000\n";
+close(F);
+
+open(F, ">${prcname}.rcp") or die "Cannot write ${prcname}.rcp: $!\n";
+print F <<EOFILE;
+#include "${prcname}Rsc.h"
+
+FORM MainForm 1 1 158 158
+BEGIN
+    TITLE "$appname"
+END
+
+APPLICATIONICONNAME 1000 "$iconname"
+ICON "$prcname.$iconext"
+
+VERSION ID 1 "0.0.1"
+EOFILE
+close(F);
+
+open(F, ">${prcname}.${iconext}") or
+    die "Cannot write ${prcname}.${iconext}: $!\n";
+if ($iconext eq 'pbitm') {
+    print F <<EOB;
+------------#######-------------
+----------###########-----------
+---------#############----------
+--------###############---------
+-------#################--------
+------###################-------
+------###################-------
+-----#####################------
+-----#####################------
+-----#####################------
+-----#####################------
+-----#####################------
+-----#####################------
+-----#####################------
+------###################-------
+------###################-------
+-------#################--------
+--------###############---------
+---------#############----------
+----------###########-----------
+------------#######-------------
+--------------------------------
+--------------------------------
+--------------------------------
+--------------------------------
+--------------------------------
+--------------------------------
+--------------------------------
+--------------------------------
+--------------------------------
+--------------------------------
+--------------------------------
+EOB
+} elsif ($iconext eq 'pbm') {
+    print F "P4\n32 32\n";
+    my ($bitmap) = <<EOB;
+000fe000003ff800007ffc0000fffe00
+01ffff0003ffff8003ffff8007ffffc0
+07ffffc007ffffc007ffffc007ffffc0
+07ffffc007ffffc003ffff8003ffff80
+01ffff0000fffe00007ffc00003ff800
+000fe000000000000000000000000000
+00000000000000000000000000000000
+00000000000000000000000000000000
+EOB
+    $bitmap =~ tr/0-9a-f//cd;
+    print F pack('H*', $bitmap);
+} else {
+    die "Unknown icon type $iconext\n";
+}
+close(F);
+
+open(F, ">callback.h") or
+    die "Cannot write callback.h: $!\n";
+
+print F <<'EOFILE';
+#ifndef __CALLBACK_H__
+#define __CALLBACK_H__
+
+/* This is a workaround for a bug in the current version of gcc:
+
+   gcc assumes that no one will touch %a4 after it is set up in crt0.o.
+   This isn't true if a function is called as a callback by something
+   that wasn't compiled by gcc (like FrmCloseAllForms()).  It may also
+   not be true if it is used as a callback by something in a different
+   shared library.
+
+   We really want a function attribute "callback" which will insert this
+   progloue and epilogoue automatically.
+   
+      - Ian */
+
+register void *reg_a4 asm("%a4");
+
+#define CALLBACK_PROLOGUE \
+    void *save_a4 = reg_a4; asm("move.l %%a5,%%a4; sub.l #edata,%%a4" : :);
+
+#define CALLBACK_EPILOGUE reg_a4 = save_a4;
+
+#endif
+EOFILE
+close(F);
+
+print "Done.\n";
