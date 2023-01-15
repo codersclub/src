@@ -1,0 +1,150 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3 align="center">Как преобразовать доменное имя в IP
+    адрес</h3>
+    <hr>
+    <p>Автор: Randy Birch</p>
+    <p><img src="iplookup.gif" width="306" height="158"></p>
+    <p>Добавьте следующий код в секцию объявлений
+    модуля BAS:</p>
+    <pre>Option Explicit</pre>
+    <pre>Public Const IP_SUCCESS As Long = 0
+Public Const MAX_WSADescription As Long = 256
+Public Const MAX_WSASYSStatus As Long = 128
+Public Const WS_VERSION_REQD As Long = &amp;H101
+Public Const WS_VERSION_MAJOR As Long = WS_VERSION_REQD \ &amp;H100 And &amp;HFF&amp;
+Public Const WS_VERSION_MINOR As Long = WS_VERSION_REQD And &amp;HFF&amp;
+Public Const MIN_SOCKETS_REQD As Long = 1
+Public Const SOCKET_ERROR As Long = -1
+
+Public Type WSADATA
+   wVersion As Integer
+   wHighVersion As Integer
+   szDescription(0 To MAX_WSADescription) As Byte
+   szSystemStatus(0 To MAX_WSASYSStatus) As Byte
+   wMaxSockets As Long
+   wMaxUDPDG As Long
+   dwVendorInfo As Long
+End Type
+
+Private Declare Function gethostbyname Lib &quot;wsock32&quot; _
+  (ByVal hostname As String) As Long
+  
+Private Declare Sub CopyMemory Lib &quot;kernel32&quot; _
+   Alias &quot;RtlMoveMemory&quot; _
+  (xDest As Any, _
+   xSource As Any, _
+   ByVal nbytes As Long)
+
+Private Declare Function lstrlenA Lib &quot;kernel32&quot; _
+  (lpString As Any) As Long
+
+Public Declare Function WSAStartup Lib &quot;wsock32&quot; _
+   (ByVal wVersionRequired As Long, _
+    lpWSADATA As WSADATA) As Long
+    
+Public Declare Function WSACleanup Lib &quot;wsock32&quot; () As Long
+
+
+Public Function SocketsInitialize() As Boolean
+
+   Dim WSAD As WSADATA
+   Dim success As Long
+   
+   SocketsInitialize = WSAStartup(WS_VERSION_REQD, WSAD) = IP_SUCCESS
+    
+End Function
+
+
+Public Sub SocketsCleanup()
+   
+   If WSACleanup() &lt;&gt; 0 Then
+       MsgBox &quot;Windows Sockets error occurred in Cleanup.&quot;, vbExclamation
+   End If
+    
+End Sub
+
+
+Public Function GetIPFromHostName(ByVal sHostName As String) As String
+
+<font
+color="#0000ff">  'преобразуем доменное имя в IP адрес.
+</font>
+   Dim nbytes As Long
+   Dim ptrHosent As Long  
+   Dim ptrName As Long    
+   Dim ptrAddress As Long 
+   Dim ptrIPAddress As Long
+   Dim sAddress As String
+   
+   sAddress = Space$(4)
+
+   ptrHosent = gethostbyname(sHostName &amp; vbNullChar)
+
+   If ptrHosent &lt;&gt; 0 Then
+
+<font
+color="#0000ff"> </font>     ptrAddress = ptrHosent + 12
+      
+<font color="#0000ff">     'получаем IP адрес</font>
+      CopyMemory ptrAddress, ByVal ptrAddress, 4
+      CopyMemory ptrIPAddress, ByVal ptrAddress, 4
+      CopyMemory ByVal sAddress, ByVal ptrIPAddress, 4
+
+      GetIPFromHostName = IPToText(sAddress)
+
+   End If
+   
+End Function
+
+
+Private Function IPToText(ByVal IPAddress As String) As String
+
+   IPToText = CStr(Asc(IPAddress)) &amp; &quot;.&quot; &amp; _
+              CStr(Asc(Mid$(IPAddress, 2, 1))) &amp; &quot;.&quot; &amp; _
+              CStr(Asc(Mid$(IPAddress, 3, 1))) &amp; &quot;.&quot; &amp; _
+              CStr(Asc(Mid$(IPAddress, 4, 1)))
+              
+End Function</pre>
+    <pre>
+</pre>
+    <table width="719">
+      <tr>
+        <td width="715" bgColor="#29527c" height="22"></td>
+      </tr>
+    </table>
+    <p>А теперь добавьте на форму кнопку (Command1),
+    текстовое поле и следующий код:</p>
+    <span id="copyfrm"><pre>Private Sub Command1_Click()
+
+   Dim sHostName As String
+   
+   If SocketsInitialize() Then
+   
+<font
+color="#0000ff">     'передаём доменный адрес в функцию</font>
+      sHostName = Text1.Text
+      Text2.Text = GetIPFromHostName(sHostName)
+      
+      SocketsCleanup
+      
+   Else
+   
+        MsgBox &quot;Windows Sockets for 32 bit Windows &quot; &amp; _
+               &quot;is not successfully responding.&quot;
+   
+   End If
+   
+
+   
+End Sub</span></pre>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

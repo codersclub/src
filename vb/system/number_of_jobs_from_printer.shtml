@@ -1,0 +1,186 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3>Как узнать количество заданий на принтере.</h3>
+    <p>Компилятор: Visual Basic</p>
+    <strong><p>'КОД ФОРМЫ</strong><br>
+    <br>
+    Private Sub Command1_Click()<br>
+    MsgBox &quot;Количество запущенных заданий: &quot; &amp;
+    GetPrinterQueue(Printer.DeviceName)<br>
+    End Sub<br>
+    <br>
+    <strong>'КОД МОДУЛЯ</strong><br>
+    <br>
+    Option Explicit<br>
+    Public Const CCHDEVICENAME = 32<br>
+    Public Const CCHFORMNAME = 32<br>
+    Public Const PRINTER_ACCESS_ADMINISTER = &amp;H4<br>
+    Public Const PRINTER_ACCESS_USE = &amp;H8<br>
+    Public Type DEVMODE<br>
+    dmDeviceName As String * CCHDEVICENAME<br>
+    dmSpecVersion As Integer<br>
+    dmDriverVersion As Integer<br>
+    dmSize As Integer<br>
+    dmDriverExtra As Integer<br>
+    dmFields As Long<br>
+    dmOrientation As Integer<br>
+    dmPaperSize As Integer<br>
+    dmPaperLength As Integer<br>
+    dmPaperWidth As Integer<br>
+    dmScale As Integer<br>
+    dmCopies As Integer<br>
+    dmDefaultSource As Integer<br>
+    dmPrintQuality As Integer<br>
+    dmColor As Integer<br>
+    dmDuplex As Integer<br>
+    dmYResolution As Integer<br>
+    dmTTOption As Integer<br>
+    dmCollate As Integer<br>
+    dmFormName As String * CCHFORMNAME<br>
+    dmUnusedPadding As Integer<br>
+    dmBitsPerPel As Long<br>
+    dmPelsWidth As Long<br>
+    dmPelsHeight As Long<br>
+    dmDisplayFlags As Long<br>
+    dmDisplayFrequency As Long<br>
+    End Type<br>
+    Public Type PRINTER_DEFAULTS<br>
+    pDatatype As String<br>
+    pDevMode As DEVMODE<br>
+    DesiredAccess As Long<br>
+    End Type<br>
+    Public Type SYSTEMTIME<br>
+    wYear As Integer<br>
+    wMonth As Integer<br>
+    wDayOfWeek As Integer<br>
+    wDay As Integer<br>
+    wHour As Integer<br>
+    wMinute As Integer<br>
+    wSecond As Integer<br>
+    wMilliseconds As Integer<br>
+    End Type<br>
+    Public Type JOB_INFO_1_API<br>
+    JobId As Long<br>
+    pPrinterName As Long<br>
+    pMachineName As Long<br>
+    pUserName As Long<br>
+    pDocument As Long<br>
+    pDatatype As Long<br>
+    pStatus As Long<br>
+    Status As Long<br>
+    Priority As Long<br>
+    Position As Long<br>
+    TotalPages As Long<br>
+    PagesPrinted As Long<br>
+    Submitted As SYSTEMTIME<br>
+    End Type<br>
+    Public Type JOB_INFO_1<br>
+    JobId As Long<br>
+    pPrinterName As String<br>
+    pMachineName As String<br>
+    pUserName As String<br>
+    pDocument As String<br>
+    pDatatype As String<br>
+    pStatus As String<br>
+    Status As Long<br>
+    Priority As Long<br>
+    Position As Long<br>
+    TotalPages As Long<br>
+    PagesPrinted As Long<br>
+    Submitted As SYSTEMTIME<br>
+    End Type<br>
+    Public Declare Function OpenPrinter Lib &quot;winspool.drv&quot; Alias
+    &quot;OpenPrinterA&quot; (ByVal pPrinterName As String, phPrinter As Long, pDefault As
+    PRINTER_DEFAULTS) As Long<br>
+    Public Declare Function EnumJobs Lib &quot;winspool.drv&quot; Alias &quot;EnumJobsA&quot;
+    (ByVal HPrinter As Long, ByVal FirstJob As Long, ByVal NoJobs As Long, ByVal Level As
+    Long, ByVal pJob As Long, ByVal cdBuf As Long, pcbNeeded As Long, pcReturned As Long) As
+    Long<br>
+    Private Declare Sub CopyMem Lib &quot;kernel32.dll&quot; Alias &quot;RtlMoveMemory&quot;
+    (pTo As Any, uFrom As Any, ByVal lSize As Long)<br>
+    Public Declare Function CloseHandle Lib &quot;kernel32.dll&quot; (ByVal hObject As Long)
+    As Long<br>
+    Private Declare Function lstrlenW Lib &quot;kernel32.dll&quot; (ByVal lpString As Long) As
+    Long<br>
+    Private Declare Function HeapAlloc Lib &quot;kernel32.dll&quot; (ByVal hHeap As Long,
+    ByVal dwFlags As Long, ByVal dwBytes As Long) As Long<br>
+    Private Declare Function GetProcessHeap Lib &quot;kernel32.dll&quot; () As Long<br>
+    Private Declare Function HeapFree Lib &quot;kernel32.dll&quot; (ByVal hHeap As Long, ByVal
+    dwFlags As Long, lpMem As Any) As Long<br>
+    Public JobsDesc(0 To 127) As JOB_INFO_1<br>
+    <br>
+    Public Function TrimStr(strName As String) As String<br>
+    'Finds a null then trims the string<br>
+    Dim x As Integer<br>
+    x = InStr(strName, vbNullChar)<br>
+    If x &gt; 0 Then TrimStr = Left(strName, x - 1) Else TrimStr = strName<br>
+    End Function<br>
+    <br>
+    Function LPSTRtoSTRING(ByVal lngPointer As Long) As String<br>
+    Dim lngLength As Long<br>
+    'Get number of characters in string<br>
+    lngLength = lstrlenW(lngPointer) * 2<br>
+    'Initialize string so we have something to copy the string into<br>
+    LPSTRtoSTRING = String(lngLength, 0)<br>
+    'Copy the string<br>
+    CopyMem ByVal StrPtr(LPSTRtoSTRING), ByVal lngPointer, lngLength<br>
+    'Convert to Unicode<br>
+    LPSTRtoSTRING = TrimStr(StrConv(LPSTRtoSTRING, vbUnicode))<br>
+    End Function<br>
+    <br>
+    'Get the number of Jobs in the specified Printer Queue (max 128)... the PrinterName can be
+    a network path: &quot;\\MYSERVER\MYPRINTER&quot;<br>
+    Function GetPrinterQueue(PrinterName As String) As Long<br>
+    Dim PrinterStruct As PRINTER_DEFAULTS<br>
+    Dim HPrinter As Long<br>
+    Dim ret As Boolean<br>
+    Dim Jobs(0 To 127) As JOB_INFO_1_API<br>
+    Dim pcbNeeded As Long<br>
+    Dim pcReturned As Long<br>
+    Dim i As Integer<br>
+    Dim TempBuff As Long<br>
+    'Initialize the Printer structure<br>
+    PrinterStruct.pDatatype = vbNullString<br>
+    PrinterStruct.pDevMode.dmSize = Len(PrinterStruct.pDevMode)<br>
+    PrinterStruct.DesiredAccess = PRINTER_ACCESS_USE<br>
+    'Get the printer Handle<br>
+    ret = OpenPrinter(PrinterName, HPrinter, PrinterStruct)<br>
+    'Get the Printer active jobs<br>
+    ret = EnumJobs(HPrinter, 0, 127, 1, TempBuff, 0, pcbNeeded, pcReturned)<br>
+    If pcbNeeded = 0 Then<br>
+    GetPrinterQueue = 0<br>
+    Else<br>
+    'Allocate the Buffer<br>
+    TempBuff = HeapAlloc(GetProcessHeap(), 0, pcbNeeded)<br>
+    ret = EnumJobs(HPrinter, 0, 127, 1, TempBuff, pcbNeeded, pcbNeeded, pcReturned)<br>
+    CopyMem Jobs(0), ByVal TempBuff, pcbNeeded<br>
+    For i = 0 To pcReturned - 1<br>
+    JobsDesc(i).pPrinterName = LPSTRtoSTRING(Jobs(i).pPrinterName)<br>
+    JobsDesc(i).pMachineName = LPSTRtoSTRING(Jobs(i).pMachineName)<br>
+    JobsDesc(i).pUserName = LPSTRtoSTRING(Jobs(i).pUserName)<br>
+    JobsDesc(i).pDocument = LPSTRtoSTRING(Jobs(i).pDocument)<br>
+    JobsDesc(i).pDatatype = LPSTRtoSTRING(Jobs(i).pDatatype)<br>
+    JobsDesc(i).pStatus = LPSTRtoSTRING(Jobs(i).pStatus)<br>
+    JobsDesc(i).JobId = Jobs(i).JobId<br>
+    JobsDesc(i).Status = Jobs(i).Status<br>
+    JobsDesc(i).Priority = Jobs(i).Priority<br>
+    JobsDesc(i).Position = Jobs(i).Position<br>
+    JobsDesc(i).TotalPages = Jobs(i).TotalPages<br>
+    JobsDesc(i).PagesPrinted = Jobs(i).PagesPrinted<br>
+    JobsDesc(i).Submitted = Jobs(i).Submitted<br>
+    Next<br>
+    If TempBuff Then HeapFree GetProcessHeap(), 0, TempBuff<br>
+    GetPrinterQueue = pcReturned<br>
+    End If<br>
+    ret = CloseHandle(HPrinter)<br>
+    End Function</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

@@ -1,0 +1,164 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3 align="center">Как расшарить папку при помощи NetShareAdd</h3>
+    <hr>
+    <p>Автор: Randy Birch</p>
+    <p>Компилятор: Visual Basic</p>
+    <p>Функция NetShareAdd даёт в доступ ресурсы сервера
+    или рабочей станции. Для использования функции
+    NetShareAdd необходимы права администратора.</p>
+    <p>Параметр sServer это указатель на строку,
+    содержащую имя удалённого сервера, на котором
+    будет выполнена функция. Эта строка должна
+    обязательно начинаться с символов \\. Если
+    параметр будет задан пустым, то в качестве
+    сервера будет использоваться текущий компьютер.
+    На NT / 2000 / XP для расшаривания ресурса могут
+    использоваться две структуры: SHARE_INFO_2 либо
+    SHARE_INFO_502. В win9x для этого используется структура
+    SHARE_INFO_50. К тому же для win9k параметр структуры
+    shi50_path должен содержать только заглавные буквы.</p>
+    <p><img src="netshareadd.gif" width="358" height="270"></p>
+    <p>Добавьте на форму кнопку (Command1), пять текстовых
+    полей (Text1 - Text5) и следующий код:</p>
+    <p>&nbsp;</p>
+    <pre>Option Explicit</pre>
+    <pre>Private Const NERR_SUCCESS As Long = 0&amp;
+
+<font color="#0000ff">'типы шар</font>
+Private Const STYPE_ALL       As Long = -1  <font
+color="#0000ff">'note: my const</font>
+Private Const STYPE_DISKTREE  As Long = 0
+Private Const STYPE_PRINTQ    As Long = 1
+Private Const STYPE_DEVICE    As Long = 2
+Private Const STYPE_IPC       As Long = 3
+Private Const STYPE_SPECIAL   As Long = &amp;H80000000
+
+<font
+color="#0000ff">'разрешения</font>
+Private Const ACCESS_READ     As Long = &amp;H1
+Private Const ACCESS_WRITE    As Long = &amp;H2
+Private Const ACCESS_CREATE   As Long = &amp;H4
+Private Const ACCESS_EXEC     As Long = &amp;H8
+Private Const ACCESS_DELETE   As Long = &amp;H10
+Private Const ACCESS_ATRIB    As Long = &amp;H20
+Private Const ACCESS_PERM     As Long = &amp;H40
+Private Const ACCESS_ALL      As Long = ACCESS_READ Or _
+                                        ACCESS_WRITE Or _
+                                        ACCESS_CREATE Or _
+                                        ACCESS_EXEC Or _
+                                        ACCESS_DELETE Or _
+                                        ACCESS_ATRIB Or _
+                                        ACCESS_PERM
+
+Private Type SHARE_INFO_2
+  shi2_netname       As Long
+  shi2_type          As Long
+  shi2_remark        As Long
+  shi2_permissions   As Long
+  shi2_max_uses      As Long
+  shi2_current_uses  As Long
+  shi2_path          As Long
+  shi2_passwd        As Long
+End Type
+  
+Private Declare Function NetShareAdd Lib &quot;netapi32&quot; _
+  (ByVal servername As Long, _
+   ByVal level As Long, _
+   buf As Any, _
+   parmerr As Long) As Long
+
+   
+
+Private Sub Form_Load()
+  
+   Text1.Text = &quot;\\&quot; &amp; Environ$(&quot;COMPUTERNAME&quot;)
+   Text2.Text = &quot;c:\program files\adobe&quot;
+   Text3.Text = &quot;vbnetdemo&quot;
+   Text4.Text = &quot;VBnet demo test share&quot;
+   Text5.Text = &quot;&quot;
+   
+End Sub
+
+
+Private Sub Command1_Click()
+
+   Dim success As Long
+               
+   success = ShareAdd(Text1.Text, _
+                      Text2.Text, _
+                      Text3.Text, _
+                      Text4.Text, _
+                      Text5.Text)
+                      
+   Select Case success
+      Case 0:    MsgBox &quot;share created successfully!&quot;
+      Case 2118: MsgBox &quot;share name already exists&quot;
+      Case Else: MsgBox &quot;create error &quot; &amp; success
+   End Select
+
+End Sub
+
+
+Private Function ShareAdd(sServer As String, _
+                          sSharePath As String, _
+                          sShareName As String, _
+                          sShareRemark As String, _
+                          sSharePw As String) As Long
+   
+   Dim dwServer   As Long
+   Dim dwNetname  As Long
+   Dim dwPath     As Long
+   Dim dwRemark   As Long
+   Dim dwPw       As Long
+   Dim parmerr    As Long
+   Dim si2        As SHARE_INFO_2
+   
+<font
+color="#0000ff">  'получаем указатели на сервер, ресурс и путь</font>
+   dwServer = StrPtr(sServer)
+   dwNetname = StrPtr(sShareName)
+   dwPath = StrPtr(sSharePath)
+   
+<font
+color="#0000ff">  'Если описание или пароль указаны,
+  'то также получаем указатели на них</font>
+   If Len(sShareRemark) &gt; 0 Then
+      dwRemark = StrPtr(sShareRemark)
+   End If
+   
+   If Len(sSharePw) &gt; 0 Then
+      dwPw = StrPtr(sSharePw)
+   End If
+      
+<font
+color="#0000ff">  'подготавливаем структуру SHARE_INFO_2</font>
+   With si2
+      .shi2_netname = dwNetname
+      .shi2_path = dwPath
+      .shi2_remark = dwRemark
+      .shi2_type = STYPE_DISKTREE
+      .shi2_permissions = ACCESS_ALL
+      .shi2_max_uses = -1
+      .shi2_passwd = dwPw
+   End With
+                          
+<font
+color="#0000ff">  'расшариваем ресурс</font>
+   ShareAdd = NetShareAdd(dwServer, _
+                          2, _
+                          si2, _
+                          parmerr)
+                          
+End Function</pre>
+    <p>&nbsp;</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

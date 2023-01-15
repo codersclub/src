@@ -1,0 +1,151 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h2 align="left">
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Получаем время
+    с удалённого NT Сервера</h2>
+    <hr>
+    <blockquote>
+      <p>Автор: Lothar Haensler<br>
+      </p>
+      <p>Здесь представлен небольшой пример,
+      возвращающий VB Date. Данный код возвращает<br>
+      всю информацию о часовом поясе.<br>
+      <br>
+      Поместите следующий код в стандартный модуль BAS: </p>
+      <pre><font size="3"><tt><font color="#990000">
+<font color="#0000ff">option</font> Explicit
+<font
+color="#009900">'</font>
+<font color="#009900">'</font>
+<font color="#0000ff">private</font> Declare Function NetRemoteTOD Lib &quot;Netapi32.dll&quot; ( _
+    tServer <font
+color="#0000ff">as</font> Any, pBuffer <font color="#0000ff">as</font> Long) <font
+color="#0000ff">as</font> Long
+<font color="#009900">'</font>
+<font color="#0000ff">private</font> Type SYSTEMTIME
+    wYear <font
+color="#0000ff">as</font> Integer
+    wMonth <font color="#0000ff">as</font> Integer
+    wDayOfWeek <font
+color="#0000ff">as</font> Integer
+    wDay <font color="#0000ff">as</font> Integer
+    wHour <font
+color="#0000ff">as</font> Integer
+    wMinute <font color="#0000ff">as</font> Integer
+    wSecond <font
+color="#0000ff">as</font> Integer
+    wMilliseconds <font color="#0000ff">as</font> Integer
+End Type
+<font
+color="#009900">'</font>
+<font color="#0000ff">private</font> Type TIME_ZONE_INFORMATION
+    Bias <font
+color="#0000ff">as</font> Long
+    StandardName(32) <font color="#0000ff">as</font> Integer
+    StandardDate <font
+color="#0000ff">as</font> SYSTEMTIME
+    StandardBias <font color="#0000ff">as</font> Long
+    DaylightName(32) <font
+color="#0000ff">as</font> Integer
+    DaylightDate <font color="#0000ff">as</font> SYSTEMTIME
+    DaylightBias <font
+color="#0000ff">as</font> Long
+End Type
+<font color="#009900">'</font>
+<font color="#0000ff">private</font> Declare Function GetTimeZoneInformation Lib &quot;kernel32&quot; (lpTimeZoneInformation <font
+color="#0000ff">as</font> TIME_ZONE_INFORMATION) <font color="#0000ff">as</font> Long
+<font
+color="#009900">'</font>
+<font color="#0000ff">private</font> Declare Function NetApiBufferFree Lib &quot;Netapi32.dll&quot; (<font
+color="#0000ff">byval</font> lpBuffer <font color="#0000ff">as</font> Long) <font
+color="#0000ff">as</font> Long
+<font color="#009900">'</font>
+<font color="#0000ff">private</font> Type TIME_OF_DAY_INFO
+    tod_elapsedt <font
+color="#0000ff">as</font> Long
+    tod_msecs <font color="#0000ff">as</font> Long
+    tod_hours <font
+color="#0000ff">as</font> Long
+    tod_mins <font color="#0000ff">as</font> Long
+    tod_secs <font
+color="#0000ff">as</font> Long
+    tod_hunds <font color="#0000ff">as</font> Long
+    tod_timezone <font
+color="#0000ff">as</font> Long
+    tod_tinterval <font color="#0000ff">as</font> Long
+    tod_day <font
+color="#0000ff">as</font> Long
+    tod_month <font color="#0000ff">as</font> Long
+    tod_year <font
+color="#0000ff">as</font> Long
+    tod_weekday <font color="#0000ff">as</font> Long
+End Type
+<font
+color="#009900">'</font>
+<font color="#0000ff">private</font> Declare Sub CopyMemory Lib &quot;kernel32&quot; Alias &quot;RtlMoveMemory&quot; (Destination <font
+color="#0000ff">as</font> Any, Source <font color="#0000ff">as</font> Any, <font color="#0000ff">byval</font> Length <font
+color="#0000ff">as</font> Long)
+<font color="#009900">'</font>
+<font color="#009900">'</font>
+<font
+color="#0000ff">public</font> Function getRemoteTOD(<font color="#0000ff">byval</font> strServer <font
+color="#0000ff">as</font> <font color="#0000ff">string</font>) <font color="#0000ff">as</font> <font
+color="#0000ff">date</font>
+<font color="#009900">'    </font>
+    Dim result <font
+color="#0000ff">as</font> <font color="#0000ff">date</font>
+    Dim lRet <font color="#0000ff">as</font> Long
+    Dim tod <font
+color="#0000ff">as</font> TIME_OF_DAY_INFO
+    Dim lpbuff <font color="#0000ff">as</font> Long
+    Dim tServer() <font
+color="#0000ff">as</font> Byte
+<font color="#009900">'</font>
+    tServer = strServer &amp; vbNullChar
+    lRet = NetRemoteTOD(tServer(0), lpbuff)
+<font
+color="#009900">'    </font>
+    If lRet = 0 <font color="#0000ff">then</font>
+        CopyMemory tod, <font
+color="#0000ff">byval</font> lpbuff, <font color="#0000ff">len</font>(tod)
+        NetApiBufferFree lpbuff
+        result = DateSerial(tod.tod_year, tod.tod_month, tod.tod_day) + _
+        TimeSerial(tod.tod_hours, tod.tod_mins - tod.tod_timezone, tod.tod_secs)
+        getRemoteTOD = result
+    <font
+color="#0000ff">else</font>
+        Err.Raise Number:=vbObjectError + 1001, _
+        Description:=&quot;cannot <font
+color="#0000ff">get</font> remote TOD&quot;
+    End If
+<font color="#009900">'</font>
+End Function
+
+</font></tt></pre>
+      <p>- для использовании в Вашей программе,
+      вызывайте функцию следующим образом : </p>
+      <pre><tt><font color="#990000">
+<font color="#0000ff">private</font> Sub Command1_Click()
+    Dim d <font
+color="#0000ff">as</font> <font color="#0000ff">date</font>
+<font color="#009900">'</font>
+    d = GetRemoteTOD(&quot;здесь нужно задать имя NT сервера&quot;)
+    MsgBox d
+End Sub
+<font
+color="#009900">'</font>
+<font color="#009900">'</font>
+<font color="#009900">'</font>
+</font></tt></font></pre>
+      <p><a href="1915_remotetod.bas">Скачать BAS модуль</a> </p>
+    </blockquote>
+    <p><br>
+    </td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

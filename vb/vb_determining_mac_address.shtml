@@ -1,0 +1,248 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h2 align="center">Определение MAC адреса сетевой карты</h2>
+    <table border="0" cellPadding="0" cellSpacing="0" width="100%">
+<TBODY>
+      <tr>
+        <td vAlign="top"><img align="right" border="0" hspace="10" src="macaddress.gif"
+        width="321" height="117"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">Данная функция возвращает Medium Access Control (MAC)
+        адресс для сетевой карты. MAC адрес - это
+        уникальное число длиной 48-бит, которое
+        присваивается сетевой карте производителем. MAC
+        адрес используется для маппинга в TCP/IP сетях.</font> <p><font
+        face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">TCP\IP под Windows NT
+        позволяет компьютеру связаться через сеть с
+        другим компьютером используя IP адрес, либо имя
+        хоста, либо NetBIOS имя. Однако, в конечном счёте
+        любое из этих трёх имён будет преобразовано в MAC
+        адрес.</font></p>
+        <p><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">Компилятор:
+        </font><font color="#29527c" face="verdana, arial" size="1"><strong>VB4-32, VB5, VB6</strong></font></td>
+      </tr>
+</TBODY>
+    </table>
+    <p>&nbsp;</p>
+    <div align="left"><table border="0" cellPadding="0" cellSpacing="0" width="100%">
+<TBODY>
+      <tr>
+        <td bgColor="#29527c" height="22" width="100%"><font color="#ffffff"
+        face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2"><strong>&nbsp;Код BAS
+        модуля</strong></font></td>
+      </tr>
+      <tr>
+        <td width="100%"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">&nbsp;&nbsp;<br>
+        Добавьте следующий код в BAS модуль:</font></td>
+      </tr>
+      <tr>
+        <td height="22" vAlign="top" width="100%"><hr color="#255f89" noShade SIZE="1">
+        </td>
+      </tr>
+</TBODY>
+    </table>
+    </div><pre><font face="Courier New"><span
+style="FONT-FAMILY: Courier New; FONT-SIZE: 10pt">Option Explicit</span></font></pre>
+    <pre><font face="Courier New"><span style="FONT-FAMILY: Courier New; FONT-SIZE: 10pt">Public Const NCBASTAT As Long = &amp;H33
+Public Const NCBNAMSZ As Long = 16
+Public Const HEAP_ZERO_MEMORY As Long = &amp;H8
+Public Const HEAP_GENERATE_EXCEPTIONS As Long = &amp;H4
+Public Const NCBRESET As Long = &amp;H32
+
+Public Type NET_CONTROL_BLOCK  'NCB
+   ncb_command    As Byte
+   ncb_retcode    As Byte
+   ncb_lsn        As Byte
+   ncb_num        As Byte
+   ncb_buffer     As Long
+   ncb_length     As Integer
+   ncb_callname   As String * NCBNAMSZ
+   ncb_name       As String * NCBNAMSZ
+   ncb_rto        As Byte
+   ncb_sto        As Byte
+   ncb_post       As Long
+   ncb_lana_num   As Byte
+   ncb_cmd_cplt   As Byte
+   ncb_reserve(9) As Byte ' Reserved, must be 0
+   ncb_event      As Long
+End Type
+
+Public Type ADAPTER_STATUS
+   adapter_address(5) As Byte
+   rev_major         As Byte
+   reserved0         As Byte
+   adapter_type      As Byte
+   rev_minor         As Byte
+   duration          As Integer
+   frmr_recv         As Integer
+   frmr_xmit         As Integer
+   iframe_recv_err   As Integer
+   xmit_aborts       As Integer
+   xmit_success      As Long
+   recv_success      As Long
+   iframe_xmit_err   As Integer
+   recv_buff_unavail As Integer
+   t1_timeouts       As Integer
+   ti_timeouts       As Integer
+   Reserved1         As Long
+   free_ncbs         As Integer
+   max_cfg_ncbs      As Integer
+   max_ncbs          As Integer
+   xmit_buf_unavail  As Integer
+   max_dgram_size    As Integer
+   pending_sess      As Integer
+   max_cfg_sess      As Integer
+   max_sess          As Integer
+   max_sess_pkt_size As Integer
+   name_count        As Integer
+End Type
+   
+Public Type NAME_BUFFER
+   name        As String * NCBNAMSZ
+   name_num    As Integer
+   name_flags  As Integer
+End Type
+
+Public Type ASTAT
+   adapt          As ADAPTER_STATUS
+   NameBuff(30)   As NAME_BUFFER
+End Type
+
+Public Declare Function Netbios Lib &quot;netapi32.dll&quot; _
+   (pncb As NET_CONTROL_BLOCK) As Byte
+     
+Public Declare Sub CopyMemory Lib &quot;kernel32&quot; Alias &quot;RtlMoveMemory&quot; _
+   (hpvDest As Any, ByVal _
+    hpvSource As Long, ByVal _
+    cbCopy As Long)
+     
+Public Declare Function GetProcessHeap Lib &quot;kernel32&quot; () As Long
+
+Public Declare Function HeapAlloc Lib &quot;kernel32&quot; _
+    (ByVal hHeap As Long, ByVal dwFlags As Long, _
+     ByVal dwBytes As Long) As Long
+     
+Public Declare Function HeapFree Lib &quot;kernel32&quot; _
+    (ByVal hHeap As Long, _
+     ByVal dwFlags As Long, _
+     lpMem As Any) As Long
+
+
+Public Function GetMACAddress() As String
+
+<font
+color="#0000ff">  'запрашиваем MAC Адрес для сетевой карты
+  'возвращаем форматированную строку
+</font>   
+   Dim tmp As String
+   Dim pASTAT As Long
+   Dim NCB As NET_CONTROL_BLOCK
+   Dim AST As ASTAT
+
+   NCB.ncb_command = NCBRESET
+   Call Netbios(NCB)
+   
+<font
+color="#0000ff">  'Для получения Media Access Control (MAC) адреса для сетевой карты
+  'программным путём, используется команда Netbios() -
+  'NCBASTAT с именем &quot;*&quot; в поле NCB.ncb_CallName (в 16-символьной строке).
+</font>   NCB.ncb_callname = &quot;*               &quot;
+   NCB.ncb_command = NCBASTAT
+   
+<font
+color="#0000ff">  'Для машин с несколькими сетевыми картами Вам необходимо использовать
+  'номер LANA и выполнять команду NCBASTAT для каждого. LANA номер 0 всегда
+  'соответствует первому сетевому адаптеру. Конечно можно использовать LANA номер
+  'и для одного сетевого адаптера, но это будет считаться как неэффективное
+  'программирование.
+</font>   NCB.ncb_lana_num = 0
+   NCB.ncb_length = Len(AST)
+   
+   pASTAT = HeapAlloc(GetProcessHeap(), HEAP_GENERATE_EXCEPTIONS _
+            Or HEAP_ZERO_MEMORY, NCB.ncb_length)
+            
+   If pASTAT = 0 Then
+      Debug.Print &quot;memory allocation failed!&quot;
+      Exit Function
+   End If
+   
+   NCB.ncb_buffer = pASTAT
+   Call Netbios(NCB)
+   
+   CopyMemory AST, NCB.ncb_buffer, Len(AST)
+   
+   tmp = Format$(Hex(AST.adapt.adapter_address(0)), &quot;00&quot;) &amp; &quot; &quot; &amp; _
+         Format$(Hex(AST.adapt.adapter_address(1)), &quot;00&quot;) &amp; &quot; &quot; &amp; _
+         Format$(Hex(AST.adapt.adapter_address(2)), &quot;00&quot;) &amp; &quot; &quot; &amp; _
+         Format$(Hex(AST.adapt.adapter_address(3)), &quot;00&quot;) &amp; &quot; &quot; &amp; _
+         Format$(Hex(AST.adapt.adapter_address(4)), &quot;00&quot;) &amp; &quot; &quot; &amp; _
+         Format$(Hex(AST.adapt.adapter_address(5)), &quot;00&quot;)
+           
+   
+   HeapFree GetProcessHeap(), 0, pASTAT
+   
+   GetMACAddress = tmp
+
+End Function</span></font></pre>
+    <p><font face="Courier New" size="2">'--end block--'<br>
+    &nbsp;&nbsp;&nbsp;</font></p>
+    <div align="left"><table border="0" cellPadding="0" cellSpacing="0" width="100%">
+<TBODY>
+      <tr>
+        <td bgColor="#29527c" height="22" width="100%"><font color="#ffffff"
+        face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2"><strong>&nbsp;Код
+        формы</strong></font></td>
+      </tr>
+      <tr>
+        <td width="100%"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">&nbsp;&nbsp;<br>
+        Добавьте в форму кнопку (Command1), и текстовое поле
+        (Text1). Метки и фреймы не обязательны. Добавьте в
+        событие кнопки следующий код:</font></td>
+      </tr>
+      <tr>
+        <td height="22" vAlign="top" width="100%"><hr color="#255f89" noShade SIZE="1">
+        </td>
+      </tr>
+</TBODY>
+    </table>
+    </div><pre><font face="Courier New" size="2"><span
+style="FONT-FAMILY: Courier New; FONT-SIZE: 10pt">Option Explicit
+
+Private Sub Command1_Click()
+
+   Text1 = GetMACAddress()
+
+End Sub</span></font></pre>
+    <p><font face="Courier New" size="2">'--end block--'<br>
+    &nbsp;&nbsp;&nbsp;</font></p>
+    <div align="left"><table border="0" cellPadding="0" cellSpacing="0" width="100%">
+<TBODY>
+      <tr>
+        <td bgColor="#29527c" height="22" width="100%"><font color="#ffffff"
+        face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2"><strong>&nbsp;Комментарии</strong></font></td>
+      </tr>
+      <tr>
+        <td width="100%"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">&nbsp;&nbsp;<br>
+        Так же MAC адрес могут иметь и другие устройства.
+        Например, модем моде может иметь MAC адрес. В таких
+        случаях обычно MAC адрес генерируется случайным
+        образом. Netbios возвращает ошибку 0x34 (NRC_ENVNOTDEF), если
+        на адаптере отсутствует сетевое соединение, даже
+        если предварительно был сделан сброс. </font><p><font
+        face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">Для протоколов
+        NetBEUI и IPX, эту информацию можно так же получить
+        через командную строку: </font></p>
+        <p><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">&nbsp;&nbsp;&nbsp;&nbsp;
+        net config workstation</font></td>
+      </tr>
+</TBODY>
+    </table>
+    </div><p><br>
+    </td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

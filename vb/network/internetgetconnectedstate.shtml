@@ -1,0 +1,197 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3 align="center">Как определить тип подключения к сети
+    при помощи InternetGetConnectedState</h3>
+    <hr>
+    <p>Автор: Paul Marshal</p>
+    <p>Компилятор: Visual Basic</p>
+    <p>API функция InternetGetConnectedState содержится в wininet.dll (IE4 /
+    IE5) и показывает состояние подключения к сети
+    локальной системы. Она довольно проста в
+    использовании и возвращает TRUE, если присутствует
+    соединение с интернетом, иначе FALSE.</p>
+    <p>Так же функция содержит параметр dwFlags. После
+    вызова функции, dwFlags содержит состояние текущего
+    соединения.</p>
+    <p><img src="internetgetconnectedstate.gif" width="303" height="321"></p>
+    <p>Добавьте следующий код в секцию объявлений
+    модуля BAS:</p>
+    <p>&nbsp;</p>
+    <pre>Option Explicit</pre>
+    <pre>Public Declare Function InternetGetConnectedState Lib &quot;wininet&quot; _
+  (ByRef dwFlags As Long, _
+   ByVal dwReserved As Long) As Long
+
+<font
+color="#0000ff">'Для соединения с интернетом используется модем.</font>
+Public Const INTERNET_CONNECTION_MODEM As Long = &amp;H1
+
+<font
+color="#0000ff">'Для соединения с интернетом используется LAN.</font>
+Public Const INTERNET_CONNECTION_LAN As Long = &amp;H2
+
+<font
+color="#0000ff">'Для соединения с интернетом используется прокси сервер.</font>
+Public Const INTERNET_CONNECTION_PROXY As Long = &amp;H4
+
+<font
+color="#0000ff">'No longer used.</font>
+Public Const INTERNET_CONNECTION_MODEM_BUSY As Long = &amp;H8
+
+Public Const INTERNET_RAS_INSTALLED As Long = &amp;H10
+Public Const INTERNET_CONNECTION_OFFLINE As Long = &amp;H20
+Public Const INTERNET_CONNECTION_CONFIGURED As Long = &amp;H40
+
+
+<font
+color="#0000ff">'Следующие функции содержат в себе вызов InternetGetConnectedState</font>
+Public Function IsNetConnectViaLAN() As Boolean
+
+   Dim dwflags As Long
+   
+<font
+color="#0000ff">  'передаём пустую переменную в функцию, чтобы
+  'получить состояние флагов, отвечающих за соединение
+</font>   Call InternetGetConnectedState(dwflags, 0&amp;)
+
+<font
+color="#0000ff">  'возвращаем True если флаги указывают на соединение по LAN
+</font>   IsNetConnectViaLAN = dwflags And INTERNET_CONNECTION_LAN
+     
+End Function
+
+
+Public Function IsNetConnectViaModem() As Boolean
+
+   Dim dwflags As Long
+   
+<font
+color="#0000ff">  'передаём пустую переменную в функцию, чтобы
+  'получить состояние флагов, отвечающих за соединение</font>
+   Call InternetGetConnectedState(dwflags, 0&amp;)
+
+<font
+color="#0000ff">  'возвращаем True если флаги указывают на соединение по модему</font>
+   IsNetConnectViaModem = dwflags And INTERNET_CONNECTION_MODEM
+     
+End Function
+
+
+Public Function IsNetConnectViaProxy() As Boolean
+
+   Dim dwflags As Long
+   
+<font
+color="#0000ff">  'передаём пустую переменную в функцию, чтобы
+  'получить состояние флагов, отвечающих за соединение</font>
+   Call InternetGetConnectedState(dwflags, 0&amp;)
+
+<font
+color="#0000ff">  'возвращаем True если флаги указывают на соединение через проксю</font>
+   IsNetConnectViaProxy = dwflags And INTERNET_CONNECTION_PROXY
+     
+End Function
+
+
+Public Function IsNetConnectOnline() As Boolean
+
+<font
+color="#0000ff">  'здесь не нужно флагов - функция вернёт True если
+  'присутствует соединие с интернетом любого типа</font>
+   IsNetConnectOnline = InternetGetConnectedState(0&amp;, 0&amp;)
+     
+End Function
+
+
+Public Function IsNetRASInstalled() As Boolean
+
+   Dim dwflags As Long
+   
+<font
+color="#0000ff">  'передаём пустую переменную в функцию, чтобы
+  'получить состояние флагов, отвечающих за соединение</font>
+   Call InternetGetConnectedState(dwflags, 0&amp;)
+
+<font
+color="#0000ff">  'возвращаем True если флаги показывают, что RAS установлен</font>
+   IsNetRASInstalled = dwflags And INTERNET_RAS_INSTALLED
+     
+End Function
+
+
+Public Function GetNetConnectString() As String
+
+   Dim dwflags As Long
+   Dim msg As String
+
+<font
+color="#0000ff">  'составляем строку для отображения</font>
+   If InternetGetConnectedState(dwflags, 0&amp;) Then
+     
+      If dwflags And INTERNET_CONNECTION_CONFIGURED Then
+         msg = msg &amp; &quot;You have a network connection configured.&quot; &amp; vbCrLf
+      End If
+
+      If dwflags And INTERNET_CONNECTION_LAN Then
+         msg = msg &amp; &quot;The local system connects to the Internet via a LAN&quot;
+      End If
+      
+      If dwflags And INTERNET_CONNECTION_PROXY Then
+            msg = msg &amp; &quot;, and uses a proxy server. &quot;
+      Else: msg = msg &amp; &quot;.&quot;
+      End If
+      
+      If dwflags And INTERNET_CONNECTION_MODEM Then
+         msg = msg &amp; &quot;The local system uses a modem to connect to the Internet. &quot;
+      End If
+      
+      If dwflags And INTERNET_CONNECTION_OFFLINE Then
+         msg = msg &amp; &quot;The connection is currently offline. &quot;
+      End If
+      
+      If dwflags And INTERNET_CONNECTION_MODEM_BUSY Then
+         msg = msg &amp; &quot;The local system's modem is busy with a non-Internet connection. &quot;
+      End If
+      
+      If dwflags And INTERNET_RAS_INSTALLED Then
+         msg = msg &amp; &quot;Remote Access Services are installed on this system.&quot;
+      End If
+      
+   Else
+    
+      msg = &quot;Not connected to the internet now.&quot;
+      
+   End If
+   
+   GetNetConnectString = msg
+
+End Function</pre>
+    <table width="719">
+      <tr>
+        <td width="715" bgColor="#29527c" height="22"></td>
+      </tr>
+    </table>
+    <p>Добавьте на форму кнопку (Command1), шесть текстовых
+    полей (Text1 - Text6). Установите в Text6 свойство Multiline в
+    True и добавьте следующий код:</p>
+    <span id="copyfrm"><pre>Private Sub Command1_Click()
+
+   Text1.Text = IsNetConnectViaLAN()
+   Text2.Text = IsNetConnectViaModem()
+   Text3.Text = IsNetConnectViaProxy()
+   Text4.Text = IsNetConnectOnline()
+   Text5.Text = IsNetRASInstalled()
+   Text6.Text = GetNetConnectString()
+
+End Sub</span></pre>
+    <p>&nbsp;</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

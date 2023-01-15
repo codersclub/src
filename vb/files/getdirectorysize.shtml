@@ -1,0 +1,193 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3 align="center">Как узнать размер директории</h3>
+    <hr>
+    <p>Автор: Randy Birch</p>
+    <p>Компилятор: Visual Basic</p>
+    <p><img src="getdirectorysize.gif" width="309" height="183"></p>
+    <p>В Windows нет API функций, позволяющих получить
+    общий объём, занимаемы указанными файлами,
+    поэтому мы воспользуемся функциями FindFirstFile и
+    FindNextFile. Приведённый ниже пример позволяет
+    получить полный объём директории, а также
+    поддиректорий. Если в примере изменить &quot;*.*&quot;
+    на нужный тип файлов (например *.doc), то можно
+    получить объём, занимаемый только ими.</p>
+    <p>Галочка &quot;Recurse&quot; позволяет суммировать объём
+    поддиректорий. Таки образом, если указать в
+    качестве пути только букву диска и убрать
+    галочку, то будет показан только объём файлов,
+    хранящихся в корневой директории диска.</p>
+    <p>&nbsp;</p>
+    <p>Создайте новый проект с формой, содержащей
+    четыре текстовых поля (Text1, Text2, Text3, Text4), чекбокс
+    (Check1), список (list box - List1), кнопку (Command1) и следующий
+    код:</p>
+    <hr>
+    <pre>Option Explicit</pre>
+    <pre>Private Const vbDot = 46
+Private Const MAXDWORD = &amp;<span id="copybas"><span
+id="copyfrm0">HFFFFFFFF</span></span>
+Private Const MAX_PATH = 260
+Private Const INVALID_HANDLE_VALUE = -1
+Private Const FILE_ATTRIBUTE_DIRECTORY = &amp;H10
+
+Private Type FILETIME
+   dwLowDateTime As Long
+   dwHighDateTime As Long
+End Type
+
+Private Type WIN32_FIND_DATA
+   dwFileAttributes As Long
+   ftCreationTime As FILETIME
+   ftLastAccessTime As FILETIME
+   ftLastWriteTime As FILETIME
+   nFileSizeHigh As Long
+   nFileSizeLow As Long
+   dwReserved0 As Long
+   dwReserved1 As Long
+   cFileName As String * MAX_PATH
+   cAlternate As String * 14
+End Type
+
+Private Type FILE_PARAMS
+   bRecurse          As Boolean
+   nFileCount        As Long
+   nFileSize         As Currency <font
+color="#0000ff">'64-битное значение</font>
+   nSearched         As Long
+   sFileNameExt      As String
+   sFileRoot         As String
+End Type
+
+Private Declare Function FindClose Lib &quot;kernel32&quot; _
+  (ByVal hFindFile As Long) As Long
+   
+Private Declare Function FindFirstFile Lib &quot;kernel32&quot; _
+   Alias &quot;FindFirstFileA&quot; _
+  (ByVal lpFileName As String, _
+   lpFindFileData As WIN32_FIND_DATA) As Long
+   
+Private Declare Function FindNextFile Lib &quot;kernel32&quot; _
+   Alias &quot;FindNextFileA&quot; _
+  (ByVal hFindFile As Long, _
+   lpFindFileData As WIN32_FIND_DATA) As Long
+   
+Private Declare Function lstrlen Lib &quot;kernel32&quot; _
+    Alias &quot;lstrlenW&quot; (ByVal lpString As Long) As Long
+
+Private Declare Function GetTickCount Lib &quot;kernel32&quot; () As Long
+
+
+Private Sub Form_Load()
+
+   Text1.Text = &quot;c:\windows&quot;
+   Check1.Caption = &quot;Recurse&quot;
+   Command1.Caption = &quot;GetDirectorySize&quot;
+   
+End Sub
+
+
+Private Sub Command1_Click()
+
+   Dim tstart As Single   <font
+color="#0000ff">'переменная таймера только для этой процедуры
+</font>   Dim tend As Single     <font
+color="#0000ff">'переменная таймера только для этой процедуры
+</font>   Dim fp As FILE_PARAMS
+   
+   Text2.Text = &quot;&quot;
+   Text3.Text = &quot;&quot;
+   Text4.Text = &quot;&quot;
+   
+   With fp
+      .sFileRoot = QualifyPath(Text1.Text) <font
+color="#0000ff">'начальный путь
+</font>      .sFileNameExt = &quot;*.*&quot;                <font
+color="#0000ff">'нужные файлы
+</font>      .bRecurse = Check1.Value = 1         <font
+color="#0000ff">'True = рекурсией
+</font>   End With
+  
+   tstart = GetTickCount()
+   Call GetDirectorySize(fp.sFileRoot, fp)
+   tend = GetTickCount()
+   
+   Text2.Text = Format$(fp.nSearched, &quot;###,###,###,##0&quot;)
+   Text3.Text = Format$(fp.nFileSize, &quot;###,###,###,##0&quot;)
+   Text4.Text = FormatNumber((tend - tstart) / 1000, 2) &amp; &quot;  seconds&quot;
+                                    
+End Sub
+
+
+Private Sub GetDirectorySize(sRoot As String, fp As FILE_PARAMS)
+
+   Dim wfd As WIN32_FIND_DATA
+   Dim hFile As Long
+  
+   hFile = FindFirstFile(sRoot &amp; &quot;*.*&quot;, wfd)
+  
+   If hFile &lt;&gt; INVALID_HANDLE_VALUE Then
+   
+      Do
+                  
+         If Asc(wfd.cFileName) &lt;&gt; vbDot Then
+            If (wfd.dwFileAttributes And vbDirectory) Then
+            
+               If fp.bRecurse Then
+                  GetDirectorySize sRoot &amp; TrimNull(wfd.cFileName) &amp; &quot;\&quot;, fp
+               End If  <font
+color="#0000ff">'If fp.bRecurse
+</font>            
+            Else
+         
+               fp.nFileCount = fp.nFileCount + 1
+               fp.nFileSize = fp.nFileSize + _
+                            ((wfd.nFileSizeHigh * _
+                             (MAXDWORD + 1)) + _
+                              wfd.nFileSizeLow)
+         
+            End If <font
+color="#0000ff">'If WFD.dwFileAttributes
+</font>            
+         End If  <font
+color="#0000ff">'If Asc(wfd.cFileName)
+</font>      
+         fp.nSearched = fp.nSearched + 1
+      
+      Loop While FindNextFile(hFile, wfd)
+   
+   End If <font
+color="#0000ff">'If hFile
+</font>  
+   Call FindClose(hFile)
+
+End Sub
+
+
+Private Function TrimNull(startstr As String) As String
+
+   TrimNull = Left$(startstr, lstrlen(StrPtr(startstr)))
+   
+End Function
+
+
+Private Function QualifyPath(sPath As String) As String
+
+   If Right$(sPath, 1) &lt;&gt; &quot;\&quot; Then
+         QualifyPath = sPath &amp; &quot;\&quot;
+   Else: QualifyPath = sPath
+   End If
+      
+End Function</pre>
+    <p>&nbsp;</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

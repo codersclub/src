@@ -1,0 +1,239 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3 align="center">Как подключиться к сетевому ресурсу</h3>
+    <hr>
+    <p>Автор: Randy Birch</p>
+    <p>Компилятор: Visual Basic</p>
+    <p><img src="netdrives.gif" width="203" height="301" alt="netdrives.gif (5156 bytes)"></p>
+    <p>Первые две функции показывают стандартные
+    диалоги &quot;Подключение сетевого диска&quot; и &quot;отключение
+    ..&quot;. Вторые две показывают диалоги подключения
+    и отключения сетевого принтера. Третья пара
+    функций поключает сетевые диски без участия
+    пользователя. Предвоследняя кнопка показывает
+    Проводник, чтобы видеть изменения в системе.</p>
+    <p>Добавьте на форму восемь кнопок и следующий код:</p>
+    <pre>Option Explicit</pre>
+    <pre>Private Type NETRESOURCE
+   dwScope       As Long
+   dwType        As Long
+   dwDisplayType As Long
+   dwUsage       As Long
+   lpLocalName   As String
+   lpRemoteName  As String
+   lpComment     As String
+   lpProvider    As String
+End Type
+
+
+
+ 
+Private Declare Function WNetAddConnection2 Lib &quot;mpr&quot; _
+    Alias &quot;WNetAddConnection2A&quot; _
+   (lpNetResource As NETRESOURCE, _
+    ByVal lpPassword As String, _
+    ByVal lpUserName As String, _
+    ByVal dwFlags As Long) As Long
+       
+Private Declare Function WNetCancelConnection2 Lib &quot;mpr&quot; _
+    Alias &quot;WNetCancelConnection2A&quot; _
+   (ByVal lpName As String, _
+    ByVal dwFlags As Long, _
+    ByVal fForce As Long) As Long
+       
+Private Declare Function WNetConnectionDialog Lib &quot;mpr&quot; _
+   (ByVal hwnd As Long, ByVal dwType As Long) As Long
+   
+Private Declare Function WNetDisconnectDialog Lib &quot;mpr&quot; _
+   (ByVal hwnd As Long, ByVal dwType As Long) As Long
+
+<font
+color="#0000ff">'Private Const RESOURCE_CONNECTED = &amp;H1
+'Private Const RESOURCE_REMEMBERED = &amp;H3
+'Private Const RESOURCEDISPLAYTYPE_DOMAIN = &amp;H1
+'Private Const RESOURCEDISPLAYTYPE_GENERIC = &amp;H0
+'Private Const RESOURCEDISPLAYTYPE_SERVER = &amp;H2
+'Private Const RESOURCEUSAGE_CONTAINER = &amp;H2</font>
+
+Private Const ERROR_SUCCESS = 0
+Private Const CONNECT_UPDATE_PROFILE = &amp;H1
+Private Const RESOURCETYPE_DISK = &amp;H1
+Private Const RESOURCETYPE_PRINT = &amp;H2
+Private Const RESOURCETYPE_ANY = &amp;H0
+Private Const RESOURCE_GLOBALNET = &amp;H2
+Private Const RESOURCEDISPLAYTYPE_SHARE = &amp;H3
+Private Const RESOURCEUSAGE_CONNECTABLE = &amp;H1
+
+Private Declare Function ShellExecute Lib &quot;shell32&quot; _
+    Alias &quot;ShellExecuteA&quot; _
+   (ByVal hwnd As Long, _
+    ByVal lpOperation As String, _
+    ByVal lpFile As String, _
+    ByVal lpParameters As String, _
+    ByVal lpDirectory As String, _
+    ByVal nShowCmd As Long) As Long
+    
+Private Const SW_SHOWNORMAL = 1
+
+         
+Private Sub Command1_Click(Index As Integer)
+
+   Dim x As Long
+   
+   Select Case Index
+      Case 0: <font
+color="#0000ff">'Диалог подключения сетевого диска
+              'Если функция выполнена успешно, то возвращённое значение
+              'будет ERROR_SUCCESS (0). Если пользователь нажал &quot;отмену&quot;
+              'то вернётся значение &amp;HFFFFFFFF (или -1).
+              '
+              'Если в функцию передать hwnd, то диалог отобразится
+              'модально по отношению к форме. Если вместо этого параметра
+              'передать 0&amp;, то родительским будет рабочий стол.</font>
+               Call WNetConnectionDialog(Me.hwnd, RESOURCETYPE_DISK)
+      
+      Case 1: <font
+color="#0000ff">'Отключение сетевого диска
+              'В случае удачи вернётся значение
+              'ERROR_SUCCESS (0). В случае отмены &amp;HFFFFFFFF.
+              '
+              'Если в функцию передать hwnd, то диалог отобразится
+              'модально по отношению к форме. Если вместо этого параметра
+              'передать 0&amp;, то родительским будет рабочий стол.</font>
+               Call WNetDisconnectDialog(Me.hwnd, RESOURCETYPE_DISK)
+               
+      Case 2: <font
+color="#0000ff">'Подключаем сетевой принтер.
+              'если писать в одну строку, то должно быть так:
+              '&quot;rundll32.exe shell32.dll,SHHelpShortcuts_RunDLL AddPrinter&quot;
+              'без дополнительных пробелов.</font>
+               Call Shell(&quot;rundll32.exe shell32.dll,&quot; &amp; _
+                          &quot;SHHelpShortcuts_RunDLL AddPrinter&quot;, _
+                           vbNormalFocus)
+              <font
+color="#0000ff">'В Windows NT, можно вызвать встроенный системный диалог
+              'подключения сетевого принтера при помощи API функции -
+              'ConnectToPrinterDlg. Однако этот диалог не получится
+              'вызвать из Visual Basic в Windows 95.
+              'Тем не менее, Вы должны использовать командную строку
+              'как описано в статье MSDN &quot;Add Printer Wizard&quot;
+              '(KB article Q154007)</font>
+               
+      Case 3: <font
+color="#0000ff">'Отключаем сетевой принтер
+              'В случае удачи вернётся значение
+              'ERROR_SUCCESS (0). В случае отмены &amp;HFFFFFFFF.
+              '
+              'Если в функцию передать hwnd, то диалог отобразится
+              'модально по отношению к форме. Если вместо этого параметра
+              'передать 0&amp;, то родительским будет рабочий стол.</font>
+               Call WNetDisconnectDialog(Me.hwnd, RESOURCETYPE_PRINT)
+      
+      Case 4: <font
+color="#0000ff">'Подключаем ресурс как букву диска</font>
+               MsgBox ConnectThisNetworkDrive(&quot;\\someserver\c$&quot;, &quot;G:&quot;)
+      
+      Case 5: <font
+color="#0000ff">'Подключаем ресурс к следующей свободной букве диска</font>
+               MsgBox ConnectNextFreeNetworkDrive(&quot;\\someserver\c$&quot;)
+      
+      Case 6: <font
+color="#0000ff">'показываем проводник</font>
+               Call ShellExecute(0&amp;, &quot;Open&quot;, _
+                                 &quot;explorer.exe&quot;, &quot;/e,/n,c:\&quot;, _
+                                 0&amp;, SW_SHOWNORMAL)
+      Case 7: <font
+color="#0000ff">'Завершаем программу</font>
+               Unload Me
+      
+   End Select
+   
+End Sub
+
+
+Private Function ConnectNextFreeNetworkDrive(sServer As String) As String
+
+   Dim NETR As NETRESOURCE
+   Dim errInfo As Long
+   Dim x As Long
+   Dim testDrv As String
+   
+<font
+color="#0000ff">  'устанавливаем первую букву как C (ASCII 67), а затем, в случае
+  'неудачи, увеличиваем её.</font>
+   x = 67
+   
+   Do
+     
+<font
+color="#0000ff">     'пробуем использовать букву D:</font>
+      x = x + 1
+      testDrv = Chr$(x) &amp; &quot;:&quot;
+      
+      With NETR
+         .dwScope = RESOURCE_GLOBALNET
+         .dwType = RESOURCETYPE_DISK
+         .dwDisplayType = RESOURCEDISPLAYTYPE_SHARE
+         .dwUsage = RESOURCEUSAGE_CONNECTABLE
+         .lpRemoteName = sServer
+         .lpLocalName = testDrv
+      End With
+      
+      errInfo = WNetAddConnection2(NETR, _
+                                   vbNullString, _
+                                   &quot;username&quot;, _
+                                   CONNECT_UPDATE_PROFILE)
+      
+   Loop Until x = 90 Or errInfo = ERROR_SUCCESS   '90 = &quot;z&quot;
+   
+   
+<font
+color="#0000ff">  'в случае удачи возвращаем диск</font>
+   If errInfo = ERROR_SUCCESS Then
+         ConnectNextFreeNetworkDrive = testDrv
+   Else: ConnectNextFreeNetworkDrive = &quot;no dice&quot;
+   End If
+   
+End Function
+
+
+Private Function ConnectThisNetworkDrive(sServer As String, _
+                                         sDrv As String) As Boolean
+
+<font
+color="#0000ff">  'Пытаемся подключить сетевой ресурс
+  'как указанный диск.
+  'если всё впорядке, то ErrInfo=ERROR_SUCCESS</font>
+
+   Dim NETR As NETRESOURCE
+   Dim errInfo As Long
+   
+   With NETR
+      .dwScope = RESOURCE_GLOBALNET
+      .dwType = RESOURCETYPE_DISK
+      .dwDisplayType = RESOURCEDISPLAYTYPE_SHARE
+      .dwUsage = RESOURCEUSAGE_CONNECTABLE
+      .lpRemoteName = sServer
+      .lpLocalName = sDrv
+   End With
+   
+   errInfo = WNetAddConnection2(NETR, _
+                                vbNullString, _
+                                &quot;username&quot;, _
+                                CONNECT_UPDATE_PROFILE)
+   
+   ConnectThisNetworkDrive = errInfo = ERROR_SUCCESS
+
+End Function</pre>
+    <p>&nbsp;</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

@@ -1,0 +1,607 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3 align="center">Как получить информацию об
+    операционной системе при помощи WMI</h3>
+    <hr>
+    <p>Автор: Randy Birch</p>
+    <p>Компилятор: Visual Basic 5.0, 6.0</p>
+    <p><img src="wmioperatingsystem.gif" width="451" height="461"></p>
+    <p>Windows Script Host встроен Microsoft Windows 98, 2000, ME и XP. Если
+    Ваша операционная система Windows 95 или NT4, то
+    прийдётся скачать Windows Script Host с сайта компании
+    Microsoft <a href="http://msdn.microsoft.com/scripting/">http://msdn.microsoft.com/scripting/</a>.</p>
+    <p>Демонстрационный пример показывает только
+    часть информации, которую можно получить при
+    помощи класса Win32_OperatingSystem WMI. В конце статьи
+    представлена таблица, содержащая список всей
+    доступной информации об операционной системе.</p>
+    <p>&nbsp;</p>
+    <p>Добавьте на форму кнопку (Command1) и список (Listview1).
+    Подключите билиотеку в Projects / References Microsoft WMI Scripting
+    Library, и добавьте следующий код:</p>
+    <hr>
+    <pre>Option Explicit</pre>
+    <pre><font color="#0000ff">'/* следующие константы используются для изменения размеров колонок</font>
+Private Const LVM_FIRST As Long = &amp;H1000
+Private Const LVM_SETCOLUMNWIDTH As Long = (LVM_FIRST + 30)
+Private Const LVSCW_AUTOSIZE As Long = -1
+Private Const LVSCW_AUTOSIZE_USEHEADER As Long = -2
+
+Private Declare Function SendMessage Lib &quot;user32&quot; _
+   Alias &quot;SendMessageA&quot; _
+  (ByVal hwnd As Long, _
+   ByVal wMsg As Long, _
+   ByVal wParam As Long, _
+   lParam As Any) As Long
+
+
+Private Sub Form_Load()
+
+   With ListView1
+      .ListItems.Clear
+      .ColumnHeaders.Clear
+      .ColumnHeaders.Add , , &quot;WMI Property&quot;
+      .ColumnHeaders.Add , , &quot;Value(s)&quot;
+      .View = lvwReport
+      .Sorted = False
+   End With
+   
+   Command1.Caption = &quot;OS Info&quot;
+
+End Sub
+
+
+Private Sub Command1_Click()
+
+   ListView1.ListItems.Clear
+   Call wmiOperatingSystemInfo
+   Call lvAutosizeControl(ListView1)
+   
+End Sub
+
+
+Private Sub lvAutosizeControl(lv As ListView)
+
+   Dim col2adjust As Long
+
+<font
+color="#0000ff">  '/* Размер каждой колонки основан на длине текста в заголовке
+  '/* столбца. Если последующая строка шире, то вся колонка
+  '/* подстраивается под эту ширину</font>
+   For col2adjust = 0 To lv.ColumnHeaders.Count - 1
+   
+      Call SendMessage(lv.hwnd, _
+                       LVM_SETCOLUMNWIDTH, _
+                       col2adjust, _
+                       ByVal LVSCW_AUTOSIZE_USEHEADER)
+
+   Next
+   
+End Sub
+
+
+Private Function SplitDateTimeBias(ByVal leasedate As String, _
+                                   leasedatepart As String, _
+                                   leasetimepart As String) As Long
+
+<font
+color="#0000ff">  'получаем дату и время при помощи
+  'Win32_NetworkAdapterConfiguration
+  'и разделяем на компоненты даты и времени, возвращиемые в
+  'переменных leasedatepart и leasetimepart</font>
+   Dim pos     As Long
+   Dim bias    As Long
+  
+   pos = InStr(leasedate, &quot;.&quot;)
+
+   If pos &gt; 0 Then
+
+      bias = StripTimeZoneBias(leasedate)
+      leasedatepart = Left$(leasedate, 8)
+      leasetimepart = Mid$(leasedate, 9, pos - Len(leasedatepart) - 1)
+      leasedatepart = InsertInString(leasedatepart, &quot;-&quot;, 5, &quot;&quot;)
+      leasedatepart = InsertInString(leasedatepart, &quot;-&quot;, 8, &quot;&quot;)
+      leasetimepart = InsertInString(leasetimepart, &quot;:&quot;, 3, &quot;&quot;)
+      leasetimepart = InsertInString(leasetimepart, &quot;:&quot;, 6, &quot;&quot;)
+      
+      SplitDateTimeBias = bias
+
+   Else
+
+   End If
+
+End Function
+
+
+Private Function InsertInString(ByVal sOriginal As String, _
+                                sReplace As String, _
+                                nField As Long, _
+                                sDelimeter As String) As String
+    
+
+         
+   Dim nCount As Long
+   Dim nStart As Long
+   Dim nLast As Long
+    
+   Do While InStr(nStart + 1, sOriginal, sDelimeter) &gt; 0
+    
+      nStart = InStr(nStart + 1, sOriginal, sDelimeter)
+      nCount = nCount + 1
+      
+      If nCount &gt;= nField Then
+         Exit Do
+      End If
+      
+      nLast = nStart
+        
+   Loop
+    
+   
+   Select Case nCount
+   
+      Case 1
+         InsertInString = sReplace &amp; Mid$(sOriginal, nStart)
+      
+      Case Is &gt;= nField
+         InsertInString = Mid$(sOriginal, 1, nLast) &amp; _
+                               sReplace &amp; Mid$(sOriginal, nStart)
+      Case Else
+         InsertInString = sOriginal &amp; _
+                          String$((nField - 1) - nCount, sDelimeter) &amp; _
+                          sReplace
+   End Select
+    
+End Function
+
+
+Private Function StripTimeZoneBias(leasedate As String) As Long
+
+   Dim pos As Long
+   Dim tmp As String
+   
+   pos = InStr(leasedate, &quot;-&quot;)
+   
+   If pos = 0 Then
+      
+      pos = InStr(leasedate, &quot;+&quot;)
+      
+      If pos = 0 Then
+         StripTimeZoneBias = 0
+      Else
+      
+      End If
+      
+   Else
+   
+      tmp = Mid$(leasedate, pos, Len(leasedate))
+      leasedate = Mid$(leasedate, 1, pos - 1)
+      StripTimeZoneBias = CLng(tmp)
+      
+   End If
+
+End Function
+
+
+Private Sub wmiOperatingSystemInfo()
+
+   Dim wmiObjSet As SWbemObjectSet
+   Dim obj As SWbemObject
+   Dim msg As String
+   Dim itmx As ListItem
+      
+<font
+color="#0000ff">  'рабочие переменные для возвращаемых данных</font>
+   Dim dtb As String
+   Dim d As String
+   Dim t As String
+   Dim bias As Long
+   
+   On Local Error Resume Next
+
+   Set wmiObjSet = GetObject(&quot;winmgmts:{impersonationLevel=impersonate}&quot;)._
+                                    InstancesOf(&quot;Win32_OperatingSystem&quot;)
+   
+   For Each obj In wmiObjSet
+    
+<font
+color="#0000ff">     'информация о версии</font>
+      Set itmx = ListView1.ListItems.Add(, , &quot;Operating System&quot;)
+      itmx.SubItems(1) = obj.Caption
+      Set itmx = ListView1.ListItems.Add(, , &quot;Version&quot;)
+      itmx.SubItems(1) = obj.Version
+      Set itmx = ListView1.ListItems.Add(, , &quot;BuildNumber&quot;)
+      itmx.SubItems(1) = obj.BuildNumber
+      Set itmx = ListView1.ListItems.Add(, , &quot;BuildType&quot;)
+      itmx.SubItems(1) = obj.BuildType
+      Set itmx = ListView1.ListItems.Add(, , &quot;Latest Service Pack&quot;)
+      itmx.SubItems(1) = obj.CSDVersion
+      Set itmx = ListView1.ListItems.Add(, , &quot;EncryptionLevel&quot;)
+      itmx.SubItems(1) = obj.EncryptionLevel &amp; &quot;-bit&quot;
+      Set itmx = ListView1.ListItems.Add(, , &quot;OSType&quot;)
+      Select Case obj.OSType
+         Case 15: msg = &quot;WIN3x&quot;
+         Case 16: msg = &quot;WIN95&quot;
+         Case 17: msg = &quot;WIN98&quot;
+         Case 18: msg = &quot;WINNT&quot;
+         Case 19: msg = &quot;WINCE&quot;
+         Case Else: msg = &quot;non-windows - see MSDN for complete list&quot;
+      End Select
+      itmx.SubItems(1) = msg
+      
+<font
+color="#0000ff">     'информация о системе</font>
+      Set itmx = ListView1.ListItems.Add(, , &quot;BootDevice&quot;)
+      itmx.SubItems(1) = obj.BootDevice
+      Set itmx = ListView1.ListItems.Add(, , &quot;RegisteredUser&quot;)
+      itmx.SubItems(1) = obj.RegisteredUser
+      Set itmx = ListView1.ListItems.Add(, , &quot;SerialNumber&quot;)
+      itmx.SubItems(1) = obj.SerialNumber
+      Set itmx = ListView1.ListItems.Add(, , &quot;Status&quot;)
+      itmx.SubItems(1) = obj.Status
+      Set itmx = ListView1.ListItems.Add(, , &quot;SystemDevice&quot;)
+      itmx.SubItems(1) = obj.SystemDevice
+      Set itmx = ListView1.ListItems.Add(, , &quot;SystemDrive&quot;)
+      itmx.SubItems(1) = obj.SystemDrive
+      Set itmx = ListView1.ListItems.Add(, , &quot;WindowsDirectory&quot;)
+      itmx.SubItems(1) = obj.WindowsDirectory
+      Set itmx = ListView1.ListItems.Add(, , &quot;SystemDirectory&quot;)
+      itmx.SubItems(1) = obj.SystemDirectory
+      
+      Set itmx = ListView1.ListItems.Add(, , &quot;LocalDateTime&quot;)
+        dtb = obj.LocalDateTime
+            bias = SplitDateTimeBias(dtb, d, t)
+            itmx.SubItems(1) = Format$(d, &quot;dddd mmm d, yyyy&quot;) &amp; &quot; &quot; &amp; _
+                               Format$(t, &quot;hh:mm&quot;) &amp; _
+                               &quot; (includes &quot; &amp; bias &amp; &quot; bias)&quot;
+            
+      Set itmx = ListView1.ListItems.Add(, , &quot;InstallDate&quot;)
+        dtb = obj.InstallDate
+            bias = SplitDateTimeBias(dtb, d, t)
+            itmx.SubItems(1) = Format$(d, &quot;dddd mmm d, yyyy&quot;) &amp; _
+                               &quot; at &quot; &amp; _
+                               Format$(t, &quot;hh:mm&quot;) &amp; _
+                               &quot; (includes &quot; &amp; bias &amp; &quot; bias)&quot;
+                               
+      Set itmx = ListView1.ListItems.Add(, , &quot;LastBootUpTime&quot;)
+        dtb = obj.LastBootUpTime
+            bias = SplitDateTimeBias(dtb, d, t)
+            itmx.SubItems(1) = Format$(d, &quot;dddd mmm d, yyyy&quot;) &amp; _
+                               &quot; at &quot; &amp; _
+                               Format$(t, &quot;hh:mm&quot;) &amp; _
+                               &quot; (includes &quot; &amp; bias &amp; &quot; bias)&quot;
+                               
+<font
+color="#0000ff">     'страна, язык, временная зона</font>
+      Set itmx = ListView1.ListItems.Add(, , &quot;OSLanguage&quot;)
+      itmx.SubItems(1) = obj.OSLanguage
+      Set itmx = ListView1.ListItems.Add(, , &quot;CodeSet&quot;)
+      itmx.SubItems(1) = obj.CodeSet
+      Set itmx = ListView1.ListItems.Add(, , &quot;Locale&quot;)
+      itmx.SubItems(1) = obj.Locale
+      Set itmx = ListView1.ListItems.Add(, , &quot;CountryCode&quot;)
+      itmx.SubItems(1) = obj.CountryCode
+      Set itmx = ListView1.ListItems.Add(, , &quot;CurrentTimeZone&quot;)
+      itmx.SubItems(1) = obj.CurrentTimeZone
+      
+<font
+color="#0000ff">     'информация о использовании памяти</font>
+      Set itmx = ListView1.ListItems.Add(, , &quot;ForegroundApplicationBoost&quot;)
+      Select Case obj.ForegroundApplicationBoost
+         Case 0: msg = &quot;none&quot;
+         Case 1: msg = &quot;minimum&quot;
+         Case 2: msg = &quot;maximum (default)&quot;
+      End Select
+      itmx.SubItems(1) = msg
+      
+      Set itmx = ListView1.ListItems.Add(, , &quot;TotalVisibleMemorySize&quot;)
+      itmx.SubItems(1) = FormatNumber(obj.TotalVisibleMemorySize, 0)
+      Set itmx = ListView1.ListItems.Add(, , &quot;FreePhysicalMemory&quot;)
+      itmx.SubItems(1) = FormatNumber(obj.FreePhysicalMemory, 0)
+      Set itmx = ListView1.ListItems.Add(, , &quot;TotalVirtualMemorySize&quot;)
+      itmx.SubItems(1) = FormatNumber(obj.TotalVirtualMemorySize, 0)
+      Set itmx = ListView1.ListItems.Add(, , &quot;FreeVirtualMemory&quot;)
+      itmx.SubItems(1) = FormatNumber(obj.FreeVirtualMemory, 0)
+      Set itmx = ListView1.ListItems.Add(, , &quot;FreeSpaceInPagingFiles&quot;)
+      itmx.SubItems(1) = FormatNumber(obj.FreeSpaceInPagingFiles, 0)
+      Set itmx = ListView1.ListItems.Add(, , &quot;SizeStoredInPagingFiles&quot;)
+      itmx.SubItems(1) = FormatNumber(obj.SizeStoredInPagingFiles, 0)
+      
+    Next
+    
+End Sub</pre>
+    <table width="719">
+      <tr>
+        <td width="715" bgColor="#29527c" height="22"></td>
+      </tr>
+    </table>
+    <p>Ниже приведена вся информация, возвращаемая
+    классом Win32_OperatingSystem (некоторые операционные
+    системы могут возвращать не всю информацию,
+    предесмотренную данным классом):<br>
+    &nbsp;&nbsp;</p>
+    <table id="AutoNumber1" style="BORDER-COLLAPSE: collapse" borderColor="#111111"
+    cellSpacing="0" cellPadding="0" border="0">
+<TBODY>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">string</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">BootDevice</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">string</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">BuildNumber</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">string</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">BuildType</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">string</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">Caption</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">string</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">CodeSet</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">string</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">CountryCode</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">string</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">CreationClassName</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">string</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">CSCreationClassName</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">string</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">CSDVersion</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">string</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">CSName</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">sint16</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">CurrentTimeZone</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">boolean</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">Debug</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">string</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">Description</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">boolean</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">Distributed</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">string</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">EncryptionLevel</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">uint8</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">ForegroundApplicationBoost</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">uint64</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">FreePhysicalMemory</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">uint64</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">FreeSpaceInPagingFiles</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">uint64</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">FreeVirtualMemory</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">datetime</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">InstallDate</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">datetime</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">LastBootUpTime</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">datetime</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">LocalDateTime</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">string</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">Locale</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">string</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">Manufacturer</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">uint32</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">MaxNumberOfProcesses</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">uint64</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">MaxProcessMemorySize</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">string</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">Name</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">uint32</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">NumberOfLicensedUsers</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">uint32</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">NumberOfProcesses</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">uint32</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">NumberOfUsers</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">string</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">Organization</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">uint32</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">OSLanguage</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">uint32</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">OSProductSuite</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">uint16</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">OSType</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">string</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">OtherTypeDescription</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">string</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">PlusProductID</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">string</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">PlusVersionNumber</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">boolean</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">Primary</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">uint8</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">QuantumLength</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">uint8</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">QuantumType</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">string</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">RegisteredUser</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">string</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">SerialNumber</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">uint16</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">ServicePackMajorVersion</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">uint16</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">ServicePackMinorVersion</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">uint64</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">SizeStoredInPagingFiles</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">string</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">Status</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">string</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">SystemDevice</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">string</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">SystemDirectory</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">string</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">SystemDrive</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">uint64</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">TotalSwapSpaceSize</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">uint64</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">TotalVirtualMemorySize</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">uint64</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">TotalVisibleMemorySize</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">string</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">Version</font></td>
+      </tr>
+      <tr>
+        <td noWrap width="125"><font face="Univers, Arial, Helvetica, Verdana, Sans-serif"
+        size="2">string</font> </td>
+        <td><font face="Univers, Arial, Helvetica, Verdana, Sans-serif" size="2">WindowsDirectory</font></td>
+      </tr>
+</TBODY>
+    </table>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

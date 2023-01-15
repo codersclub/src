@@ -1,0 +1,214 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3 align="center">Как посмотреть все сетевые соединения</h3>
+    <hr>
+    <p>Автор: Randy Birch</p>
+    <p>Компилятор: Visual Basic</p>
+    <p><img src="netconnectionenum.gif" width="480" height="306"
+    alt="netconnectionenum.gif (8441 bytes)"></p>
+    <p>Пример демонстрирует подключения и открытые
+    файлы на расшаренном C$ локального компьютера. В NT
+    или 2000 для получения нужной нам информации
+    используется струтктура CONNECTION_INFO_1. В то время как
+    на машинах Windows 9x для этого необходимо
+    воспользоваться CONNECTION_INFO_50. Ко всему прочему в 9x
+    для структуры CONNECTION_INFO_50 необходимо выделять и
+    освобождать буфер до и после вызова API функции.</p>
+    <p>Добавьте на форму кнопку (Command1), список (List1), два
+    лейбла (Label1, Label2) и следующий код:</p>
+    <pre>Option Explicit</pre>
+    <pre>Private Const NERR_SUCCESS As Long = 0&amp;
+Private Const MAX_PREFERRED_LENGTH As Long = -1
+Private Const ERROR_MORE_DATA As Long = 234&amp;
+Private Const LB_SETTABSTOPS As Long = &amp;H192
+   
+Private Const STYPE_DISKTREE = 0
+Private Const STYPE_PRINTQ = 1
+Private Const STYPE_DEVICE = 2
+Private Const STYPE_IPC = 3
+
+<font
+color="#0000ff">'используется только в Win NT/2000</font>
+Private Type CONNECTION_INFO_1
+  coni1_id As Long
+  coni1_type As Long
+  coni1_num_opens As Long
+  coni1_num_users As Long
+  coni1_time As Long
+  coni1_username As Long
+  coni1_netname As Long
+End Type
+
+Private Declare Function NetConnectionEnum Lib &quot;netapi32&quot; _
+  (ByVal servername As Long, _
+   ByVal qualifier As Long, _
+   ByVal level As Long, _
+   bufptr As Long, _
+   ByVal prefmaxlen As Long, _
+   entriesread As Long, _
+   totalentries As Long, _
+   resume_handle As Long) As Long
+   
+Private Declare Function NetApiBufferFree Lib &quot;netapi32&quot; _
+   (ByVal Buffer As Long) As Long
+   
+<font
+color="#0000ff">'стандартные функции</font>
+Private Declare Sub CopyMemory Lib &quot;kernel32&quot; _
+   Alias &quot;RtlMoveMemory&quot; _
+  (pTo As Any, uFrom As Any, _
+   ByVal lSize As Long)
+   
+Private Declare Function lstrlenW Lib &quot;kernel32&quot; _
+  (ByVal lpString As Long) As Long
+
+Private Declare Function SendMessage Lib &quot;user32&quot; _
+   Alias &quot;SendMessageA&quot; _
+  (ByVal hwnd As Long, _
+   ByVal wMsg As Long, _
+   ByVal wParam As Long, _
+   lParam As Any) As Long
+
+
+Private Sub Form_Load()
+
+   ReDim TabArray(0 To 5) As Long
+   
+   TabArray(0) = 59
+   TabArray(1) = 128
+   TabArray(2) = 159
+   TabArray(3) = 185
+   TabArray(4) = 212
+   TabArray(5) = 243
+   
+  <font
+color="#0000ff">'очищаем и устанавливаем столбцы</font>
+   Call SendMessage(List1.hwnd, LB_SETTABSTOPS, 0&amp;, ByVal 0&amp;)
+   Call SendMessage(List1.hwnd, LB_SETTABSTOPS, 6&amp;, TabArray(0))
+   List1.Refresh
+   
+   Command1.Caption = &quot;NetConnectionEnum&quot;
+   Label1.Caption = &quot;call success (0) or error :&quot;
+   Label2.Caption = &quot;&quot;
+   
+End Sub
+
+
+Private Sub Command1_Click()
+
+   Dim bufptr          As Long  <font
+color="#0000ff">'output</font>
+   Dim dwServer        As Long  <font color="#0000ff">'указатель на сервер</font> 
+   Dim dwShare         As Long  <font
+color="#0000ff">'указатель на расшаренный ресурс</font> 
+   Dim dwEntriesread   As Long  <font
+color="#0000ff">'out</font>
+   Dim dwTotalentries  As Long  <font color="#0000ff">'out</font>
+   Dim dwResumehandle  As Long  <font
+color="#0000ff">'out</font>
+   Dim success         As Long  
+   Dim nStructSize     As Long
+   Dim cnt             As Long
+   Dim bServer         As String
+   Dim bShare          As String   
+   Dim ci1             As CONNECTION_INFO_1
+     
+  <font
+color="#0000ff">'для тестирования используем локальный компьютер. Этот параметр может 
+  'указывать либо на локальный компьютер, либо на другой. в данном 
+  'случае COMPUTERNAME, это переменная окружения NT/2000.</font>
+   bServer = &quot;\\&quot; &amp; Environ$(&quot;COMPUTERNAME&quot;) &amp; vbNullString
+   dwServer = StrPtr(bServer)
+   
+   bShare = &quot;C$&quot;
+   dwShare = StrPtr(bShare)
+   
+  <font
+color="#0000ff">'так объявляется в NT/2000!</font> 
+   success = NetConnectionEnum(dwServer, _
+                               dwShare, _
+                               1, _
+                               bufptr, _
+                               MAX_PREFERRED_LENGTH, _
+                               dwEntriesread, _
+                               dwTotalentries, _
+                               dwResumehandle)
+
+   List1.Clear
+   Label2.Caption = success
+   
+   If success = NERR_SUCCESS And _
+      success &lt;&gt; ERROR_MORE_DATA Then
+      
+      nStructSize = LenB(ci1)
+      
+      For cnt = 0 To dwEntriesread - 1
+         
+        <font
+color="#0000ff">'получаем часть данных и копируем их
+        'в CONNECTION_INFO_1, а затем добавляем
+        'данные в список</font>
+         CopyMemory ci1, ByVal bufptr + (nStructSize * cnt), nStructSize
+         
+        <font
+color="#0000ff">'ci1.coni1_time возвращает количество секунд; 
+        'переводим их в минуты</font>
+         List1.AddItem GetPointerToByteStringW(ci1.coni1_username) &amp; vbTab &amp; _
+                       GetPointerToByteStringW(ci1.coni1_netname) &amp; vbTab &amp; _
+                       ci1.coni1_time \ 60 &amp; vbTab &amp; _
+                       ci1.coni1_num_opens &amp; vbTab &amp; _
+                       ci1.coni1_num_users &amp; vbTab &amp; _
+                       ci1.coni1_id &amp; vbTab &amp; _
+                       GetConnectionType(ci1.coni1_type)
+
+      Next
+   End If
+   
+   Call NetApiBufferFree(bufptr)
+
+End Sub
+
+
+Private Function GetPointerToByteStringW(ByVal dwData As Long) As String
+  
+   Dim tmp() As Byte
+   Dim tmplen As Long
+   
+   If dwData &lt;&gt; 0 Then
+   
+      tmplen = lstrlenW(dwData) * 2
+      
+      If tmplen &lt;&gt; 0 Then
+      
+         ReDim tmp(0 To (tmplen - 1)) As Byte
+         CopyMemory tmp(0), ByVal dwData, tmplen
+         GetPointerToByteStringW = tmp
+         
+     End If
+     
+   End If
+    
+End Function
+
+
+Private Function GetConnectionType(ByVal dwSessionType As Long) As String
+
+   Select Case dwSessionType
+      Case STYPE_DISKTREE: GetConnectionType = &quot;Disk drive&quot;
+      Case STYPE_PRINTQ:   GetConnectionType = &quot; Print queue&quot;
+      Case STYPE_DEVICE:   GetConnectionType = &quot;Communication device&quot;
+      Case STYPE_IPC:      GetConnectionType = &quot;(IPC)&quot;
+      Case Else:           GetConnectionType = &quot;&quot;
+   End Select
+   
+End Function</pre>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->

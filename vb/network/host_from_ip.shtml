@@ -1,0 +1,142 @@
+<!--#include virtual="/ssi/top.html"-->
+<div align="center"><center>
+
+<table width="680" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <h3 align="center"> ак преобразовать IP адрес в доменное
+    им€</h3>
+    <hr>
+    <p>јвтор: Randy Birch</p>
+    <p><img src="hostfromip.gif" width="298" height="126"></p>
+    <p>ƒобавьте следующий код в секцию объ€влений
+    модул€ BAS:</p>
+    <pre>Option Explicit</pre>
+    <pre>Private Const WSADescription_Len As Long = 256
+Private Const WSASYS_Status_Len As Long = 128
+Private Const WS_VERSION_REQD As Long = &amp;H101
+Private Const IP_SUCCESS As Long = 0
+Private Const SOCKET_ERROR As Long = -1
+Private Const AF_INET As Long = 2
+
+Private Type WSADATA
+  wVersion As Integer
+  wHighVersion As Integer
+  szDescription(0 To WSADescription_Len) As Byte
+  szSystemStatus(0 To WSASYS_Status_Len) As Byte
+  imaxsockets As Integer
+  imaxudp As Integer
+  lpszvenderinfo As Long
+End Type
+
+Private Declare Function WSAStartup Lib &quot;wsock32&quot; _
+  (ByVal VersionReq As Long, _
+   WSADataReturn As WSADATA) As Long
+  
+Private Declare Function WSACleanup Lib &quot;wsock32&quot; () As Long
+
+Private Declare Function inet_addr Lib &quot;wsock32&quot; _
+  (ByVal s As String) As Long
+
+Private Declare Function gethostbyaddr Lib &quot;wsock32&quot; _
+  (haddr As Long, _
+   ByVal hnlen As Long, _
+   ByVal addrtype As Long) As Long
+
+Private Declare Sub CopyMemory Lib &quot;kernel32&quot; _
+   Alias &quot;RtlMoveMemory&quot; _
+  (xDest As Any, _
+   xSource As Any, _
+   ByVal nbytes As Long)
+   
+Private Declare Function lstrlen Lib &quot;kernel32&quot; _
+   Alias &quot;lstrlenA&quot; _
+  (lpString As Any) As Long
+  
+  
+Public Function SocketsInitialize() As Boolean
+
+   Dim WSAD As WSADATA
+   
+   SocketsInitialize = WSAStartup(WS_VERSION_REQD, WSAD) = IP_SUCCESS
+    
+End Function
+
+
+Public Sub SocketsCleanup()
+   
+   If WSACleanup() &lt;&gt; 0 Then
+       MsgBox &quot;Windows Sockets error occurred in Cleanup.&quot;, vbExclamation
+   End If
+    
+End Sub
+
+
+Public Function GetHostNameFromIP(ByVal sAddress As String) As String
+
+   Dim ptrHosent As Long
+   Dim hAddress As Long
+   Dim nbytes As Long
+   
+   If SocketsInitialize() Then
+
+  <font
+color="#0000ff">   'преобразуем адрес из string в long</font>
+      hAddress = inet_addr(sAddress)
+      
+      If hAddress &lt;&gt; SOCKET_ERROR Then
+         
+<font
+color="#0000ff">        'получаем указатель на структуру HOSTENT
+        'котора€ содержит им€ и адрес, отвечающие за данный
+        'сетевой адрес.
+</font>         ptrHosent = gethostbyaddr(hAddress, 4, AF_INET)
+   
+         If ptrHosent &lt;&gt; 0 Then
+         
+<font
+color="#0000ff">           'преобразуем адрес и получаем доменное им€
+</font>            CopyMemory ptrHosent, ByVal ptrHosent, 4
+            nbytes = lstrlen(ByVal ptrHosent)
+         
+            If nbytes &gt; 0 Then
+               sAddress = Space$(nbytes)
+               CopyMemory ByVal sAddress, ByVal ptrHosent, nbytes
+               GetHostNameFromIP = sAddress
+            End If
+         
+         Else: MsgBox &quot;Call to gethostbyaddr failed.&quot;
+         End If '<font
+color="#0000ff">If ptrHosent</font>
+      
+      SocketsCleanup
+      
+      Else: MsgBox &quot;String passed is an invalid IP.&quot;
+      End If <font
+color="#0000ff">'If hAddress</font>
+   
+   Else: MsgBox &quot;Sockets failed to initialize.&quot;
+   End If  <font
+color="#0000ff">'If SocketsInitialize</font>
+      
+End Function</pre>
+    <p>&nbsp;</p>
+    <table width="719">
+      <tr>
+        <td width="715" bgColor="#29527c" height="22"></td>
+      </tr>
+    </table>
+    <p>ј теперь добавьте на форму кнопку (Command1), два
+    текстовых пол€ (Text1 and Text2), и следующий код:</p>
+    <span id="copyfrm"><pre>Private Sub Command1_Click()
+
+   Text2.Text = GetHostNameFromIP(Text1.Text)
+   
+End Sub</span></pre>
+    <p>&nbsp;</p>
+    <p>&nbsp;</p>
+    <p>&nbsp;</td>
+  </tr>
+</table>
+</center></div>
+<!--#include virtual="/ssi/bottom.html"-->
