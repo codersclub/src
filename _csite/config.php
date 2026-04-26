@@ -12,9 +12,8 @@ $conf['snipets_max_rows']	= '10';
 $conf['']	= '';
 $conf['']	= '';
 
-
 //----------------------------------------------
 // Adjust the Forum Variables
 
-$ibforums->base_url		= 'http://forum.sources.local/index.php?';
-$ibforums->vars['img_url'] = 'http://forum.sources.local/style_images/1';
+$ibforums->base_url		= 'http://forum.sources.ru/index.php?';
+$ibforums->vars['img_url'] = 'http://forum.sources.ru/style_images/1';
