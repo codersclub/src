@@ -1,1481 +1,1638 @@
 <!--#include virtual="/ssi/top.html"-->
 <div align="center"><center>
 
-<h1>Изучаем Direct X вместе на примерах SDK 7.0</h1>
-
-<b>Создадим проект, который показывает первичный и вторичный буфера.</b>
-
-<br>
-<br>
-
-Перед началом работы возьмите DirectX SDK 7.0
-(<a href="http://www.microsoft.com/" target="_blank">http://www.microsoft.com/</a>,
-128 891 648 байт или прямиком
-<a href="http://www.msdn.microsoft.com/directx/downloads.asp" target="_blank">СЮДА</a>),
-скиньте из директории Lib файлы в Visual C++, тоже в директорию Lib,
-и перепишите Include в директорию Include.
-
-<br>
-<br>
-
-Откройте проект имеющий расширение *.mak, а не *.dsw.
-Или же, если у Вас нет терпения качать, а Шаг первый хотите сделать,
-возьмите отсюда:
-<a href="http://zhenya.hotmail.ru/directx/projects\include.rar">include.rar</a>
-и <a href="http://zhenya.hotmail.ru/directx/projects\lib.rar">lib.rar</a>.
-
-<br>
-<br>
-
-Затем загрузите этот проект:
-<a href="http://zhenya.hotmail.ru/directx/projects\projects.rar">project.rar</a>
-.
-
-<br>
-<br>
-
-Откройте проект при помощи меню <b>File-&gt;Open Workspace</b>,
-и выберите ddex1.dsw.
-
-<br>
-<br>
-
-Проект загружен. Можете скомпилировать и посмотреть для
-начала, что происходит. Лично я применял Visual C++ 6.0 взятый из
-Visual Studio 6.0 (но может и на 5.0 компилироваться, если сделать выше
-указанные действия).
-
-<br>
-<br>
-
-Итак, рассмотрим нижеследующий код:
-
-<pre>
-#include &lt;windows.h&gt;
-
-#include &lt;ddraw.h&gt;
-
-#include &lt;stdio.h&gt;
-
-#include &lt;stdarg.h&gt;
-
-#include &quot;resource.h&quot;
-
-int PASCAL
-
-WinMain(HINSTANCE hInstance,
-
-        HINSTANCE
- hPrevInstance,
-
- >
-        LPSTR
- lpCmdLine,
-
- >
-        int nCmdShow)
-
- >{
-
- >
-    MSG                        
- msg;
-
- > 
-
- >
-    InitApp(hInstance, nCmdShow);
-
- > 
-
- >
-    while (GetMessage(&amp;msg, NULL, 0,
- 0))
-
- >
-    {
-
- >
-        TranslateMessage(&amp;msg);
-
- >
-        DispatchMessage(&amp;msg);
-
- >
-    }
-
- >
-    return msg.wParam;
-
- >}
-       
- 
-
-<b>
-style="COLOR: red; FONT-SIZE: 10pt; >РАЗЪЯСНЕНИЕ:</b>
-<b>
->InitApp
->(
-
->hInstance
->,
-
->nCmdShow
->)</b> –
-style="COLOR: blue"> создает класс окна, в котором
-инициализируется
->DirectDraw
->, ниже мы
-его создадим.
-
->Цикл <b>
-
->while
-</b> >–
-обработка сообщений с клавиатуры (постоянна, на
-протяжении всей программы, пока она не
-завершится).
-
-> 
-
->Теперь
-рассмотрим
->InitApp
- >более
-подробно:
-<p style="TEXT-ALIGN: justify; TEXT-INDENT: 14.2pt">
-> 
-
-<pre>
-static
- HRESULT
-
-InitApp(HINSTANCE
- hInstance, int nCmdShow)
-
-{
-
-
-    HWND            
-            hWnd;
-
-
-    WNDCLASS
-                   
- wc;
-
-
-    DDSURFACEDESC2
-             
- ddsd;
-
-
-    DDSCAPS2
-                   
- ddscaps;
-
- 
-
-
-    //
-Устанавливаем
-
- >параметры
-
- >окна
-       
-
-
-
-    wc.style = CS_HREDRAW | CS_VREDRAW;
-
-
-    wc.lpfnWndProc = WindowProc;
-
-
-    wc.cbClsExtra = 0;
-
-
-    wc.cbWndExtra = 0;
-
-
-    wc.hInstance = hInstance;
-
-
-    wc.hIcon = LoadIcon(hInstance,
- MAKEINTRESOURCE(IDI_MAIN_ICON)); style="COLOR: blue">
-
-
-    wc.hCursor = LoadCursor(NULL,
- IDC_ARROW);
-
-
-    wc.hbrBackground = (HBRUSH
- )GetStockObject(BLACK_BRUSH);
-
-
-    wc.lpszMenuName = NAME;
-
-
-    wc.lpszClassName = NAME;
-
-
-    RegisterClass(&amp;wc);
-
- 
-
-
-    //
-Создаем
-
- >окно
-       
-
-
-
-    hWnd = CreateWindowEx(WS_EX_TOPMOST,
-
-
-                         
- NAME,
-
-
-                         
- TITLE,
-
-
-                         
- WS_POPUP,
-
-
-                         
- 0,
-
-
- 
-                         0,
-
-
-                         
- GetSystemMetrics(SM_CXSCREEN),
-
-
-                         
- GetSystemMetrics(SM_CYSCREEN),
-
-
-                         
- NULL, style="COLOR: blue">
-
-
-                         
- NULL,
-
-
-                         
- hInstance,
-
-
-             
-             NULL);
-
-
-    ShowWindow(hWnd, nCmdShow);
-
-
-    UpdateWindow(hWnd);
-
- 
-
-
-    ///////////////////////////////////////////////////////////////////////////
-
-
-    //
-Создаем
-
- >главный
-       
-
- DirectDraw
-объект
-       
-
-
-
-    ///////////////////////////////////////////////////////////////////////////
-
-
-    DirectDrawCreateEx(NULL,
- (VOID**)&amp;g_pDD, IID_IDirectDraw7, NULL);
-
- 
-
-
-    //
-Отображение
-
- >окна
-       
-:
- >полноэкранный
-       
-
-
-
-    g_pDD-&gt;SetCooperativeLevel(hWnd,
- DDSCL_EXCLUSIVE | DDSCL_FULLSCREEN);
-
- 
-
-
-   
-//
- Устанавливаем графический режим 640
-x
-480
-       
-x
-8
-
-   
-
-g_pDD-&gt;SetDisplayMode(640,
- 480, 8, 0, 0);
-
- style="COLOR: blue; FONT-SIZE: 10pt; > 
-
-
-   
-// Создаем
- первичный буфер, у которого есть вторичный
-
-
-   
-ZeroMemory(&amp;ddsd,
- sizeof(ddsd));
-
-
-    ddsd.dwSize = sizeof(ddsd);
-
-
-    ddsd.dwFlags = DDSD_CAPS |
- DDSD_BACKBUFFERCOUNT;
-
-
-    ddsd.ddsCaps.dwCaps =
- DDSCAPS_PRIMARYSURFACE | DDSCAPS_FLIP |
-
-
-                         
- DDSCAPS_COMPLEX;
-
-
-    ddsd.dwBackBufferCount = 1;
-
-
-    g_pDD-&gt;CreateSurface(&amp;ddsd,
- &amp;g_pDDSPrimary, NULL);
-
- 
-
-
-    //
-Делаем
-
- >вторичный
-
- >буфер
-       
-
-
-
-    ZeroMemory(&amp;ddscaps,
- sizeof(ddscaps));
-
-
-    ddscaps.dwCaps = DDSCAPS_BACKBUFFER;
-
-
-    g_pDDSPrimary-&gt;GetAttachedSurface(&amp;ddscaps,
- &amp;g_pDDSBack);
-
- 
-
-
-    //
-Устанавливаем
-
- >таймер
-       
-
- style="mso-tab-count: 1">      
-
-
-    SetTimer(hWnd, TIMER_ID, TIMER_RATE,
- NULL);
-
- 
-
-
-    return DD_OK;
-
-}
-       
-</td>
-      </tr>
-    </table>
-   
-    style="COLOR: blue; FONT-SIZE: 10pt; > 
-   
-А также
-     после #
-include
-
-инициализируем
-    следующие параметры:
-    <p style="TEXT-ALIGN: justify; TEXT-INDENT: 14.2pt">
- 
+<table width="650" cellspacing="0" cellpadding="0">
+  <tr>
+    <td><hr>
+    <b><span
+    style="BACKGROUND: red; COLOR: yellow; FONT-FAMILY: Arial; FONT-SIZE: 14pt; mso-bidi-font-size: 12.0pt; mso-highlight: red"><p
+    align="center">Изучаем </span><span lang="EN-US"
+    style="BACKGROUND: red; COLOR: yellow; FONT-FAMILY: Arial; FONT-SIZE: 14pt; mso-bidi-font-size: 12.0pt; mso-highlight: red; mso-ansi-language: EN-US">Direct
+    X</span><span
+    style="BACKGROUND: red; COLOR: yellow; FONT-FAMILY: Arial; FONT-SIZE: 14pt; mso-bidi-font-size: 12.0pt; mso-highlight: red">
+    вместе на примерах<span style="mso-spacerun: yes">&nbsp; </span></span><span
+    lang="EN-US"
+    style="BACKGROUND: red; COLOR: yellow; FONT-FAMILY: Arial; FONT-SIZE: 14pt; mso-bidi-font-size: 12.0pt; mso-highlight: red; mso-ansi-language: EN-US">SDK</span><span
+    style="BACKGROUND: red; COLOR: yellow; FONT-FAMILY: Arial; FONT-SIZE: 14pt; mso-bidi-font-size: 12.0pt; mso-highlight: red">
+    7.0</span></b></p>
+    <p align="center" class="MsoNormal" style="TEXT-ALIGN: center"><b><span
+    style="FONT-FAMILY: Arial">Создадим проект, который
+    показывает первичный и вторичный буфера.<o:p></o:p></span></b></p>
+    <p align="center" class="MsoNormal" style="TEXT-ALIGN: center">&nbsp;<o:p></o:p></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Перед
+    началом работы возьмите </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">DirectX
+    SDK</span><span style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">
+    7.0 (</span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><a
+    href="http://www.microsoft.com/" target="_parent">http<span lang="RU"
+    style="mso-ansi-language: RU">://</span>www<span lang="RU" style="mso-ansi-language: RU">.</span>microsoft<span
+    lang="RU" style="mso-ansi-language: RU">.</span>com<span lang="RU"
+    style="mso-ansi-language: RU">/</span></a></span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">, 128 891 648
+    байт или прямиком <a
+    href="http://www.msdn.microsoft.com/directx/downloads.asp" target="_parent">сюда</a>),
+    скиньте из директории </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">Lib</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"> файлы в </span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">Visual
+    C</span><span style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">++,
+    тоже в директорию </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">Lib</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">, и<span
+    style="mso-spacerun: yes">&nbsp; </span>перепишите </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">Include</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"> в
+    директорию </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">Include</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">. Откройте
+    проект имеющий расширение *.</span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">mak</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">, а не *.</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">dsw</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">. Или же,
+    если у Вас нет терпения качать, а Шаг первый
+    хотите сделать, возьмите отсюда: </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><a
+    href="http://zhenya.hotmail.ru/directx/projects\include.rar">include<span lang="RU"
+    style="mso-ansi-language: RU">.</span>rar</a> </span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">и </span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><a
+    href="http://zhenya.hotmail.ru/directx/projects\lib.rar">lib<span lang="RU"
+    style="mso-ansi-language: RU">.</span>rar</a></span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">. <o:p></o:p></span></p>
+    <p class="MsoNormal"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></p>
+    <p class="MsoNormal"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Затем
+    загрузите этот проект: </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><a
+    href="http://zhenya.hotmail.ru/directx/projects\projects.rar">project<span lang="RU"
+    style="mso-ansi-language: RU">.</span>rar</a></span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">.<o:p></o:p></span></p>
+    <p align="center" class="MsoNormal" style="TEXT-ALIGN: center">&nbsp;<o:p></o:p></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Откройте
+    проект при помощи меню </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">File</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">-&gt;</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">Open
+    Workspace</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">, и
+    выберите </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">ddex</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">1.</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">dsw</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">. Проект
+    загружен. Можете скомпилировать и посмотреть для
+    начала, что происходит. Лично я применял </span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">Visual
+    C</span><span style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">++
+    6.0 взятый из </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">Visual
+    Studio </span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">6.0 (но
+    может и на 5.0 компилироваться, если сделать выше
+    указанные действия).<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Итак,
+    рассмотрим нижеследующий код:<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify; TEXT-INDENT: 14.2pt"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></p>
     <table bgColor="#00ccff" border="1" cellPadding="0" cellSpacing="0"
     style="BACKGROUND: #00ccff; BORDER-BOTTOM: medium none; BORDER-COLLAPSE: collapse; BORDER-LEFT: medium none; BORDER-RIGHT: medium none; BORDER-TOP: medium none; mso-padding-alt: 0cm 5.4pt 0cm 5.4pt; mso-border-alt: solid windowtext .5pt">
+<TBODY>
       <tr>
- <td
- style="BORDER-BOTTOM: windowtext 0.5pt solid; BORDER-LEFT: windowtext 0.5pt solid; BORDER-RIGHT: windowtext 0.5pt solid; BORDER-TOP: windowtext 0.5pt solid; PADDING-BOTTOM: 0cm; PADDING-LEFT: 5.4pt; PADDING-RIGHT: 5.4pt; PADDING-TOP: 0cm; WIDTH: 478.55pt"
- vAlign="top" width="638">
-       
-#define
- NAME                        
- &quot;DDExample1&quot;
-
-#define
- TITLE                         
- &quot;Direct Draw Example 1&quot;
-
- 
-
-#define
- TIMER_ID                   
- 1
-
-#define
- TIMER_RATE              
- 500
-
- 
-
-LPDIRECTDRAW7
-            
-       g_pDD = NULL;               
- //
-Главный
-       
-
- DirectDraw
-объект
-       
-
-
-LPDIRECTDRAWSURFACE7
-    g_pDDSPrimary = NULL;
-  //
-Первичная
-
- >память
-       
-
- DirectDraw
-
-LPDIRECTDRAWSURFACE7
-    g_pDDSBack = NULL;
-      //
-Вторичная
-
- >память
-       
-
- DirectDraw
-
- 
-
-static
- char                
- szMsg[] = &quot;Page Flipping Test: Press F12 to exit&quot;;
-
-static
- char                
- szFrontMsg[] = &quot;Front buffer (F12 to quit)&quot;;
-
-static
- char                
- szBackMsg[] = &quot;Back buffer (F12 to quit)&quot;;</td>
+        <td
+        style="BORDER-BOTTOM: windowtext 0.5pt solid; BORDER-LEFT: windowtext 0.5pt solid; BORDER-RIGHT: windowtext 0.5pt solid; BORDER-TOP: windowtext 0.5pt solid; PADDING-BOTTOM: 0cm; PADDING-LEFT: 5.4pt; PADDING-RIGHT: 5.4pt; PADDING-TOP: 0cm; WIDTH: 478.55pt"
+        vAlign="top" width="638"><p class="MsoNormal"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">#include
+        &lt;windows.h&gt;<o:p></o:p></span></p>
+        <p class="MsoNormal"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">#include
+        &lt;ddraw.h&gt;<o:p></o:p></span></p>
+        <p class="MsoNormal"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">#include
+        &lt;stdio.h&gt;<o:p></o:p></span></p>
+        <p class="MsoNormal"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">#include
+        &lt;stdarg.h&gt;<o:p></o:p></span></p>
+        <p class="MsoNormal"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">#include
+        &quot;resource.h&quot;<o:p></o:p></span></p>
+        <p class="MsoNormal"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">&nbsp;<o:p></o:p></span></p>
+        <p class="MsoNormal"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">int
+        PASCAL<o:p></o:p></span></p>
+        <p class="MsoNormal"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">WinMain(HINSTANCE
+        hInstance,<o:p></o:p></span></p>
+        <p class="MsoNormal"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span>HINSTANCE
+        hPrevInstance,<o:p></o:p></span></p>
+        <p class="MsoNormal"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span>LPSTR
+        lpCmdLine,<o:p></o:p></span></p>
+        <p class="MsoNormal"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span>int nCmdShow)<o:p></o:p></span></p>
+        <p class="MsoNormal"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">{<o:p></o:p></span></p>
+        <p class="MsoNormal"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>MSG<span style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>msg;<o:p></o:p></span></p>
+        <p class="MsoNormal"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">&nbsp;<o:p></o:p></span></p>
+        <p class="MsoNormal"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>InitApp(hInstance, nCmdShow);<o:p></o:p></span></p>
+        <p class="MsoNormal"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">&nbsp;<o:p></o:p></span></p>
+        <p class="MsoNormal"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>while (GetMessage(&amp;msg, NULL, 0,
+        0))<o:p></o:p></span></p>
+        <p class="MsoNormal"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>{<o:p></o:p></span></p>
+        <p class="MsoNormal"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span>TranslateMessage(&amp;msg);<o:p></o:p></span></p>
+        <p class="MsoNormal"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span>DispatchMessage(&amp;msg);<o:p></o:p></span></p>
+        <p class="MsoNormal"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>}<o:p></o:p></span></p>
+        <p class="MsoNormal"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>return msg.wParam;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">}</span><span
+        lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><o:p></o:p></span></td>
       </tr>
+</TBODY>
     </table>
-   
-    style="COLOR: blue; FONT-SIZE: 10pt; > 
-    <b>
-    style="COLOR: red; FONT-SIZE: 10pt; >РАЗЪЯСНЕНИЕ:</b>
-    <b>
-    style="COLOR: red; FONT-SIZE: 10pt; > </b>
-    <b>
-    style="COLOR: red; FONT-SIZE: 10pt; >Создание
-    объекта
-    style="COLOR: red; FONT-SIZE: 10pt; >DirectDraw
-    style="COLOR: red; FONT-SIZE: 10pt; >,
-    определяем  режим
+    <p class="MsoNormal"><span
+    style="COLOR: blue; FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></p>
+    <p class="MsoNormal"><b><span
+    style="COLOR: red; FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">РАЗЪЯСНЕНИЕ:<o:p></o:p></span></b></p>
+    <p class="MsoNormal"><b><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">InitApp</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">(</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">hInstance</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">, </span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">nCmdShow</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">)</b> –<span
+    style="COLOR: blue"> </span>создает класс окна, в котором
+    инициализируется </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">DirectDraw</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">, ниже мы
+    его создадим.<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Цикл </span><b><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">while
+    </span></b><span style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">–
+    обработка сообщений с клавиатуры (постоянна, на
+    протяжении всей программы, пока она не
+    завершится).<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Теперь
+    рассмотрим </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">InitApp
+    </span><span style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">более
+    подробно:<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify; TEXT-INDENT: 14.2pt"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></p>
+    <table bgColor="#00ccff" border="1" cellPadding="0" cellSpacing="0"
+    style="BACKGROUND: #00ccff; BORDER-BOTTOM: medium none; BORDER-COLLAPSE: collapse; BORDER-LEFT: medium none; BORDER-RIGHT: medium none; BORDER-TOP: medium none; mso-padding-alt: 0cm 5.4pt 0cm 5.4pt; mso-border-alt: solid windowtext .5pt">
+<TBODY>
+      <tr>
+        <td
+        style="BORDER-BOTTOM: windowtext 0.5pt solid; BORDER-LEFT: windowtext 0.5pt solid; BORDER-RIGHT: windowtext 0.5pt solid; BORDER-TOP: windowtext 0.5pt solid; PADDING-BOTTOM: 0cm; PADDING-LEFT: 5.4pt; PADDING-RIGHT: 5.4pt; PADDING-TOP: 0cm; WIDTH: 478.55pt"
+        vAlign="top" width="638"><p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+        lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">static
+        HRESULT<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">InitApp(HINSTANCE
+        hInstance, int nCmdShow)<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">{<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>HWND<span style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>hWnd;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>WNDCLASS<span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>wc;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>DDSURFACEDESC2<span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>ddsd;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>DDSCAPS2<span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>ddscaps;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">&nbsp;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>// </span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Устанавливаем</span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">
+        </span><span style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">параметры</span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">
+        </span><span style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">окна</span><span
+        lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>wc.style = CS_HREDRAW | CS_VREDRAW;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>wc.lpfnWndProc = WindowProc;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>wc.cbClsExtra = 0;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>wc.cbWndExtra = 0;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>wc.hInstance = hInstance;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>wc.hIcon = LoadIcon(hInstance,
+        MAKEINTRESOURCE(IDI_MAIN_ICON));<span style="COLOR: blue"><o:p></o:p></span></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>wc.hCursor = LoadCursor(NULL,
+        IDC_ARROW);<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>wc.hbrBackground = (HBRUSH
+        )GetStockObject(BLACK_BRUSH);<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>wc.lpszMenuName = NAME;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>wc.lpszClassName = NAME;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>RegisterClass(&amp;wc);<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">&nbsp;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>// </span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Создаем</span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">
+        </span><span style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">окно</span><span
+        lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>hWnd = CreateWindowEx(WS_EX_TOPMOST,<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>NAME,<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>TITLE,<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>WS_POPUP,<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>0,<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>0,<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>GetSystemMetrics(SM_CXSCREEN),<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>GetSystemMetrics(SM_CYSCREEN),<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>NULL,<span style="COLOR: blue"><o:p></o:p></span></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>NULL,<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>hInstance,<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>NULL);<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>ShowWindow(hWnd, nCmdShow);<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>UpdateWindow(hWnd);<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">&nbsp;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>///////////////////////////////////////////////////////////////////////////<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>// </span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Создаем</span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">
+        </span><span style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">главный</span><span
+        lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">
+        DirectDraw </span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">объект</span><span
+        lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>///////////////////////////////////////////////////////////////////////////<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>DirectDrawCreateEx(NULL,
+        (VOID**)&amp;g_pDD, IID_IDirectDraw7, NULL);<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">&nbsp;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>// </span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Отображение</span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">
+        </span><span style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">окна</span><span
+        lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">:
+        </span><span style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">полноэкранный</span><span
+        lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>g_pDD-&gt;SetCooperativeLevel(hWnd,
+        DDSCL_EXCLUSIVE | DDSCL_FULLSCREEN);<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">&nbsp;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span></span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">//
+        Устанавливаем графический режим 640</span><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">x</span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">480</span><span
+        lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">x</span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">8<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span style="mso-spacerun: yes"><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;&nbsp;&nbsp;
+        </span></span><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">g_pDD-&gt;SetDisplayMode(640,
+        480, 8, 0, 0);<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="COLOR: blue; FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">&nbsp;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span></span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">// Создаем
+        первичный буфер, у которого есть вторичный<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span></span><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">ZeroMemory(&amp;ddsd,
+        sizeof(ddsd));<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>ddsd.dwSize = sizeof(ddsd);<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>ddsd.dwFlags = DDSD_CAPS |
+        DDSD_BACKBUFFERCOUNT;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>ddsd.ddsCaps.dwCaps =
+        DDSCAPS_PRIMARYSURFACE | DDSCAPS_FLIP |<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>DDSCAPS_COMPLEX;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>ddsd.dwBackBufferCount = 1;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>g_pDD-&gt;CreateSurface(&amp;ddsd,
+        &amp;g_pDDSPrimary, NULL);<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">&nbsp;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>// </span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Делаем</span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">
+        </span><span style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">вторичный</span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">
+        </span><span style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">буфер</span><span
+        lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>ZeroMemory(&amp;ddscaps,
+        sizeof(ddscaps));<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>ddscaps.dwCaps = DDSCAPS_BACKBUFFER;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>g_pDDSPrimary-&gt;GetAttachedSurface(&amp;ddscaps,
+        &amp;g_pDDSBack);<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">&nbsp;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>// </span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Устанавливаем</span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">
+        </span><span style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">таймер</span><span
+        lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-tab-count: 1">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>SetTimer(hWnd, TIMER_ID, TIMER_RATE,
+        NULL);<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">&nbsp;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>return DD_OK;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">}</span><span
+        lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><o:p></o:p></span></td>
+      </tr>
+</TBODY>
+    </table>
+    <p class="MsoNormal"><span lang="EN-US"
+    style="COLOR: blue; FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">&nbsp;<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">А также<span
+    style="mso-spacerun: yes">&nbsp; </span>после #</span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">include</span><span
+    lang="EN-US" style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"> </span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">инициализируем
+    следующие параметры:<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify; TEXT-INDENT: 14.2pt"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></p>
+    <table bgColor="#00ccff" border="1" cellPadding="0" cellSpacing="0"
+    style="BACKGROUND: #00ccff; BORDER-BOTTOM: medium none; BORDER-COLLAPSE: collapse; BORDER-LEFT: medium none; BORDER-RIGHT: medium none; BORDER-TOP: medium none; mso-padding-alt: 0cm 5.4pt 0cm 5.4pt; mso-border-alt: solid windowtext .5pt">
+<TBODY>
+      <tr>
+        <td
+        style="BORDER-BOTTOM: windowtext 0.5pt solid; BORDER-LEFT: windowtext 0.5pt solid; BORDER-RIGHT: windowtext 0.5pt solid; BORDER-TOP: windowtext 0.5pt solid; PADDING-BOTTOM: 0cm; PADDING-LEFT: 5.4pt; PADDING-RIGHT: 5.4pt; PADDING-TOP: 0cm; WIDTH: 478.55pt"
+        vAlign="top" width="638"><p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+        lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">#define
+        NAME<span style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>&quot;DDExample1&quot;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">#define
+        TITLE<span style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>&quot;Direct Draw Example 1&quot;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">&nbsp;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">#define
+        TIMER_ID<span style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>1<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">#define
+        TIMER_RATE<span style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>500<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">&nbsp;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">LPDIRECTDRAW7<span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>g_pDD = NULL;<span style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>// </span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Главный</span><span
+        lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">
+        DirectDraw </span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">объект</span><span
+        lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">LPDIRECTDRAWSURFACE7<span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>g_pDDSPrimary = NULL;<span
+        style="mso-spacerun: yes">&nbsp; </span>// </span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Первичная</span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">
+        </span><span style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">память</span><span
+        lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">
+        DirectDraw<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">LPDIRECTDRAWSURFACE7<span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>g_pDDSBack = NULL;<span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span>// </span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Вторичная</span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">
+        </span><span style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">память</span><span
+        lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">
+        DirectDraw<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">&nbsp;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">static
+        char<span style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>szMsg[] = &quot;Page Flipping Test: Press F12 to exit&quot;;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">static
+        char<span style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>szFrontMsg[] = &quot;Front buffer (F12 to quit)&quot;;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">static
+        char<span style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>szBackMsg[] = &quot;Back buffer (F12 to quit)&quot;;<o:p></o:p></span></td>
+      </tr>
+</TBODY>
+    </table>
+    <p class="MsoNormal"><span lang="EN-US"
+    style="COLOR: blue; FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">&nbsp;<o:p></o:p></span></p>
+    <p class="MsoNormal"><b><span
+    style="COLOR: red; FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">РАЗЪЯСНЕНИЕ:<o:p></o:p></span></b></p>
+    <p class="MsoNormal"><b><span
+    style="COLOR: red; FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></b></p>
+    <p align="center" class="MsoNormal" style="TEXT-ALIGN: center"><b><span
+    style="COLOR: red; FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Создание
+    объекта </span><span lang="EN-US"
+    style="COLOR: red; FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">DirectDraw</span><span
+    style="COLOR: red; FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">,
+    определяем<span style="mso-spacerun: yes">&nbsp; </span>режим
     отображения и разрешаемую графическую
-    способность</b>
-    <b>
-    style="COLOR: red; FONT-SIZE: 10pt; > </b>
-    <b>
-DirectDrawCreateEx(NULL,
-    (VOID**)&amp;g_pDD, IID_IDirectDraw7, NULL);</b>
-   
-Перед тем
-    как пользоваться возможностями
-DirectDraw
-, нужно
-    его создать, что и делает эта функция. <b>
-   
-g
-_
-   
-pDD</b>
- –
-    содержит сам объект на
-DirectDraw
-.
-   
- 
-    <b>
-g_pDD-&gt;SetCooperativeLevel(hWnd,
-    DDSCL_EXCLUSIVE | DDSCL_FULLSCREEN);</b>
-   
-Устанавливаем
-    полноэкранный графический режим.
-    <b>
-DDSCL
-_
-   
-EXCLUSIVE</b>
- –
+    способность<o:p></o:p></span></b></p>
+    <p align="center" class="MsoNormal" style="TEXT-ALIGN: center"><b><span
+    style="COLOR: red; FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></b></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><b><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">DirectDrawCreateEx(NULL,
+    (VOID**)&amp;g_pDD, IID_IDirectDraw7, NULL);<o:p></o:p></span></b></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Перед тем
+    как пользоваться возможностями </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">DirectDraw</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">, нужно
+    его создать, что и делает эта функция. </span><b><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">g</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">_</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">pDD</span></b><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"> –
+    содержит сам объект на </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">DirectDraw</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">.<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><b><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">g_pDD-&gt;SetCooperativeLevel(hWnd,
+    DDSCL_EXCLUSIVE | DDSCL_FULLSCREEN);<o:p></o:p></span></b></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Устанавливаем
+    полноэкранный графический режим.<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><b><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">DDSCL</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">_</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">EXCLUSIVE</span></b><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"> –
     разрешает прямой доступ к видеокарте. Т.е. все
     операции, которые мы будем проводить позднее, они
     будут обрабатываться значительно быстрее.
-    Доступен только при параметре
-DDSCL
-_
-   
-FULLSCREEN
-.
-    <b>
-DDSCL
-_
-   
-FULLSCREEN</b>
- –
-    создаем полноэкранный графический режим.
-   
- 
-    <b>
-g_pDD-&gt;SetDisplayMode(640,
-    480, 8, 0, 0);</b>
-   
-Устанавливаем
-    графический режим.
-   
-<b>640</b> –
-    точек по горизонтали.
-   
-<b>480</b> –
-    точек по вертикали.
-   
-Режимы
-    могут быть: 320
-x
-200, 640
-   
-x
-480, 800
-   
-x
-600, 1024
-   
-x
-768, 1280
-   
-x
-1024, 1600
-   
-x
-1280)
-   
-<b>8</b> –
+    Доступен только при параметре </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">DDSCL</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">_</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">FULLSCREEN</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">.<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><b><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">DDSCL</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">_</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">FULLSCREEN</span></b><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"> –
+    создаем полноэкранный графический режим.<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><b><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">g_pDD-&gt;SetDisplayMode(640,
+    480, 8, 0, 0);<o:p></o:p></span></b></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Устанавливаем
+    графический режим.<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"><b>640</b> –
+    точек по горизонтали.<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"><b>480</b> –
+    точек по вертикали.<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Режимы
+    могут быть: 320</span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">x</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">200, 640</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">x</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">480, 800</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">x</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">600, 1024</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">x</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">768, 1280</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">x</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">1024, 1600</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">x</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">1280)<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"><b>8</b> –
     бит цветов или 256. Также могут быть 16 бит, 24 бита и
-    32 бита.
-   
- 
-    <h1> style="COLOR: red">Создаем первичный буфер</h1>
-   
- 
-    <b>
-ZeroMemory
-(&amp;
-   
-ddsd
-,
-   
-sizeof
-(
-   
-ddsd
-));</b>
-   
-Выделяем
+    32 бита.<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></p>
+    <h1><span style="COLOR: red">Создаем первичный буфер<o:p></o:p></span></h1>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><b><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">ZeroMemory</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">(&amp;</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">ddsd</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">, </span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">sizeof</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">(</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">ddsd</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">));<o:p></o:p></span></b></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Выделяем
     память в видеобуфере, если ее не хватит, то в
-    оперативную или на жестком диске.
-   
-<b>ddsd</b>
-указывает
-    на структуру
-DDSURFACEDESC
-2, которая
-    в свою очередь содержит характеристики
-     буфера . Ее свойства
-    описаны ниже:
-   
- 
-    <b>
-ddsd.dwSize
-    = sizeof(ddsd);</b>
-   
-Присваиваем
-    размер
-ddsd
-.
-   
- 
-    <b>
-ddsd.dwFlags
-    = DDSD_CAPS | DDSD_BACKBUFFERCOUNT;</b>
-   
-У этой
+    оперативную или на жестком диске.<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><b>ddsd</b>
+    </span><span style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">указывает
+    на структуру </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">DDSURFACEDESC</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">2, которая
+    в свою очередь содержит характеристики<span
+    style="mso-spacerun: yes">&nbsp; </span>буфера . Ее свойства
+    описаны ниже:<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><b><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">ddsd.dwSize
+    = sizeof(ddsd);<o:p></o:p></span></b></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Присваиваем
+    размер </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">ddsd</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">.<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><b><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">ddsd.dwFlags
+    = DDSD_CAPS | DDSD_BACKBUFFERCOUNT;<o:p></o:p></span></b></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">У этой
     поверхности (выделенной памяти), будут
-    использоваться параметры
-DDSD
-_
-   
-CAPS
- и
-   
-DDSD
-_
-   
-BACKBUFFERCOUNT
-. Т.е. для
-    чего она будет предназначена.
-   
- 
-    <b>
-ddsd.ddsCaps.dwCaps
-    = DDSCAPS_PRIMARYSURFACE | DDSCAPS_FLIP | DDSCAPS_COMPLEX;</b>
-   
-Эта
+    использоваться параметры </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">DDSD</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">_</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">CAPS</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"> и </span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">DDSD</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">_</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">BACKBUFFERCOUNT</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">. Т.е. для
+    чего она будет предназначена.<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></p>
+    <p class="MsoNormal"><b><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">ddsd.ddsCaps.dwCaps
+    = DDSCAPS_PRIMARYSURFACE | DDSCAPS_FLIP | DDSCAPS_COMPLEX;<o:p></o:p></span></b></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Эта
     поверхность используется в качестве первичного
-    видеобуфера (
-DDS
-CAPS_PRIMARYSURFACE),
-    применяется переключение видеостраниц (
-   
-DDSCAPS
-_
-   
-FLIP
-).
-    Параметр
-DDSCAOS
-_
-   
-COMPLEX
- нужен,
-    если ставишь
-DDSCAPS
-_
-   
-FLIP
-, для
-    быстродействия.
-   
- 
-    <b>
-ddsd
-.
-   
-dwBackBufferCount
- = 1;</b>
-   
-Указываем,
+    видеобуфера (</span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">DDS</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">CAPS_PRIMARYSURFACE),
+    применяется переключение видеостраниц (</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">DDSCAPS</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">_</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">FLIP</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">).
+    Параметр </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">DDSCAOS</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">_</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">COMPLEX</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"> нужен,
+    если ставишь </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">DDSCAPS</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">_</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">FLIP</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">, для
+    быстродействия.<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><b><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">ddsd</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">.</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">dwBackBufferCount</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"> = 1;<o:p></o:p></span></b></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Указываем,
     что эта поверхность будет использовать второй
     буфер. Если параметры второго буфера не задаем,
     то они ставятся по умолчанию, в зависимости от
-    первичного буфера.
-   
- 
-    <b>
-g_pDD-&gt;CreateSurface(&amp;ddsd,
-    &amp;g_pDDSPrimary, NULL);</b>
-   
-Выше мы
-    определили параметры памяти
-ddsd
-, теперь
-    их переносим в
-g
-_
-   
-pDDSPrimary
-, которая
+    первичного буфера.<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><b><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">g_pDD-&gt;CreateSurface(&amp;ddsd,
+    &amp;g_pDDSPrimary, NULL);<o:p></o:p></span></b></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Выше мы
+    определили параметры памяти </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">ddsd</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">, теперь
+    их переносим в </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">g</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">_</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">pDDSPrimary</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">, которая
     и будет первичным видеобуфером (тот который
-    отображается на экране). А
-ddsd
- можно
-    использовать для другого…
-   
- 
+    отображается на экране). А </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">ddsd</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"> можно
+    использовать для другого…<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></p>
     <h2>Создаем вторичный буфер</h2>
-   
- 
-    <b>
-ZeroMemory
-(&amp;
-   
-ddscaps
-,
-   
-sizeof
-(
-   
-ddscaps
-));</b>
-   
-Выделяем
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><b><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">ZeroMemory</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">(&amp;</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">ddscaps</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">, </span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">sizeof</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">(</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">ddscaps</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">));<o:p></o:p></span></b></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Выделяем
     память для вторичного видеобуфера. Он должен
-    иметь структуру не
-LPDIRECTDRAWSURFACE
-7, а
-   
-DDSCAPS
-2, хотя в
-    большинстве параметров они схожи
-    style="FONT-FAMILY: Wingdings; FONT-SIZE: 10pt; mso-ansi-language: EN-US; mso-ascii-mso-hansi-mso-bidi-mso-char-type: symbol; mso-symbol-font-family: Wingdings">
-    style="mso-char-type: symbol; mso-symbol-font-family: Wingdings">J
-
-   
- 
-    <b>
-ddscaps.dwCaps
-    = DDSCAPS_BACKBUFFER;</b>
-   
-Указываем,
+    иметь структуру не </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">LPDIRECTDRAWSURFACE</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">7, а </span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">DDSCAPS</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">2, хотя в
+    большинстве параметров они схожи </span><span lang="EN-US"
+    style="FONT-FAMILY: Wingdings; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US; mso-ascii-font-family: Arial; mso-hansi-font-family: Arial; mso-bidi-font-family: Arial; mso-char-type: symbol; mso-symbol-font-family: Wingdings"><span
+    style="mso-char-type: symbol; mso-symbol-font-family: Wingdings">J</span></span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"><o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><b><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">ddscaps.dwCaps
+    = DDSCAPS_BACKBUFFER;<o:p></o:p></span></b></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Указываем,
     что данная память будет предназначена в качестве
     вторичного видеобуфера (т.е. память, которая не
-    отображается на экране).
-   
- 
-    <b>
-g_pDDSPrimary-&gt;GetAttachedSurface(&amp;ddscaps,
-    &amp;g_pDDSBack);</b>
-   
-g
-_
-   
-pDDSBack
- теперь
+    отображается на экране).<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><b><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">g_pDDSPrimary-&gt;GetAttachedSurface(&amp;ddscaps,
+    &amp;g_pDDSBack);<o:p></o:p></span></b></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">g</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">_</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">pDDSBack</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"> теперь
     содержится вторичный буфер, который, в данном
     моменте, подключается к первичной памяти при
-    помощи функции
-GetAttachedSurface
-. И стоит
-    вызвать функцию
-flip
-, как они
+    помощи функции</span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">GetAttachedSurface</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">. И стоит
+    вызвать функцию </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">flip</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">, как они
     поменяются на экране, т.е. невидимая, станет
-    видимой, а видимая невидимой, но это ниже…
-   
- 
-    <b>
-SetTimer(hWnd,
-    TIMER_ID, TIMER_RATE, NULL);</b>
-   
-Устанавливаем
-    время. Через определенное миллисекунд,
-   
-Windows
-
-    отправляет сообщение
-WM
-_
-   
-TIMER
-, которая
-    нам в дальнейшем пригодится.
-    <b>
-TIMER
-_
-   
-ID</b>
- –
+    видимой, а видимая невидимой, но это ниже…<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><b><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">SetTimer(hWnd,
+    TIMER_ID, TIMER_RATE, NULL);<o:p></o:p></span></b></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Устанавливаем
+    время. Через определенное миллисекунд, </span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">Windows</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">
+    отправляет сообщение </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">WM</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">_</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">TIMER</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">, которая
+    нам в дальнейшем пригодится.<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><b><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">TIMER</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">_</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">ID</span></b><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"> –
     идентификатор часов, в нашем случае он равняется
     1. Можно поставить одновременно несколько
-    таймеров, задав функцию
-SetTimer
- но уже с
+    таймеров, задав функцию </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">SetTimer</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"> но уже с
     индификатором 2, будет создан второй таймер, и при
-    помощи функции
-KillTimer
-(
-   
-hWnd
-, 2), его
-    удаляем, а первый остается.
-    <b>
-TIMER
-_
-   
-RATE</b>
- – ставим
-    число в миллисекундах,  1с
-    = 1000 мс.
-   
- 
-   
-Ниже
-    следующий код расположите перед функцией
-   
-InitApp
-:
-   
- 
-    <b>
-    style="COLOR: red; FONT-SIZE: 10pt; >Обработка
-    style="COLOR: red; FONT-SIZE: 10pt; >
-   
-    style="COLOR: red; FONT-SIZE: 10pt; >сообщений
-   
-    style="COLOR: red; FONT-SIZE: 10pt; >
-    Windows</b>
-    <p style="TEXT-ALIGN: justify; TEXT-INDENT: 14.2pt">
- 
+    помощи функции </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">KillTimer</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">(</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">hWnd</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">, 2), его
+    удаляем, а первый остается.<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><b><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">TIMER</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">_</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">RATE</span></b><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"> – ставим
+    число в миллисекундах,<span style="mso-spacerun: yes">&nbsp; </span>1с
+    = 1000 мс.<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Ниже
+    следующий код расположите перед функцией </span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">InitApp</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">:<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></p>
+    <p align="center" class="MsoNormal" style="TEXT-ALIGN: center"><b><span
+    style="COLOR: red; FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Обработка</span><span
+    style="COLOR: red; FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">
+    </span><span
+    style="COLOR: red; FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">сообщений</span><span
+    lang="EN-US"
+    style="COLOR: red; FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">
+    Windows<o:p></o:p></span></b></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify; TEXT-INDENT: 14.2pt"><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">&nbsp;<o:p></o:p></span></p>
     <table bgColor="#00ccff" border="1" cellPadding="0" cellSpacing="0"
     style="BACKGROUND: #00ccff; BORDER-BOTTOM: medium none; BORDER-COLLAPSE: collapse; BORDER-LEFT: medium none; BORDER-RIGHT: medium none; BORDER-TOP: medium none; mso-padding-alt: 0cm 5.4pt 0cm 5.4pt; mso-border-alt: solid windowtext .5pt">
+<TBODY>
       <tr>
- <td
- style="BORDER-BOTTOM: windowtext 0.5pt solid; BORDER-LEFT: windowtext 0.5pt solid; BORDER-RIGHT: windowtext 0.5pt solid; BORDER-TOP: windowtext 0.5pt solid; PADDING-BOTTOM: 0cm; PADDING-LEFT: 5.4pt; PADDING-RIGHT: 5.4pt; PADDING-TOP: 0cm; WIDTH: 478.55pt"
- vAlign="top" width="638">
-       
-long
- FAR PASCAL
-
-WindowProc(HWND
- hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-
-{
-
-
-   
-switch
- (
-       
-message
-)
-
-
-    {
-
-
-         //
- Завершение программы
-
-
-       
-       
-case
- WM_DESTROY:
-
-
-           
- PostQuitMessage(0);
-
-
-           
- return 0L;
-
- 
-
-
-        
-// Если
- нажали клавишу, в данном случае
-Esc
- >и
-       
-F
-12
- завершает программу
-
-
-       
-       
-case
- WM_KEYDOWN:
-
-
-           
- switch (wParam)
-
-
-           
- {
-
-
-               
- case VK_ESCAPE:
-
-
-               
- case VK_F12:
-
-
-                   
- PostMessage(hWnd, WM_CLOSE, 0, 0);
-
-
-                   
- return 0L;
-
-
-           
- }
-
-
-           
- break;
-
- style="COLOR: blue; FONT-SIZE: 10pt; > 
-
-
-        
-//
- Скрываем курсор с экрана
-
-
-       
-       
-case
- WM_SETCURSOR:
-
-
-           
- SetCursor(NULL);
-
-
-           
- return TRUE;
-
-
-        
-
-
-       
-//
- Перерисовываем экран по таймеру, таймер
- автоматически посылает
-WM
-_
-       
-TIMER
-
-
-
-       
-       
-case
- WM_TIMER:
-
-
-           
-
-//
-
- >Перерисовываем
- вторичный буфер
-
-
-           
-
-UpdateFrame
-(
-       
-hWnd
-);
-
- 
-
-
- style="mso-tab-count: 1">           
- // Меняем местами, первичный со вторичным
- буфером
-
-
- style="mso-tab-count: 1">           
-
-g_pDDSPrimary-&gt;Flip(NULL,
- 0);
-
- 
-
-
-    }
-
-
-    return DefWindowProc(hWnd, message,
- wParam, lParam);
-
-}</td>
+        <td
+        style="BORDER-BOTTOM: windowtext 0.5pt solid; BORDER-LEFT: windowtext 0.5pt solid; BORDER-RIGHT: windowtext 0.5pt solid; BORDER-TOP: windowtext 0.5pt solid; PADDING-BOTTOM: 0cm; PADDING-LEFT: 5.4pt; PADDING-RIGHT: 5.4pt; PADDING-TOP: 0cm; WIDTH: 478.55pt"
+        vAlign="top" width="638"><p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+        lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">long
+        FAR PASCAL<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">WindowProc(HWND
+        hWnd, UINT message, WPARAM wParam, LPARAM lParam)<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">{<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span></span><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">switch</span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"> (</span><span
+        lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">message</span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">)<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>{<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span>//
+        Завершение программы<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span><span
+        lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">case
+        WM_DESTROY:<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>PostQuitMessage(0);<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>return 0L;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">&nbsp;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">// Если
+        нажали клавишу, в данном случае </span><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">Esc
+        </span><span style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">и </span><span
+        lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">F</span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">12
+        завершает программу<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span><span
+        lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">case
+        WM_KEYDOWN:<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>switch (wParam)<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>{<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>case VK_ESCAPE:<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>case VK_F12:<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>PostMessage(hWnd, WM_CLOSE, 0, 0);<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>return 0L;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>}<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>break;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="COLOR: blue; FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">&nbsp;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">//
+        Скрываем курсор с экрана<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span><span
+        lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">case
+        WM_SETCURSOR:<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>SetCursor(NULL);<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>return TRUE;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">//
+        Перерисовываем экран по таймеру, таймер
+        автоматически посылает </span><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">WM</span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">_</span><span
+        lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">TIMER</span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"><o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span><span
+        lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">case
+        WM_TIMER:<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span></span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">//</span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">
+        </span><span style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Перерисовываем
+        вторичный буфер<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span></span><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">UpdateFrame</span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">(</span><span
+        lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">hWnd</span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">);<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"><span
+        style="mso-tab-count: 1">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>// Меняем местами, первичный со вторичным
+        буфером<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"><span
+        style="mso-tab-count: 1">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span></span><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">g_pDDSPrimary-&gt;Flip(NULL,
+        0);<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">&nbsp;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>}<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>return DefWindowProc(hWnd, message,
+        wParam, lParam);<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">}<o:p></o:p></span></td>
       </tr>
+</TBODY>
     </table>
-   
- 
-    <b>
-    style="COLOR: red; FONT-SIZE: 10pt; >РАЗЪЯСНЕНИЕ:</b>
-   
-Здесь
-    вроде и так все понятно, читай комментарии. 
-   
- 
-   
-Смотрим
-    дальше, что у нас:
-    <p style="TEXT-ALIGN: justify; TEXT-INDENT: 14.2pt">
- 
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></p>
+    <p class="MsoNormal"><b><span
+    style="COLOR: red; FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">РАЗЪЯСНЕНИЕ:<o:p></o:p></span></b></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Здесь
+    вроде и так все понятно, читай комментарии. <o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Смотрим
+    дальше, что у нас:<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify; TEXT-INDENT: 14.2pt"><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">&nbsp;<o:p></o:p></span></p>
     <table bgColor="#00ccff" border="1" cellPadding="0" cellSpacing="0"
     style="BACKGROUND: #00ccff; BORDER-BOTTOM: medium none; BORDER-COLLAPSE: collapse; BORDER-LEFT: medium none; BORDER-RIGHT: medium none; BORDER-TOP: medium none; mso-padding-alt: 0cm 5.4pt 0cm 5.4pt; mso-border-alt: solid windowtext .5pt">
+<TBODY>
       <tr>
- <td
- style="BORDER-BOTTOM: windowtext 0.5pt solid; BORDER-LEFT: windowtext 0.5pt solid; BORDER-RIGHT: windowtext 0.5pt solid; BORDER-TOP: windowtext 0.5pt solid; PADDING-BOTTOM: 0cm; PADDING-LEFT: 5.4pt; PADDING-RIGHT: 5.4pt; PADDING-TOP: 0cm; WIDTH: 478.55pt"
- vAlign="top" width="638">
-       
-static
- void
-
-UpdateFrame(HWND
- hWnd)
-
-{
-
-
-    static BYTE
-                
- phase = 0;
-
-
-    HDC                        
- hdc;
-
-
-    DDBLTFX                    
- ddbltfx;
-
-
-    RECT                       
- rc;
-
-
-    SIZE                    
-    size;
-
- 
-
-
-   
-//
- Заполняем выделенную память черным цветом и
- затем копируем ее во вторичный буфер
-
-
-   
-ZeroMemory(&amp;ddbltfx,
- sizeof(ddbltfx));
-
-
-    ddbltfx.dwSize = sizeof(ddbltfx);
-
-
-    ddbltfx.dwFillColor = 0;
-
-
-    g_pDDSBack-&gt;Blt(NULL, NULL, NULL,
- DDBLT_COLORFILL | DDBLT_WAIT, &amp;ddbltfx);
-
- 
-
-
-    // Отрываем контекст
- устройства (Кто забудет это сделать, тот не
- сможет вывести символы)
-
-
-   
-g_pDDSBack-&gt;GetDC(&amp;hdc);
-
-
-    SetBkColor(hdc, RGB(0, 0, 255));
-
-
-    SetTextColor(hdc, RGB(255, 255, 0));
-
-
-        if
- (
-       
-phase
-)
- style="COLOR: blue">
-
-
-        {
-
-
- style="mso-tab-count: 1">           
- // Первый раз она пропускается, так как
-       
-phase
- = 0.
- Заносим текст во вторичный буфер
-
-
-           
-
-GetClientRect(hWnd,
- &amp;rc);
-
-
-           
- GetTextExtentPoint(hdc, szMsg, lstrlen(szMsg), &amp;size);
-
-
-           
- TextOut(hdc, (rc.right - size.cx) / 2, (rc.bottom - size.cy) / 2,
-
-
-                   
- szMsg, sizeof(szMsg) - 1);
-
-
-           
- TextOut(hdc, 0, 0, szFrontMsg, lstrlen(szFrontMsg));
-
-
-           
- phase
- = 0;
-
-
-        }
-
-
-       
-       
-else
-
-
-
-        {
-
-
-           
- // При первом обращении выполняется эта
- функция, заносит текст во вторичный
-
-
-
-           
- //
- буфер
- <p style="TEXT-ALIGN: justify; TEXT-INDENT: 35.4pt">
-TextOut(hdc,
- 0, 0, szBackMsg, lstrlen(szBackMsg));
-
-
-           
- phase
- = 1;
-
-
-        }
-
-
-        //
- Закрываем контекст устройства
-
-
-       
-       
-g_pDDSBack-&gt;ReleaseDC(hdc);
-
-}
-       
-</td>
+        <td
+        style="BORDER-BOTTOM: windowtext 0.5pt solid; BORDER-LEFT: windowtext 0.5pt solid; BORDER-RIGHT: windowtext 0.5pt solid; BORDER-TOP: windowtext 0.5pt solid; PADDING-BOTTOM: 0cm; PADDING-LEFT: 5.4pt; PADDING-RIGHT: 5.4pt; PADDING-TOP: 0cm; WIDTH: 478.55pt"
+        vAlign="top" width="638"><p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+        lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">static
+        void<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">UpdateFrame(HWND
+        hWnd)<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">{<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>static BYTE<span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>phase = 0;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>HDC<span style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>hdc;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>DDBLTFX<span style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>ddbltfx;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>RECT<span style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>rc;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>SIZE<span style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        &nbsp;&nbsp;&nbsp;</span>size;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">&nbsp;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span></span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">//
+        Заполняем выделенную память черным цветом и
+        затем копируем ее во вторичный буфер<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span></span><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">ZeroMemory(&amp;ddbltfx,
+        sizeof(ddbltfx));<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>ddbltfx.dwSize = sizeof(ddbltfx);<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>ddbltfx.dwFillColor = 0;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>g_pDDSBack-&gt;Blt(NULL, NULL, NULL,
+        DDBLT_COLORFILL | DDBLT_WAIT, &amp;ddbltfx);<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">&nbsp;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>// Отрываем контекст
+        устройства (Кто забудет это сделать, тот не
+        сможет вывести символы)<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span></span><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">g_pDDSBack-&gt;GetDC(&amp;hdc);<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>SetBkColor(hdc, RGB(0, 0, 255));<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp; </span>SetTextColor(hdc, RGB(255, 255, 0));<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span>if</span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"> (</span><span
+        lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">phase</span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">)<span
+        style="COLOR: blue"><o:p></o:p></span></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;</span>{<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"><span
+        style="mso-tab-count: 1">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>// Первый раз она пропускается, так как </span><span
+        lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">phase</span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"> = 0.
+        Заносим текст во вторичный буфер<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span></span><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">GetClientRect(hWnd,
+        &amp;rc);<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>GetTextExtentPoint(hdc, szMsg, lstrlen(szMsg), &amp;size);<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>TextOut(hdc, (rc.right - size.cx) / 2, (rc.bottom - size.cy) / 2,<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>szMsg, sizeof(szMsg) - 1);<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>TextOut(hdc, 0, 0, szFrontMsg, lstrlen(szFrontMsg));<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>phase</span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"> = 0;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span>}<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span><span
+        lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">else</span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"><o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span>{<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>// При первом обращении выполняется эта
+        функция, заносит текст во вторичный</span><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>//</span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"> буфер<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify; TEXT-INDENT: 35.4pt"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">TextOut(hdc,
+        0, 0, szBackMsg, lstrlen(szBackMsg));<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </span>phase</span><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"> = 1;<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span>}<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span>//
+        Закрываем контекст устройства<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"><span
+        style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span><span
+        lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">g_pDDSBack-&gt;ReleaseDC(hdc);<o:p></o:p></span></p>
+        <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">}</span><span
+        lang="EN-US"
+        style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><o:p></o:p></span></td>
       </tr>
+</TBODY>
     </table>
-
-   
- 
-    <b>
-    style="COLOR: red; FONT-SIZE: 10pt; >РАЗЪЯСНЕНИЕ:</b>
-    <b>
-    style="COLOR: red; FONT-SIZE: 10pt; > </b>
-    <b>
-    style="COLOR: red; FONT-SIZE: 10pt; >Очищаем
-    вторичную память.</b>
-    <b>
-    style="COLOR: red; FONT-SIZE: 10pt; > </b>
-    <b>
-ZeroMemory(&amp;ddbltfx,
-    sizeof(ddbltfx));</b>
-   
-Выделяем
-    свободную память.
-    <b>
-ddbltfx.dwSize
-    = sizeof(ddbltfx);</b>
-   
-Ставим ее
-    размер.
-    <b>
-ddbltfx
-.
-   
-dwFillColor
- = 0;</b>
-   
-Цвет
-    заполнения ставим 0, т.е. черный.
-    <b>
- </b>
-    <b>
-g_pDDSBack-&gt;Blt(NULL,
-    NULL, NULL, DDBLT_COLORFILL | DDBLT_WAIT, &amp;ddbltfx);</b>
-   
-Заполняем
-    вторичную память черным цветом, т.е. очищаем.
-   
- 
-    <b>
-    style="COLOR: red; FONT-SIZE: 10pt; >Рисуем
-    во вторичной памяти:</b>
-    <b>
- </b>
-    <b>
-g_pDDSBack-&gt;GetDC(&amp;hdc);</b>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></p>
+    <p class="MsoNormal"><b><span
+    style="COLOR: red; FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">РАЗЪЯСНЕНИЕ:<o:p></o:p></span></b></p>
+    <p class="MsoNormal"><b><span
+    style="COLOR: red; FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></b></p>
+    <p align="center" class="MsoNormal" style="TEXT-ALIGN: center"><b><span
+    style="COLOR: red; FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Очищаем
+    вторичную память.<o:p></o:p></span></b></p>
+    <p align="center" class="MsoNormal" style="TEXT-ALIGN: center"><b><span
+    style="COLOR: red; FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></b></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><b><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">ZeroMemory(&amp;ddbltfx,
+    sizeof(ddbltfx));<o:p></o:p></span></b></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Выделяем
+    свободную память.<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><b><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">ddbltfx.dwSize
+    = sizeof(ddbltfx);<o:p></o:p></span></b></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Ставим ее
+    размер.<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><b><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">ddbltfx</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">.</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">dwFillColor</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"> = 0;<o:p></o:p></span></b></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Цвет
+    заполнения ставим 0, т.е. черный.<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><b><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></b></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><b><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">g_pDDSBack-&gt;Blt(NULL,
+    NULL, NULL, DDBLT_COLORFILL | DDBLT_WAIT, &amp;ddbltfx);<o:p></o:p></span></b></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Заполняем
+    вторичную память черным цветом, т.е. очищаем.<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></p>
+    <p align="center" class="MsoNormal" style="TEXT-ALIGN: center"><b><span
+    style="COLOR: red; FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Рисуем
+    во вторичной памяти:<o:p></o:p></span></b></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><b><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></b></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><b><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">g_pDDSBack-&gt;GetDC(&amp;hdc);<o:p></o:p></span></b></p>
     <p class="MsoBodyText">Открываем контекст устройства для
     вторичной памяти, потому что именно в ней будут
-    происходить изменения.
-    <b>
- </b>
-    <b>
-SetBkColor(hdc,
-    RGB(0, 0, 255));</b>
-   
-Устанавливаем
-    фон текста,
-RGB
- –
-    красный, зеленый, синий.
-   
- 
-    <b>
-SetTextColor(hdc,
-    RGB(255, 255, 0));</b>
-    <p class="MsoBodyText">Устанавливаем цвет самого текста.
-    <p class="MsoBodyText"> 
-   
-if
-    (phase)
-   
-
-      {
-   
-
-          GetClientRect(hWnd,
-    &amp;rc);
-   
-
-          GetTextExtentPoint
-(
-   
-hdc
-, “Тест
-    переключения страниц: нажмите
-F
-12, чтобы
-    выйти”, 
-    <p style="MARGIN-LEFT: 35.4pt; TEXT-ALIGN: justify; TEXT-INDENT: 35.4pt">
-   
-lstrlen
-(“Тест
-    переключения страниц: нажмите
-F
-12, чтобы
-    выйти”),
-    <p style="MARGIN-LEFT: 35.4pt; TEXT-ALIGN: justify; TEXT-INDENT: 35.4pt">
-&amp;
-   
-size
-);
-   
-
-         
-   
-TextOut
-(
-   
-hdc
-, (
-   
-rc
-.
-   
-right
- -
-   
-size
-.
-   
-cx
-) / 2, (
-   
-rc
-.
-   
-bottom
- -
-   
-size
-.
-   
-cy
-) / 2, “Тест
-    переключения страниц: 
-    <p style="MARGIN-LEFT: 35.4pt; TEXT-ALIGN: justify; TEXT-INDENT: 35.4pt">
-нажмите
-    F12, чтобы выйти”,
-sizeof
-(“Тест
-    переключения страниц: нажмите
-F
-12, 
-    <p style="MARGIN-LEFT: 35.4pt; TEXT-ALIGN: justify; TEXT-INDENT: 35.4pt">
-чтобы
-    выйти”) - 1);
-   
-
-         
-   
-TextOut
-(
-   
-hdc
-, 0, 0,
-    “Первичный буфер: (
-F
-12 выход)”.
-   
-szFrontMsg
-,
-   
-lstrlen
-(“Первичный
-    буфер: 
-    <p style="MARGIN-LEFT: 35.4pt; TEXT-ALIGN: justify; TEXT-INDENT: 35.4pt">
-(
-   
-F
-12
-    выход)”.));
-   
-
-         
-   
-phase
- = 0;
-    <p class="MsoBodyText">   }
-    style="COLOR: blue">
-    <p class="MsoBodyText">Выполняется в том случае, если
-    style=">phase> равна
-    1 (при первом обращении она не выполняется).
-    <p class="MsoBodyText"> 
-    <p class="MsoBodyText"><b> style=">GetClientRect(hWnd,
-    &amp;rc);</b>
-    <p class="MsoBodyText">Заносит в структуру
-    style=">rc параметры окна, левого
-    верхнего угла, и правого нижнего.
-    <p class="MsoBodyText"> style="COLOR: blue"> 
-    <b>
-GetTextExtentPoint
-(
-   
-hdc
-, “Тест
-    переключения страниц: нажмите
-F
-12, чтобы
-    выйти”,</b>
-    <p style="TEXT-ALIGN: justify; TEXT-INDENT: 35.4pt"><b>
-   
-lstrlen
-(“Тест
-    переключения страниц: нажмите
-F
-12, чтобы
-    выйти”), &amp;
-size
-);</b>
-   
-Заносит в структуру size ширину и высоту данной строки.
-Которая используется для вывода текста по середине экрана.
-
-<b>TextOut( hdc, ( rc.right - size.cx ) / 2, ( rc.bottom - size.cy ) / 2, “Тест
-    переключения страниц:</b>
-
-<b>нажмите F12, чтобы выйти”,
-sizeof
-(“Тест
-    переключения страниц: нажмите
-F
-12, </b>
-    <p style="TEXT-ALIGN: justify; TEXT-INDENT: 35.4pt"><b>
-чтобы
-    выйти”) - 1);</b>
-   
-Выводим текст в координатах х и y, задав его текст и размер текста.
-Один вычитаем, чтобы не было иероглифа.
-
-<br>
-<br>
-
-<b>Переключение страниц:</b>
-<br>
-<br>
-Затем выводим вторую строку на вторичный буфер, выполняется команда
-<br>
-<b>g_pDDSPrimary-&gt;Flip( NULL, 0);</b>
-<br>
-и вторичный буфер мы с Вами увидим на экране, а первичный “прячется”.
-
-<br>
-<br>
-
-Через некоторое время Windows посылает команду WM_TIMER и на этот
-раз выполняется if, куда заносятся две строки.
-
+    происходить изменения.</p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><b><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></b></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><b><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">SetBkColor(hdc,
+    RGB(0, 0, 255));<o:p></o:p></span></b></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Устанавливаем
+    фон текста, </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">RGB</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"> –
+    красный, зеленый, синий.<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><b><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">SetTextColor(hdc,
+    RGB(255, 255, 0));<o:p></o:p></span></b></p>
+    <p class="MsoBodyText">Устанавливаем цвет самого текста.</p>
+    <p class="MsoBodyText">&nbsp;<o:p></o:p></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">if
+    (phase)<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+    style="mso-spacerun: yes">&nbsp;&nbsp; </span>{<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+    style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span>GetClientRect(hWnd,
+    &amp;rc);<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US"><span
+    style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span>GetTextExtentPoint</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">(</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">hdc</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">, “Тест
+    переключения страниц: нажмите </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">F</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">12, чтобы
+    выйти”, <o:p></o:p></span></p>
+    <p class="MsoNormal" style="MARGIN-LEFT: 35.4pt; TEXT-ALIGN: justify; TEXT-INDENT: 35.4pt"><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">lstrlen</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">(“Тест
+    переключения страниц: нажмите </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">F</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">12, чтобы
+    выйти”),<o:p></o:p></span></p>
+    <p class="MsoNormal" style="MARGIN-LEFT: 35.4pt; TEXT-ALIGN: justify; TEXT-INDENT: 35.4pt"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&amp;</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">size</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">);<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"><span
+    style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">TextOut</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">(</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">hdc</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">, (</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">rc</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">.</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">right</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"> - </span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">size</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">.</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">cx</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">) / 2, (</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">rc</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">.</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">bottom</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"> - </span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">size</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">.</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">cy</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">) / 2, “Тест
+    переключения страниц: <o:p></o:p></span></p>
+    <p class="MsoNormal" style="MARGIN-LEFT: 35.4pt; TEXT-ALIGN: justify; TEXT-INDENT: 35.4pt"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">нажмите
+    F12, чтобы выйти”, </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">sizeof</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">(“Тест
+    переключения страниц: нажмите </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">F</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">12, <o:p></o:p></span></p>
+    <p class="MsoNormal" style="MARGIN-LEFT: 35.4pt; TEXT-ALIGN: justify; TEXT-INDENT: 35.4pt"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">чтобы
+    выйти”) - 1);<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"><span
+    style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">TextOut</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">(</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">hdc</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">, 0, 0,
+    “Первичный буфер: (</span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">F</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">12 выход)”.</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">szFrontMsg</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">, </span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">lstrlen</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">(“Первичный
+    буфер: <o:p></o:p></span></p>
+    <p class="MsoNormal" style="MARGIN-LEFT: 35.4pt; TEXT-ALIGN: justify; TEXT-INDENT: 35.4pt"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">(</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">F</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">12
+    выход)”.));<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"><span
+    style="mso-spacerun: yes">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">phase</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"> = 0;<o:p></o:p></span></p>
+    <p class="MsoBodyText"><span style="mso-spacerun: yes">&nbsp;&nbsp; </span>}<span
+    style="COLOR: blue"><o:p></o:p></span></p>
+    <p class="MsoBodyText">Выполняется в том случае, если <span
+    lang="EN-US" style="mso-ansi-language: EN-US">phase</span><span lang="EN-US"> </span>равна
+    1 (при первом обращении она не выполняется).</p>
+    <p class="MsoBodyText">&nbsp;<o:p></o:p></p>
+    <p class="MsoBodyText"><b><span lang="EN-US" style="mso-ansi-language: EN-US">GetClientRect(hWnd,
+    &amp;rc);<o:p></o:p></span></b></p>
+    <p class="MsoBodyText">Заносит в структуру <span lang="EN-US"
+    style="mso-ansi-language: EN-US">rc</span> параметры окна, левого
+    верхнего угла, и правого нижнего.</p>
+    <p class="MsoBodyText"><span style="COLOR: blue">&nbsp;<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><b><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">GetTextExtentPoint</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">(</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">hdc</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">, “Тест
+    переключения страниц: нажмите </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">F</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">12, чтобы
+    выйти”,<o:p></o:p></span></b></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify; TEXT-INDENT: 35.4pt"><b><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">lstrlen</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">(“Тест
+    переключения страниц: нажмите </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">F</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">12, чтобы
+    выйти”), &amp;</span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">size</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">);<o:p></o:p></span></b></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Заносит в
+    структуру </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">size
+    </span><span style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">ширину
+    и высоту данной строки. Которая используется для
+    вывода текста по середине экрана.<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><b><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">TextOut</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">(</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">hdc</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">, (</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">rc</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">.</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">right</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"> - </span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">size</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">.</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">cx</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">) / 2, (</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">rc</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">.</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">bottom</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"> - </span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">size</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">.</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">cy</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">) / 2, “Тест
+    переключения страниц:<o:p></o:p></span></b></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify; TEXT-INDENT: 35.4pt"><b><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">нажмите </span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">F</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">12, чтобы
+    выйти”, </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">sizeof</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">(“Тест
+    переключения страниц: нажмите </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">F</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">12, <o:p></o:p></span></b></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify; TEXT-INDENT: 35.4pt"><b><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">чтобы
+    выйти”) - 1);<o:p></o:p></span></b></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Выводим
+    текст в координатах х и </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">y</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">, задав
+    его текст и размер текста. Один вычитаем, чтобы не
+    было иероглифа.<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></p>
+    <p align="center" class="MsoNormal" style="TEXT-ALIGN: center"><b><span
+    style="COLOR: red; FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Переключение
+    страниц:<o:p></o:p></span></b></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">&nbsp;<o:p></o:p></span></p>
+    <p class="MsoNormal" style="TEXT-ALIGN: justify"><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">Затем
+    выводим вторую строку на вторичный буфер,
+    выполняется команда<span style="COLOR: blue"><span
+    style="mso-spacerun: yes">
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    </span></span></span><b><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">g</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">_</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">pDDSPrimary</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">-&gt;</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">Flip</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">(</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">NULL</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">, 0); </b>и
+    вторичный буфер мы с Вами увидим на экране, а
+    первичный “прячется”. Через некоторое время </span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">Windows</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"> посылает
+    команду </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">WM</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">_</span><span
+    lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">TIMER</span><span
+    lang="EN-US" style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt"> </span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">и на этот
+    раз выполняется </span><span lang="EN-US"
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt; mso-ansi-language: EN-US">if</span><span
+    style="FONT-FAMILY: Arial; FONT-SIZE: 10pt; mso-bidi-font-size: 12.0pt">, куда
+    заносятся две строки.<o:p></o:p></span></td>
+  </tr>
+</table>
+</center></div>
 <!--#include virtual="/ssi/bottom.html"-->
