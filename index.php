@@ -1,154 +1,165 @@
 <?php
-error_reporting  (E_ERROR | E_WARNING | E_PARSE);
+
+//echo 'index.php';
+//exit;
+
+error_reporting (E_ALL);
+
+header('Content-Type: text/html; charset=windows-1251');
 
 // Root path
-//define( 'ROOT_PATH', "/usr/local/www/sources.forum/htdocs/" );
-define( 'ROOT_PATH', "/home/forum/htdocs/" );
+define( 'ROOT', __DIR__ );
 
-//define( 'THIS_PATH', "/usr/local/www/sources.ru/htdocs/" );
-define( 'THIS_PATH', "/home/sources/htdocs/" );
+//echo ROOT;
+//exit;
 
+include(ROOT . '/ssi/top.html');
+?>
 
-
-
-
-class info {
-
-	var $member     	= array();
-	var $is_bot       	= 0;
-	var $input      	= array();
-	var $session_id 	= "";
-	var $session_type 	= "";
-	var $base_url   	= "";
-	var $vars       	= "";
-	var $skin       	= "";
-	var $skin_id    	= "0";     // Skin Dir name
-	var $skin_rid   	= "";      // Real skin id (numerical only)
-	var $lang_id    	= "en";
-	var $lang       	= "";
-	var $server_load 	= 0;
-	var $lastclick  	= "";
-	var $location   	= "";
-	var $debug_html 	= "";
-	var $perm_id    	= "";
-	var $forum_read 	= array();
-	var $topic_cache 	= "";
-	var $version    	= "v1.2";
-
-	function info() 
-	{
-		global $sess, $std, $DB, $INFO;
-		
-		$this->vars = &$INFO;
-		
-		$this->vars['TEAM_ICON_URL']   = $INFO['html_url'] . '/team_icons';
-		$this->vars['AVATARS_URL']     = $INFO['html_url'] . '/avatars';
-		$this->vars['mime_img']        = $INFO['html_url'] . '/mime_types';
-
-	}
-}
+<TABLE border="0" align="center" cellpadding="0" cellspacing="0" width="970">
+ <TR valign="top">
+  <TD width=150>
 
 
-require ROOT_PATH."../conf_global.php";
+<!-- Left Column -->
+
+<? include(ROOT . '/ssi/leftmenu.html'); ?>
+
+<BR>
+
+<? include(ROOT . '/ssi/left_banner.html'); ?>
+<br>
+<br>
 
 
 
+<? include(ROOT . '/ssi/toplist.html'); ?>
 
-require ROOT_PATH."sources/functions.php";
-//require THIS_PATH."../sources/functions.php";
-$std   = new FUNC;
-
-
-
-require ROOT_PATH."sources/session.php";
-$sess  = new session();
+<BR>
+<BR>
 
 
-$INFO['sql_driver'] = !$INFO['sql_driver'] ? 'mySQL' : $INFO['sql_driver'];
-
-$to_require = ROOT_PATH."sources/Drivers/".$INFO['sql_driver'].".php";
-require ($to_require);
-
-$DB = new db_driver;
-
-$DB->obj['sql_database']     = $INFO['sql_database'];
-$DB->obj['sql_user']         = $INFO['sql_user'];
-$DB->obj['sql_pass']         = $INFO['sql_pass'];
-$DB->obj['sql_host']         = $INFO['sql_host'];
-$DB->obj['sql_tbl_prefix']   = $INFO['sql_tbl_prefix'];
-$DB->obj['debug']            = ($INFO['sql_debug'] == 1) ? $_GET['debug'] : 0;
-
-if ( !$DB->connect() )
-{
-	echo "<h1>Слишком много подключений к серверу. Пожалуйста подождите несколько минут и повторите попытку.</h1>";
-	exit;
-}
+<!-- /Left Column -->
+    </TD>
 
 
 
-
-$ibforums = new info();
-//unset($INFO);
-
-
-$ibforums->input  = $std->parse_incoming();
-$ibforums->member = $sess->authorise();
+  <!-- CENTER Column -->
+  <TD id="centercolumn">
 
 
-//DEBUG
-//echo "<pre>SERVER=";
-//print_r($_SERVER);
-//echo "<hr>";
-//echo "<pre>ibforums=";
-//print_r($ibforums);
-//echo "</pre>";
 
-	if ( $ibforums->member['id'] ) {
-		$hello = "Hello, ".$ibforums->member['name'];
-	} else {
-		$hello = "Hello, guest!";
-	}
-//	echo "<br>";
+<!-- NEWS BAND -->
+   <H2 align="center">
+     Интересные материалы:
+   </H2>
+   <table cellspacing="7" border="0" width="100%">
+   <noindex>
+   <? //include(ROOT . '/../cgi-bin/news/news.cgi'); ?>
+   </noindex>
+   </table>
+<!-- //NEWS BAND -->
 
-//--------------------------------------------------------------
 
-	$result = $DB->query("SELECT COUNT(*) FROM ibf_sessions where running_time > UNIX_TIMESTAMP()-15*60");
+<!-- MEETINGS -->
+   <? include(ROOT . '/ssi/meetings.html'); ?>
+<!-- MEETINGS -->
 
-//	$res = $DB->get_affected_rows($result); // number of selected rows
-//	$res = $DB->fetch_simple_row($result); // one row
-	$row = $DB->fetch_simple_row($result); // one row
-	$s = $row[0] == 1 ? "" : "s";
+   </TD>
 
-//	echo $row[0]." user".$s." online"; 
 
-	$users_online = $row[0]." user".$s." online"; 
 
-//        echo "Result = ".$result;
+   <!-- RIGHT COLUMN -->
+   <TD width="150">
+
+
+
+<!--
+
+<div class=boxtitle>
+Внимание
+</div>
+<div class=boxcontent>
+Для желающих поделиться с народом исходниками:
+<A href="mailto:sources@pisem.net">sources@pisem.net</A>
+<BR>
+<BR>
+</div>
+
+-->
+
+
+<? include(ROOT . '/tmtnews.html'); ?>
+
+
+
+<noindex>
+
+<? include(ROOT . '/ssi/right_banner.html'); ?>
+
+<? //include(ROOT . '/ssi/right_banner_main.html'); ?>
+
+<? //include(ROOT . '/ssi/right_vot_main.html'); ?>
+
+<? //include(ROOT . '/ssi/right_vot_main2.html'); ?>
+
+
+<? //include(ROOT . '/ssi/right_vot_main3.html'); ?>
+
+
+</noindex>
 
 
 
 
+    </TD>
+  </TR>
+</TABLE>
 
 
 
-//--------------------------------------------------------------
-// Get Local Configuration
 
-require_once(THIS_PATH."_csite/config.php");
+<hr>
 
-//--------------------------------------------------------------
-// Load Our Functions
+<TABLE border="0" align="center" cellpadding="0" cellspacing="0" width="750">
+<tr align="center">
+<td width="50%">
+<!-- BOTTOM-LEFT BANNER -->
 
-require_once(THIS_PATH."_csite/functions.php");
+<!--div class=bordered style="height:60;overflow:auto"-->
+<!--div class=bordered style="height:60"-->
+<div class=bordered>
+<div class=inbox>
+
+<!-- left banner text -->
+<br>
+</div>
+</div>
+<!-- /BOTTOM-LEFT BANNER -->
+</td>
 
 
-//--------------------------------------------------------------
-// Run the Template
+<td>
+<!--bizar-->
+<br>
 
-require_once(THIS_PATH."_csite/templates/index.php");
+<noindex>
+<!-- BOTTOM-RIGHT BANNER -->
 
-//--------------------------------------------------------------
-// Closa Database Connection
+<!-- /BOTTOM-RIGHT BANNER -->
+</noindex>
+</td>
+</tr>
+</table>
 
-$DB->close_db();
+
+
+
+
+
+
+
+
+</BODY>
+</HTML>
 

@@ -170,59 +170,7 @@ function clearall() {
   <H1>Помощь проекту</H1>
 <br>
 
-<!--TopList COUNTER--><a target=_top
-href="http://top.list.ru/jump?from=89876"><script language="JavaScript"><!--
-d=document;a='';a+=';r='+escape(d.referrer)
-js=10//--></script><script language="JavaScript1.1"><!--
-a+=';j='+navigator.javaEnabled()
-js=11//--></script><script language="JavaScript1.2"><!--
-s=screen;a+=';s='+s.width+'*'+s.height
-a+=';d='+(s.colorDepth?s.colorDepth:s.pixelDepth)
-js=12//--></script><script language="JavaScript1.3"><!--
-js=13//--></script><script language="JavaScript"><!--
-d.write('<img src="http://top.list.ru/counter'+
-'?id=89876;t=57;js='+js+a+';rand='+Math.random()+
-'" alt="TopList" '+ 'border=0 height=1 width=1>')
-if(js>11)d.write('<'+'!-- ')//--></script><noscript><img
-src="http://top.list.ru/counter?js=na;id=89876;t=57"
-border=0 height=1 width=1
-alt="TopList"></noscript><script language="JavaScript"><!--
-if(js>11)d.write('--'+'>')//--></script></a><!--TopList COUNTER-->
 
-<!--Rambler--><a href="http://counter.rambler.ru/top100/"><img src="http://counter.rambler.ru/top100.cnt?163871" alt="Rambler's Top100" width=1 height=1 border=0></a>
-
-<!-- SpyLOG f:0211 --><script language="javascript"> 
-u="u1624.10.spylog.com";d=document;nv=navigator;na=nv.appName;p=1; 
-bv=Math.round(parseFloat(nv.appVersion)*100); 
-n=(na.substring(0,2)=="Mi")?0:1;rn=Math.random();z="p="+p+"&rn="+rn;y=""; 
-y+="<a href='http://"+u+"/cnt?f=3&p="+p+"&rn="+rn+"' target=_blank>"; 
-y+="<img src='http://"+u+"/cnt?"+z+ 
-"&r="+escape(d.referrer)+"&pg="+escape(window.location.href)+"' border=0 width=1 height=1 alt='SpyLOG'>"; 
-y+="</a>"; d.write(y);if(!n) { d.write("<"+"!--"); }//--></script><noscript> 
-<a href="http://u1624.10.spylog.com/cnt?f=3&p=1" target=_blank> 
-<img src="http://u1624.10.spylog.com/cnt?p=1" alt='SpyLOG' border='0' width=1 height=1 > 
-</a></noscript><script language="javascript1.2"><!-- 
-if(!n) { d.write("--"+">"); }//--></script><!-- SpyLOG -->
-
-<!-- HotLog --><script language="javascript">
-hotlog_js="1.0";hotlog_d=document; hotlog_n=navigator;hotlog_rn=Math.random();
-hotlog_n_n=(hotlog_n.appName.substring(0,3)=="Mic")?0:1;
-hotlog_r=""+hotlog_rn+"&s=14399&r="+escape(hotlog_d.referrer)+"&pg="+
-escape(window.location.href);
-hotlog_d.cookie="hotlog=1"; hotlog_r+="&c="+(hotlog_d.cookie?"Y":"N");
-hotlog_d.cookie="hotlog=1; expires=Thu, 01-Jan-70 00:00:01 GMT"</script>
-<script language="javascript1.1">
-hotlog_js="1.1";hotlog_r+="&j="+(navigator.javaEnabled()?"Y":"N")</script>
-<script language="javascript1.2">
-hotlog_js="1.2";hotlog_s=screen;
-hotlog_r+="&wh="+hotlog_s.width+'x'+hotlog_s.height+"&px="+((hotlog_n_n==0)?
-hotlog_s.colorDepth:hotlog_s.pixelDepth)</script>
-<script language="javascript1.3">hotlog_js="1.3"</script>
-<script language="javascript">hotlog_r+="&js="+hotlog_js;
-hotlog_d.write("<img src='http://hit2.hotlog.ru/cgi-bin/hotlog/count?'+hotlog_r+'&' border=0 width=1 height=1>")</script>
-<noscript><img src="http://hit2.hotlog.ru/cgi-bin/hotlog/count?s=14399" border=0 
-width=1 height=1></noscript>
-<!-- /HotLog -->
 
 
 </td>
