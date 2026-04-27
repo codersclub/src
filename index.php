@@ -8,7 +8,7 @@ error_reporting (E_ALL);
 header('Content-Type: text/html; charset=windows-1251');
 
 // Root path
-define( 'ROOT', __DIR__ );
+define( 'ROOT', str_replace('\\', '/', __DIR__) );
 
 //echo ROOT;
 //exit;
