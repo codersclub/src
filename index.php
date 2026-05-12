@@ -5,7 +5,7 @@
 
 error_reporting (E_ALL);
 
-header('Content-Type: text/html; charset=windows-1251');
+//header('Content-Type: text/html; charset=windows-1251');
 
 // Root path
 define( 'ROOT', str_replace('\\', '/', __DIR__) );
@@ -51,7 +51,7 @@ include(ROOT . '/ssi/top.html');
 
 <!-- NEWS BAND -->
    <H2 align="center">
-     Интересные материалы:
+     РРЅС‚РµСЂРµСЃРЅС‹Рµ РјР°С‚РµСЂРёР°Р»С‹:
    </H2>
    <table cellspacing="7" border="0" width="100%">
    <noindex>
@@ -77,10 +77,10 @@ include(ROOT . '/ssi/top.html');
 <!--
 
 <div class=boxtitle>
-Внимание
+Р’РЅРёРјР°РЅРёРµ
 </div>
 <div class=boxcontent>
-Для желающих поделиться с народом исходниками:
+Р”Р»СЏ Р¶РµР»Р°СЋС‰РёС… РїРѕРґРµР»РёС‚СЊСЃСЏ СЃ РЅР°СЂРѕРґРѕРј РёСЃС…РѕРґРЅРёРєР°РјРё:
 <A href="mailto:sources@pisem.net">sources@pisem.net</A>
 <BR>
 <BR>
